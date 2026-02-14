@@ -3,8 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getScoresNow } from '@sportsnot/nhl-api';
 import { supabase } from '../supabase';
 
-/* eslint-disable no-undef */
-
 /**
  * Polls for active NHL games and triggers stat sync Edge Functions
  * when games are live. Pauses when the browser tab is hidden.
@@ -24,10 +22,7 @@ export function useStatSync(leagueId: string | undefined) {
   }, []);
 
   // Poll for active games using React Query's refetchInterval
-  const {
-    data: games = [],
-    isLoading: isCheckingGames,
-  } = useQuery({
+  const { data: games = [], isLoading: isCheckingGames } = useQuery({
     queryKey: ['nhl-scores-now'],
     queryFn: () => getScoresNow(),
     refetchInterval: isTabVisible ? 60_000 : false,

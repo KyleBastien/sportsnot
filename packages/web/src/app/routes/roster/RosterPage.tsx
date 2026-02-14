@@ -18,13 +18,52 @@ import {
 } from '@mantine/core';
 import { useState, useMemo, useCallback, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase, usePlayoffPlayers, usePlayoffTeams, useStatSync, useLiveScoring } from '@sportsnot/supabase';
+import {
+  supabase,
+  usePlayoffPlayers,
+  usePlayoffTeams,
+  useStatSync,
+  useLiveScoring,
+} from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
-import { useCompareContext, type ComparePlayer } from '../../context/CompareContext';
+import {
+  useCompareContext,
+  type ComparePlayer,
+} from '../../context/CompareContext';
 import { usePlayerDetailContext } from '../../context/PlayerDetailContext';
 import { SCORING } from '@sportsnot/types';
 import { ResponsiveTable, type ResponsiveTableColumn } from '@sportsnot/ui';
 import { downloadCsv } from '@sportsnot/utils';
+
+interface PlayerStatRow {
+  player_id: number;
+  player_name: string | null;
+  position: string | null;
+  team_abbreviation: string | null;
+  goals: number | null;
+  assists: number | null;
+  games_played: number | null;
+  is_injured: boolean;
+}
+
+interface TeamStatRow {
+  team_id: number;
+  team_name: string | null;
+  team_abbreviation: string | null;
+  wins: number | null;
+  shutouts: number | null;
+  is_eliminated: boolean;
+}
+
+interface RosterSlotRow {
+  id: string;
+  player_id: number | null;
+  team_id: number | null;
+  position: string;
+  is_active: boolean;
+  points_earned: number | null;
+  activated_from_ir: boolean;
+}
 
 function useMyRoster(leagueId: string) {
   const { user } = useAuthContext();
@@ -106,7 +145,12 @@ export function RosterPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { data, isLoading, error } = useMyRoster(leagueId!);
   const queryClient = useQueryClient();
-  const { players: comparePlayers, isFull: isCompareFull, addPlayer, removePlayer } = useCompareContext();
+  const {
+    players: comparePlayers,
+    isFull: isCompareFull,
+    addPlayer,
+    removePlayer,
+  } = useCompareContext();
   const { openPlayerDetail } = usePlayerDetailContext();
   const [irModal, setIrModal] = useState<{
     injuredSlotId: string;
@@ -123,14 +167,18 @@ export function RosterPage() {
   const { data: teamStats } = usePlayoffTeams(currentSeason, currentRound);
 
   const playerLookup = useMemo(() => {
-    const map = new Map<number, any>();
-    playerStats?.forEach((p: any) => map.set(p.player_id, p));
+    const map = new Map<number, PlayerStatRow>();
+    (playerStats as PlayerStatRow[] | undefined)?.forEach((p) =>
+      map.set(p.player_id, p)
+    );
     return map;
   }, [playerStats]);
 
   const teamLookup = useMemo(() => {
-    const map = new Map<number, any>();
-    teamStats?.forEach((t: any) => map.set(t.team_id, t));
+    const map = new Map<number, TeamStatRow>();
+    (teamStats as TeamStatRow[] | undefined)?.forEach((t) =>
+      map.set(t.team_id, t)
+    );
     return map;
   }, [teamStats]);
 
@@ -165,18 +213,23 @@ export function RosterPage() {
     );
   }
 
-  const { slots, round, leagueName } = data;
+  const { slots: rawSlots, round, leagueName } = data;
+  const slots = rawSlots as RosterSlotRow[];
   const displayTime = lastUpdated ?? lastSyncedAt ?? null;
 
   const handleExportCsv = () => {
     const headers = ['Position', 'Player/Team', 'Status', 'Points'];
-    const rows = slots.map((slot: any) => {
-      const playerInfo = slot.player_id ? playerLookup.get(slot.player_id) : null;
+    const rows = slots.map((slot) => {
+      const playerInfo = slot.player_id
+        ? playerLookup.get(slot.player_id)
+        : null;
       const teamInfo = slot.team_id ? teamLookup.get(slot.team_id) : null;
       const displayName =
         playerInfo?.player_name ??
         teamInfo?.team_name ??
-        (slot.player_id ? `Player #${slot.player_id}` : `Team #${slot.team_id}`);
+        (slot.player_id
+          ? `Player #${slot.player_id}`
+          : `Team #${slot.team_id}`);
 
       return [
         POSITION_LABELS[slot.position] ?? slot.position,
@@ -194,12 +247,12 @@ export function RosterPage() {
   const groupedSlots = POSITION_ORDER.map((pos) => ({
     position: pos,
     label: POSITION_LABELS[pos],
-    players: slots.filter((s: any) => s.position === pos),
+    players: slots.filter((s) => s.position === pos),
   }));
 
   const totalPoints = slots
-    .filter((s: any) => s.is_active)
-    .reduce((sum: number, s: any) => sum + (s.points_earned ?? 0), 0);
+    .filter((s) => s.is_active)
+    .reduce((sum: number, s) => sum + (s.points_earned ?? 0), 0);
 
   const rosterColumns: ResponsiveTableColumn[] = [
     { key: 'compare', label: '' },
@@ -210,14 +263,18 @@ export function RosterPage() {
   ];
 
   const buildGroupData = useCallback(
-    (groupPlayers: any[]) =>
-      groupPlayers.map((slot: any) => {
-        const playerInfo = slot.player_id ? playerLookup.get(slot.player_id) : null;
+    (groupPlayers: RosterSlotRow[]) =>
+      groupPlayers.map((slot) => {
+        const playerInfo = slot.player_id
+          ? playerLookup.get(slot.player_id)
+          : null;
         const teamInfo = slot.team_id ? teamLookup.get(slot.team_id) : null;
         const displayName =
           playerInfo?.player_name ??
           teamInfo?.team_name ??
-          (slot.player_id ? `Player #${slot.player_id}` : `Team #${slot.team_id}`);
+          (slot.player_id
+            ? `Player #${slot.player_id}`
+            : `Team #${slot.team_id}`);
 
         return {
           _slotId: slot.id,
@@ -236,9 +293,9 @@ export function RosterPage() {
 
   const renderRosterCell = useCallback(
     (key: string, value: unknown, row: Record<string, unknown>): ReactNode => {
-      const slot = row._slot as any;
-      const playerInfo = row._playerInfo as any;
-      const teamInfo = row._teamInfo as any;
+      const slot = row._slot as RosterSlotRow;
+      const playerInfo = row._playerInfo as PlayerStatRow | null;
+      const teamInfo = row._teamInfo as TeamStatRow | null;
       const compareId = slot.player_id ?? slot.team_id;
       const inCompare = comparePlayerIds.has(compareId);
 
@@ -273,7 +330,15 @@ export function RosterPage() {
 
       if (key === 'compare') {
         return (
-          <Tooltip label={inCompare ? 'Remove from compare' : isCompareFull ? 'Compare full' : 'Add to compare'}>
+          <Tooltip
+            label={
+              inCompare
+                ? 'Remove from compare'
+                : isCompareFull
+                  ? 'Compare full'
+                  : 'Add to compare'
+            }
+          >
             <ActionIcon
               size="sm"
               variant={inCompare ? 'filled' : 'subtle'}
@@ -296,9 +361,14 @@ export function RosterPage() {
           <Text
             size="sm"
             truncate="end"
-            style={{ maxWidth: 180, cursor: clickableId ? 'pointer' : undefined }}
+            style={{
+              maxWidth: 180,
+              cursor: clickableId ? 'pointer' : undefined,
+            }}
             c={clickableId ? 'blue' : undefined}
-            onClick={clickableId ? () => openPlayerDetail(clickableId) : undefined}
+            onClick={
+              clickableId ? () => openPlayerDetail(clickableId) : undefined
+            }
           >
             {String(value)}
           </Text>
@@ -309,12 +379,18 @@ export function RosterPage() {
         return (
           <>
             {slot.is_active ? (
-              <Badge color="green" size="sm">Active</Badge>
+              <Badge color="green" size="sm">
+                Active
+              </Badge>
             ) : (
-              <Badge color="gray" size="sm">Inactive</Badge>
+              <Badge color="gray" size="sm">
+                Inactive
+              </Badge>
             )}
             {slot.activated_from_ir && (
-              <Badge color="orange" size="sm" ml="xs">From IR</Badge>
+              <Badge color="orange" size="sm" ml="xs">
+                From IR
+              </Badge>
             )}
           </>
         );
@@ -356,9 +432,14 @@ export function RosterPage() {
         const isIrSlot = slot.position === 'IR_F' || slot.position === 'IR_D';
         const matchingPosition = slot.position === 'IR_F' ? 'F' : 'D';
         const injuredCandidates = slots.filter(
-          (s: any) => s.position === matchingPosition && s.is_active && s.id !== slot.id
+          (s) =>
+            s.position === matchingPosition && s.is_active && s.id !== slot.id
         );
-        if (isIrSlot && !slot.activated_from_ir && injuredCandidates.length > 0) {
+        if (
+          isIrSlot &&
+          !slot.activated_from_ir &&
+          injuredCandidates.length > 0
+        ) {
           return (
             <Button
               size="xs"
@@ -381,7 +462,14 @@ export function RosterPage() {
 
       return <>{value != null ? String(value) : '—'}</>;
     },
-    [comparePlayerIds, isCompareFull, handleCompareToggle, slotDeltas, slots, openPlayerDetail]
+    [
+      comparePlayerIds,
+      isCompareFull,
+      handleCompareToggle,
+      slotDeltas,
+      slots,
+      openPlayerDetail,
+    ]
   );
 
   const handleActivateIR = async () => {
@@ -454,7 +542,13 @@ export function RosterPage() {
         </Text>
 
         {groupedSlots.map((group) => (
-          <Card key={group.position} shadow="sm" padding="md" radius="md" withBorder>
+          <Card
+            key={group.position}
+            shadow="sm"
+            padding="md"
+            radius="md"
+            withBorder
+          >
             <Group justify="space-between" mb="sm">
               <Title order={4}>{group.label}</Title>
               <Badge variant="light">

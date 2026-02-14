@@ -67,9 +67,7 @@ export function ProfilePage() {
   };
 
   const initial =
-    displayName?.[0]?.toUpperCase() ??
-    user?.email?.[0]?.toUpperCase() ??
-    '?';
+    displayName?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? '?';
 
   return (
     <Container size="sm" py="xl">
@@ -138,7 +136,8 @@ export function ProfilePage() {
 
             {pushSupported && pushPermission === 'denied' && (
               <Alert color="yellow">
-                Push notifications are blocked. Please enable them in your browser settings.
+                Push notifications are blocked. Please enable them in your
+                browser settings.
               </Alert>
             )}
 

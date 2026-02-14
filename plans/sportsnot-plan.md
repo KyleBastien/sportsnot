@@ -5,6 +5,7 @@
 **SportsNot** is a web application for playing NHL Fantasy Playoff Hockey with a unique re-draft mechanic between playoff rounds. Built as an Nx monorepo with React + rspack, using Supabase for backend services.
 
 ### Core Gameplay Mechanics
+
 - **Snake draft** at start of each playoff round
 - **Full re-draft between rounds** with standings-based order (worst to best, snake pattern)
 - **No keepers**: All players return to the pool between rounds
@@ -13,25 +14,27 @@
 - **IR Activation**: Retroactive point swap when replacing injured players (same position only)
 
 ### Technical Stack
-| Layer | Technology |
-|-------|------------|
-| Monorepo | Nx |
-| Package Manager | Yarn 4.x (Berry) |
-| Frontend | React 19 with React Compiler |
-| Bundler | rspack |
-| Backend | Supabase (PostgreSQL, Auth, Realtime) |
-| UI Library | Mantine (recommended - modern, accessible, mobile-friendly) |
-| Styling | Vanilla Extract (zero-runtime CSS-in-JS, fully typed) |
-| State Management | TanStack Query (memoization handled by React Compiler) |
-| Real-time | Supabase Realtime (WebSocket subscriptions) |
-| Data Source | NHL Official API |
-| Testing | Rstest + React Testing Library |
+
+| Layer            | Technology                                                  |
+| ---------------- | ----------------------------------------------------------- |
+| Monorepo         | Nx                                                          |
+| Package Manager  | Yarn 4.x (Berry)                                            |
+| Frontend         | React 19 with React Compiler                                |
+| Bundler          | rspack                                                      |
+| Backend          | Supabase (PostgreSQL, Auth, Realtime)                       |
+| UI Library       | Mantine (recommended - modern, accessible, mobile-friendly) |
+| Styling          | Vanilla Extract (zero-runtime CSS-in-JS, fully typed)       |
+| State Management | TanStack Query (memoization handled by React Compiler)      |
+| Real-time        | Supabase Realtime (WebSocket subscriptions)                 |
+| Data Source      | NHL Official API                                            |
+| Testing          | Rstest + React Testing Library                              |
 
 ---
 
 ## Phase 1: Project Foundation & Infrastructure
 
 ### 1.1 Nx Monorepo Setup
+
 - [ ] Install Node.js 24 LTS and Yarn 4.x (Berry) globally
 - [ ] Initialize Nx workspace with `npx create-nx-workspace@latest sportsnot --preset=npm`
 - [ ] Configure Yarn Berry with `yarn set version stable`
@@ -40,6 +43,7 @@
 - [ ] Set up path aliases in `tsconfig.base.json`
 
 ### 1.2 Application Structure
+
 - [ ] Create React application: `nx g @nx/react:app web --directory=packages/web --bundler=rspack`
 - [ ] Create shared UI library: `nx g @nx/react:lib ui --directory=packages/ui`
 - [ ] Create shared types library: `nx g @nx/js:lib types --directory=packages/types`
@@ -47,7 +51,9 @@
 - [ ] Create NHL API client library: `nx g @nx/js:lib nhl-api --directory=packages/nhl-api`
 - [ ] Create Supabase client library: `nx g @nx/js:lib supabase --directory=packages/supabase`
 - [ ] Configure Nx workspaceLayout in `nx.json` to use `packages/` for all projects
+
 ### 1.3 rspack Configuration
+
 - [ ] Configure rspack in `packages/web/rspack.config.js`
 - [ ] Set up development server with HMR
 - [ ] Configure production build optimizations
@@ -61,12 +67,14 @@
 - [ ] Verify React Compiler is optimizing components correctly
 
 ### 1.4 Code Quality & Tooling
+
 - [ ] Configure ESLint with Nx recommended rules
 - [ ] Configure Prettier for consistent formatting
 - [ ] Set up commitlint for conventional commits
 - [ ] Configure TypeScript strict mode
 
 ### 1.5 CI/CD Pipeline (GitHub Actions)
+
 - [ ] Create workflow for PR validation (lint, test, build)
 - [ ] Create workflow for GitHub Pages deployment on main branch
 - [ ] Configure GitHub Pages in repository settings (Actions source)
@@ -78,6 +86,7 @@
 ## Phase 2: Supabase Backend Setup
 
 ### 2.1 Supabase Project Configuration
+
 - [ ] Create Supabase project in dashboard
 - [ ] Initialize Supabase CLI in `packages/supabase-db/` with `supabase init`
 - [ ] Configure authentication providers (magic link email)
@@ -88,6 +97,7 @@
 ### 2.2 Database Schema Design
 
 #### Users Table
+
 ```sql
 CREATE TABLE users (
   id UUID PRIMARY KEY REFERENCES auth.users(id),
@@ -100,6 +110,7 @@ CREATE TABLE users (
 ```
 
 #### Leagues Table
+
 ```sql
 CREATE TABLE leagues (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -115,6 +126,7 @@ CREATE TABLE leagues (
 ```
 
 #### League Members Table
+
 ```sql
 CREATE TABLE league_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -128,6 +140,7 @@ CREATE TABLE league_members (
 ```
 
 #### Drafts Table
+
 ```sql
 CREATE TABLE drafts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -143,6 +156,7 @@ CREATE TABLE drafts (
 ```
 
 #### Draft Picks Table
+
 ```sql
 CREATE TABLE draft_picks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -158,6 +172,7 @@ CREATE TABLE draft_picks (
 ```
 
 #### Rosters Table (Current Round Active Roster)
+
 ```sql
 CREATE TABLE rosters (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -174,6 +189,7 @@ CREATE TABLE rosters (
 ```
 
 #### Player Stats Cache Table
+
 ```sql
 CREATE TABLE player_stats_cache (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -190,6 +206,7 @@ CREATE TABLE player_stats_cache (
 ```
 
 #### Team Stats Cache Table
+
 ```sql
 CREATE TABLE team_stats_cache (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -204,6 +221,7 @@ CREATE TABLE team_stats_cache (
 ```
 
 ### 2.3 Database Functions & Triggers
+
 - [ ] Create function to auto-update `updated_at` timestamps
 - [ ] Create function to generate unique invite codes
 - [ ] Create function to calculate snake draft order
@@ -213,6 +231,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Create function to validate roster composition
 
 ### 2.4 Row Level Security Policies
+
 - [ ] Users can read their own data, update display_name/avatar
 - [ ] League members can read league data they belong to
 - [ ] Commissioners can update their league settings
@@ -220,12 +239,14 @@ CREATE TABLE team_stats_cache (
 - [ ] Roster changes only by roster owner during valid windows
 
 ### 2.5 Realtime Subscriptions
+
 - [ ] Configure realtime for `drafts` table (draft status changes)
 - [ ] Configure realtime for `draft_picks` table (new picks)
 - [ ] Configure realtime for `rosters` table (roster changes)
 - [ ] Configure realtime for `league_members` table (points updates)
 
 ### 2.6 Edge Functions
+
 - [ ] Create edge function to sync NHL API player data
 - [ ] Create edge function to update player/team stats
 - [ ] Create scheduled function to poll NHL API during games
@@ -236,6 +257,7 @@ CREATE TABLE team_stats_cache (
 ## Phase 3: NHL API Integration
 
 ### 3.1 NHL API Client Library
+
 - [ ] Research NHL API endpoints (https://api-web.nhle.com)
 - [ ] Create TypeScript types for NHL API responses
 - [ ] Implement player search/lookup endpoints
@@ -245,6 +267,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Implement playoff bracket/series endpoints
 
 ### 3.2 Data Sync Service
+
 - [ ] Create service to fetch all playoff-eligible players
 - [ ] Create service to fetch current playoff bracket
 - [ ] Create service to track eliminated teams/players
@@ -253,6 +276,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Handle API rate limiting gracefully
 
 ### 3.3 Player/Team Data Models
+
 - [ ] Define Player interface with NHL API fields
 - [ ] Define Team interface with NHL API fields
 - [ ] Define Game interface for schedule tracking
@@ -264,6 +288,7 @@ CREATE TABLE team_stats_cache (
 ## Phase 4: Authentication & User Management
 
 ### 4.1 Auth Context & Hooks
+
 - [ ] Create Supabase auth client wrapper
 - [ ] Create `useAuth` hook for auth state
 - [ ] Create `useUser` hook for user profile
@@ -272,6 +297,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Handle auth state persistence
 
 ### 4.2 Auth UI Components
+
 - [ ] Create `LoginPage` with magic link form
 - [ ] Create `AuthCallback` page for magic link redirect
 - [ ] Create email input validation
@@ -279,12 +305,14 @@ CREATE TABLE team_stats_cache (
 - [ ] Create loading states for auth operations
 
 ### 4.3 User Profile
+
 - [ ] Create `ProfilePage` component
 - [ ] Create display name edit form
 - [ ] Create avatar upload (Supabase Storage)
 - [ ] Create account deletion flow
 
 ### 4.4 Protected Routes
+
 - [ ] Create `ProtectedRoute` wrapper component
 - [ ] Implement redirect to login for unauthenticated users
 - [ ] Create auth loading skeleton
@@ -295,6 +323,7 @@ CREATE TABLE team_stats_cache (
 ## Phase 5: Core UI Components (Mantine-based)
 
 ### 5.1 Layout Components
+
 - [ ] Create `AppShell` with responsive navigation
 - [ ] Create `Header` with user menu and logo
 - [ ] Create `MobileNav` with bottom navigation
@@ -303,6 +332,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Create `ErrorBoundary` with fallback UI
 
 ### 5.2 Common Components
+
 - [ ] Create `PlayerCard` component (photo, name, team, stats)
 - [ ] Create `TeamCard` component (logo, name, record)
 - [ ] Create `PointsBadge` component
@@ -312,12 +342,14 @@ CREATE TABLE team_stats_cache (
 - [ ] Create `CountdownTimer` component
 
 ### 5.3 Form Components
+
 - [ ] Create `LeagueForm` for creating/editing leagues
 - [ ] Create `TeamNameForm` for league members
 - [ ] Create `InviteCodeInput` for joining leagues
 - [ ] Create form validation with Mantine form hooks
 
 ### 5.4 Modal Components
+
 - [ ] Create `PlayerDetailModal` with full stats
 - [ ] Create `ConfirmationModal` for destructive actions
 - [ ] Create `InviteMembersModal` with share options
@@ -328,6 +360,7 @@ CREATE TABLE team_stats_cache (
 ## Phase 6: League Management Features
 
 ### 6.1 League Creation
+
 - [ ] Create `CreateLeaguePage` component
 - [ ] Implement league name input with validation
 - [ ] Implement max participants selector (2-12)
@@ -336,6 +369,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Navigate to league dashboard after creation
 
 ### 6.2 League Dashboard
+
 - [ ] Create `LeagueDashboardPage` component
 - [ ] Display league name, status, and round
 - [ ] Show member list with points
@@ -344,6 +378,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Show invite code with copy button
 
 ### 6.3 Join League Flow
+
 - [ ] Create `JoinLeaguePage` component
 - [ ] Implement invite code input
 - [ ] Validate code and show league preview
@@ -352,6 +387,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Navigate to league dashboard after joining
 
 ### 6.4 League Settings (Commissioner)
+
 - [ ] Create `LeagueSettingsPage` component
 - [ ] Edit league name
 - [ ] Regenerate invite code
@@ -360,6 +396,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Advance to next round controls
 
 ### 6.5 My Leagues List
+
 - [ ] Create `MyLeaguesPage` component
 - [ ] List all leagues user belongs to
 - [ ] Show league status and user's rank
@@ -371,6 +408,7 @@ CREATE TABLE team_stats_cache (
 ## Phase 7: Draft System
 
 ### 7.1 Draft Preparation
+
 - [ ] Create `DraftLobbyPage` component
 - [ ] Show all league members with ready status
 - [ ] Display draft order (snake visualization)
@@ -379,6 +417,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Real-time member presence indicators
 
 ### 7.2 Draft Board
+
 - [ ] Create `DraftBoardPage` component
 - [ ] Display available players grid/list
 - [ ] Filter by position (F, D, G/Team)
@@ -388,6 +427,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Highlight injured players
 
 ### 7.3 Draft Interface
+
 - [ ] Create `DraftRoom` component
 - [ ] Show current pick number and drafter
 - [ ] Display pick timer (if implemented)
@@ -396,6 +436,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Confirmation modal before finalizing pick
 
 ### 7.4 Roster Builder (During Draft)
+
 - [ ] Create `MyDraftRoster` sidebar component
 - [ ] Show filled/empty roster slots
 - [ ] Visual indication of position requirements
@@ -403,6 +444,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Position requirement indicators
 
 ### 7.5 Draft History
+
 - [ ] Create `DraftHistory` component
 - [ ] Show all picks in chronological order
 - [ ] Filter by round/team
@@ -410,6 +452,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Real-time updates via Supabase subscription
 
 ### 7.6 Re-Draft Flow (Between Rounds)
+
 - [ ] Create `RoundTransitionPage` component
 - [ ] Show previous round final standings
 - [ ] Display new draft order (worst to best, snake)
@@ -418,6 +461,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Commissioner triggers new round draft
 
 ### 7.7 Real-time Draft Sync
+
 - [ ] Subscribe to draft status changes
 - [ ] Subscribe to new pick events
 - [ ] Handle pick conflicts gracefully
@@ -429,6 +473,7 @@ CREATE TABLE team_stats_cache (
 ## Phase 8: Roster Management
 
 ### 8.1 My Roster Page
+
 - [ ] Create `MyRosterPage` component
 - [ ] Display current round roster
 - [ ] Show each player with current round stats
@@ -436,6 +481,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Show total team points
 
 ### 8.2 IR Activation Flow
+
 - [ ] Create `IRActivationModal` component
 - [ ] Detect injured players on roster
 - [ ] Show eligible IR replacements
@@ -444,12 +490,14 @@ CREATE TABLE team_stats_cache (
 - [ ] Update roster and points in database
 
 ### 8.3 Roster Validation
+
 - [ ] Validate 5F, 3D, 1G composition
 - [ ] Prevent duplicate players
 - [ ] Block picks of eliminated players
 - [ ] Enforce position matching for IR
 
 ### 8.4 Historical Rosters
+
 - [ ] Create `RosterHistoryPage` component
 - [ ] View rosters from previous rounds
 - [ ] Show points earned per round
@@ -460,6 +508,7 @@ CREATE TABLE team_stats_cache (
 ## Phase 9: Scoring & Standings
 
 ### 9.1 Points Calculation Engine
+
 - [ ] Create scoring calculation functions
 - [ ] Player goals: 1 point each
 - [ ] Player assists: 1 point each
@@ -468,6 +517,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Handle IR activation point swaps
 
 ### 9.2 Standings Page
+
 - [ ] Create `StandingsPage` component
 - [ ] Show league members ranked by points
 - [ ] Display points breakdown (player pts, goalie pts)
@@ -475,12 +525,14 @@ CREATE TABLE team_stats_cache (
 - [ ] Highlight current user's position
 
 ### 9.3 Live Scoring Updates
+
 - [ ] Subscribe to player stats changes
 - [ ] Subscribe to team stats changes
 - [ ] Real-time point updates during games
 - [ ] Visual notifications for scoring events
 
 ### 9.4 Scoring History
+
 - [ ] Create `ScoringHistoryPage` component
 - [ ] Show all scoring events
 - [ ] Filter by player/team/date
@@ -491,6 +543,7 @@ CREATE TABLE team_stats_cache (
 ## Phase 10: Dashboard & Home
 
 ### 10.1 Main Dashboard
+
 - [ ] Create `DashboardPage` component
 - [ ] Show active leagues summary
 - [ ] Display upcoming drafts
@@ -498,12 +551,14 @@ CREATE TABLE team_stats_cache (
 - [ ] Quick links to all leagues
 
 ### 10.2 Live Games Widget
+
 - [ ] Create `LiveGamesWidget` component
 - [ ] Show games currently in progress
 - [ ] Highlight players on user's rosters
 - [ ] Real-time score updates
 
 ### 10.3 Notifications
+
 - [ ] Draft starting soon alerts
 - [ ] Your turn to pick alerts
 - [ ] Scoring milestone notifications
@@ -514,18 +569,21 @@ CREATE TABLE team_stats_cache (
 ## Phase 11: Mobile Optimization
 
 ### 11.1 Responsive Layouts
+
 - [ ] Test all pages on mobile viewports
 - [ ] Implement collapsible sections
 - [ ] Optimize touch targets (min 44px)
 - [ ] Implement swipe gestures where appropriate
 
 ### 11.2 Mobile-Specific Components
+
 - [ ] Create mobile draft interface
 - [ ] Create mobile roster view
 - [ ] Create mobile-friendly player selection
 - [ ] Bottom sheet modals for mobile
 
 ### 11.3 Performance Optimization
+
 - [ ] Implement virtualized lists for large data
 - [ ] Lazy load images
 - [ ] Optimize bundle size
@@ -536,6 +594,7 @@ CREATE TABLE team_stats_cache (
 ## Phase 12: Testing
 
 ### 12.1 Unit Tests (Rstest)
+
 - [ ] Configure Rstest (@rstest/core) for Nx workspace
 - [ ] Leverage rspack integration for fast test transforms
 - [ ] Test scoring calculation functions
@@ -546,6 +605,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Test utility functions
 
 ### 12.2 Component Tests (React Testing Library)
+
 - [ ] Configure @testing-library/react with Rstest
 - [ ] Test auth flow components
 - [ ] Test league creation/join forms
@@ -554,6 +614,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Test standings display
 
 ### 12.3 Integration Tests
+
 - [ ] Test Supabase client integration
 - [ ] Test real-time subscriptions
 - [ ] Test NHL API data sync
@@ -564,12 +625,14 @@ CREATE TABLE team_stats_cache (
 ## Phase 13: Deployment & DevOps
 
 ### 13.1 Environment Configuration
+
 - [ ] Set up development environment variables
 - [ ] Set up production environment variables
 - [ ] Configure Supabase project for production
 - [ ] Create `.env.example` with required variables
 
 ### 13.2 GitHub Pages Hosting
+
 - [ ] Configure rspack for static SPA output
 - [ ] Set up base URL/public path for GitHub Pages subdirectory
 - [ ] Create 404.html redirect for SPA client-side routing
@@ -577,6 +640,7 @@ CREATE TABLE team_stats_cache (
 - [ ] Set up CNAME file for custom domain
 
 ### 13.3 GitHub Actions Deployment Pipeline
+
 - [ ] Create `.github/workflows/ci.yml` for PR checks
   - [ ] Checkout code
   - [ ] Set up Node.js and Yarn
@@ -592,9 +656,11 @@ CREATE TABLE team_stats_cache (
   - [ ] Enable HTTPS enforcement
 
 ### 13.4 Monitoring & Analytics
+
 - [ ] Configure Supabase usage monitoring
 
 ### 13.5 Database Management
+
 - [ ] Set up database migrations workflow
 - [ ] Configure database backups
 - [ ] Plan for data retention policies
@@ -694,6 +760,7 @@ sportsnot/
 ## MVP Feature Checklist
 
 ### Must Have (MVP)
+
 - [x] ~~Define requirements~~ (Completed in planning)
 - [ ] Nx monorepo with rspack + React
 - [ ] Supabase auth (magic link)
@@ -708,6 +775,7 @@ sportsnot/
 - [ ] Player comparison tools
 
 ### Nice to Have (Post-MVP)
+
 - [ ] Push notifications
 - [ ] Draft auto-pick (timeout)
 - [ ] Historical league archives
@@ -721,12 +789,12 @@ sportsnot/
 
 ## Risk Mitigation
 
-| Risk | Mitigation |
-|------|------------|
-| NHL API changes/instability | Cache data aggressively, implement fallback manual entry |
-| Real-time draft sync issues | Implement optimistic updates with conflict resolution |
-| Supabase rate limits | Batch operations, implement client-side caching |
-| Mobile performance | Virtualization, lazy loading, bundle optimization |
+| Risk                         | Mitigation                                               |
+| ---------------------------- | -------------------------------------------------------- |
+| NHL API changes/instability  | Cache data aggressively, implement fallback manual entry |
+| Real-time draft sync issues  | Implement optimistic updates with conflict resolution    |
+| Supabase rate limits         | Batch operations, implement client-side caching          |
+| Mobile performance           | Virtualization, lazy loading, bundle optimization        |
 | Playoff schedule uncertainty | Flexible round detection, commissioner override controls |
 
 ---

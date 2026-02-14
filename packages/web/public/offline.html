@@ -1,13 +1,18 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <title>SportsNot - Offline</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -20,9 +25,20 @@
         text-align: center;
         max-width: 420px;
       }
-      .icon { font-size: 64px; margin-bottom: 16px; }
-      h1 { color: #fff; font-size: 24px; margin-bottom: 12px; }
-      p { font-size: 16px; line-height: 1.5; margin-bottom: 24px; }
+      .icon {
+        font-size: 64px;
+        margin-bottom: 16px;
+      }
+      h1 {
+        color: #fff;
+        font-size: 24px;
+        margin-bottom: 12px;
+      }
+      p {
+        font-size: 16px;
+        line-height: 1.5;
+        margin-bottom: 24px;
+      }
       button {
         background: #228be6;
         color: #fff;
@@ -32,14 +48,19 @@
         font-size: 16px;
         cursor: pointer;
       }
-      button:hover { background: #1c7ed6; }
+      button:hover {
+        background: #1c7ed6;
+      }
     </style>
   </head>
   <body>
     <div class="container">
       <div class="icon">📡</div>
       <h1>You're Offline</h1>
-      <p>It looks like you've lost your internet connection. Some features may be unavailable until you reconnect.</p>
+      <p>
+        It looks like you've lost your internet connection. Some features may be
+        unavailable until you reconnect.
+      </p>
       <button onclick="window.location.reload()">Try Again</button>
     </div>
   </body>

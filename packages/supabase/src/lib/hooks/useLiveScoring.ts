@@ -2,8 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../supabase';
 
-/* eslint-disable no-undef */
-
 interface PointDelta {
   id: string;
   delta: number;
@@ -17,7 +15,9 @@ interface PointDelta {
 export function useLiveScoring(leagueId: string | undefined) {
   const queryClient = useQueryClient();
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [memberDeltas, setMemberDeltas] = useState<Record<string, PointDelta>>({});
+  const [memberDeltas, setMemberDeltas] = useState<Record<string, PointDelta>>(
+    {}
+  );
   const [slotDeltas, setSlotDeltas] = useState<Record<string, PointDelta>>({});
   const deltaTimers = useRef<number[]>([]);
 
@@ -53,10 +53,12 @@ export function useLiveScoring(leagueId: string | undefined) {
           filter: `league_id=eq.${leagueId}`,
         },
         (payload) => {
-          const oldPoints = (payload.old as any)?.total_points ?? 0;
-          const newPoints = (payload.new as any)?.total_points ?? 0;
+          const oldRec = payload.old as Record<string, unknown>;
+          const newRec = payload.new as Record<string, unknown>;
+          const oldPoints = (oldRec?.['total_points'] as number) ?? 0;
+          const newPoints = (newRec?.['total_points'] as number) ?? 0;
           const delta = newPoints - oldPoints;
-          const memberId = (payload.new as any)?.id;
+          const memberId = newRec?.['id'] as string | undefined;
 
           if (delta !== 0 && memberId) {
             setMemberDeltas((prev) => ({
@@ -78,10 +80,12 @@ export function useLiveScoring(leagueId: string | undefined) {
           table: 'rosters',
         },
         (payload) => {
-          const oldPoints = (payload.old as any)?.points_earned ?? 0;
-          const newPoints = (payload.new as any)?.points_earned ?? 0;
+          const oldRec = payload.old as Record<string, unknown>;
+          const newRec = payload.new as Record<string, unknown>;
+          const oldPoints = (oldRec?.['points_earned'] as number) ?? 0;
+          const newPoints = (newRec?.['points_earned'] as number) ?? 0;
           const delta = newPoints - oldPoints;
-          const slotId = (payload.new as any)?.id;
+          const slotId = newRec?.['id'] as string | undefined;
 
           if (delta !== 0 && slotId) {
             setSlotDeltas((prev) => ({

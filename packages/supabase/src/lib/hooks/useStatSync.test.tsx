@@ -1,11 +1,9 @@
-import { describe, it, expect, afterEach, beforeEach } from '@rstest/core';
+import { describe, it, expect, afterEach } from '@rstest/core';
 import { renderHook, cleanup, waitFor, act } from '@testing-library/react';
-import React from 'react';
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useStatSync } from './useStatSync';
 import { supabase } from '../supabase';
-
-/* eslint-disable no-undef */
 
 afterEach(cleanup);
 
@@ -29,24 +27,23 @@ function createTestQueryClient() {
 function createWrapper(queryClient?: QueryClient) {
   const qc = queryClient ?? createTestQueryClient();
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
   };
 }
 
 // Proxy-based mock for supabase.from() chain
-function mockSupabaseFrom(
-  resolveWith: { data?: unknown; error?: unknown; count?: number | null }
-) {
+function mockSupabaseFrom(resolveWith: {
+  data?: unknown;
+  error?: unknown;
+  count?: number | null;
+}) {
   const chainMethods: Record<string, unknown> = {};
   const chain = new Proxy(chainMethods, {
     get(_target, prop) {
       if (prop === 'then') {
         return (
           resolve: (val: unknown) => void,
-          // eslint-disable-next-line no-unused-vars
-          reject: (val: unknown) => void
+          _reject: (val: unknown) => void
         ) => {
           resolve({
             data: resolveWith.data ?? null,
@@ -63,8 +60,9 @@ function mockSupabaseFrom(
 
 // Save originals
 const originalFrom = supabase.from.bind(supabase);
-const originalFunctionsDescriptor = Object.getOwnPropertyDescriptor(
-  Object.getPrototypeOf(supabase), 'functions'
+const _originalFunctionsDescriptor = Object.getOwnPropertyDescriptor(
+  Object.getPrototypeOf(supabase),
+  'functions'
 );
 const originalFetch = globalThis.fetch;
 
@@ -72,7 +70,7 @@ afterEach(() => {
   supabase.from = originalFrom;
   // Restore the functions getter: remove any instance override to fall back to prototype
   if (Object.getOwnPropertyDescriptor(supabase, 'functions')) {
-    delete (supabase as any).functions;
+    delete (supabase as unknown as Record<string, unknown>).functions;
   }
   globalThis.fetch = originalFetch;
   // Restore document.hidden
@@ -84,7 +82,10 @@ afterEach(() => {
 
 // Helper to mock supabase.functions.invoke
 function mockFunctionsInvoke(
-  handler: (funcName: string, options?: unknown) => Promise<{ data: unknown; error: unknown }>
+  handler: (
+    funcName: string,
+    options?: unknown
+  ) => Promise<{ data: unknown; error: unknown }>
 ) {
   Object.defineProperty(supabase, 'functions', {
     configurable: true,

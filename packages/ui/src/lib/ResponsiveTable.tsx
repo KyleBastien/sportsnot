@@ -11,10 +11,14 @@ export interface ResponsiveTableColumn {
 export interface ResponsiveTableProps {
   columns: ResponsiveTableColumn[];
   data: Record<string, unknown>[];
-  onRowClick?: (row: Record<string, unknown>) => void; // eslint-disable-line no-unused-vars
+  onRowClick?: (row: Record<string, unknown>) => void;
   sortable?: boolean;
-  renderCell?: (key: string, value: unknown, row: Record<string, unknown>) => ReactNode; // eslint-disable-line no-unused-vars
-  rowStyle?: (row: Record<string, unknown>) => CSSProperties | undefined; // eslint-disable-line no-unused-vars
+  renderCell?: (
+    key: string,
+    value: unknown,
+    row: Record<string, unknown>
+  ) => ReactNode;
+  rowStyle?: (row: Record<string, unknown>) => CSSProperties | undefined;
 }
 
 type SortDirection = 'asc' | 'desc';

@@ -27,24 +27,23 @@ function createTestQueryClient() {
 function createWrapper(queryClient?: QueryClient) {
   const qc = queryClient ?? createTestQueryClient();
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
   };
 }
 
 // Proxy-based mock for supabase.from() chain
-function mockSupabaseFrom(
-  resolveWith: { data?: unknown; error?: unknown; count?: number | null }
-) {
+function mockSupabaseFrom(resolveWith: {
+  data?: unknown;
+  error?: unknown;
+  count?: number | null;
+}) {
   const chainMethods: Record<string, unknown> = {};
   const chain = new Proxy(chainMethods, {
     get(_target, prop) {
       if (prop === 'then') {
         return (
           resolve: (val: unknown) => void,
-          // eslint-disable-next-line no-unused-vars
-          reject: (val: unknown) => void
+          _reject: (val: unknown) => void
         ) => {
           if (resolveWith.error) {
             resolve({
@@ -195,13 +194,21 @@ describe('useLeagueRosters', () => {
 
   it('fetches rosters for all league members', async () => {
     const leagueRosters = [
-      { ...mockRosterData[0], league_members: { user_id: 'user-1', team_name: 'Team A' } },
-      { ...mockRosterData[1], league_members: { user_id: 'user-2', team_name: 'Team B' } },
+      {
+        ...mockRosterData[0],
+        league_members: { user_id: 'user-1', team_name: 'Team A' },
+      },
+      {
+        ...mockRosterData[1],
+        league_members: { user_id: 'user-2', team_name: 'Team B' },
+      },
     ];
 
     supabase.from = ((table: string) => {
       if (table === 'league_members') {
-        return mockSupabaseFrom({ data: [{ id: 'member-1' }, { id: 'member-2' }] });
+        return mockSupabaseFrom({
+          data: [{ id: 'member-1' }, { id: 'member-2' }],
+        });
       }
       if (table === 'rosters') {
         return mockSupabaseFrom({ data: leagueRosters });
@@ -267,7 +274,7 @@ describe('useActivateIR', () => {
     supabase.rpc = ((funcName: string, params: Record<string, unknown>) => {
       rpcCalled = true;
       rpcParams = params;
-      return Promise.resolve({ data: null, error: null }) as any;
+      return Promise.resolve({ data: null, error: null }) as unknown;
     }) as unknown as typeof supabase.rpc;
 
     const { result } = renderHook(() => useActivateIR(), {
@@ -299,7 +306,7 @@ describe('useActivateIR', () => {
       Promise.resolve({
         data: null,
         error: { message: 'RPC failed', code: '500' },
-      }) as any) as unknown as typeof supabase.rpc;
+      })) as unknown as typeof supabase.rpc;
 
     const { result } = renderHook(() => useActivateIR(), {
       wrapper: createWrapper(),

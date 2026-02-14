@@ -51,9 +51,7 @@ describe('PositionBadge', () => {
   });
 
   it('applies light variant by default', () => {
-    const { container } = renderWithMantine(
-      <PositionBadge position="F" />
-    );
+    const { container } = renderWithMantine(<PositionBadge position="F" />);
     const badge = container.querySelector('.mantine-Badge-root');
     expect(badge).toBeTruthy();
     expect((badge as HTMLElement).getAttribute('data-variant')).toBe('light');

@@ -4,7 +4,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 interface NavTab {
   label: string;
   icon: string;
-  path: (leagueId?: string) => string; // eslint-disable-line no-unused-vars
+  path: (leagueId?: string) => string;
   match: string[];
 }
 

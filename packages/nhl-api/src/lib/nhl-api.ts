@@ -23,7 +23,9 @@ export async function getPlayoffBracket(
   season: string
 ): Promise<NHLPlayoffSeries[]> {
   const url = `${NHL_API_BASE}/playoff-bracket/${season}`;
-  const data = await fetchJson<{ rounds: Array<{ series: NHLPlayoffSeries[] }> }>(url);
+  const data = await fetchJson<{
+    rounds: Array<{ series: NHLPlayoffSeries[] }>;
+  }>(url);
   return data.rounds.flatMap((round) => round.series);
 }
 
@@ -69,7 +71,14 @@ export async function getPlayerGameLog(
  */
 export async function getTeams(): Promise<NHLTeam[]> {
   const url = `${NHL_API_BASE}/standings/now`;
-  const data = await fetchJson<{ standings: Array<{ teamAbbrev: { default: string }; teamName: { default: string }; teamLogo: string; teamCommonName: { default: string } }> }>(url);
+  const data = await fetchJson<{
+    standings: Array<{
+      teamAbbrev: { default: string };
+      teamName: { default: string };
+      teamLogo: string;
+      teamCommonName: { default: string };
+    }>;
+  }>(url);
   return data.standings.map((team) => ({
     id: 0,
     name: team.teamName.default,
@@ -102,9 +111,9 @@ export async function getPlayoffSchedule(season: string): Promise<NHLGame[]> {
 /**
  * Get live game boxscore
  */
-export async function getGameBoxscore(gameId: number): Promise<any> {
+export async function getGameBoxscore(gameId: number): Promise<unknown> {
   const url = `${NHL_API_BASE}/gamecenter/${gameId}/boxscore`;
-  return fetchJson<any>(url);
+  return fetchJson<unknown>(url);
 }
 
 /**

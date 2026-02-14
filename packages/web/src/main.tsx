@@ -23,15 +23,15 @@ const queryClient = new QueryClient({
 });
 
 // Register service worker for offline caching
-if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') { // eslint-disable-line no-undef
-  window.addEventListener('load', () => { // eslint-disable-line no-undef
-    navigator.serviceWorker // eslint-disable-line no-undef
+if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
       .register('/sw.js')
       .then((registration) => {
-        console.warn('SW registered:', registration.scope); // eslint-disable-line no-undef
+        console.warn('SW registered:', registration.scope);
       })
       .catch((error) => {
-        console.error('SW registration failed:', error); // eslint-disable-line no-undef
+        console.error('SW registration failed:', error);
       });
   });
 }

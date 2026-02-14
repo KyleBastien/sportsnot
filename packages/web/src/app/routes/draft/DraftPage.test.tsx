@@ -33,7 +33,10 @@ function renderPage(queryClient?: QueryClient, leagueId = 'test-league-1') {
           <AuthProvider>
             <CompareProvider>
               <Routes>
-                <Route path="/leagues/:leagueId/draft" element={<DraftPage />} />
+                <Route
+                  path="/leagues/:leagueId/draft"
+                  element={<DraftPage />}
+                />
               </Routes>
             </CompareProvider>
           </AuthProvider>
@@ -59,8 +62,20 @@ function makeDraftData(overrides: Record<string, unknown> = {}) {
 
 function makeMemberData() {
   return [
-    { id: 'member-1', user_id: 'user-1', team_name: 'Team Alpha', total_points: 0, users: { display_name: 'Alice' } },
-    { id: 'member-2', user_id: 'user-2', team_name: 'Team Beta', total_points: 0, users: { display_name: 'Bob' } },
+    {
+      id: 'member-1',
+      user_id: 'user-1',
+      team_name: 'Team Alpha',
+      total_points: 0,
+      users: { display_name: 'Alice' },
+    },
+    {
+      id: 'member-2',
+      user_id: 'user-2',
+      team_name: 'Team Beta',
+      total_points: 0,
+      users: { display_name: 'Bob' },
+    },
   ];
 }
 
@@ -109,7 +124,10 @@ describe('DraftPage', () => {
 
   it('shows current pick number', () => {
     const qc = createTestQueryClient();
-    qc.setQueryData(['draft', 'test-league-1'], makeDraftData({ current_pick: 3 }));
+    qc.setQueryData(
+      ['draft', 'test-league-1'],
+      makeDraftData({ current_pick: 3 })
+    );
     qc.setQueryData(['league-members', 'test-league-1'], makeMemberData());
     renderPage(qc);
     expect(screen.getByText('Pick #3')).toBeTruthy();
@@ -117,10 +135,13 @@ describe('DraftPage', () => {
 
   it('shows turn indicator for current picker', () => {
     const qc = createTestQueryClient();
-    qc.setQueryData(['draft', 'test-league-1'], makeDraftData({
-      current_pick: 1,
-      draft_order: ['user-1', 'user-2'],
-    }));
+    qc.setQueryData(
+      ['draft', 'test-league-1'],
+      makeDraftData({
+        current_pick: 1,
+        draft_order: ['user-1', 'user-2'],
+      })
+    );
     qc.setQueryData(['league-members', 'test-league-1'], makeMemberData());
     renderPage(qc);
     // Current picker is user-1 (index 0), their team_name is "Team Alpha"
@@ -129,7 +150,10 @@ describe('DraftPage', () => {
 
   it('renders draft board section with no picks message', () => {
     const qc = createTestQueryClient();
-    qc.setQueryData(['draft', 'test-league-1'], makeDraftData({ draft_picks: [] }));
+    qc.setQueryData(
+      ['draft', 'test-league-1'],
+      makeDraftData({ draft_picks: [] })
+    );
     qc.setQueryData(['league-members', 'test-league-1'], makeMemberData());
     renderPage(qc);
     expect(screen.getByText('Draft History')).toBeTruthy();
@@ -156,10 +180,13 @@ describe('DraftPage', () => {
         league_members: { team_name: 'Team Beta', user_id: 'user-2' },
       },
     ];
-    qc.setQueryData(['draft', 'test-league-1'], makeDraftData({
-      draft_picks: picks,
-      current_pick: 3,
-    }));
+    qc.setQueryData(
+      ['draft', 'test-league-1'],
+      makeDraftData({
+        draft_picks: picks,
+        current_pick: 3,
+      })
+    );
     qc.setQueryData(['league-members', 'test-league-1'], makeMemberData());
     renderPage(qc);
     // Desktop layout shows picks in Draft History as "#pickNumber - teamName"
@@ -207,18 +234,21 @@ describe('DraftPage', () => {
     const qc = createTestQueryClient();
     qc.setQueryData(['draft', 'test-league-1'], makeDraftData());
     qc.setQueryData(['league-members', 'test-league-1'], makeMemberData());
-    qc.setQueryData(['playoff-players', '20242025', 1], [
-      {
-        player_id: 97,
-        player_name: 'Connor McDavid',
-        position: 'F',
-        team_abbreviation: 'EDM',
-        goals: 10,
-        assists: 15,
-        games_played: 8,
-        is_injured: false,
-      },
-    ]);
+    qc.setQueryData(
+      ['playoff-players', '20242025', 1],
+      [
+        {
+          player_id: 97,
+          player_name: 'Connor McDavid',
+          position: 'F',
+          team_abbreviation: 'EDM',
+          goals: 10,
+          assists: 15,
+          games_played: 8,
+          is_injured: false,
+        },
+      ]
+    );
     qc.setQueryData(['playoff-teams', '20242025', 1], []);
     renderPage(qc);
     expect(screen.getByText('Connor McDavid')).toBeTruthy();

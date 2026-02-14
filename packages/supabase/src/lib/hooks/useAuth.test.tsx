@@ -1,6 +1,6 @@
-import { describe, it, expect, afterEach, beforeEach } from '@rstest/core';
+import { describe, it, expect, afterEach } from '@rstest/core';
 import { renderHook, cleanup, act, waitFor } from '@testing-library/react';
-import React from 'react';
+
 import { useAuth } from './useAuth';
 import { supabase } from '../supabase';
 
@@ -92,7 +92,7 @@ describe('useAuth', () => {
   });
 
   it('restores session on mount', async () => {
-    setupAuthMocks({ session: mockSession as any });
+    setupAuthMocks({ session: mockSession });
 
     const { result } = renderHook(() => useAuth());
 
@@ -145,7 +145,7 @@ describe('useAuth', () => {
   it('signInWithMagicLink calls signInWithOtp', async () => {
     let otpCalled = false;
     setupAuthMocks();
-    supabase.auth.signInWithOtp = ((opts: unknown) => {
+    supabase.auth.signInWithOtp = ((_opts: unknown) => {
       otpCalled = true;
       return Promise.resolve({ data: {}, error: null });
     }) as unknown as typeof supabase.auth.signInWithOtp;
@@ -158,9 +158,8 @@ describe('useAuth', () => {
 
     let signInResult: { error: unknown };
     await act(async () => {
-      signInResult = await result.current.signInWithMagicLink(
-        'test@example.com'
-      );
+      signInResult =
+        await result.current.signInWithMagicLink('test@example.com');
     });
 
     expect(otpCalled).toBe(true);
@@ -185,9 +184,8 @@ describe('useAuth', () => {
 
     let signInResult: { error: unknown };
     await act(async () => {
-      signInResult = await result.current.signInWithMagicLink(
-        'test@example.com'
-      );
+      signInResult =
+        await result.current.signInWithMagicLink('test@example.com');
     });
 
     expect(signInResult!.error).toBeTruthy();
@@ -195,7 +193,7 @@ describe('useAuth', () => {
 
   it('signOut calls supabase signOut', async () => {
     let signOutCalled = false;
-    setupAuthMocks({ session: mockSession as any });
+    setupAuthMocks({ session: mockSession });
     supabase.auth.signOut = (() => {
       signOutCalled = true;
       return Promise.resolve({ error: null });
@@ -218,7 +216,7 @@ describe('useAuth', () => {
 
   it('signOut returns error on failure', async () => {
     const signOutError = new Error('Network error');
-    setupAuthMocks({ session: mockSession as any });
+    setupAuthMocks({ session: mockSession });
     supabase.auth.signOut = (() =>
       Promise.resolve({
         error: signOutError,
@@ -240,7 +238,7 @@ describe('useAuth', () => {
 
   it('clears user on sign out auth state change', async () => {
     const { getAuthChangeCallback } = setupAuthMocks({
-      session: mockSession as any,
+      session: mockSession,
     });
 
     const { result } = renderHook(() => useAuth());
@@ -264,7 +262,7 @@ describe('useAuth', () => {
   it('unsubscribes from auth changes on unmount', async () => {
     let unsubscribeCalled = false;
     setupAuthMocks();
-    supabase.auth.onAuthStateChange = ((callback: unknown) => ({
+    supabase.auth.onAuthStateChange = ((_callback: unknown) => ({
       data: {
         subscription: {
           unsubscribe: () => {

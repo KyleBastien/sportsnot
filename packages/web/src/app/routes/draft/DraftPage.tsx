@@ -25,9 +25,16 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { supabase, usePlayoffPlayers, usePlayoffTeams } from '@sportsnot/supabase';
+import {
+  supabase,
+  usePlayoffPlayers,
+  usePlayoffTeams,
+} from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
-import { useCompareContext, type ComparePlayer } from '../../context/CompareContext';
+import {
+  useCompareContext,
+  type ComparePlayer,
+} from '../../context/CompareContext';
 import { usePlayerDetailContext } from '../../context/PlayerDetailContext';
 import type { Position } from '@sportsnot/types';
 
@@ -40,6 +47,43 @@ interface DraftablePlayer {
   team: string;
   teamId: number;
   headshot?: string;
+}
+
+interface PlayerStatRow {
+  player_id: number;
+  player_name: string | null;
+  position: string | null;
+  team_abbreviation: string | null;
+  goals: number | null;
+  assists: number | null;
+  games_played: number | null;
+  is_injured: boolean;
+}
+
+interface TeamStatRow {
+  team_id: number;
+  team_name: string | null;
+  team_abbreviation: string | null;
+  wins: number | null;
+  shutouts: number | null;
+  is_eliminated: boolean;
+}
+
+interface DraftMember {
+  id: string;
+  user_id: string;
+  team_name: string;
+  total_points: number;
+  users?: { display_name: string | null };
+}
+
+interface DraftPickRow {
+  id: string;
+  pick_number: number;
+  player_id: number | null;
+  team_id: number | null;
+  position: string;
+  league_members?: { team_name: string; user_id: string };
 }
 
 function useDraft(leagueId: string) {
@@ -77,8 +121,8 @@ function useLeagueMembers(leagueId: string) {
 }
 
 interface AvailablePlayerBoardProps {
-  playerStats: any[];
-  teamStats: any[];
+  playerStats: PlayerStatRow[];
+  teamStats: TeamStatRow[];
   draftedPlayerIds: Set<number>;
   draftedTeamIds: Set<number>;
   positionFilter: string;
@@ -87,7 +131,7 @@ interface AvailablePlayerBoardProps {
   onSelectPlayer: (player: DraftablePlayer) => void;
   comparePlayers: ComparePlayer[];
   isCompareFull: boolean;
-  onCompareToggle: (player: ComparePlayer) => void; // eslint-disable-line no-unused-vars
+  onCompareToggle: (player: ComparePlayer) => void;
 }
 
 function AvailablePlayerBoard({
@@ -142,7 +186,12 @@ function AvailablePlayerBoard({
     }));
 
   const filteredSkaters = skaterRows.filter((p) => {
-    if (positionFilter !== 'ALL' && positionFilter !== 'F' && positionFilter !== 'D') return false;
+    if (
+      positionFilter !== 'ALL' &&
+      positionFilter !== 'F' &&
+      positionFilter !== 'D'
+    )
+      return false;
     if (positionFilter === 'F' && p.position !== 'F') return false;
     if (positionFilter === 'D' && p.position !== 'D') return false;
     if (query && !p.fullName.toLowerCase().includes(query)) return false;
@@ -171,7 +220,9 @@ function AvailablePlayerBoard({
     <Stack gap="md">
       {showSkaters && (
         <>
-          <Text fw={600} size="sm">Skaters ({filteredSkaters.length} available)</Text>
+          <Text fw={600} size="sm">
+            Skaters ({filteredSkaters.length} available)
+          </Text>
           <div ref={skaterScrollRef} style={{ height: 300, overflow: 'auto' }}>
             <Table striped highlightOnHover>
               <Table.Thead>
@@ -190,23 +241,45 @@ function AvailablePlayerBoard({
                 {filteredSkaters.length === 0 ? (
                   <Table.Tr>
                     <Table.Td colSpan={isMyTurn ? 8 : 7}>
-                      <Text c="dimmed" ta="center" size="sm">No available skaters match your filters</Text>
+                      <Text c="dimmed" ta="center" size="sm">
+                        No available skaters match your filters
+                      </Text>
                     </Table.Td>
                   </Table.Tr>
                 ) : (
                   <>
-                    {skaterVirtualizer.getVirtualItems().length > 0 && skaterVirtualizer.getVirtualItems()[0].start > 0 && (
-                      <Table.Tr>
-                        <Table.Td colSpan={isMyTurn ? 8 : 7} style={{ height: skaterVirtualizer.getVirtualItems()[0].start, padding: 0 }} />
-                      </Table.Tr>
-                    )}
+                    {skaterVirtualizer.getVirtualItems().length > 0 &&
+                      skaterVirtualizer.getVirtualItems()[0].start > 0 && (
+                        <Table.Tr>
+                          <Table.Td
+                            colSpan={isMyTurn ? 8 : 7}
+                            style={{
+                              height:
+                                skaterVirtualizer.getVirtualItems()[0].start,
+                              padding: 0,
+                            }}
+                          />
+                        </Table.Tr>
+                      )}
                     {skaterVirtualizer.getVirtualItems().map((virtualRow) => {
                       const p = filteredSkaters[virtualRow.index];
                       const inCompare = comparePlayerIds.has(p.id);
                       return (
-                        <Table.Tr key={p.id} data-index={virtualRow.index} ref={skaterVirtualizer.measureElement}>
+                        <Table.Tr
+                          key={p.id}
+                          data-index={virtualRow.index}
+                          ref={skaterVirtualizer.measureElement}
+                        >
                           <Table.Td>
-                            <Tooltip label={inCompare ? 'Remove from compare' : isCompareFull ? 'Compare full' : 'Add to compare'}>
+                            <Tooltip
+                              label={
+                                inCompare
+                                  ? 'Remove from compare'
+                                  : isCompareFull
+                                    ? 'Compare full'
+                                    : 'Add to compare'
+                              }
+                            >
                               <ActionIcon
                                 size="sm"
                                 variant={inCompare ? 'filled' : 'subtle'}
@@ -218,7 +291,12 @@ function AvailablePlayerBoard({
                                     name: p.fullName,
                                     teamAbbrev: p.team,
                                     position: p.position,
-                                    stats: { goals: p.goals, assists: p.assists, points: p.points, gamesPlayed: p.gamesPlayed },
+                                    stats: {
+                                      goals: p.goals,
+                                      assists: p.assists,
+                                      points: p.points,
+                                      gamesPlayed: p.gamesPlayed,
+                                    },
                                   })
                                 }
                               >
@@ -237,12 +315,24 @@ function AvailablePlayerBoard({
                             </Text>
                           </Table.Td>
                           <Table.Td>
-                            <Badge size="xs" variant="light">{p.position}</Badge>
+                            <Badge size="xs" variant="light">
+                              {p.position}
+                            </Badge>
                           </Table.Td>
-                          <Table.Td style={{ textAlign: 'right' }}>{p.goals}</Table.Td>
-                          <Table.Td style={{ textAlign: 'right' }}>{p.assists}</Table.Td>
-                          <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{p.points}</Table.Td>
-                          <Table.Td style={{ textAlign: 'right' }}>{p.gamesPlayed}</Table.Td>
+                          <Table.Td style={{ textAlign: 'right' }}>
+                            {p.goals}
+                          </Table.Td>
+                          <Table.Td style={{ textAlign: 'right' }}>
+                            {p.assists}
+                          </Table.Td>
+                          <Table.Td
+                            style={{ textAlign: 'right', fontWeight: 600 }}
+                          >
+                            {p.points}
+                          </Table.Td>
+                          <Table.Td style={{ textAlign: 'right' }}>
+                            {p.gamesPlayed}
+                          </Table.Td>
                           {isMyTurn && (
                             <Table.Td>
                               <Button
@@ -272,7 +362,11 @@ function AvailablePlayerBoard({
                         <Table.Td
                           colSpan={isMyTurn ? 8 : 7}
                           style={{
-                            height: skaterVirtualizer.getTotalSize() - (skaterVirtualizer.getVirtualItems()[skaterVirtualizer.getVirtualItems().length - 1].end),
+                            height:
+                              skaterVirtualizer.getTotalSize() -
+                              skaterVirtualizer.getVirtualItems()[
+                                skaterVirtualizer.getVirtualItems().length - 1
+                              ].end,
                             padding: 0,
                           }}
                         />
@@ -288,7 +382,9 @@ function AvailablePlayerBoard({
 
       {showTeams && (
         <>
-          <Text fw={600} size="sm">Teams / Goaltending ({filteredTeams.length} available)</Text>
+          <Text fw={600} size="sm">
+            Teams / Goaltending ({filteredTeams.length} available)
+          </Text>
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
@@ -303,59 +399,71 @@ function AvailablePlayerBoard({
               {filteredTeams.map((t) => {
                 const inCompare = comparePlayerIds.has(t.teamId);
                 return (
-                <Table.Tr key={t.teamId}>
-                  <Table.Td>
-                    <Tooltip label={inCompare ? 'Remove from compare' : isCompareFull ? 'Compare full' : 'Add to compare'}>
-                      <ActionIcon
-                        size="sm"
-                        variant={inCompare ? 'filled' : 'subtle'}
-                        color={inCompare ? 'blue' : 'gray'}
-                        disabled={!inCompare && isCompareFull}
-                        onClick={() =>
-                          onCompareToggle({
-                            playerId: t.teamId,
-                            name: t.fullName,
-                            teamAbbrev: t.team,
-                            position: 'G',
-                            stats: { wins: t.wins, shutouts: t.shutouts },
-                          })
-                        }
-                      >
-                        {inCompare ? '✓' : '⚖'}
-                      </ActionIcon>
-                    </Tooltip>
-                  </Table.Td>
-                  <Table.Td>{t.fullName}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{t.wins}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{t.shutouts}</Table.Td>
-                  {isMyTurn && (
+                  <Table.Tr key={t.teamId}>
                     <Table.Td>
-                      <Button
-                        size="xs"
-                        variant="light"
-                        onClick={() =>
-                          onSelectPlayer({
-                            id: t.teamId,
-                            fullName: t.fullName,
-                            firstName: '',
-                            lastName: '',
-                            position: 'G',
-                            team: t.team,
-                            teamId: t.teamId,
-                          })
+                      <Tooltip
+                        label={
+                          inCompare
+                            ? 'Remove from compare'
+                            : isCompareFull
+                              ? 'Compare full'
+                              : 'Add to compare'
                         }
                       >
-                        Draft
-                      </Button>
+                        <ActionIcon
+                          size="sm"
+                          variant={inCompare ? 'filled' : 'subtle'}
+                          color={inCompare ? 'blue' : 'gray'}
+                          disabled={!inCompare && isCompareFull}
+                          onClick={() =>
+                            onCompareToggle({
+                              playerId: t.teamId,
+                              name: t.fullName,
+                              teamAbbrev: t.team,
+                              position: 'G',
+                              stats: { wins: t.wins, shutouts: t.shutouts },
+                            })
+                          }
+                        >
+                          {inCompare ? '✓' : '⚖'}
+                        </ActionIcon>
+                      </Tooltip>
                     </Table.Td>
-                  )}
-                </Table.Tr>
+                    <Table.Td>{t.fullName}</Table.Td>
+                    <Table.Td style={{ textAlign: 'right' }}>{t.wins}</Table.Td>
+                    <Table.Td style={{ textAlign: 'right' }}>
+                      {t.shutouts}
+                    </Table.Td>
+                    {isMyTurn && (
+                      <Table.Td>
+                        <Button
+                          size="xs"
+                          variant="light"
+                          onClick={() =>
+                            onSelectPlayer({
+                              id: t.teamId,
+                              fullName: t.fullName,
+                              firstName: '',
+                              lastName: '',
+                              position: 'G',
+                              team: t.team,
+                              teamId: t.teamId,
+                            })
+                          }
+                        >
+                          Draft
+                        </Button>
+                      </Table.Td>
+                    )}
+                  </Table.Tr>
                 );
               })}
               {filteredTeams.length === 0 && (
                 <Table.Tr>
                   <Table.Td colSpan={isMyTurn ? 5 : 4}>
-                    <Text c="dimmed" ta="center" size="sm">No available teams match your filters</Text>
+                    <Text c="dimmed" ta="center" size="sm">
+                      No available teams match your filters
+                    </Text>
                   </Table.Td>
                 </Table.Tr>
               )}
@@ -370,12 +478,20 @@ function AvailablePlayerBoard({
 export function DraftPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { user } = useAuthContext();
-  const { players: comparePlayers, isFull: isCompareFull, addPlayer, removePlayer, setDraftedIds } = useCompareContext();
+  const {
+    players: comparePlayers,
+    isFull: isCompareFull,
+    addPlayer,
+    removePlayer,
+    setDraftedIds,
+  } = useCompareContext();
   const { data: draft, isLoading: draftLoading } = useDraft(leagueId!);
   const { data: members } = useLeagueMembers(leagueId!);
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [confirmPlayer, setConfirmPlayer] = useState<DraftablePlayer | null>(null);
+  const [confirmPlayer, setConfirmPlayer] = useState<DraftablePlayer | null>(
+    null
+  );
   const [confirmPosition, setConfirmPosition] = useState<Position>('F');
   const [submitting, setSubmitting] = useState(false);
 
@@ -431,23 +547,29 @@ export function DraftPage() {
   }
 
   const draftOrder: string[] = (draft.draft_order as string[]) ?? [];
-  const picks = draft.draft_picks ?? [];
+  const picks = (draft.draft_picks ?? []) as DraftPickRow[];
 
   const currentPickIndex = draft.current_pick - 1;
   const currentPickerUserId = draftOrder[currentPickIndex];
   const isMyTurn = currentPickerUserId === user?.id;
-  const myMember = members?.find((m: any) => m.user_id === user?.id);
+  const myMember = members?.find((m: DraftMember) => m.user_id === user?.id);
   const currentPicker = members?.find(
-    (m: any) => m.user_id === currentPickerUserId
+    (m: DraftMember) => m.user_id === currentPickerUserId
   );
 
   // Track which players/teams have already been drafted
   const draftedPlayerIds = useMemo(
-    () => new Set<number>(picks.filter((p: any) => p.player_id).map((p: any) => p.player_id as number)),
+    () =>
+      new Set<number>(
+        picks.filter((p) => p.player_id).map((p) => p.player_id as number)
+      ),
     [picks]
   );
   const draftedTeamIds = useMemo(
-    () => new Set<number>(picks.filter((p: any) => p.team_id).map((p: any) => p.team_id as number)),
+    () =>
+      new Set<number>(
+        picks.filter((p) => p.team_id).map((p) => p.team_id as number)
+      ),
     [picks]
   );
 
@@ -526,16 +648,12 @@ export function DraftPage() {
 
   const isMobile = useMediaQuery('(max-width: 768px)');
 
-  const myPicks = picks.filter((p: any) => p.league_members?.user_id === user?.id);
+  const myPicks = picks.filter((p) => p.league_members?.user_id === user?.id);
 
   const onSelectPlayer = (player: DraftablePlayer) => {
     setConfirmPlayer(player);
     setConfirmPosition(
-      player.position === 'G'
-        ? 'G'
-        : player.position === 'D'
-          ? 'D'
-          : 'F'
+      player.position === 'G' ? 'G' : player.position === 'D' ? 'D' : 'F'
     );
   };
 
@@ -545,11 +663,19 @@ export function DraftPage() {
       <Group justify="space-between" wrap="wrap">
         <div>
           <Title order={isMobile ? 4 : 2}>Draft Room</Title>
-          <Text c="dimmed" size="sm">Round {draft.round}</Text>
+          <Text c="dimmed" size="sm">
+            Round {draft.round}
+          </Text>
         </div>
         <Group gap="xs" align="center">
-          <Text size="sm" c="dimmed">Pick #{draft.current_pick}</Text>
-          <Text fw={700}>{currentPicker ? (currentPicker as any).team_name : 'Unknown'}</Text>
+          <Text size="sm" c="dimmed">
+            Pick #{draft.current_pick}
+          </Text>
+          <Text fw={700}>
+            {currentPicker
+              ? (currentPicker as DraftMember).team_name
+              : 'Unknown'}
+          </Text>
           {isMyTurn && <Badge color="green">Your Turn!</Badge>}
         </Group>
       </Group>
@@ -587,7 +713,8 @@ export function DraftPage() {
       {!playerStats?.length && !teamStats?.length ? (
         <Stack gap="sm">
           <Text size="sm" c="dimmed">
-            No player data available yet. Ensure the NHL stats sync edge function has been run to populate playoff player data.
+            No player data available yet. Ensure the NHL stats sync edge
+            function has been run to populate playoff player data.
           </Text>
           {isMyTurn ? (
             <Alert color="green" title="It's your turn!">
@@ -595,7 +722,11 @@ export function DraftPage() {
             </Alert>
           ) : (
             <Alert color="blue">
-              Waiting for {currentPicker ? (currentPicker as any).team_name : 'the next drafter'} to make their pick...
+              Waiting for{' '}
+              {currentPicker
+                ? (currentPicker as DraftMember).team_name
+                : 'the next drafter'}{' '}
+              to make their pick...
             </Alert>
           )}
         </Stack>
@@ -620,9 +751,13 @@ export function DraftPage() {
   // Draft board content (draft history / all picks as a grid)
   const boardContent = (
     <Stack gap="sm">
-      <Text fw={600} size="sm">Draft Board</Text>
+      <Text fw={600} size="sm">
+        Draft Board
+      </Text>
       {picks.length === 0 ? (
-        <Text c="dimmed" size="sm">No picks yet</Text>
+        <Text c="dimmed" size="sm">
+          No picks yet
+        </Text>
       ) : (
         <ScrollArea h={isMobile ? 400 : undefined}>
           <Table striped highlightOnHover>
@@ -636,13 +771,25 @@ export function DraftPage() {
             </Table.Thead>
             <Table.Tbody>
               {[...picks]
-                .sort((a: any, b: any) => (a.pick_number ?? 0) - (b.pick_number ?? 0))
-                .map((pick: any) => (
+                .sort((a, b) => (a.pick_number ?? 0) - (b.pick_number ?? 0))
+                .map((pick) => (
                   <Table.Tr key={pick.id}>
                     <Table.Td>{pick.pick_number}</Table.Td>
-                    <Table.Td>{pick.league_members?.team_name ?? 'Unknown'}</Table.Td>
-                    <Table.Td>{pick.player_id ? `Player #${pick.player_id}` : pick.team_id ? `Team #${pick.team_id}` : '—'}</Table.Td>
-                    <Table.Td><Badge variant="light" size="xs">{pick.position}</Badge></Table.Td>
+                    <Table.Td>
+                      {pick.league_members?.team_name ?? 'Unknown'}
+                    </Table.Td>
+                    <Table.Td>
+                      {pick.player_id
+                        ? `Player #${pick.player_id}`
+                        : pick.team_id
+                          ? `Team #${pick.team_id}`
+                          : '—'}
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge variant="light" size="xs">
+                        {pick.position}
+                      </Badge>
+                    </Table.Td>
                   </Table.Tr>
                 ))}
             </Table.Tbody>
@@ -655,21 +802,35 @@ export function DraftPage() {
   // My Picks content
   const myPicksContent = (
     <Stack gap="sm">
-      <Text fw={600} size="sm">My Picks ({myPicks.length})</Text>
+      <Text fw={600} size="sm">
+        My Picks ({myPicks.length})
+      </Text>
       {myPicks.length === 0 ? (
-        <Text c="dimmed" size="sm">You haven't made any picks yet</Text>
+        <Text c="dimmed" size="sm">
+          You haven't made any picks yet
+        </Text>
       ) : (
         <Stack gap="xs">
           {[...myPicks]
-            .sort((a: any, b: any) => (a.pick_number ?? 0) - (b.pick_number ?? 0))
-            .map((pick: any) => (
+            .sort((a, b) => (a.pick_number ?? 0) - (b.pick_number ?? 0))
+            .map((pick) => (
               <Card key={pick.id} padding="xs" radius="sm" withBorder>
                 <Group justify="space-between">
                   <Group gap="xs">
-                    <Text size="sm" fw={600}>#{pick.pick_number}</Text>
-                    <Text size="sm">{pick.player_id ? `Player #${pick.player_id}` : pick.team_id ? `Team #${pick.team_id}` : '—'}</Text>
+                    <Text size="sm" fw={600}>
+                      #{pick.pick_number}
+                    </Text>
+                    <Text size="sm">
+                      {pick.player_id
+                        ? `Player #${pick.player_id}`
+                        : pick.team_id
+                          ? `Team #${pick.team_id}`
+                          : '—'}
+                    </Text>
                   </Group>
-                  <Badge variant="light" size="sm">{pick.position}</Badge>
+                  <Badge variant="light" size="sm">
+                    {pick.position}
+                  </Badge>
                 </Group>
               </Card>
             ))}
@@ -689,7 +850,8 @@ export function DraftPage() {
       {confirmPlayer && (
         <Stack gap="md">
           <Text>
-            Draft <strong>{confirmPlayer.fullName}</strong> ({confirmPlayer.team})?
+            Draft <strong>{confirmPlayer.fullName}</strong> (
+            {confirmPlayer.team})?
           </Text>
           <SegmentedControl
             value={confirmPosition}
@@ -709,8 +871,12 @@ export function DraftPage() {
             }
           />
           <Group justify="flex-end">
-            <Button variant="subtle" onClick={() => setConfirmPlayer(null)}>Cancel</Button>
-            <Button onClick={handleConfirmPick} loading={submitting}>Confirm Pick</Button>
+            <Button variant="subtle" onClick={() => setConfirmPlayer(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmPick} loading={submitting}>
+              Confirm Pick
+            </Button>
           </Group>
         </Stack>
       )}
@@ -780,20 +946,27 @@ export function DraftPage() {
 
         {/* Draft History */}
         <Card shadow="sm" padding="md" radius="md" withBorder>
-          <Title order={4} mb="sm">Draft History</Title>
+          <Title order={4} mb="sm">
+            Draft History
+          </Title>
           {picks.length === 0 ? (
-            <Text c="dimmed" size="sm">No picks yet</Text>
+            <Text c="dimmed" size="sm">
+              No picks yet
+            </Text>
           ) : (
             <Stack gap="xs">
               {[...picks]
-                .sort((a: any, b: any) => (b.pick_number ?? 0) - (a.pick_number ?? 0))
+                .sort((a, b) => (b.pick_number ?? 0) - (a.pick_number ?? 0))
                 .slice(0, 10)
-                .map((pick: any) => (
+                .map((pick) => (
                   <Group key={pick.id} justify="space-between">
                     <Text size="sm">
-                      #{pick.pick_number} - {pick.league_members?.team_name ?? 'Unknown'}
+                      #{pick.pick_number} -{' '}
+                      {pick.league_members?.team_name ?? 'Unknown'}
                     </Text>
-                    <Badge variant="light" size="sm">{pick.position}</Badge>
+                    <Badge variant="light" size="sm">
+                      {pick.position}
+                    </Badge>
                   </Group>
                 ))}
             </Stack>
@@ -802,11 +975,14 @@ export function DraftPage() {
 
         {/* Available Players */}
         <Card shadow="sm" padding="md" radius="md" withBorder>
-          <Title order={4} mb="sm">Available Players</Title>
+          <Title order={4} mb="sm">
+            Available Players
+          </Title>
           {!playerStats?.length && !teamStats?.length ? (
             <Stack gap="sm">
               <Text size="sm" c="dimmed">
-                No player data available yet. Ensure the NHL stats sync edge function has been run to populate playoff player data.
+                No player data available yet. Ensure the NHL stats sync edge
+                function has been run to populate playoff player data.
               </Text>
               {isMyTurn ? (
                 <Alert color="green" title="It's your turn!">
@@ -814,7 +990,11 @@ export function DraftPage() {
                 </Alert>
               ) : (
                 <Alert color="blue">
-                  Waiting for {currentPicker ? (currentPicker as any).team_name : 'the next drafter'} to make their pick...
+                  Waiting for{' '}
+                  {currentPicker
+                    ? (currentPicker as DraftMember).team_name
+                    : 'the next drafter'}{' '}
+                  to make their pick...
                 </Alert>
               )}
             </Stack>

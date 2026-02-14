@@ -16,7 +16,7 @@ function makePlayer(overrides: Partial<NHLPlayer> = {}): NHLPlayer {
     birthDate: '1997-01-13',
     currentAge: 29,
     nationality: 'CA',
-    height: "6'1\"",
+    height: '6\'1"',
     weight: 193,
     shootsCatches: 'L',
     primaryPosition: {
@@ -79,7 +79,9 @@ describe('PlayerCard', () => {
   it('calls onSelect when card is clicked', () => {
     const player = makePlayer();
     let calledWith: NHLPlayer | null = null;
-    const onSelect = (p: NHLPlayer) => { calledWith = p; };
+    const onSelect = (p: NHLPlayer) => {
+      calledWith = p;
+    };
     renderWithMantine(<PlayerCard player={player} onSelect={onSelect} />);
     fireEvent.click(screen.getByText('Connor McDavid'));
     expect(calledWith).toEqual(player);

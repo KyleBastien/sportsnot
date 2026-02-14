@@ -3,10 +3,7 @@
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "defaultBase": "main",
   "namedInputs": {
-    "default": [
-      "{projectRoot}/**/*",
-      "sharedGlobals"
-    ],
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
       "default",
       "!{projectRoot}/**/*.spec.ts",
@@ -16,9 +13,7 @@
   },
   "targetDefaults": {
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
+      "dependsOn": ["^build"],
       "cache": true
     },
     "test": {
@@ -44,6 +39,12 @@
       }
     },
     {
+      "plugin": "@nx/eslint/plugin",
+      "options": {
+        "targetName": "lint"
+      }
+    },
+    {
       "plugin": "@nx/rspack/plugin",
       "options": {
         "buildTargetName": "build",
@@ -60,7 +61,7 @@
       "application": {
         "babel": true,
         "style": "none",
-        "linter": "none",
+        "linter": "eslint",
         "bundler": "rspack"
       },
       "component": {
@@ -68,7 +69,7 @@
       },
       "library": {
         "style": "none",
-        "linter": "none",
+        "linter": "eslint",
         "unitTestRunner": "none"
       }
     }

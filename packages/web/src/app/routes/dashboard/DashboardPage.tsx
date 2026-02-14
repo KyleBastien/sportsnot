@@ -25,7 +25,11 @@ interface LeagueWithMembership {
   max_participants: number;
   commissioner_id: string;
   invite_code: string;
-  league_members: Array<{ team_name: string; total_points: number; user_id: string }>;
+  league_members: Array<{
+    team_name: string;
+    total_points: number;
+    user_id: string;
+  }>;
   memberCount: number;
 }
 
@@ -47,9 +51,10 @@ function useMyLeagues() {
 
       if (error) throw error;
 
-      return (data ?? []).map((league: any) => ({
+      return (data ?? []).map((league: Record<string, unknown>) => ({
         ...league,
-        memberCount: league.league_members?.length ?? 0,
+        memberCount:
+          (league['league_members'] as unknown[] | undefined)?.length ?? 0,
       })) as LeagueWithMembership[];
     },
     enabled: !!user,
@@ -75,7 +80,8 @@ export function DashboardPage() {
           <div>
             <Title order={2}>Dashboard</Title>
             <Text c="dimmed">
-              Welcome back, {user?.user_metadata?.['display_name'] ?? user?.email}
+              Welcome back,{' '}
+              {user?.user_metadata?.['display_name'] ?? user?.email}
             </Text>
           </div>
           <Group>

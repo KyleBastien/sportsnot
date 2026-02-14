@@ -23,7 +23,13 @@ function formatStartTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function TeamRow({ team, isWinner }: { team: GameCardTeam; isWinner: boolean }) {
+function TeamRow({
+  team,
+  isWinner,
+}: {
+  team: GameCardTeam;
+  isWinner: boolean;
+}) {
   return (
     <Group gap="xs">
       <Avatar src={team.logoUrl} size="sm" radius="sm">

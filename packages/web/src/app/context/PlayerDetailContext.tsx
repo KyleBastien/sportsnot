@@ -9,11 +9,13 @@ import {
 
 interface PlayerDetailContextValue {
   selectedPlayerId: number | null;
-  openPlayerDetail: (playerId: number) => void; // eslint-disable-line no-unused-vars
+  openPlayerDetail: (playerId: number) => void;
   closePlayerDetail: () => void;
 }
 
-const PlayerDetailContext = createContext<PlayerDetailContextValue | null>(null);
+const PlayerDetailContext = createContext<PlayerDetailContextValue | null>(
+  null
+);
 
 export function PlayerDetailProvider({ children }: { children: ReactNode }) {
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);

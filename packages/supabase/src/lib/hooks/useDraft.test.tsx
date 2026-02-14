@@ -27,24 +27,23 @@ function createTestQueryClient() {
 function createWrapper(queryClient?: QueryClient) {
   const qc = queryClient ?? createTestQueryClient();
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
   };
 }
 
 // Proxy-based mock for supabase.from() chain
-function mockSupabaseFrom(
-  resolveWith: { data?: unknown; error?: unknown; count?: number | null }
-) {
+function mockSupabaseFrom(resolveWith: {
+  data?: unknown;
+  error?: unknown;
+  count?: number | null;
+}) {
   const chainMethods: Record<string, unknown> = {};
   const chain = new Proxy(chainMethods, {
     get(_target, prop) {
       if (prop === 'then') {
         return (
           resolve: (val: unknown) => void,
-          // eslint-disable-next-line no-unused-vars
-          reject: (val: unknown) => void
+          _reject: (val: unknown) => void
         ) => {
           if (resolveWith.error) {
             resolve({
@@ -202,7 +201,7 @@ describe('useDraft', () => {
         return () => proxy;
       },
     });
-    supabase.channel = ((name: string) => {
+    supabase.channel = ((_name: string) => {
       channelCreated = true;
       return proxy;
     }) as unknown as typeof supabase.channel;
@@ -250,10 +249,10 @@ describe('useMakePick', () => {
     mockChannel();
     let insertCalled = false;
     let updateCalled = false;
-    let callCount = 0;
+    let _callCount = 0;
 
     supabase.from = ((table: string) => {
-      callCount++;
+      _callCount++;
       if (table === 'draft_picks') {
         insertCalled = true;
         return mockSupabaseFrom({ data: null });

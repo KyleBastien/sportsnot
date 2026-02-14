@@ -9,7 +9,10 @@ import {
   ScrollArea,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { useCompareContext, type ComparePlayer } from '../context/CompareContext';
+import {
+  useCompareContext,
+  type ComparePlayer,
+} from '../context/CompareContext';
 import { usePlayerDetailContext } from '../context/PlayerDetailContext';
 
 interface ComparisonModalProps {
@@ -20,7 +23,7 @@ interface ComparisonModalProps {
 interface StatDef {
   key: string;
   label: string;
-  format?: (value: number) => string; // eslint-disable-line no-unused-vars
+  format?: (value: number) => string;
   higherIsBetter?: boolean;
 }
 
@@ -40,7 +43,12 @@ const SKATER_STATS: StatDef[] = [
 const GOALIE_STATS: StatDef[] = [
   { key: 'wins', label: 'Wins' },
   { key: 'shutouts', label: 'Shutouts' },
-  { key: 'gaa', label: 'GAA', format: (v: number) => v.toFixed(2), higherIsBetter: false },
+  {
+    key: 'gaa',
+    label: 'GAA',
+    format: (v: number) => v.toFixed(2),
+    higherIsBetter: false,
+  },
   {
     key: 'savePercentage',
     label: 'SV%',
@@ -81,10 +89,7 @@ function findBestIndex(
   for (let i = 0; i < values.length; i++) {
     const v = values[i];
     if (v === null) continue;
-    if (
-      bestVal === null ||
-      (higherIsBetter ? v > bestVal : v < bestVal)
-    ) {
+    if (bestVal === null || (higherIsBetter ? v > bestVal : v < bestVal)) {
       bestVal = v;
       bestIdx = i;
     }
@@ -121,43 +126,46 @@ export function ComparisonModal({ opened, onClose }: ComparisonModalProps) {
                     ? draftedTeamIds?.has(player.playerId)
                     : draftedPlayerIds?.has(player.playerId)) ?? false;
                 return (
-                <Table.Th key={player.playerId} style={{ textAlign: 'center' }}>
-                  <Stack align="center" gap={4}>
-                    <Avatar
-                      src={player.headshot}
-                      alt={player.name}
-                      size="md"
-                      radius="xl"
-                    />
-                    <Text
-                      size="sm"
-                      fw={500}
-                      c={isDrafted ? 'dimmed' : 'blue'}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => openPlayerDetail(player.playerId)}
-                    >
-                      {player.name}
-                    </Text>
-                    <Group gap={4} justify="center">
-                      <Text size="xs" c="dimmed">
-                        {player.teamAbbrev}
+                  <Table.Th
+                    key={player.playerId}
+                    style={{ textAlign: 'center' }}
+                  >
+                    <Stack align="center" gap={4}>
+                      <Avatar
+                        src={player.headshot}
+                        alt={player.name}
+                        size="md"
+                        radius="xl"
+                      />
+                      <Text
+                        size="sm"
+                        fw={500}
+                        c={isDrafted ? 'dimmed' : 'blue'}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => openPlayerDetail(player.playerId)}
+                      >
+                        {player.name}
                       </Text>
-                      <Badge size="xs" variant="light">
-                        {player.position}
-                      </Badge>
-                    </Group>
-                    {isDrafted && (
-                      <Badge size="xs" variant="light" color="red">
-                        Drafted
-                      </Badge>
-                    )}
-                    {player.stats['fantasyPoints'] != null && (
-                      <Badge size="sm" variant="filled" color="green">
-                        {player.stats['fantasyPoints']} pts
-                      </Badge>
-                    )}
-                  </Stack>
-                </Table.Th>
+                      <Group gap={4} justify="center">
+                        <Text size="xs" c="dimmed">
+                          {player.teamAbbrev}
+                        </Text>
+                        <Badge size="xs" variant="light">
+                          {player.position}
+                        </Badge>
+                      </Group>
+                      {isDrafted && (
+                        <Badge size="xs" variant="light" color="red">
+                          Drafted
+                        </Badge>
+                      )}
+                      {player.stats['fantasyPoints'] != null && (
+                        <Badge size="sm" variant="filled" color="green">
+                          {player.stats['fantasyPoints']} pts
+                        </Badge>
+                      )}
+                    </Stack>
+                  </Table.Th>
                 );
               })}
             </Table.Tr>

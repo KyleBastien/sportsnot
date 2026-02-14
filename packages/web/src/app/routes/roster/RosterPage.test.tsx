@@ -33,7 +33,10 @@ function renderPage(queryClient?: QueryClient, leagueId = 'test-league-1') {
           <AuthProvider>
             <CompareProvider>
               <Routes>
-                <Route path="/leagues/:leagueId/roster" element={<RosterPage />} />
+                <Route
+                  path="/leagues/:leagueId/roster"
+                  element={<RosterPage />}
+                />
               </Routes>
             </CompareProvider>
           </AuthProvider>
@@ -91,7 +94,10 @@ describe('RosterPage', () => {
 
   it('shows round number', () => {
     const qc = createTestQueryClient();
-    qc.setQueryData(['roster', 'test-league-1', undefined], makeRosterData({ round: 3 }));
+    qc.setQueryData(
+      ['roster', 'test-league-1', undefined],
+      makeRosterData({ round: 3 })
+    );
     renderPage(qc);
     expect(screen.getByText('Round 3')).toBeTruthy();
   });
@@ -119,7 +125,10 @@ describe('RosterPage', () => {
 
   it('shows "No player drafted in this slot" for empty groups', () => {
     const qc = createTestQueryClient();
-    qc.setQueryData(['roster', 'test-league-1', undefined], makeRosterData({ slots: [] }));
+    qc.setQueryData(
+      ['roster', 'test-league-1', undefined],
+      makeRosterData({ slots: [] })
+    );
     renderPage(qc);
     const emptyMessages = screen.getAllByText('No player drafted in this slot');
     // All 5 position groups should be empty
@@ -132,11 +141,33 @@ describe('RosterPage', () => {
       makeSlot({ id: 's1', position: 'F', player_id: 97, points_earned: 15 }),
       makeSlot({ id: 's2', position: 'D', player_id: 88, points_earned: 8 }),
     ];
-    qc.setQueryData(['roster', 'test-league-1', undefined], makeRosterData({ slots }));
-    qc.setQueryData(['playoff-players', '20242025', 2], [
-      { player_id: 97, player_name: 'Connor McDavid', position: 'F', team_abbreviation: 'EDM', goals: 10, assists: 15, games_played: 8 },
-      { player_id: 88, player_name: 'Cale Makar', position: 'D', team_abbreviation: 'COL', goals: 3, assists: 12, games_played: 8 },
-    ]);
+    qc.setQueryData(
+      ['roster', 'test-league-1', undefined],
+      makeRosterData({ slots })
+    );
+    qc.setQueryData(
+      ['playoff-players', '20242025', 2],
+      [
+        {
+          player_id: 97,
+          player_name: 'Connor McDavid',
+          position: 'F',
+          team_abbreviation: 'EDM',
+          goals: 10,
+          assists: 15,
+          games_played: 8,
+        },
+        {
+          player_id: 88,
+          player_name: 'Cale Makar',
+          position: 'D',
+          team_abbreviation: 'COL',
+          goals: 3,
+          assists: 12,
+          games_played: 8,
+        },
+      ]
+    );
     qc.setQueryData(['playoff-teams', '20242025', 2], []);
     renderPage(qc);
     expect(screen.getByText('Connor McDavid')).toBeTruthy();
@@ -150,7 +181,10 @@ describe('RosterPage', () => {
       makeSlot({ id: 's2', position: 'D', is_active: true, points_earned: 5 }),
       makeSlot({ id: 's3', position: 'G', is_active: false, points_earned: 3 }),
     ];
-    qc.setQueryData(['roster', 'test-league-1', undefined], makeRosterData({ slots }));
+    qc.setQueryData(
+      ['roster', 'test-league-1', undefined],
+      makeRosterData({ slots })
+    );
     renderPage(qc);
     expect(screen.getByText('Total Points')).toBeTruthy();
     // Only active slots count: 10 + 5 = 15
@@ -163,7 +197,10 @@ describe('RosterPage', () => {
       makeSlot({ id: 's1', position: 'F', is_active: true, points_earned: 5 }),
       makeSlot({ id: 's2', position: 'D', is_active: false, points_earned: 0 }),
     ];
-    qc.setQueryData(['roster', 'test-league-1', undefined], makeRosterData({ slots }));
+    qc.setQueryData(
+      ['roster', 'test-league-1', undefined],
+      makeRosterData({ slots })
+    );
     renderPage(qc);
     expect(screen.getByText('Active')).toBeTruthy();
     expect(screen.getByText('Inactive')).toBeTruthy();
@@ -176,7 +213,10 @@ describe('RosterPage', () => {
       makeSlot({ id: 's2', position: 'F', player_id: 2 }),
       makeSlot({ id: 's3', position: 'D', player_id: 3 }),
     ];
-    qc.setQueryData(['roster', 'test-league-1', undefined], makeRosterData({ slots }));
+    qc.setQueryData(
+      ['roster', 'test-league-1', undefined],
+      makeRosterData({ slots })
+    );
     renderPage(qc);
     expect(screen.getByText('2 players')).toBeTruthy();
     expect(screen.getByText('1 player')).toBeTruthy();
@@ -186,19 +226,29 @@ describe('RosterPage', () => {
     const qc = createTestQueryClient();
     const slots = [
       makeSlot({ id: 's1', position: 'F', player_id: 1, is_active: true }),
-      makeSlot({ id: 's2', position: 'IR_F', player_id: 2, is_active: false, activated_from_ir: false }),
+      makeSlot({
+        id: 's2',
+        position: 'IR_F',
+        player_id: 2,
+        is_active: false,
+        activated_from_ir: false,
+      }),
     ];
-    qc.setQueryData(['roster', 'test-league-1', undefined], makeRosterData({ slots }));
+    qc.setQueryData(
+      ['roster', 'test-league-1', undefined],
+      makeRosterData({ slots })
+    );
     renderPage(qc);
     expect(screen.getByText('Activate IR')).toBeTruthy();
   });
 
   it('shows fallback player ID when player stats are not cached', () => {
     const qc = createTestQueryClient();
-    const slots = [
-      makeSlot({ id: 's1', position: 'F', player_id: 999 }),
-    ];
-    qc.setQueryData(['roster', 'test-league-1', undefined], makeRosterData({ slots }));
+    const slots = [makeSlot({ id: 's1', position: 'F', player_id: 999 })];
+    qc.setQueryData(
+      ['roster', 'test-league-1', undefined],
+      makeRosterData({ slots })
+    );
     // No playoff-players cached, so fallback name used
     renderPage(qc);
     expect(screen.getByText('Player #999')).toBeTruthy();

@@ -12,9 +12,24 @@ export interface TeamCardProps {
 }
 
 const sizeMap = {
-  sm: { padding: 'xs' as const, avatar: 'md' as const, titleSize: 'sm', gap: 2 },
-  md: { padding: 'sm' as const, avatar: 'lg' as const, titleSize: 'md', gap: 4 },
-  lg: { padding: 'md' as const, avatar: 'xl' as const, titleSize: 'lg', gap: 6 },
+  sm: {
+    padding: 'xs' as const,
+    avatar: 'md' as const,
+    titleSize: 'sm',
+    gap: 2,
+  },
+  md: {
+    padding: 'sm' as const,
+    avatar: 'lg' as const,
+    titleSize: 'md',
+    gap: 4,
+  },
+  lg: {
+    padding: 'md' as const,
+    avatar: 'xl' as const,
+    titleSize: 'lg',
+    gap: 6,
+  },
 };
 
 export function TeamCard({

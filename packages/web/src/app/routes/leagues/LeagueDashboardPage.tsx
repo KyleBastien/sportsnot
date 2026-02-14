@@ -21,6 +21,14 @@ import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { LiveGamesWidget } from '../../components/LiveGamesWidget';
 
+interface DashboardMember {
+  id: string;
+  user_id: string;
+  team_name: string;
+  total_points: number;
+  users?: { display_name: string | null; avatar_url: string | null };
+}
+
 function useLeague(leagueId: string) {
   return useQuery({
     queryKey: ['league', leagueId],
@@ -77,9 +85,9 @@ export function LeagueDashboardPage() {
   }
 
   const isCommissioner = league.commissioner_id === user?.id;
-  const members = league.league_members ?? [];
+  const members = (league.league_members ?? []) as DashboardMember[];
   const sortedMembers = [...members].sort(
-    (a: any, b: any) => (b.total_points ?? 0) - (a.total_points ?? 0)
+    (a, b) => (b.total_points ?? 0) - (a.total_points ?? 0)
   );
 
   return (
@@ -207,19 +215,16 @@ export function LeagueDashboardPage() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {sortedMembers.map((member: any, index: number) => (
+              {sortedMembers.map((member, index: number) => (
                 <Table.Tr
                   key={member.id}
                   style={{
-                    fontWeight:
-                      member.user_id === user?.id ? 700 : undefined,
+                    fontWeight: member.user_id === user?.id ? 700 : undefined,
                   }}
                 >
                   <Table.Td>{index + 1}</Table.Td>
                   <Table.Td>{member.team_name}</Table.Td>
-                  <Table.Td>
-                    {member.users?.display_name ?? 'Unknown'}
-                  </Table.Td>
+                  <Table.Td>{member.users?.display_name ?? 'Unknown'}</Table.Td>
                   <Table.Td style={{ textAlign: 'right' }}>
                     {member.total_points ?? 0}
                   </Table.Td>

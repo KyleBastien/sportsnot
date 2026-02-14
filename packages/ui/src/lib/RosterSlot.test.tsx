@@ -48,7 +48,9 @@ describe('RosterSlot', () => {
   });
 
   it('shows points when pointsEarned is provided', () => {
-    renderWithMantine(<RosterSlot position="F" player={player} pointsEarned={12} />);
+    renderWithMantine(
+      <RosterSlot position="F" player={player} pointsEarned={12} />
+    );
     expect(screen.getByText('12')).toBeTruthy();
   });
 
@@ -59,7 +61,9 @@ describe('RosterSlot', () => {
 
   it('renders action buttons and calls onAction', () => {
     let calledAction: string | null = null;
-    const onAction = (action: string) => { calledAction = action; };
+    const onAction = (action: string) => {
+      calledAction = action;
+    };
     renderWithMantine(
       <RosterSlot
         position="F"
@@ -76,7 +80,9 @@ describe('RosterSlot', () => {
 
   it('renders activate action for IR slots', () => {
     let calledAction: string | null = null;
-    const onAction = (action: string) => { calledAction = action; };
+    const onAction = (action: string) => {
+      calledAction = action;
+    };
     renderWithMantine(
       <RosterSlot
         position="IR_F"
@@ -96,7 +102,9 @@ describe('RosterSlot', () => {
   });
 
   it('applies reduced opacity when isActive is false', () => {
-    renderWithMantine(<RosterSlot position="F" player={player} isActive={false} />);
+    renderWithMantine(
+      <RosterSlot position="F" player={player} isActive={false} />
+    );
     expect(screen.getByText('Connor McDavid')).toBeTruthy();
   });
 });

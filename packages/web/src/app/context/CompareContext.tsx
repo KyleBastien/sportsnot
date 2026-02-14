@@ -28,14 +28,16 @@ interface CompareContextValue {
   clearAll: () => void;
   draftedPlayerIds: Set<number>;
   draftedTeamIds: Set<number>;
-  setDraftedIds: (playerIds: Set<number>, teamIds: Set<number>) => void; // eslint-disable-line no-unused-vars
+  setDraftedIds: (playerIds: Set<number>, teamIds: Set<number>) => void;
 }
 
 const CompareContext = createContext<CompareContextValue | null>(null);
 
 export function CompareProvider({ children }: { children: ReactNode }) {
   const [players, setPlayers] = useState<ComparePlayer[]>([]);
-  const [draftedPlayerIds, setDraftedPlayerIds] = useState<Set<number>>(new Set());
+  const [draftedPlayerIds, setDraftedPlayerIds] = useState<Set<number>>(
+    new Set()
+  );
   const [draftedTeamIds, setDraftedTeamIds] = useState<Set<number>>(new Set());
   const { user } = useAuthContext();
 
@@ -64,14 +66,35 @@ export function CompareProvider({ children }: { children: ReactNode }) {
     setPlayers([]);
   }, []);
 
-  const setDraftedIds = useCallback((playerIds: Set<number>, teamIds: Set<number>) => {
-    setDraftedPlayerIds(playerIds);
-    setDraftedTeamIds(teamIds);
-  }, []);
+  const setDraftedIds = useCallback(
+    (playerIds: Set<number>, teamIds: Set<number>) => {
+      setDraftedPlayerIds(playerIds);
+      setDraftedTeamIds(teamIds);
+    },
+    []
+  );
 
   const value = useMemo<CompareContextValue>(
-    () => ({ players, isFull, addPlayer, removePlayer, clearAll, draftedPlayerIds, draftedTeamIds, setDraftedIds }),
-    [players, isFull, addPlayer, removePlayer, clearAll, draftedPlayerIds, draftedTeamIds, setDraftedIds]
+    () => ({
+      players,
+      isFull,
+      addPlayer,
+      removePlayer,
+      clearAll,
+      draftedPlayerIds,
+      draftedTeamIds,
+      setDraftedIds,
+    }),
+    [
+      players,
+      isFull,
+      addPlayer,
+      removePlayer,
+      clearAll,
+      draftedPlayerIds,
+      draftedTeamIds,
+      setDraftedIds,
+    ]
   );
 
   return (

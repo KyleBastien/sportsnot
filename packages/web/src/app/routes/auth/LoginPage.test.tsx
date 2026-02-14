@@ -45,7 +45,9 @@ describe('LoginPage', () => {
 
   it('renders magic link description text', () => {
     renderPage();
-    expect(screen.getByText('Enter your email to receive a magic link')).toBeTruthy();
+    expect(
+      screen.getByText('Enter your email to receive a magic link')
+    ).toBeTruthy();
   });
 
   it('renders email input field', () => {
@@ -66,14 +68,18 @@ describe('LoginPage', () => {
 
   it('allows typing in email input', () => {
     renderPage();
-    const emailInput = screen.getByPlaceholderText('you@example.com') as HTMLInputElement;
+    const emailInput = screen.getByPlaceholderText(
+      'you@example.com'
+    ) as HTMLInputElement;
     fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
     expect(emailInput.value).toBe('test@example.com');
   });
 
   it('renders email input with type email', () => {
     renderPage();
-    const emailInput = screen.getByPlaceholderText('you@example.com') as HTMLInputElement;
+    const emailInput = screen.getByPlaceholderText(
+      'you@example.com'
+    ) as HTMLInputElement;
     expect(emailInput.type).toBe('email');
   });
 

@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 import { useState, useEffect, useCallback } from 'react';
 import {
   requestNotificationPermission,
@@ -48,7 +47,8 @@ export function usePushNotifications() {
   );
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [preferences, setPreferencesState] = useState<PushPreferences>(loadPreferences);
+  const [preferences, setPreferencesState] =
+    useState<PushPreferences>(loadPreferences);
 
   // Check current subscription on mount
   useEffect(() => {

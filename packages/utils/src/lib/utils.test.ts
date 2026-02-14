@@ -190,8 +190,12 @@ describe('downloadCsv', () => {
     revokedUrl = '';
 
     // Mock URL.createObjectURL and revokeObjectURL
-    (globalThis as any).URL.createObjectURL = (_blob: Blob) => 'blob:mock-url';
-    (globalThis as any).URL.revokeObjectURL = (url: string) => {
+    (globalThis.URL as unknown as Record<string, unknown>).createObjectURL = (
+      _blob: Blob
+    ) => 'blob:mock-url';
+    (globalThis.URL as unknown as Record<string, unknown>).revokeObjectURL = (
+      url: string
+    ) => {
       revokedUrl = url;
     };
 
@@ -208,7 +212,8 @@ describe('downloadCsv', () => {
           set(target, prop, value) {
             if (prop === 'download') downloadAttr = value as string;
             if (prop === 'href') hrefAttr = value as string;
-            (target as any)[prop] = value;
+            (target as unknown as Record<string | symbol, unknown>)[prop] =
+              value;
             return true;
           },
         });

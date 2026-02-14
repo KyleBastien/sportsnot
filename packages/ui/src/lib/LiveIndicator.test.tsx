@@ -56,9 +56,7 @@ describe('LiveIndicator', () => {
 
   it('hides timestamp when showTimestamp is false', () => {
     const recent = new Date();
-    renderWithMantine(
-      <LiveIndicator isLive lastUpdated={recent} />
-    );
+    renderWithMantine(<LiveIndicator isLive lastUpdated={recent} />);
     expect(screen.queryByText(/Updated/)).toBeNull();
   });
 

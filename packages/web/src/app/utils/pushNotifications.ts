@@ -1,5 +1,3 @@
-/* eslint-disable no-undef */
-
 // Placeholder VAPID public key - replace with server-generated key in production
 const VAPID_PUBLIC_KEY =
   'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkGs-GDY6QKgS-XQ5-jJHs2be8P3Do2CjGH_xFNjHs';

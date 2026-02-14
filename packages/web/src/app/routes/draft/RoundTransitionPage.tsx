@@ -18,6 +18,21 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 
+interface TransitionMember {
+  id: string;
+  user_id: string;
+  team_name: string;
+  total_points: number;
+  users?: { display_name: string | null };
+}
+
+interface CompletedDraft {
+  id: string;
+  round: number;
+  status: string;
+  completed_at: string | null;
+}
+
 export function RoundTransitionPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { user } = useAuthContext();
@@ -63,16 +78,16 @@ export function RoundTransitionPage() {
   const nextRound = currentRound + 1;
 
   // Sort members by points (worst to best for re-draft order)
-  const sortedMembers = [...(league?.league_members ?? [])].sort(
-    (a: any, b: any) => (a.total_points ?? 0) - (b.total_points ?? 0)
-  );
+  const sortedMembers = [
+    ...((league?.league_members ?? []) as TransitionMember[]),
+  ].sort((a, b) => (a.total_points ?? 0) - (b.total_points ?? 0));
 
   const handleStartReDraft = async () => {
     if (!league || sortedMembers.length < 2) return;
     setStarting(true);
 
     // Re-draft order: worst to best by points (snake pattern)
-    const reDraftOrder = sortedMembers.map((m: any) => m.user_id);
+    const reDraftOrder = sortedMembers.map((m) => m.user_id);
 
     const { error } = await supabase.from('drafts').insert({
       league_id: leagueId,
@@ -139,12 +154,9 @@ export function RoundTransitionPage() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {[...(league.league_members ?? [])]
-                  .sort(
-                    (a: any, b: any) =>
-                      (b.total_points ?? 0) - (a.total_points ?? 0)
-                  )
-                  .map((m: any, index: number) => (
+                {[...((league.league_members ?? []) as TransitionMember[])]
+                  .sort((a, b) => (b.total_points ?? 0) - (a.total_points ?? 0))
+                  .map((m, index: number) => (
                     <Table.Tr key={m.id}>
                       <Table.Td>
                         <Badge
@@ -156,9 +168,14 @@ export function RoundTransitionPage() {
                       </Table.Td>
                       <Table.Td>{m.team_name}</Table.Td>
                       <Table.Td>
-                        {(m.users as any)?.display_name ?? 'Unknown'}
+                        {m.users?.display_name ?? 'Unknown'}
                         {m.user_id === user?.id && (
-                          <Badge size="xs" ml="xs" color="green" variant="light">
+                          <Badge
+                            size="xs"
+                            ml="xs"
+                            color="green"
+                            variant="light"
+                          >
                             You
                           </Badge>
                         )}
@@ -181,7 +198,7 @@ export function RoundTransitionPage() {
           <Card shadow="sm" padding="lg" radius="md" withBorder>
             <Stack gap="md">
               <Title order={4}>Draft History</Title>
-              {completedDrafts.map((d: any) => (
+              {(completedDrafts as CompletedDraft[]).map((d) => (
                 <Group key={d.id} justify="space-between">
                   <Text>Round {d.round}</Text>
                   <Badge color="green" variant="light">

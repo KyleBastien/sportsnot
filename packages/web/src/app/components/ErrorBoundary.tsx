@@ -36,7 +36,9 @@ export class ErrorBoundary extends Component<Props, State> {
           <Stack align="center" gap="lg">
             <Title order={2}>Something went wrong</Title>
             <Alert color="red" title="Error Details" maw={500} w="100%">
-              <Text size="sm">{this.state.error?.message ?? 'Unknown error'}</Text>
+              <Text size="sm">
+                {this.state.error?.message ?? 'Unknown error'}
+              </Text>
             </Alert>
             <Button onClick={() => window.location.reload()}>
               Reload Page

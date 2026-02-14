@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 import { Badge, Text } from '@mantine/core';
 import type { MantineSize } from '@mantine/core';
 import { useEffect, useRef, useState } from 'react';
@@ -50,7 +49,9 @@ export function PointsBadge({
         size={size}
         variant={variant}
         color={getColor(points)}
-        style={pulsing ? { animation: 'pointsPulse 200ms ease-in-out' } : undefined}
+        style={
+          pulsing ? { animation: 'pointsPulse 200ms ease-in-out' } : undefined
+        }
       >
         {points}
       </Badge>

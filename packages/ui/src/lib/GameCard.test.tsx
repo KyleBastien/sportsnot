@@ -42,9 +42,7 @@ describe('GameCard', () => {
   });
 
   it('shows LIVE indicator for live status', () => {
-    renderWithMantine(
-      <GameCard {...makeProps({ status: 'live' })} />
-    );
+    renderWithMantine(<GameCard {...makeProps({ status: 'live' })} />);
     expect(screen.getByText('LIVE')).toBeTruthy();
   });
 
@@ -65,9 +63,7 @@ describe('GameCard', () => {
   it('shows start time for upcoming games', () => {
     const startTime = new Date(2026, 1, 14, 19, 0);
     renderWithMantine(
-      <GameCard
-        {...makeProps({ status: 'upcoming', startTime })}
-      />
+      <GameCard {...makeProps({ status: 'upcoming', startTime })} />
     );
     expect(screen.getByText(/7:00/)).toBeTruthy();
   });
@@ -97,7 +93,10 @@ describe('GameCard', () => {
   it('shows highlight reason when provided', () => {
     renderWithMantine(
       <GameCard
-        {...makeProps({ highlight: true, highlightReason: 'Your player scored!' })}
+        {...makeProps({
+          highlight: true,
+          highlightReason: 'Your player scored!',
+        })}
       />
     );
     expect(screen.getByText('Your player scored!')).toBeTruthy();
@@ -106,7 +105,10 @@ describe('GameCard', () => {
   it('does not show highlight reason without highlight', () => {
     renderWithMantine(
       <GameCard
-        {...makeProps({ highlight: false, highlightReason: 'Your player scored!' })}
+        {...makeProps({
+          highlight: false,
+          highlightReason: 'Your player scored!',
+        })}
       />
     );
     expect(screen.queryByText('Your player scored!')).toBeNull();
@@ -115,7 +117,13 @@ describe('GameCard', () => {
   it('calls onClick when card is clicked', () => {
     let clicked = false;
     renderWithMantine(
-      <GameCard {...makeProps({ onClick: () => { clicked = true; } })} />
+      <GameCard
+        {...makeProps({
+          onClick: () => {
+            clicked = true;
+          },
+        })}
+      />
     );
     fireEvent.click(screen.getByText('FINAL'));
     expect(clicked).toBe(true);

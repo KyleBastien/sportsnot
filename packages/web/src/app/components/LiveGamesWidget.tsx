@@ -24,7 +24,9 @@ interface RosteredPlayer {
   position: string;
 }
 
-function mapGameStatus(state: NHLGame['gameState']): 'upcoming' | 'live' | 'final' {
+function mapGameStatus(
+  state: NHLGame['gameState']
+): 'upcoming' | 'live' | 'final' {
   if (state === 'LIVE') return 'live';
   if (state === 'FINAL' || state === 'OFF') return 'final';
   return 'upcoming';
@@ -162,7 +164,11 @@ export function LiveGamesWidget({ leagueId }: LiveGamesWidgetProps) {
           status={mapGameStatus(game.gameState)}
           period={formatPeriod(game.period)}
           timeRemaining={game.periodTimeRemaining}
-          startTime={game.gameState === 'FUT' || game.gameState === 'PRE' ? new Date(game.startTimeUTC) : undefined}
+          startTime={
+            game.gameState === 'FUT' || game.gameState === 'PRE'
+              ? new Date(game.startTimeUTC)
+              : undefined
+          }
           highlight={hasRosteredPlayers}
           highlightReason={
             hasRosteredPlayers

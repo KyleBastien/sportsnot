@@ -1,4 +1,13 @@
-import { Card, Group, Text, Badge, Avatar, Stack, ActionIcon, Tooltip } from '@mantine/core';
+import {
+  Card,
+  Group,
+  Text,
+  Badge,
+  Avatar,
+  Stack,
+  ActionIcon,
+  Tooltip,
+} from '@mantine/core';
 import type { NHLPlayer } from '@sportsnot/types';
 
 export interface PlayerCardProps {
@@ -11,7 +20,7 @@ export interface PlayerCardProps {
   /** Whether the compare tray is full (4 players) */
   isCompareFull?: boolean;
   /** Called when the compare button is clicked; receives the player */
-  onCompareToggle?: (player: NHLPlayer) => void; // eslint-disable-line no-unused-vars
+  onCompareToggle?: (player: NHLPlayer) => void;
 }
 
 export function PlayerCard({
@@ -84,7 +93,9 @@ export function PlayerCard({
                 e.stopPropagation();
                 onCompareToggle(player);
               }}
-              aria-label={isInCompare ? 'Remove from compare' : 'Add to compare'}
+              aria-label={
+                isInCompare ? 'Remove from compare' : 'Add to compare'
+              }
             >
               {isInCompare ? '✓' : '⚖'}
             </ActionIcon>

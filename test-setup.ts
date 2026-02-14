@@ -24,4 +24,3 @@ class ResizeObserverMock {
   disconnect() {}
 }
 (globalThis as Record<string, unknown>).ResizeObserver = ResizeObserverMock;
-

@@ -1,7 +1,15 @@
 import { Badge } from '@mantine/core';
 import type { MantineSize } from '@mantine/core';
 
-export type PositionType = 'F' | 'D' | 'G' | 'IR_F' | 'IR_D' | 'C' | 'LW' | 'RW';
+export type PositionType =
+  | 'F'
+  | 'D'
+  | 'G'
+  | 'IR_F'
+  | 'IR_D'
+  | 'C'
+  | 'LW'
+  | 'RW';
 
 export interface PositionBadgeProps {
   position: PositionType;

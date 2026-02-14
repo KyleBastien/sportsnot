@@ -1,10 +1,13 @@
-/* eslint-disable no-undef */
 /// <reference lib="webworker" />
 
 import { clientsClaim } from 'workbox-core';
 import { precacheAndRoute, matchPrecache } from 'workbox-precaching';
 import { registerRoute, setCatchHandler, Route } from 'workbox-routing';
-import { CacheFirst, StaleWhileRevalidate, NetworkFirst } from 'workbox-strategies';
+import {
+  CacheFirst,
+  StaleWhileRevalidate,
+  NetworkFirst,
+} from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 
@@ -28,7 +31,10 @@ registerRoute(
       cacheName: 'static-assets',
       plugins: [
         new CacheableResponsePlugin({ statuses: [0, 200] }),
-        new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 }),
+        new ExpirationPlugin({
+          maxEntries: 100,
+          maxAgeSeconds: 30 * 24 * 60 * 60,
+        }),
       ],
     })
   )
@@ -38,8 +44,7 @@ registerRoute(
 registerRoute(
   new Route(
     ({ url }) =>
-      url.pathname.includes('/rest/') ||
-      url.hostname.includes('supabase'),
+      url.pathname.includes('/rest/') || url.hostname.includes('supabase'),
     new StaleWhileRevalidate({
       cacheName: 'api-responses',
       plugins: [
@@ -56,9 +61,7 @@ registerRoute(
     ({ request }) => request.mode === 'navigate',
     new NetworkFirst({
       cacheName: 'pages',
-      plugins: [
-        new CacheableResponsePlugin({ statuses: [0, 200] }),
-      ],
+      plugins: [new CacheableResponsePlugin({ statuses: [0, 200] })],
     })
   )
 );
@@ -109,18 +112,20 @@ self.addEventListener('notificationclick', (event) => {
   const clickAction = event.notification.data?.clickAction || '/';
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Focus existing window if available
-      for (const client of clientList) {
-        if ('focus' in client) {
-          (client as WindowClient).focus();
-          (client as WindowClient).navigate(clickAction);
-          return;
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // Focus existing window if available
+        for (const client of clientList) {
+          if ('focus' in client) {
+            (client as WindowClient).focus();
+            (client as WindowClient).navigate(clickAction);
+            return;
+          }
         }
-      }
-      // Open new window otherwise
-      return self.clients.openWindow(clickAction);
-    })
+        // Open new window otherwise
+        return self.clients.openWindow(clickAction);
+      })
   );
 });
 

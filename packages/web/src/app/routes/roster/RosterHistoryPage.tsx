@@ -18,6 +18,12 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 
+interface HistoryMember {
+  id: string;
+  user_id: string;
+  team_name: string;
+}
+
 export function RosterHistoryPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { user } = useAuthContext();
@@ -38,8 +44,8 @@ export function RosterHistoryPage() {
     enabled: !!leagueId,
   });
 
-  const myMember = (league?.league_members ?? []).find(
-    (m: any) => m.user_id === user?.id
+  const myMember = ((league?.league_members ?? []) as HistoryMember[]).find(
+    (m) => m.user_id === user?.id
   );
 
   const { data: rosters, isLoading: rostersLoading } = useQuery({

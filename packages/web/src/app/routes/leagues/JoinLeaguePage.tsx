@@ -44,7 +44,12 @@ export function JoinLeaguePage() {
       return;
     }
 
-    const memberCount = (league as any).league_members?.length ?? 0;
+    const memberCount =
+      (
+        (league as Record<string, unknown>)['league_members'] as
+          | unknown[]
+          | undefined
+      )?.length ?? 0;
 
     if (memberCount >= league.max_participants) {
       setError('This league is full.');
@@ -68,13 +73,11 @@ export function JoinLeaguePage() {
     setLoading(true);
     setError(null);
 
-    const { error: joinError } = await supabase
-      .from('league_members')
-      .insert({
-        league_id: leaguePreview.id,
-        user_id: user.id,
-        team_name: teamName,
-      });
+    const { error: joinError } = await supabase.from('league_members').insert({
+      league_id: leaguePreview.id,
+      user_id: user.id,
+      team_name: teamName,
+    });
 
     if (joinError) {
       if (joinError.message.includes('unique')) {

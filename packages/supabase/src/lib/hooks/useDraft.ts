@@ -32,7 +32,12 @@ export function useDraft(leagueId: string | undefined) {
       .channel(`draft-${leagueId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'drafts', filter: `league_id=eq.${leagueId}` },
+        {
+          event: '*',
+          schema: 'public',
+          table: 'drafts',
+          filter: `league_id=eq.${leagueId}`,
+        },
         () => queryClient.invalidateQueries({ queryKey: ['draft', leagueId] })
       )
       .on(

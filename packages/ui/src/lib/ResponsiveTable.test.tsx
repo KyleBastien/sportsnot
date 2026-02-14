@@ -24,27 +24,21 @@ const data = [
 
 describe('ResponsiveTable – desktop (table view)', () => {
   it('renders column headers', () => {
-    renderWithMantine(
-      <ResponsiveTable columns={columns} data={data} />
-    );
+    renderWithMantine(<ResponsiveTable columns={columns} data={data} />);
     expect(screen.getByText('Name')).toBeTruthy();
     expect(screen.getByText('Points')).toBeTruthy();
     expect(screen.getByText('Team')).toBeTruthy();
   });
 
   it('renders all data rows', () => {
-    renderWithMantine(
-      <ResponsiveTable columns={columns} data={data} />
-    );
+    renderWithMantine(<ResponsiveTable columns={columns} data={data} />);
     expect(screen.getByText('McDavid')).toBeTruthy();
     expect(screen.getByText('Matthews')).toBeTruthy();
     expect(screen.getByText('Draisaitl')).toBeTruthy();
   });
 
   it('renders cell values', () => {
-    renderWithMantine(
-      <ResponsiveTable columns={columns} data={data} />
-    );
+    renderWithMantine(<ResponsiveTable columns={columns} data={data} />);
     expect(screen.getByText('120')).toBeTruthy();
     // EDM appears twice in data (McDavid and Draisaitl)
     expect(screen.getAllByText('EDM').length).toBe(2);
@@ -56,7 +50,9 @@ describe('ResponsiveTable – desktop (table view)', () => {
       <ResponsiveTable
         columns={columns}
         data={data}
-        onRowClick={(row) => { clickedRow = row; }}
+        onRowClick={(row) => {
+          clickedRow = row;
+        }}
       />
     );
     fireEvent.click(screen.getByText('McDavid'));
@@ -69,7 +65,11 @@ describe('ResponsiveTable – desktop (table view)', () => {
         columns={columns}
         data={data}
         renderCell={(key, value) =>
-          key === 'points' ? <strong>{String(value)} pts</strong> : String(value ?? '')
+          key === 'points' ? (
+            <strong>{String(value)} pts</strong>
+          ) : (
+            String(value ?? '')
+          )
         }
       />
     );
@@ -79,7 +79,10 @@ describe('ResponsiveTable – desktop (table view)', () => {
   it('shows em-dash for null values', () => {
     const sparse = [{ name: 'Test', points: null, team: null }];
     renderWithMantine(
-      <ResponsiveTable columns={columns} data={sparse as unknown as Record<string, unknown>[]} />
+      <ResponsiveTable
+        columns={columns}
+        data={sparse as unknown as Record<string, unknown>[]}
+      />
     );
     expect(screen.getAllByText('—').length).toBe(2);
   });
@@ -157,9 +160,7 @@ describe('ResponsiveTable – mobile (card view)', () => {
 
   it('renders column labels on each card in mobile view', () => {
     setMobile();
-    renderWithMantine(
-      <ResponsiveTable columns={columns} data={[data[0]]} />
-    );
+    renderWithMantine(<ResponsiveTable columns={columns} data={[data[0]]} />);
     expect(screen.getByText('Name')).toBeTruthy();
     expect(screen.getByText('Points')).toBeTruthy();
     expect(screen.getByText('Team')).toBeTruthy();
@@ -172,7 +173,9 @@ describe('ResponsiveTable – mobile (card view)', () => {
       <ResponsiveTable
         columns={columns}
         data={[data[0]]}
-        onRowClick={(row) => { clickedRow = row; }}
+        onRowClick={(row) => {
+          clickedRow = row;
+        }}
       />
     );
     fireEvent.click(screen.getByText('McDavid'));

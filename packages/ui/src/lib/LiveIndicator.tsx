@@ -17,10 +17,11 @@ function formatTimeAgo(date: Date): string {
   return `${hours}h ago`;
 }
 
-const SIZE_MAP: Record<'sm' | 'md', { badge: MantineSize; text: MantineSize }> = {
-  sm: { badge: 'sm', text: 'xs' },
-  md: { badge: 'lg', text: 'xs' },
-};
+const SIZE_MAP: Record<'sm' | 'md', { badge: MantineSize; text: MantineSize }> =
+  {
+    sm: { badge: 'sm', text: 'xs' },
+    md: { badge: 'lg', text: 'xs' },
+  };
 
 export function LiveIndicator({
   isLive,

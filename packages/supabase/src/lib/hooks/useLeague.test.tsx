@@ -2,7 +2,12 @@ import { describe, it, expect, afterEach } from '@rstest/core';
 import { renderHook, cleanup, waitFor, act } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useLeagues, useLeague, useCreateLeague, useJoinLeague } from './useLeague';
+import {
+  useLeagues,
+  useLeague,
+  useCreateLeague,
+  useJoinLeague,
+} from './useLeague';
 import { supabase } from '../supabase';
 
 afterEach(cleanup);
@@ -27,16 +32,16 @@ function createTestQueryClient() {
 function createWrapper(queryClient?: QueryClient) {
   const qc = queryClient ?? createTestQueryClient();
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
   };
 }
 
 // Helper to create a mock chain for supabase.from().select().eq()... patterns
-function mockSupabaseFrom(
-  resolveWith: { data?: unknown; error?: unknown; count?: number | null }
-) {
+function mockSupabaseFrom(resolveWith: {
+  data?: unknown;
+  error?: unknown;
+  count?: number | null;
+}) {
   const chainMethods: Record<string, unknown> = {};
   const chain = new Proxy(chainMethods, {
     get(_target, prop) {
@@ -44,7 +49,7 @@ function mockSupabaseFrom(
         // Make it thenable to resolve the final value
         return (
           resolve: (val: unknown) => void,
-          reject: (val: unknown) => void
+          _reject: (val: unknown) => void
         ) => {
           if (resolveWith.error) {
             // For queries, errors are thrown by the hook
@@ -275,10 +280,10 @@ describe('useLeague', () => {
 describe('useCreateLeague', () => {
   it('creates a league and returns the data', async () => {
     const createdLeague = { id: 'new-league', name: 'My League' };
-    let fromCallCount = 0;
+    let _fromCallCount = 0;
 
     supabase.from = ((table: string) => {
-      fromCallCount++;
+      _fromCallCount++;
       if (table === 'leagues') {
         // insert().select().single() chain for leagues
         return mockSupabaseFrom({ data: createdLeague });
@@ -335,7 +340,11 @@ describe('useCreateLeague', () => {
 
 describe('useJoinLeague', () => {
   it('joins a league successfully', async () => {
-    const foundLeague = { id: 'league-1', name: 'Test League', max_participants: 8 };
+    const foundLeague = {
+      id: 'league-1',
+      name: 'Test League',
+      max_participants: 8,
+    };
 
     supabase.from = ((table: string) => {
       if (table === 'leagues') {

@@ -49,9 +49,7 @@ function UserMenu() {
   }
 
   const displayName =
-    user.user_metadata?.['display_name'] ??
-    user.email?.split('@')[0] ??
-    'User';
+    user.user_metadata?.['display_name'] ?? user.email?.split('@')[0] ?? 'User';
 
   return (
     <Menu shadow="md" width={200}>

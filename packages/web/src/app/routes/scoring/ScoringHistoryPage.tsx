@@ -97,7 +97,11 @@ export function ScoringHistoryPage() {
     return f;
   }, [eventTypeFilter, dateFrom, dateTo, showMyEvents, currentMemberId]);
 
-  const { data: result, isLoading, isError } = useScoringEvents(leagueId, filters, page);
+  const {
+    data: result,
+    isLoading,
+    isError,
+  } = useScoringEvents(leagueId, filters, page);
 
   const memberMap = useMemo(() => {
     const map: Record<string, string> = {};

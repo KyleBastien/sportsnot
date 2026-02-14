@@ -55,7 +55,7 @@ function NotificationItem({
   onSelect,
 }: {
   notification: Notification;
-  onSelect: (n: Notification) => void; // eslint-disable-line no-unused-vars
+  onSelect: (n: Notification) => void;
 }) {
   return (
     <Box
@@ -77,11 +77,7 @@ function NotificationItem({
           {ICON_MAP[notification.type]}
         </Text>
         <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            size="sm"
-            fw={notification.read ? 400 : 700}
-            truncate="end"
-          >
+          <Text size="sm" fw={notification.read ? 400 : 700} truncate="end">
             {notification.title}
           </Text>
           <Text size="xs" c="dimmed" lineClamp={2}>

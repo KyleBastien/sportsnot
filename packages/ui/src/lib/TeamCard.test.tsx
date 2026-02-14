@@ -11,9 +11,7 @@ function renderWithMantine(ui: React.ReactElement) {
 
 describe('TeamCard', () => {
   it('renders team name and abbreviation', () => {
-    renderWithMantine(
-      <TeamCard teamName="Edmonton Oilers" teamAbbrev="EDM" />
-    );
+    renderWithMantine(<TeamCard teamName="Edmonton Oilers" teamAbbrev="EDM" />);
     expect(screen.getByText('Edmonton Oilers')).toBeTruthy();
     expect(screen.getAllByText('EDM').length).toBeGreaterThan(0);
   });
@@ -30,9 +28,7 @@ describe('TeamCard', () => {
   });
 
   it('does not render record when not provided', () => {
-    renderWithMantine(
-      <TeamCard teamName="Edmonton Oilers" teamAbbrev="EDM" />
-    );
+    renderWithMantine(<TeamCard teamName="Edmonton Oilers" teamAbbrev="EDM" />);
     expect(screen.queryByText(/W–/)).toBeNull();
   });
 
@@ -70,13 +66,11 @@ describe('TeamCard', () => {
 
   it('calls onClick when card is clicked', () => {
     let called = false;
-    const onClick = () => { called = true; };
+    const onClick = () => {
+      called = true;
+    };
     renderWithMantine(
-      <TeamCard
-        teamName="Edmonton Oilers"
-        teamAbbrev="EDM"
-        onClick={onClick}
-      />
+      <TeamCard teamName="Edmonton Oilers" teamAbbrev="EDM" onClick={onClick} />
     );
     fireEvent.click(screen.getByText('Edmonton Oilers'));
     expect(called).toBe(true);

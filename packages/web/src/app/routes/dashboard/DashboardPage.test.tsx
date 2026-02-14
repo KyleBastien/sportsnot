@@ -99,7 +99,9 @@ describe('DashboardPage', () => {
         max_participants: 6,
         commissioner_id: 'user-1',
         invite_code: 'DEF456',
-        league_members: [{ team_name: 'Team C', total_points: 0, user_id: 'user-1' }],
+        league_members: [
+          { team_name: 'Team C', total_points: 0, user_id: 'user-1' },
+        ],
         memberCount: 1,
       },
     ];
@@ -117,19 +119,22 @@ describe('DashboardPage', () => {
 
   it('does not show empty state when leagues exist', () => {
     const qc = createTestQueryClient();
-    qc.setQueryData(['my-leagues', undefined], [
-      {
-        id: 'league-1',
-        name: 'My League',
-        status: 'active',
-        current_round: 1,
-        max_participants: 4,
-        commissioner_id: 'u1',
-        invite_code: 'XYZ',
-        league_members: [{ team_name: 'T1', total_points: 0, user_id: 'u1' }],
-        memberCount: 1,
-      },
-    ]);
+    qc.setQueryData(
+      ['my-leagues', undefined],
+      [
+        {
+          id: 'league-1',
+          name: 'My League',
+          status: 'active',
+          current_round: 1,
+          max_participants: 4,
+          commissioner_id: 'u1',
+          invite_code: 'XYZ',
+          league_members: [{ team_name: 'T1', total_points: 0, user_id: 'u1' }],
+          memberCount: 1,
+        },
+      ]
+    );
     renderPage(qc);
     expect(screen.queryByText("You haven't joined any leagues yet")).toBeNull();
   });

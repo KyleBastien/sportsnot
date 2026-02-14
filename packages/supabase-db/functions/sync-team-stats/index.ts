@@ -108,7 +108,11 @@ Deno.serve(async (req) => {
             ? game.awayTeam?.score
             : game.homeTeam?.score;
 
-          if (teamScore != null && opponentScore != null && teamScore > opponentScore) {
+          if (
+            teamScore != null &&
+            opponentScore != null &&
+            teamScore > opponentScore
+          ) {
             wins++;
             if (opponentScore === 0) shutouts++;
           }
@@ -145,9 +149,9 @@ Deno.serve(async (req) => {
       { headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: (error as Error).message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 });

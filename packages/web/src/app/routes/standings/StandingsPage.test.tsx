@@ -31,7 +31,10 @@ function renderPage(queryClient?: QueryClient, leagueId = 'test-league-1') {
         <MemoryRouter initialEntries={[`/leagues/${leagueId}/standings`]}>
           <AuthProvider>
             <Routes>
-              <Route path="/leagues/:leagueId/standings" element={<StandingsPage />} />
+              <Route
+                path="/leagues/:leagueId/standings"
+                element={<StandingsPage />}
+              />
             </Routes>
           </AuthProvider>
         </MemoryRouter>
@@ -92,9 +95,27 @@ describe('StandingsPage', () => {
     qc.setQueryData(['standings', 'test-league-1'], {
       league: { name: 'My League', current_round: 1 },
       members: [
-        { id: 'm1', user_id: 'u1', team_name: 'Team Alpha', total_points: 42, users: { display_name: 'Alice' } },
-        { id: 'm2', user_id: 'u2', team_name: 'Team Beta', total_points: 35, users: { display_name: 'Bob' } },
-        { id: 'm3', user_id: 'u3', team_name: 'Team Gamma', total_points: 28, users: { display_name: 'Carol' } },
+        {
+          id: 'm1',
+          user_id: 'u1',
+          team_name: 'Team Alpha',
+          total_points: 42,
+          users: { display_name: 'Alice' },
+        },
+        {
+          id: 'm2',
+          user_id: 'u2',
+          team_name: 'Team Beta',
+          total_points: 35,
+          users: { display_name: 'Bob' },
+        },
+        {
+          id: 'm3',
+          user_id: 'u3',
+          team_name: 'Team Gamma',
+          total_points: 28,
+          users: { display_name: 'Carol' },
+        },
       ],
     });
     renderPage(qc);
@@ -111,9 +132,27 @@ describe('StandingsPage', () => {
     qc.setQueryData(['standings', 'test-league-1'], {
       league: { name: 'Ranked League', current_round: 1 },
       members: [
-        { id: 'm1', user_id: 'u1', team_name: 'First', total_points: 100, users: { display_name: 'A' } },
-        { id: 'm2', user_id: 'u2', team_name: 'Second', total_points: 80, users: { display_name: 'B' } },
-        { id: 'm3', user_id: 'u3', team_name: 'Third', total_points: 60, users: { display_name: 'C' } },
+        {
+          id: 'm1',
+          user_id: 'u1',
+          team_name: 'First',
+          total_points: 100,
+          users: { display_name: 'A' },
+        },
+        {
+          id: 'm2',
+          user_id: 'u2',
+          team_name: 'Second',
+          total_points: 80,
+          users: { display_name: 'B' },
+        },
+        {
+          id: 'm3',
+          user_id: 'u3',
+          team_name: 'Third',
+          total_points: 60,
+          users: { display_name: 'C' },
+        },
       ],
     });
     renderPage(qc);
@@ -127,8 +166,20 @@ describe('StandingsPage', () => {
     qc.setQueryData(['standings', 'test-league-1'], {
       league: { name: 'League', current_round: 1 },
       members: [
-        { id: 'm1', user_id: 'u1', team_name: 'Team A', total_points: 10, users: { display_name: 'Alice Johnson' } },
-        { id: 'm2', user_id: 'u2', team_name: 'Team B', total_points: 5, users: { display_name: 'Bob Smith' } },
+        {
+          id: 'm1',
+          user_id: 'u1',
+          team_name: 'Team A',
+          total_points: 10,
+          users: { display_name: 'Alice Johnson' },
+        },
+        {
+          id: 'm2',
+          user_id: 'u2',
+          team_name: 'Team B',
+          total_points: 5,
+          users: { display_name: 'Bob Smith' },
+        },
       ],
     });
     renderPage(qc);
@@ -141,7 +192,13 @@ describe('StandingsPage', () => {
     qc.setQueryData(['standings', 'test-league-1'], {
       league: { name: 'League', current_round: 1 },
       members: [
-        { id: 'm1', user_id: 'u1', team_name: 'No Manager Team', total_points: 10, users: null },
+        {
+          id: 'm1',
+          user_id: 'u1',
+          team_name: 'No Manager Team',
+          total_points: 10,
+          users: null,
+        },
       ],
     });
     renderPage(qc);
@@ -153,7 +210,13 @@ describe('StandingsPage', () => {
     qc.setQueryData(['standings', 'test-league-1'], {
       league: { name: 'League', current_round: 1 },
       members: [
-        { id: 'm1', user_id: 'u1', team_name: 'T1', total_points: 0, users: { display_name: 'A' } },
+        {
+          id: 'm1',
+          user_id: 'u1',
+          team_name: 'T1',
+          total_points: 0,
+          users: { display_name: 'A' },
+        },
       ],
     });
     renderPage(qc);

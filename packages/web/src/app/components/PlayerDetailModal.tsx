@@ -209,7 +209,9 @@ function GameLogRow({ game }: { game: GameLogEntry }) {
       </Table.Td>
       <Table.Td style={{ textAlign: 'right' }}>{game.goals}</Table.Td>
       <Table.Td style={{ textAlign: 'right' }}>{game.assists}</Table.Td>
-      <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{game.points}</Table.Td>
+      <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
+        {game.points}
+      </Table.Td>
       <Table.Td style={{ textAlign: 'right' }}>
         {game.plusMinus > 0 ? `+${game.plusMinus}` : game.plusMinus}
       </Table.Td>
@@ -248,16 +250,29 @@ function VirtualizedGameLog({ games }: { games: GameLogEntry[] }) {
       <Table striped highlightOnHover>
         <GameLogTableHead />
         <Table.Tbody>
-          {virtualizer.getVirtualItems().length > 0 && virtualizer.getVirtualItems()[0].start > 0 && (
-            <Table.Tr>
-              <Table.Td colSpan={9} style={{ height: virtualizer.getVirtualItems()[0].start, padding: 0 }} />
-            </Table.Tr>
-          )}
+          {virtualizer.getVirtualItems().length > 0 &&
+            virtualizer.getVirtualItems()[0].start > 0 && (
+              <Table.Tr>
+                <Table.Td
+                  colSpan={9}
+                  style={{
+                    height: virtualizer.getVirtualItems()[0].start,
+                    padding: 0,
+                  }}
+                />
+              </Table.Tr>
+            )}
           {virtualizer.getVirtualItems().map((virtualRow) => (
-            <Table.Tr key={games[virtualRow.index].gameId} data-index={virtualRow.index} ref={virtualizer.measureElement}>
+            <Table.Tr
+              key={games[virtualRow.index].gameId}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+            >
               <Table.Td>
                 <Text size="sm">
-                  {new Date(games[virtualRow.index].gameDate).toLocaleDateString('en-US', {
+                  {new Date(
+                    games[virtualRow.index].gameDate
+                  ).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
                   })}
@@ -266,15 +281,29 @@ function VirtualizedGameLog({ games }: { games: GameLogEntry[] }) {
               <Table.Td>
                 <Text size="sm">{games[virtualRow.index].opponentAbbrev}</Text>
               </Table.Td>
-              <Table.Td style={{ textAlign: 'right' }}>{games[virtualRow.index].goals}</Table.Td>
-              <Table.Td style={{ textAlign: 'right' }}>{games[virtualRow.index].assists}</Table.Td>
-              <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{games[virtualRow.index].points}</Table.Td>
               <Table.Td style={{ textAlign: 'right' }}>
-                {games[virtualRow.index].plusMinus > 0 ? `+${games[virtualRow.index].plusMinus}` : games[virtualRow.index].plusMinus}
+                {games[virtualRow.index].goals}
               </Table.Td>
-              <Table.Td style={{ textAlign: 'right' }}>{games[virtualRow.index].pim}</Table.Td>
-              <Table.Td style={{ textAlign: 'right' }}>{games[virtualRow.index].shots}</Table.Td>
-              <Table.Td style={{ textAlign: 'right' }}>{games[virtualRow.index].toi}</Table.Td>
+              <Table.Td style={{ textAlign: 'right' }}>
+                {games[virtualRow.index].assists}
+              </Table.Td>
+              <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
+                {games[virtualRow.index].points}
+              </Table.Td>
+              <Table.Td style={{ textAlign: 'right' }}>
+                {games[virtualRow.index].plusMinus > 0
+                  ? `+${games[virtualRow.index].plusMinus}`
+                  : games[virtualRow.index].plusMinus}
+              </Table.Td>
+              <Table.Td style={{ textAlign: 'right' }}>
+                {games[virtualRow.index].pim}
+              </Table.Td>
+              <Table.Td style={{ textAlign: 'right' }}>
+                {games[virtualRow.index].shots}
+              </Table.Td>
+              <Table.Td style={{ textAlign: 'right' }}>
+                {games[virtualRow.index].toi}
+              </Table.Td>
             </Table.Tr>
           ))}
           {virtualizer.getVirtualItems().length > 0 && (
@@ -282,7 +311,11 @@ function VirtualizedGameLog({ games }: { games: GameLogEntry[] }) {
               <Table.Td
                 colSpan={9}
                 style={{
-                  height: virtualizer.getTotalSize() - virtualizer.getVirtualItems()[virtualizer.getVirtualItems().length - 1].end,
+                  height:
+                    virtualizer.getTotalSize() -
+                    virtualizer.getVirtualItems()[
+                      virtualizer.getVirtualItems().length - 1
+                    ].end,
                   padding: 0,
                 }}
               />

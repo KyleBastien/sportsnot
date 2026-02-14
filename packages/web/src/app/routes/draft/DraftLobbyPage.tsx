@@ -18,6 +18,13 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 
+interface LobbyMember {
+  id: string;
+  user_id: string;
+  team_name: string;
+  users?: { display_name: string | null };
+}
+
 export function DraftLobbyPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { user } = useAuthContext();
@@ -67,14 +74,14 @@ export function DraftLobbyPage() {
   }, [activeDraft, leagueId, navigate]);
 
   const isCommissioner = league?.commissioner_id === user?.id;
-  const members = league?.league_members ?? [];
+  const members = (league?.league_members ?? []) as LobbyMember[];
   const nextRound = (league?.current_round ?? 0) + 1;
 
   const handleStartDraft = async () => {
     if (!league || members.length < 2) return;
     setStarting(true);
 
-    const memberUserIds = members.map((m: any) => m.user_id);
+    const memberUserIds = members.map((m) => m.user_id);
     const shuffled = [...memberUserIds].sort(() => Math.random() - 0.5);
 
     const { error } = await supabase.from('drafts').insert({
@@ -162,12 +169,10 @@ export function DraftLobbyPage() {
           <Stack gap="md">
             <Title order={4}>Participants</Title>
             <List spacing="sm">
-              {members.map((m: any) => (
+              {members.map((m) => (
                 <List.Item key={m.id}>
                   <Group gap="sm">
-                    <Text fw={500}>
-                      {(m.users as any)?.display_name ?? 'Unknown'}
-                    </Text>
+                    <Text fw={500}>{m.users?.display_name ?? 'Unknown'}</Text>
                     <Text c="dimmed" size="sm">
                       ({m.team_name})
                     </Text>

@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 import {
   createContext,
   useContext,
@@ -28,12 +27,16 @@ export interface Notification {
 interface NotificationContextValue {
   notifications: Notification[];
   unreadCount: number;
-  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void; // eslint-disable-line no-unused-vars
-  markAsRead: (id: string) => void; // eslint-disable-line no-unused-vars
+  addNotification: (
+    notification: Omit<Notification, 'id' | 'timestamp' | 'read'>
+  ) => void;
+  markAsRead: (id: string) => void;
   markAllRead: () => void;
 }
 
-const NotificationContext = createContext<NotificationContextValue | null>(null);
+const NotificationContext = createContext<NotificationContextValue | null>(
+  null
+);
 
 function loadNotifications(): Notification[] {
   try {
@@ -56,7 +59,8 @@ function saveNotifications(notifications: Notification[]): void {
 }
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const [notifications, setNotifications] = useState<Notification[]>(loadNotifications);
+  const [notifications, setNotifications] =
+    useState<Notification[]>(loadNotifications);
   const { user } = useAuthContext();
 
   // Clear notifications on sign-out
@@ -105,7 +109,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<NotificationContextValue>(
-    () => ({ notifications, unreadCount, addNotification, markAsRead, markAllRead }),
+    () => ({
+      notifications,
+      unreadCount,
+      addNotification,
+      markAsRead,
+      markAllRead,
+    }),
     [notifications, unreadCount, addNotification, markAsRead, markAllRead]
   );
 

@@ -20,6 +20,14 @@ import { ResponsiveTable, type ResponsiveTableColumn } from '@sportsnot/ui';
 import { downloadCsv } from '@sportsnot/utils';
 import { type ReactNode, useMemo, useCallback } from 'react';
 
+interface StandingsMember {
+  id: string;
+  user_id: string;
+  team_name: string;
+  total_points: number;
+  users?: { display_name: string | null };
+}
+
 function useStandings(leagueId: string) {
   return useQuery({
     queryKey: ['standings', leagueId],
@@ -40,7 +48,7 @@ function useStandings(leagueId: string) {
 
       return {
         league,
-        members: members ?? [],
+        members: (members ?? []) as StandingsMember[],
       };
     },
   });
@@ -97,7 +105,7 @@ export function StandingsPage() {
 
   const handleExportCsv = () => {
     const headers = ['Rank', 'Team', 'Manager', 'Points'];
-    const rows = members.map((member: any, index: number) => [
+    const rows = members.map((member, index: number) => [
       index + 1,
       member.team_name ?? '',
       member.users?.display_name ?? 'Unknown',
@@ -117,7 +125,7 @@ export function StandingsPage() {
 
   const standingsData = useMemo(
     () =>
-      members.map((member: any, index: number) => ({
+      members.map((member, index: number) => ({
         _id: member.id,
         _userId: member.user_id,
         rank: index + 1,
@@ -135,9 +143,24 @@ export function StandingsPage() {
 
       if (key === 'rank') {
         const rank = value as number;
-        if (rank === 1) return <Badge color="gold" variant="filled">1st</Badge>;
-        if (rank === 2) return <Badge color="gray" variant="filled">2nd</Badge>;
-        if (rank === 3) return <Badge color="orange" variant="filled">3rd</Badge>;
+        if (rank === 1)
+          return (
+            <Badge color="gold" variant="filled">
+              1st
+            </Badge>
+          );
+        if (rank === 2)
+          return (
+            <Badge color="gray" variant="filled">
+              2nd
+            </Badge>
+          );
+        if (rank === 3)
+          return (
+            <Badge color="orange" variant="filled">
+              3rd
+            </Badge>
+          );
         return <>{rank}</>;
       }
 
@@ -223,26 +246,26 @@ export function StandingsPage() {
               Export CSV
             </Button>
             <Stack gap={4} align="flex-end">
-            {isLive && (
-              <Badge
-                color="green"
-                variant="dot"
-                size="lg"
-                styles={{
-                  root: {
-                    animation: 'scorePulse 2s ease-in-out infinite',
-                  },
-                }}
-              >
-                LIVE
-              </Badge>
-            )}
-            {displayTime && (
-              <Text size="xs" c="dimmed">
-                Updated {formatTimeAgo(displayTime)}
-              </Text>
-            )}
-          </Stack>
+              {isLive && (
+                <Badge
+                  color="green"
+                  variant="dot"
+                  size="lg"
+                  styles={{
+                    root: {
+                      animation: 'scorePulse 2s ease-in-out infinite',
+                    },
+                  }}
+                >
+                  LIVE
+                </Badge>
+              )}
+              {displayTime && (
+                <Text size="xs" c="dimmed">
+                  Updated {formatTimeAgo(displayTime)}
+                </Text>
+              )}
+            </Stack>
           </Group>
         </Group>
 
