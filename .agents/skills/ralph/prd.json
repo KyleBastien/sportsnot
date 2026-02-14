@@ -1,7 +1,7 @@
 {
   "project": "SportsNot",
   "branchName": "ralph/platform-features",
-  "description": "SportsNot Platform Features (P0-P2) \u00e2\u20ac\u201d Player comparison, live scoring, mobile responsive design, live games widget, notifications, scoring history, reusable UI components, testing coverage, and P2 enhancements",
+  "description": "SportsNot Platform Features (P0-P2) â€” Player comparison, live scoring, mobile responsive design, live games widget, notifications, scoring history, reusable UI components, testing coverage, and P2 enhancements",
   "userStories": [
     {
       "id": "US-001",
@@ -27,7 +27,7 @@
         "Create CompareTray component that reads from CompareContext",
         "Tray is fixed to the bottom of the viewport, only visible when 1+ players are selected",
         "Tray shows player avatars/names and a count badge (e.g. 'Compare (2)')",
-        "Each player in the tray has an \u00c3\u2014 button to remove them",
+        "Each player in the tray has an Ã— button to remove them",
         "A 'Clear All' button empties the tray",
         "A 'Compare' button is enabled when 2+ players are selected and opens the comparison modal (modal implemented in next story)",
         "Tray does not obstruct bottom navigation on mobile (positioned above it)",
@@ -51,7 +51,7 @@
         "Each player column shows: name, team, position, headshot",
         "Fantasy points earned (from roster) are shown if the player is on a user's roster",
         "Modal uses Mantine Modal with fullScreen on mobile, standard size on desktop",
-        "Modal can be closed via \u00c3\u2014 button or Escape key",
+        "Modal can be closed via Ã— button or Escape key",
         "Typecheck passes",
         "Verify in browser if browser testing tools are available"
       ],
@@ -246,7 +246,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -262,7 +262,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 15,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -280,7 +280,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 16,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -298,7 +298,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 17,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -315,7 +315,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 18,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -332,7 +332,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 19,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -350,7 +350,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 20,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on PositionBadge (US-015) and PointsBadge (US-016)"
     },
     {
@@ -369,7 +369,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 21,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on LiveIndicator (US-018)"
     },
     {
@@ -385,7 +385,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 22,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on GameCard (US-021)"
     },
     {
@@ -401,7 +401,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 23,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on LiveGamesWidget (US-022)"
     },
     {
@@ -532,7 +532,7 @@
     },
     {
       "id": "US-031",
-      "title": "Component tests for @sportsnot/ui \u00e2\u20ac\u201d PlayerCard, TeamCard, PositionBadge",
+      "title": "Component tests for @sportsnot/ui â€” PlayerCard, TeamCard, PositionBadge",
       "description": "As a developer, I want component tests for PlayerCard, TeamCard, and PositionBadge so that I can refactor with confidence.",
       "acceptanceCriteria": [
         "Tests for PlayerCard: renders player info, handles missing data, shows points when provided",
@@ -548,7 +548,7 @@
     },
     {
       "id": "US-032",
-      "title": "Component tests for @sportsnot/ui \u00e2\u20ac\u201d RosterSlot, PointsBadge, StatRow",
+      "title": "Component tests for @sportsnot/ui â€” RosterSlot, PointsBadge, StatRow",
       "description": "As a developer, I want component tests for RosterSlot, PointsBadge, and StatRow.",
       "acceptanceCriteria": [
         "Tests for RosterSlot: renders empty state, filled state, IR state, action buttons",
@@ -564,7 +564,7 @@
     },
     {
       "id": "US-033",
-      "title": "Component tests for @sportsnot/ui \u00e2\u20ac\u201d LiveIndicator, GameCard, ResponsiveTable",
+      "title": "Component tests for @sportsnot/ui â€” LiveIndicator, GameCard, ResponsiveTable",
       "description": "As a developer, I want component tests for LiveIndicator, GameCard, and ResponsiveTable.",
       "acceptanceCriteria": [
         "Tests for LiveIndicator: live/offline states, timestamp display",
@@ -613,7 +613,7 @@
     },
     {
       "id": "US-036",
-      "title": "Hook tests for @sportsnot/supabase \u00e2\u20ac\u201d auth and league hooks",
+      "title": "Hook tests for @sportsnot/supabase â€” auth and league hooks",
       "description": "As a developer, I want tests for auth and league data hooks.",
       "acceptanceCriteria": [
         "Tests for useAuth: sign-in, sign-out, session restoration",
@@ -628,7 +628,7 @@
     },
     {
       "id": "US-037",
-      "title": "Hook tests for @sportsnot/supabase \u00e2\u20ac\u201d draft, roster, and stat sync hooks",
+      "title": "Hook tests for @sportsnot/supabase â€” draft, roster, and stat sync hooks",
       "description": "As a developer, I want tests for draft, roster, and stat sync hooks.",
       "acceptanceCriteria": [
         "Tests for useDraft, useMakePick: draft flow, pick validation",

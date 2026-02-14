@@ -3,6 +3,7 @@ Started: 02/13/2026 17:16:12
 
 ## Codebase Patterns
 - Context pattern: Create in `packages/web/src/app/context/`, export Provider + useXxxContext hook
+- ResponsiveTable: Extended with optional `renderCell` and `rowStyle` props for custom cell rendering and row styling
 - Provider wiring: Add providers in `packages/web/src/main.tsx`, nest inside AuthProvider if auth-dependent
 - Types: Shared types in `packages/types/src/lib/types.ts` and `nhl.ts`, exported via `@sportsnot/types`
 - Monorepo: Uses Nx with Yarn, packages at `packages/{web,ui,supabase,types,utils,nhl-api}`
@@ -283,4 +284,192 @@ Started: 02/13/2026 17:16:12
   - Extract content sections into variables (playersContent, boardContent, etc.) for reuse across mobile/desktop layouts
   - useMediaQuery('(max-width: 768px)') for mobile detection, matching Mantine sm breakpoint
   - SegmentedControl has fullWidth prop for mobile-friendly full-width display
+---
+
+## 2026-02-14T02:04 - US-014
+- What was implemented: Made RosterPage and StandingsPage responsive using ResponsiveTable
+  - Extended ResponsiveTable with `renderCell` and `rowStyle` optional props for custom cell rendering
+  - StandingsPage: Replaced manual Table with ResponsiveTable, cards on mobile with truncated manager names (maxWidth: 160)
+  - RosterPage: Replaced Table in each position group with ResponsiveTable, cards on mobile with tap-friendly actions
+  - IR activation button uses stopPropagation so tap on mobile card opens modal, not card click
+  - Compare toggle buttons also use stopPropagation for proper mobile tap handling
+  - Rank badges (1st/2nd/3rd), status badges, and point delta animations preserved via renderCell
+- Files changed:
+  - `packages/ui/src/lib/ResponsiveTable.tsx` (modified - added renderCell, rowStyle props + CSSProperties import)
+  - `packages/web/src/app/routes/standings/StandingsPage.tsx` (modified - replaced Table with ResponsiveTable)
+  - `packages/web/src/app/routes/roster/RosterPage.tsx` (modified - replaced Table with ResponsiveTable per position group)
+- **Learnings for future iterations:**
+  - ResponsiveTable now supports `renderCell(key, value, row)` returning ReactNode for custom rendering
+  - ResponsiveTable `rowStyle(row)` returns CSSProperties for conditional row styling (e.g., highlight current user)
+  - Use `_`-prefixed keys in data records (e.g., `_slot`, `_playerInfo`) for internal data that renderCell needs but isn't a visible column
+  - Use `stopPropagation()` on interactive elements inside ResponsiveTable cards to prevent card-level onClick from firing
+  - `React.CSSProperties` won't work in ESLint without browser globals - import `CSSProperties` from 'react' directly
+  - Mantine Text `truncate="end"` with `maxWidth` provides graceful name truncation on small screens
+---
+
+## 2026-02-14T02:09 - US-015
+- What was implemented: Extracted PositionBadge component to @sportsnot/ui
+  - Props: position (F|D|G|IR_F|IR_D|C|LW|RW), size (MantineSize, default 'sm'), variant (filled|outline|light, default 'light')
+  - Distinct colors per position: F=blue, D=green, G=orange, IR_*=red, C=indigo, LW=cyan, RW=teal
+  - Renders as a Mantine Badge with position abbreviation text
+  - Exported PositionBadge, PositionBadgeProps, PositionType from @sportsnot/ui
+- Files changed:
+  - `packages/ui/src/lib/PositionBadge.tsx` (new)
+  - `packages/ui/src/index.ts` (added PositionBadge exports)
+- **Learnings for future iterations:**
+  - Use MantineSize type from @mantine/core for size props instead of custom string union
+  - C/LW/RW are blue variants: indigo, cyan, teal respectively
+  - Existing codebase has inconsistent position colors (RosterHistoryPage uses G=grape, D=blue, F=green); PositionBadge standardizes this
+  - Future stories can replace inline Badge+color logic with PositionBadge for consistency
+---
+
+## 2026-02-14T02:10 - US-016
+- What was implemented: Extracted PointsBadge component to @sportsnot/ui
+  - Props: points (number), size (MantineSize, default 'md'), animate (boolean), delta (number), variant ('filled'|'outline'|'subtle')
+  - Color scales with point value: gray for 0 or negative, blue (accent) for positive
+  - When animate is true, pulses briefly (200ms CSS scale animation) on value change using useEffect + useRef
+  - When delta is provided and non-zero, shows '+N' (green) or '-N' (red) Text next to badge
+  - Uses inline style injection for @keyframes pointsPulse animation
+  - Exported PointsBadge, PointsBadgeProps from @sportsnot/ui
+- Files changed:
+  - packages/ui/src/lib/PointsBadge.tsx (new)
+  - packages/ui/src/index.ts (added PointsBadge exports)
+- **Learnings for future iterations:**
+  - useEffect must return undefined on all code paths when some paths return cleanup functions (TS7030)
+  - ESLint no-undef for window.setTimeout/clearTimeout in UI package - use /* eslint-disable no-undef */ at file top
+  - useRef tracks previous value for detecting changes in useEffect (prevPoints pattern)
+  - Badge + Text in inline-flex span provides clean badge-with-delta layout
+---
+
+## 2026-02-14T02:12 - US-017
+- What was implemented: Extracted StatRow component to @sportsnot/ui
+  - Props: label (string), value (string|number), highlight (boolean), trend ('up'|'down'|'neutral'), compact (boolean)
+  - Renders horizontal label-value pair with Group justify="space-between" for consistent alignment
+  - highlight applies fw=700 (bold) + c='blue' (accent color) to value text
+  - trend shows unicode arrow icons: ▲ (green up), ▼ (red down), ▸ (gray neutral)
+  - compact reduces padding (py=2 vs py=6) and uses xs text size for dense layouts
+  - Exported StatRow and StatRowProps from @sportsnot/ui
+- Files changed:
+  - packages/ui/src/lib/StatRow.tsx (new)
+  - packages/ui/src/index.ts (added StatRow exports)
+- **Learnings for future iterations:**
+  - Mantine Group with justify="space-between" provides clean label-value alignment
+  - Unicode arrows (▲▼▸) work well as trend indicators without needing an icon library
+  - Follow PositionBadge/PointsBadge pattern: simple functional component with typed props, default values, Mantine primitives
+---
+
+## 2026-02-14T02:15 - US-018
+- What was implemented: Extracted LiveIndicator component to @sportsnot/ui
+  - Props: isLive (boolean), lastUpdated (Date), showTimestamp (boolean), size ('sm'|'md')
+  - isLive=true: pulsing green dot Badge with 'LIVE' text, CSS animation via inline style tag
+  - isLive=false: gray dot Badge with 'OFFLINE' text
+  - showTimestamp=true + lastUpdated provided: shows 'Updated Xm ago' relative timestamp
+  - Embedded formatTimeAgo utility (same as StandingsPage/RosterPage duplicated function)
+  - Size mapping: sm -> sm badge + xs text, md -> lg badge + xs text
+  - Exported LiveIndicator and LiveIndicatorProps from @sportsnot/ui
+- Files changed:
+  - packages/ui/src/lib/LiveIndicator.tsx (new)
+  - packages/ui/src/index.ts (added LiveIndicator exports)
+- **Learnings for future iterations:**
+  - formatTimeAgo is duplicated in StandingsPage and RosterPage; LiveIndicator embeds its own copy since UI package can't import from web
+  - Follow PointsBadge pattern for CSS animation injection via inline <style> tags
+  - Mantine Badge variant="dot" provides the pulsing dot indicator style
+  - Size prop maps to badge+text size combinations for consistent scaling
+---
+
+## 2026-02-14T02:17 - US-019
+- What was implemented: Extracted TeamCard component to @sportsnot/ui
+  - Props: teamName, teamAbbrev, logoUrl?, record?, points?, isEliminated?, onClick?, size ('sm'|'md'|'lg')
+  - Shows team logo/abbreviation fallback, name, record (W-L), and points badge
+  - Eliminated teams rendered with 0.5 opacity and strikethrough on name
+  - Size variants (sm/md/lg) control padding, avatar size, title text size, and gap
+  - Points badge uses gray color when eliminated, green otherwise
+  - Follows PlayerCard pattern with Mantine Card, Group, Stack layout
+- Files changed:
+  - packages/ui/src/lib/TeamCard.tsx (new)
+  - packages/ui/src/index.ts (added TeamCard exports)
+- **Learnings for future iterations:**
+  - Use sizeMap object pattern for multi-size components to keep variant logic clean
+  - Avatar fallback children (teamAbbrev) shown when no logoUrl provided
+  - Follow PlayerCard layout pattern: Card > Group > Avatar + Stack + optional Badge
+  - Mantine Text 	d prop controls text-decoration (line-through for eliminated)
+---
+
+## 2026-02-14T02:18 - US-020
+- What was implemented: Extracted RosterSlot component to @sportsnot/ui
+  - Props: position (F|D|G|IR_F|IR_D), player ({name, teamAbbrev, headshot?, stats?}), pointsEarned, isActive, isEmpty, onAction, actions
+  - Empty slots: dashed border with PositionBadge and italic 'Empty' text
+  - Filled slots: player avatar (initials fallback), name, teamAbbrev, PositionBadge, PointsBadge
+  - IR slots: red-tinted background and red border color for visual distinction
+  - Actions: compare (scale icon), activate (up arrow), details (ellipsis) rendered as Tooltip-wrapped ActionIcons
+  - Inactive slots rendered with 0.6 opacity
+  - stopPropagation on action buttons prevents card-level events
+  - Exported RosterSlot, RosterSlotProps, RosterSlotPlayer, RosterSlotAction from @sportsnot/ui
+- Files changed:
+  - packages/ui/src/lib/RosterSlot.tsx (new)
+  - packages/ui/src/index.ts (added RosterSlot exports)
+- **Learnings for future iterations:**
+  - Compose existing UI components (PositionBadge, PointsBadge) inside new components for consistency
+  - Use CSS custom properties (var(--mantine-color-*)) for theme-aware colors instead of hardcoded values
+  - Follow PlayerCard/TeamCard Card+Group+Stack pattern for layout consistency
+  - Action button config pattern (ACTION_CONFIG record) keeps action metadata DRY
+---
+
+## 2026-02-14T02:20 - US-021
+- What was implemented: GameCard component extracted to @sportsnot/ui
+  - Props: homeTeam, awayTeam (abbrev, score, logoUrl?), status ('upcoming'|'live'|'final'), period, timeRemaining, startTime, highlight, highlightReason, onClick
+  - TeamRow sub-component shows team logo avatar, abbreviation, and score; winner bolded for final games
+  - Live games show pulsing LiveIndicator (from US-018) + period + time remaining
+  - Final games show gray 'FINAL' badge
+  - Upcoming games show formatted start time
+  - Highlight prop adds blue accent border; highlightReason shows explanatory text below scores
+  - Exported GameCard, GameCardProps, GameCardTeam from @sportsnot/ui index
+- Files changed:
+  - `packages/ui/src/lib/GameCard.tsx` (new)
+  - `packages/ui/src/index.ts` (modified - added GameCard exports)
+- **Learnings for future iterations:**
+  - GameCard follows same Card + Stack layout pattern as TeamCard and RosterSlot
+  - Uses LiveIndicator internally for live game status display
+  - GameCardTeam is a simple interface (abbrev, score, logoUrl?) - keep it lightweight for widget consumption
+  - No icon library needed; status display uses Badge and LiveIndicator components
+---
+
+## 2026-02-14T02:22 - US-022
+- What was implemented: LiveGamesWidget component with real-time NHL scores
+  - Uses getScoresNow() from @sportsnot/nhl-api with React Query 30-second polling (refetchInterval: 30000)
+  - Maps NHLGame to GameCard props: status (FUT/PRE->upcoming, LIVE->live, FINAL/OFF->final), period formatting (1st/2nd/3rd/OT), time remaining
+  - Mobile: horizontally scrollable via Mantine ScrollArea with nowrap Group, min-width 200px per card
+  - Desktop: SimpleGrid with responsive columns (2/3/4/5 based on breakpoints)
+  - Returns null when no games available (no empty state clutter)
+  - Shows 'NHL Scores' title with 'Updates every 30s' hint
+  - Added to DashboardPage (between header and My Leagues) and LeagueDashboardPage (between invite code and standings)
+- Files changed:
+  - packages/web/src/app/components/LiveGamesWidget.tsx (new)
+  - packages/web/src/app/routes/dashboard/DashboardPage.tsx (modified - added LiveGamesWidget import and render)
+  - packages/web/src/app/routes/leagues/LeagueDashboardPage.tsx (modified - added LiveGamesWidget import and render)
+- **Learnings for future iterations:**
+  - @sportsnot/nhl-api available in web package via tsconfig path aliases (no package.json dep needed)
+  - NHLGame.gameState values: FUT (future), PRE (pregame), LIVE, FINAL, OFF (official final)
+  - React Query refetchInterval: 30000 for 30-second polling - simple and effective for live data
+  - ScrollArea + Group wrap='nowrap' provides horizontal scrolling on mobile
+  - SimpleGrid with responsive cols object handles desktop grid layout cleanly
+---
+
+## 2026-02-14T02:25 - US-023
+- What was implemented: Rostered-player highlighting in LiveGamesWidget
+  - LiveGamesWidget now accepts optional \leagueId\ prop
+  - When league context provided, fetches user roster + player_stats_cache to get team abbreviations
+  - Games containing rostered players get blue accent border via GameCard \highlight\ prop
+  - Shows player count indicator (e.g.  rostered players\)
+  - Clicking highlighted game expands Collapse section showing specific player names with position badges
+  - LeagueDashboardPage passes leagueId; DashboardPage keeps no league context (no highlighting)
+- Files changed:
+  - \packages/web/src/app/components/LiveGamesWidget.tsx\ (modified - added highlighting logic)
+  - \packages/web/src/app/routes/leagues/LeagueDashboardPage.tsx\ (modified - pass leagueId prop)
+- **Learnings for future iterations:**
+  - GameCard already supports \highlight\, \highlightReason\, and \onClick\ props - use them for visual emphasis
+  - Leagues table does NOT have hl_season\ column; season is hardcoded as 42025\ throughout the app
+  - Use \player_stats_cache\ table to map player_id to team_abbreviation and player_name
+  - Mantine \Collapse\ component works well for expandable sections within card lists
+  - LiveGamesWidget is used in both DashboardPage (no league) and LeagueDashboardPage (with league) - make props optional for backward compatibility
 ---
