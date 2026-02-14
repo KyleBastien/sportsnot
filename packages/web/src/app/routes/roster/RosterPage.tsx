@@ -9,7 +9,6 @@ import {
   Card,
   Badge,
   Button,
-  Table,
   Loader,
   Center,
   Alert,
@@ -17,12 +16,13 @@ import {
   Tooltip,
   Box,
 } from '@mantine/core';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, usePlayoffPlayers, usePlayoffTeams, useStatSync, useLiveScoring } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { useCompareContext, type ComparePlayer } from '../../context/CompareContext';
 import { SCORING } from '@sportsnot/types';
+import { ResponsiveTable, type ResponsiveTableColumn } from '@sportsnot/ui';
 
 function useMyRoster(leagueId: string) {
   const { user } = useAuthContext();
@@ -175,6 +175,182 @@ export function RosterPage() {
     .filter((s: any) => s.is_active)
     .reduce((sum: number, s: any) => sum + (s.points_earned ?? 0), 0);
 
+  const rosterColumns: ResponsiveTableColumn[] = [
+    { key: 'compare', label: '' },
+    { key: 'name', label: 'Player/Team' },
+    { key: 'status', label: 'Status' },
+    { key: 'points', label: 'Points', sortable: true },
+    { key: 'actions', label: 'Actions' },
+  ];
+
+  const buildGroupData = useCallback(
+    (groupPlayers: any[]) =>
+      groupPlayers.map((slot: any) => {
+        const playerInfo = slot.player_id ? playerLookup.get(slot.player_id) : null;
+        const teamInfo = slot.team_id ? teamLookup.get(slot.team_id) : null;
+        const displayName =
+          playerInfo?.player_name ??
+          teamInfo?.team_name ??
+          (slot.player_id ? `Player #${slot.player_id}` : `Team #${slot.team_id}`);
+
+        return {
+          _slotId: slot.id,
+          _slot: slot,
+          _playerInfo: playerInfo,
+          _teamInfo: teamInfo,
+          compare: '',
+          name: displayName,
+          status: slot.is_active ? 'Active' : 'Inactive',
+          points: slot.points_earned ?? 0,
+          actions: '',
+        } as Record<string, unknown>;
+      }),
+    [playerLookup, teamLookup]
+  );
+
+  const renderRosterCell = useCallback(
+    (key: string, value: unknown, row: Record<string, unknown>): ReactNode => {
+      const slot = row._slot as any;
+      const playerInfo = row._playerInfo as any;
+      const teamInfo = row._teamInfo as any;
+      const compareId = slot.player_id ?? slot.team_id;
+      const inCompare = comparePlayerIds.has(compareId);
+
+      const buildComparePlayer = (): ComparePlayer => {
+        if (playerInfo) {
+          return {
+            playerId: slot.player_id,
+            name: playerInfo.player_name ?? `Player #${slot.player_id}`,
+            teamAbbrev: playerInfo.team_abbreviation ?? '',
+            position: playerInfo.position ?? slot.position,
+            stats: {
+              goals: playerInfo.goals ?? 0,
+              assists: playerInfo.assists ?? 0,
+              points: (playerInfo.goals ?? 0) + (playerInfo.assists ?? 0),
+              gamesPlayed: playerInfo.games_played ?? 0,
+              fantasyPoints: slot.points_earned ?? 0,
+            },
+          };
+        }
+        return {
+          playerId: slot.team_id,
+          name: teamInfo?.team_name ?? `Team #${slot.team_id}`,
+          teamAbbrev: teamInfo?.team_abbreviation ?? '',
+          position: 'G',
+          stats: {
+            wins: teamInfo?.wins ?? 0,
+            shutouts: teamInfo?.shutouts ?? 0,
+            fantasyPoints: slot.points_earned ?? 0,
+          },
+        };
+      };
+
+      if (key === 'compare') {
+        return (
+          <Tooltip label={inCompare ? 'Remove from compare' : isCompareFull ? 'Compare full' : 'Add to compare'}>
+            <ActionIcon
+              size="sm"
+              variant={inCompare ? 'filled' : 'subtle'}
+              color={inCompare ? 'blue' : 'gray'}
+              disabled={!inCompare && isCompareFull}
+              onClick={(e: { stopPropagation: () => void }) => {
+                e.stopPropagation();
+                handleCompareToggle(buildComparePlayer());
+              }}
+            >
+              {inCompare ? '✓' : '⚖'}
+            </ActionIcon>
+          </Tooltip>
+        );
+      }
+
+      if (key === 'name') {
+        return (
+          <Text size="sm" truncate="end" style={{ maxWidth: 180 }}>
+            {String(value)}
+          </Text>
+        );
+      }
+
+      if (key === 'status') {
+        return (
+          <>
+            {slot.is_active ? (
+              <Badge color="green" size="sm">Active</Badge>
+            ) : (
+              <Badge color="gray" size="sm">Inactive</Badge>
+            )}
+            {slot.activated_from_ir && (
+              <Badge color="orange" size="sm" ml="xs">From IR</Badge>
+            )}
+          </>
+        );
+      }
+
+      if (key === 'points') {
+        return (
+          <Box
+            style={{
+              textAlign: 'right',
+              position: 'relative',
+              animation: slotDeltas[slot.id]
+                ? 'scorePulse 200ms ease-in-out'
+                : undefined,
+            }}
+          >
+            <Box component="span" fw={slotDeltas[slot.id] ? 700 : undefined}>
+              {slot.points_earned ?? 0}
+            </Box>
+            {slotDeltas[slot.id] && (
+              <Text
+                component="span"
+                size="xs"
+                c="green"
+                fw={700}
+                ml={4}
+                style={{ animation: 'deltaFade 2s ease-out forwards' }}
+              >
+                {slotDeltas[slot.id].delta > 0
+                  ? `+${slotDeltas[slot.id].delta}`
+                  : slotDeltas[slot.id].delta}
+              </Text>
+            )}
+          </Box>
+        );
+      }
+
+      if (key === 'actions') {
+        const isIrSlot = slot.position === 'IR_F' || slot.position === 'IR_D';
+        const matchingPosition = slot.position === 'IR_F' ? 'F' : 'D';
+        const injuredCandidates = slots.filter(
+          (s: any) => s.position === matchingPosition && s.is_active && s.id !== slot.id
+        );
+        if (isIrSlot && !slot.activated_from_ir && injuredCandidates.length > 0) {
+          return (
+            <Button
+              size="xs"
+              variant="outline"
+              color="orange"
+              onClick={(e: { stopPropagation: () => void }) => {
+                e.stopPropagation();
+                setIrModal({
+                  injuredSlotId: injuredCandidates[0].id,
+                  irSlotId: slot.id,
+                });
+              }}
+            >
+              Activate IR
+            </Button>
+          );
+        }
+        return null;
+      }
+
+      return <>{value != null ? String(value) : '—'}</>;
+    },
+    [comparePlayerIds, isCompareFull, handleCompareToggle, slotDeltas, slots]
+  );
+
   const handleActivateIR = async () => {
     if (!irModal) return;
     setActivating(true);
@@ -256,153 +432,12 @@ export function RosterPage() {
                 No player drafted in this slot
               </Text>
             ) : (
-              <Table>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th />
-                    <Table.Th>Player/Team</Table.Th>
-                    <Table.Th>Status</Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
-                    <Table.Th>Actions</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {group.players.map((slot: any) => {
-                    const isIrSlot =
-                      slot.position === 'IR_F' || slot.position === 'IR_D';
-                    const matchingPosition =
-                      slot.position === 'IR_F' ? 'F' : 'D';
-                    // Find an active injured player at the matching position
-                    const injuredCandidates = slots.filter(
-                      (s: any) =>
-                        s.position === matchingPosition &&
-                        s.is_active &&
-                        s.id !== slot.id
-                    );
-
-                    // Resolve player/team info from stats cache
-                    const playerInfo = slot.player_id ? playerLookup.get(slot.player_id) : null;
-                    const teamInfo = slot.team_id ? teamLookup.get(slot.team_id) : null;
-                    const displayName = playerInfo?.player_name ?? (teamInfo?.team_name ?? (slot.player_id ? `Player #${slot.player_id}` : `Team #${slot.team_id}`));
-                    const compareId = slot.player_id ?? slot.team_id;
-                    const inCompare = comparePlayerIds.has(compareId);
-
-                    const buildComparePlayer = (): ComparePlayer => {
-                      if (playerInfo) {
-                        return {
-                          playerId: slot.player_id,
-                          name: playerInfo.player_name ?? `Player #${slot.player_id}`,
-                          teamAbbrev: playerInfo.team_abbreviation ?? '',
-                          position: playerInfo.position ?? slot.position,
-                          stats: {
-                            goals: playerInfo.goals ?? 0,
-                            assists: playerInfo.assists ?? 0,
-                            points: (playerInfo.goals ?? 0) + (playerInfo.assists ?? 0),
-                            gamesPlayed: playerInfo.games_played ?? 0,
-                            fantasyPoints: slot.points_earned ?? 0,
-                          },
-                        };
-                      }
-                      return {
-                        playerId: slot.team_id,
-                        name: teamInfo?.team_name ?? `Team #${slot.team_id}`,
-                        teamAbbrev: teamInfo?.team_abbreviation ?? '',
-                        position: 'G',
-                        stats: {
-                          wins: teamInfo?.wins ?? 0,
-                          shutouts: teamInfo?.shutouts ?? 0,
-                          fantasyPoints: slot.points_earned ?? 0,
-                        },
-                      };
-                    };
-
-                    return (
-                      <Table.Tr key={slot.id}>
-                        <Table.Td>
-                          <Tooltip label={inCompare ? 'Remove from compare' : isCompareFull ? 'Compare full' : 'Add to compare'}>
-                            <ActionIcon
-                              size="sm"
-                              variant={inCompare ? 'filled' : 'subtle'}
-                              color={inCompare ? 'blue' : 'gray'}
-                              disabled={!inCompare && isCompareFull}
-                              onClick={() => handleCompareToggle(buildComparePlayer())}
-                            >
-                              {inCompare ? '✓' : '⚖'}
-                            </ActionIcon>
-                          </Tooltip>
-                        </Table.Td>
-                        <Table.Td>
-                          {displayName}
-                        </Table.Td>
-                        <Table.Td>
-                          {slot.is_active ? (
-                            <Badge color="green" size="sm">
-                              Active
-                            </Badge>
-                          ) : (
-                            <Badge color="gray" size="sm">
-                              Inactive
-                            </Badge>
-                          )}
-                          {slot.activated_from_ir && (
-                            <Badge color="orange" size="sm" ml="xs">
-                              From IR
-                            </Badge>
-                          )}
-                        </Table.Td>
-                        <Table.Td
-                          style={{
-                            textAlign: 'right',
-                            position: 'relative',
-                            animation: slotDeltas[slot.id]
-                              ? 'scorePulse 200ms ease-in-out'
-                              : undefined,
-                          }}
-                        >
-                          <Box component="span" fw={slotDeltas[slot.id] ? 700 : undefined}>
-                            {slot.points_earned ?? 0}
-                          </Box>
-                          {slotDeltas[slot.id] && (
-                            <Text
-                              component="span"
-                              size="xs"
-                              c="green"
-                              fw={700}
-                              ml={4}
-                              style={{
-                                animation: 'deltaFade 2s ease-out forwards',
-                              }}
-                            >
-                              {slotDeltas[slot.id].delta > 0
-                                ? `+${slotDeltas[slot.id].delta}`
-                                : slotDeltas[slot.id].delta}
-                            </Text>
-                          )}
-                        </Table.Td>
-                        <Table.Td>
-                          {isIrSlot &&
-                            !slot.activated_from_ir &&
-                            injuredCandidates.length > 0 && (
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                color="orange"
-                                onClick={() =>
-                                  setIrModal({
-                                    injuredSlotId: injuredCandidates[0].id,
-                                    irSlotId: slot.id,
-                                  })
-                                }
-                              >
-                                Activate IR
-                              </Button>
-                            )}
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
-                </Table.Tbody>
-              </Table>
+              <ResponsiveTable
+                columns={rosterColumns}
+                data={buildGroupData(group.players)}
+                sortable
+                renderCell={renderRosterCell}
+              />
             )}
           </Card>
         ))}

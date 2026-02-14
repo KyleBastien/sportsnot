@@ -5,7 +5,6 @@ import {
   Text,
   Stack,
   Card,
-  Table,
   Badge,
   Loader,
   Center,
@@ -16,6 +15,8 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase, useStatSync, useLiveScoring } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
+import { ResponsiveTable, type ResponsiveTableColumn } from '@sportsnot/ui';
+import { type ReactNode, useMemo, useCallback } from 'react';
 
 function useStandings(leagueId: string) {
   return useQuery({
@@ -92,6 +93,105 @@ export function StandingsPage() {
   const { league, members } = data;
   const displayTime = lastUpdated ?? lastSyncedAt ?? null;
 
+  const standingsColumns: ResponsiveTableColumn[] = [
+    { key: 'rank', label: 'Rank' },
+    { key: 'team', label: 'Team' },
+    { key: 'manager', label: 'Manager' },
+    { key: 'points', label: 'Points', sortable: true },
+  ];
+
+  const standingsData = useMemo(
+    () =>
+      members.map((member: any, index: number) => ({
+        _id: member.id,
+        _userId: member.user_id,
+        rank: index + 1,
+        team: member.team_name ?? '',
+        manager: member.users?.display_name ?? 'Unknown',
+        points: member.total_points ?? 0,
+      })),
+    [members]
+  );
+
+  const renderCell = useCallback(
+    (key: string, value: unknown, row: Record<string, unknown>): ReactNode => {
+      const isMe = row._userId === user?.id;
+      const memberId = row._id as string;
+
+      if (key === 'rank') {
+        const rank = value as number;
+        if (rank === 1) return <Badge color="gold" variant="filled">1st</Badge>;
+        if (rank === 2) return <Badge color="gray" variant="filled">2nd</Badge>;
+        if (rank === 3) return <Badge color="orange" variant="filled">3rd</Badge>;
+        return <>{rank}</>;
+      }
+
+      if (key === 'manager') {
+        return (
+          <Text size="sm" truncate="end" style={{ maxWidth: 160 }}>
+            {String(value)}
+            {isMe && (
+              <Badge size="xs" ml="xs" variant="light">
+                You
+              </Badge>
+            )}
+          </Text>
+        );
+      }
+
+      if (key === 'points') {
+        return (
+          <Box
+            style={{
+              textAlign: 'right',
+              fontVariantNumeric: 'tabular-nums',
+              position: 'relative',
+              animation: memberDeltas[memberId]
+                ? 'scorePulse 200ms ease-in-out'
+                : undefined,
+            }}
+          >
+            <Box component="span" fw={memberDeltas[memberId] ? 700 : undefined}>
+              {value as number}
+            </Box>
+            {memberDeltas[memberId] && (
+              <Text
+                component="span"
+                size="xs"
+                c="green"
+                fw={700}
+                ml={4}
+                style={{
+                  animation: 'deltaFade 2s ease-out forwards',
+                }}
+              >
+                {memberDeltas[memberId].delta > 0
+                  ? `+${memberDeltas[memberId].delta}`
+                  : memberDeltas[memberId].delta}
+              </Text>
+            )}
+          </Box>
+        );
+      }
+
+      return <>{value != null ? String(value) : '—'}</>;
+    },
+    [user?.id, memberDeltas]
+  );
+
+  const rowStyle = useCallback(
+    (row: Record<string, unknown>) => {
+      const isMe = row._userId === user?.id;
+      return isMe
+        ? {
+            fontWeight: 700,
+            backgroundColor: 'var(--mantine-color-blue-0)',
+          }
+        : undefined;
+    },
+    [user?.id]
+  );
+
   return (
     <Container size="lg" py="xl">
       <style>{pulseKeyframes}</style>
@@ -127,89 +227,13 @@ export function StandingsPage() {
         </Group>
 
         <Card shadow="sm" padding="md" radius="md" withBorder>
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th style={{ width: 60 }}>Rank</Table.Th>
-                <Table.Th>Team</Table.Th>
-                <Table.Th>Manager</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {members.map((member: any, index: number) => {
-                const isMe = member.user_id === user?.id;
-                return (
-                  <Table.Tr
-                    key={member.id}
-                    style={{
-                      fontWeight: isMe ? 700 : undefined,
-                      backgroundColor: isMe
-                        ? 'var(--mantine-color-blue-0)'
-                        : undefined,
-                    }}
-                  >
-                    <Table.Td>
-                      {index === 0 ? (
-                        <Badge color="gold" variant="filled">
-                          1st
-                        </Badge>
-                      ) : index === 1 ? (
-                        <Badge color="gray" variant="filled">
-                          2nd
-                        </Badge>
-                      ) : index === 2 ? (
-                        <Badge color="orange" variant="filled">
-                          3rd
-                        </Badge>
-                      ) : (
-                        index + 1
-                      )}
-                    </Table.Td>
-                    <Table.Td>{member.team_name}</Table.Td>
-                    <Table.Td>
-                      {member.users?.display_name ?? 'Unknown'}
-                      {isMe && (
-                        <Badge size="xs" ml="xs" variant="light">
-                          You
-                        </Badge>
-                      )}
-                    </Table.Td>
-                    <Table.Td
-                      style={{
-                        textAlign: 'right',
-                        fontVariantNumeric: 'tabular-nums',
-                        position: 'relative',
-                        animation: memberDeltas[member.id]
-                          ? 'scorePulse 200ms ease-in-out'
-                          : undefined,
-                      }}
-                    >
-                      <Box component="span" fw={memberDeltas[member.id] ? 700 : undefined}>
-                        {member.total_points ?? 0}
-                      </Box>
-                      {memberDeltas[member.id] && (
-                        <Text
-                          component="span"
-                          size="xs"
-                          c="green"
-                          fw={700}
-                          ml={4}
-                          style={{
-                            animation: 'deltaFade 2s ease-out forwards',
-                          }}
-                        >
-                          {memberDeltas[member.id].delta > 0
-                            ? `+${memberDeltas[member.id].delta}`
-                            : memberDeltas[member.id].delta}
-                        </Text>
-                      )}
-                    </Table.Td>
-                  </Table.Tr>
-                );
-              })}
-            </Table.Tbody>
-          </Table>
+          <ResponsiveTable
+            columns={standingsColumns}
+            data={standingsData}
+            sortable
+            renderCell={renderCell}
+            rowStyle={rowStyle}
+          />
         </Card>
       </Stack>
     </Container>

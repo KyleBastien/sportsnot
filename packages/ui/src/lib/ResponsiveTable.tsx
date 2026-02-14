@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode, type CSSProperties } from 'react';
 import { Table, Card, Stack, Group, Text, UnstyledButton } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 
@@ -13,6 +13,8 @@ export interface ResponsiveTableProps {
   data: Record<string, unknown>[];
   onRowClick?: (row: Record<string, unknown>) => void; // eslint-disable-line no-unused-vars
   sortable?: boolean;
+  renderCell?: (key: string, value: unknown, row: Record<string, unknown>) => ReactNode; // eslint-disable-line no-unused-vars
+  rowStyle?: (row: Record<string, unknown>) => CSSProperties | undefined; // eslint-disable-line no-unused-vars
 }
 
 type SortDirection = 'asc' | 'desc';
@@ -22,6 +24,8 @@ export function ResponsiveTable({
   data,
   onRowClick,
   sortable = false,
+  renderCell,
+  rowStyle,
 }: ResponsiveTableProps) {
   const isMobile = useMediaQuery('(max-width: 62em)');
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -102,7 +106,10 @@ export function ResponsiveTable({
             padding="sm"
             radius="md"
             withBorder
-            style={{ cursor: onRowClick ? 'pointer' : 'default' }}
+            style={{
+              cursor: onRowClick ? 'pointer' : 'default',
+              ...rowStyle?.(row),
+            }}
             onClick={() => onRowClick?.(row)}
           >
             <Stack gap={4}>
@@ -111,8 +118,12 @@ export function ResponsiveTable({
                   <Text size="sm" c="dimmed">
                     {col.label}
                   </Text>
-                  <Text size="sm" fw={500}>
-                    {row[col.key] != null ? String(row[col.key]) : '—'}
+                  <Text size="sm" fw={500} component="span">
+                    {renderCell
+                      ? renderCell(col.key, row[col.key], row)
+                      : row[col.key] != null
+                        ? String(row[col.key])
+                        : '—'}
                   </Text>
                 </Group>
               ))}
@@ -146,12 +157,19 @@ export function ResponsiveTable({
         {sortedData.map((row, idx) => (
           <Table.Tr
             key={idx}
-            style={{ cursor: onRowClick ? 'pointer' : 'default' }}
+            style={{
+              cursor: onRowClick ? 'pointer' : 'default',
+              ...rowStyle?.(row),
+            }}
             onClick={() => onRowClick?.(row)}
           >
             {columns.map((col) => (
               <Table.Td key={col.key}>
-                {row[col.key] != null ? String(row[col.key]) : '—'}
+                {renderCell
+                  ? renderCell(col.key, row[col.key], row)
+                  : row[col.key] != null
+                    ? String(row[col.key])
+                    : '—'}
               </Table.Td>
             ))}
           </Table.Tr>
