@@ -418,7 +418,7 @@
         "Typecheck passes"
       ],
       "priority": 24,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -438,7 +438,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 25,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on NotificationContext (US-024)"
     },
     {

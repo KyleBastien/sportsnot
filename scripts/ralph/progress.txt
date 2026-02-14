@@ -27,6 +27,7 @@ Started: 02/13/2026 17:16:12
 - Cross-package imports: @sportsnot/nhl-api available in @sportsnot/supabase via tsconfig path aliases (no package.json dep needed)
 - Supabase Realtime: Use `supabase.channel('name').on('postgres_changes', {...}).subscribe()`, cleanup with `supabase.removeChannel(channel)` in useEffect
 - Live indicators: Mantine Badge `variant="dot"` with CSS animation for pulsing LIVE status; inject keyframes via `<style>` in JSX
+- Mantine Notifications: Configure `<Notifications />` inside MantineProvider, import `@mantine/notifications/styles.css`, use `notifications.show()` imperative API with onClick
 
 ---
 
@@ -472,4 +473,49 @@ Started: 02/13/2026 17:16:12
   - Use \player_stats_cache\ table to map player_id to team_abbreviation and player_name
   - Mantine \Collapse\ component works well for expandable sections within card lists
   - LiveGamesWidget is used in both DashboardPage (no league) and LeagueDashboardPage (with league) - make props optional for backward compatibility
+---
+
+## 2026-02-14T02:31 - US-024
+- What was implemented: NotificationContext with NotificationProvider and useNotificationContext hook
+  - Notification shape: { id, type, title, message, timestamp, read, leagueId? }
+  - Types: 'draft', 'scoring', 'league', 'system' (NotificationType union)
+  - Context provides: notifications[], unreadCount, addNotification(), markAsRead(id), markAllRead()
+  - Notifications persist in localStorage (key: 'sportsnot_notifications')
+  - Cleared on sign-out (watches user from AuthContext)
+  - Maximum 50 notifications stored (oldest trimmed when limit exceeded)
+  - Uses crypto.randomUUID() for unique notification IDs
+  - NotificationProvider wired in main.tsx inside AuthProvider, wrapping CompareProvider
+- Files changed:
+  - `packages/web/src/app/context/NotificationContext.tsx` (new)
+  - `packages/web/src/main.tsx` (added NotificationProvider)
+- **Learnings for future iterations:**
+  - Follow CompareContext pattern: createContext, Provider with useAuthContext, useXxxContext hook
+  - ESLint browser globals (localStorage, crypto) need `/* eslint-disable no-undef */` at file top
+  - NotificationProvider must be inside AuthProvider (uses useAuthContext for sign-out detection)
+  - Omit<Notification, 'id' | 'timestamp' | 'read'> for addNotification param keeps API clean
+---
+
+## 2026-02-14T02:33 - US-025
+- What was implemented: Toast alerts for real-time events using @mantine/notifications
+  - Installed @mantine/notifications@^8.3.14 and configured Notifications provider in main.tsx
+  - Created NotificationToasts component that listens to NotificationContext for new unread notifications
+  - Toast notifications appear in top-right corner of the screen
+  - Color-coded by type: draft=blue, scoring=green, league=yellow, system=gray
+  - Auto-dismiss after 5 seconds, max 3 visible at once (oldest dismissed first via limit prop)
+  - Clicking a toast marks it as read via NotificationContext.markAsRead() and navigates to relevant page
+  - Navigation routing: draft → /draft/{leagueId}, scoring → /roster/{leagueId}, league → /leagues/{leagueId}
+  - Uses ref-based tracking (shownIdsRef) to avoid re-showing already-displayed notifications
+  - Cleanup effect removes stale IDs when notifications are cleared
+- Files changed:
+  - `packages/web/src/app/components/NotificationToasts.tsx` (new)
+  - `packages/web/src/main.tsx` (added Notifications provider + CSS import)
+  - `packages/web/src/app/app.tsx` (added NotificationToasts component)
+  - `package.json`, `yarn.lock` (added @mantine/notifications dependency)
+- **Learnings for future iterations:**
+  - Mantine Notifications: configure `<Notifications />` inside MantineProvider in main.tsx, use `notifications.show()` imperative API
+  - `notifications.show()` accepts onClick from inherited div HTML props (through BoxProps → NotificationProps → NotificationData chain)
+  - The `style` prop on NotificationData comes from Mantine's BoxProps (MantineStyleProp), not from standard HTML div props
+  - Use `notifications.hide(id)` to programmatically close a toast after click
+  - Use a ref-based Set to track shown notification IDs to prevent re-displaying on re-renders
+  - @mantine/notifications CSS must be imported separately: `@mantine/notifications/styles.css`
 ---
