@@ -15,10 +15,11 @@ import {
   Alert,
   Modal,
   Tooltip,
+  Box,
 } from '@mantine/core';
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase, usePlayoffPlayers, usePlayoffTeams } from '@sportsnot/supabase';
+import { supabase, usePlayoffPlayers, usePlayoffTeams, useStatSync, useLiveScoring } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { useCompareContext, type ComparePlayer } from '../../context/CompareContext';
 import { SCORING } from '@sportsnot/types';
@@ -77,6 +78,27 @@ const POSITION_LABELS: Record<string, string> = {
 
 const POSITION_ORDER = ['F', 'D', 'G', 'IR_F', 'IR_D'];
 
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
+
+const pulseKeyframes = `
+@keyframes scorePulse {
+  0% { background-color: transparent; }
+  50% { background-color: var(--mantine-color-green-1); }
+  100% { background-color: transparent; }
+}
+@keyframes deltaFade {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-12px); }
+}
+`;
+
 export function RosterPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { data, isLoading, error } = useMyRoster(leagueId!);
@@ -87,6 +109,8 @@ export function RosterPage() {
     irSlotId: string;
   } | null>(null);
   const [activating, setActivating] = useState(false);
+  const { isLive, lastSyncedAt } = useStatSync(leagueId);
+  const { lastUpdated, slotDeltas } = useLiveScoring(leagueId);
 
   // Fetch cached NHL data for player/team name lookups
   const currentSeason = '20242025'; // TODO: derive from NHL API
@@ -138,6 +162,7 @@ export function RosterPage() {
   }
 
   const { slots, round } = data;
+  const displayTime = lastUpdated ?? lastSyncedAt ?? null;
 
   // Group slots by position
   const groupedSlots = POSITION_ORDER.map((pos) => ({
@@ -171,11 +196,33 @@ export function RosterPage() {
 
   return (
     <Container size="lg" py="xl">
+      <style>{pulseKeyframes}</style>
       <Stack gap="xl">
         <Group justify="space-between">
           <div>
             <Title order={2}>My Roster</Title>
-            <Text c="dimmed">Round {round}</Text>
+            <Group gap="xs">
+              <Text c="dimmed">Round {round}</Text>
+              {isLive && (
+                <Badge
+                  color="green"
+                  variant="dot"
+                  size="sm"
+                  styles={{
+                    root: {
+                      animation: 'scorePulse 2s ease-in-out infinite',
+                    },
+                  }}
+                >
+                  LIVE
+                </Badge>
+              )}
+            </Group>
+            {displayTime && (
+              <Text size="xs" c="dimmed">
+                Updated {formatTimeAgo(displayTime)}
+              </Text>
+            )}
           </div>
           <Card padding="md" radius="md" withBorder>
             <Stack gap={0} align="center">
@@ -303,8 +350,34 @@ export function RosterPage() {
                             </Badge>
                           )}
                         </Table.Td>
-                        <Table.Td style={{ textAlign: 'right' }}>
-                          {slot.points_earned ?? 0}
+                        <Table.Td
+                          style={{
+                            textAlign: 'right',
+                            position: 'relative',
+                            animation: slotDeltas[slot.id]
+                              ? 'scorePulse 200ms ease-in-out'
+                              : undefined,
+                          }}
+                        >
+                          <Box component="span" fw={slotDeltas[slot.id] ? 700 : undefined}>
+                            {slot.points_earned ?? 0}
+                          </Box>
+                          {slotDeltas[slot.id] && (
+                            <Text
+                              component="span"
+                              size="xs"
+                              c="green"
+                              fw={700}
+                              ml={4}
+                              style={{
+                                animation: 'deltaFade 2s ease-out forwards',
+                              }}
+                            >
+                              {slotDeltas[slot.id].delta > 0
+                                ? `+${slotDeltas[slot.id].delta}`
+                                : slotDeltas[slot.id].delta}
+                            </Text>
+                          )}
                         </Table.Td>
                         <Table.Td>
                           {isIrSlot &&

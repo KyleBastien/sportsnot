@@ -10,9 +10,11 @@ import {
   Loader,
   Center,
   Alert,
+  Group,
+  Box,
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@sportsnot/supabase';
+import { supabase, useStatSync, useLiveScoring } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 
 function useStandings(leagueId: string) {
@@ -41,10 +43,33 @@ function useStandings(leagueId: string) {
   });
 }
 
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
+
+const pulseKeyframes = `
+@keyframes scorePulse {
+  0% { background-color: transparent; }
+  50% { background-color: var(--mantine-color-green-1); }
+  100% { background-color: transparent; }
+}
+@keyframes deltaFade {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-12px); }
+}
+`;
+
 export function StandingsPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { user } = useAuthContext();
   const { data, isLoading, error } = useStandings(leagueId!);
+  const { isLive, lastSyncedAt } = useStatSync(leagueId);
+  const { lastUpdated, memberDeltas } = useLiveScoring(leagueId);
 
   if (isLoading) {
     return (
@@ -65,16 +90,41 @@ export function StandingsPage() {
   }
 
   const { league, members } = data;
+  const displayTime = lastUpdated ?? lastSyncedAt ?? null;
 
   return (
     <Container size="lg" py="xl">
+      <style>{pulseKeyframes}</style>
       <Stack gap="xl">
-        <div>
-          <Title order={2}>Standings</Title>
-          <Text c="dimmed">
-            {league?.name} · Round {league?.current_round ?? 0}
-          </Text>
-        </div>
+        <Group justify="space-between" align="flex-start">
+          <div>
+            <Title order={2}>Standings</Title>
+            <Text c="dimmed">
+              {league?.name} · Round {league?.current_round ?? 0}
+            </Text>
+          </div>
+          <Stack gap={4} align="flex-end">
+            {isLive && (
+              <Badge
+                color="green"
+                variant="dot"
+                size="lg"
+                styles={{
+                  root: {
+                    animation: 'scorePulse 2s ease-in-out infinite',
+                  },
+                }}
+              >
+                LIVE
+              </Badge>
+            )}
+            {displayTime && (
+              <Text size="xs" c="dimmed">
+                Updated {formatTimeAgo(displayTime)}
+              </Text>
+            )}
+          </Stack>
+        </Group>
 
         <Card shadow="sm" padding="md" radius="md" withBorder>
           <Table striped highlightOnHover>
@@ -126,9 +176,34 @@ export function StandingsPage() {
                       )}
                     </Table.Td>
                     <Table.Td
-                      style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                      style={{
+                        textAlign: 'right',
+                        fontVariantNumeric: 'tabular-nums',
+                        position: 'relative',
+                        animation: memberDeltas[member.id]
+                          ? 'scorePulse 200ms ease-in-out'
+                          : undefined,
+                      }}
                     >
-                      {member.total_points ?? 0}
+                      <Box component="span" fw={memberDeltas[member.id] ? 700 : undefined}>
+                        {member.total_points ?? 0}
+                      </Box>
+                      {memberDeltas[member.id] && (
+                        <Text
+                          component="span"
+                          size="xs"
+                          c="green"
+                          fw={700}
+                          ml={4}
+                          style={{
+                            animation: 'deltaFade 2s ease-out forwards',
+                          }}
+                        >
+                          {memberDeltas[member.id].delta > 0
+                            ? `+${memberDeltas[member.id].delta}`
+                            : memberDeltas[member.id].delta}
+                        </Text>
+                      )}
                     </Table.Td>
                   </Table.Tr>
                 );
