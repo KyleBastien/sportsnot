@@ -315,4 +315,44 @@ Started: 02/14/2026 08:16:46
   - League dashboard members are in a table, not a `role="list"` -- use `getByText()` directly, not scoped to `getByRole('list')`
   - Mantine modals render as overlay dialogs on all viewports -- no special bottom sheet behavior on mobile
   - `setViewportSize()` should be called before `setupSupabaseMocks()` and `goto()` for consistent rendering
+- DashboardPage does not destructure `isError` from React Query — API errors fall through to empty state, not ErrorBoundary
+- React Query `retry: 1` config — tests for error states should account for retry delay
+- Use `mockTableError(status, message)` to simulate PostgREST errors in route handlers
+---
+
+## 2026-02-14T17:58 - US-020
+- Created `packages/e2e/tests/error-states.spec.ts` with 5 error state and edge case E2E tests (all passing)
+- Tests: network failure fallback (500 error → empty state), 401 triggers login redirect, server-side form validation errors shown, loading states with delayed responses, empty states for no data
+- Used `mockTableError()` for 500 error simulation, delayed `route.fulfill()` for loading states, localStorage clearing for auth invalidation
+- Files changed: packages/e2e/tests/error-states.spec.ts (new)
+- **Learnings for future iterations:**
+  - DashboardPage swallows API errors — only destructures `isLoading` from `useMyLeagues()`, not `isError`; falls through to empty state
+  - React Query default config: `retry: 1`, `staleTime: 5min` — errors retry once before settling
+  - To test loading states: use `await new Promise(resolve => setTimeout(resolve, ms))` inside route handler before `route.fulfill()`
+  - Mantine `Loader` component has class `.mantine-Loader-root` — use CSS selector to detect loading spinners
+  - To simulate expired auth: override `/auth/v1/user` to return 401 AND clear localStorage `sb-*` keys via `addInitScript()`
+  - CreateLeaguePage properly shows server error messages via red Alert with `{error}` text content
+---
+
+## 2026-02-14T18:04 - US-021
+- Created dedicated .github/workflows/e2e.yml CI workflow for Playwright E2E tests
+- Workflow triggers on PRs and pushes to main branch
+- CI installs Playwright browsers via 
+px playwright install --with-deps chromium with caching
+- Builds web app with 
+x build @sportsnot/web using mock Supabase env vars
+- Playwright runs against built static output via 
+px serve (not dev server)
+- HTML report always uploaded; trace files uploaded on failure as CI artifacts
+- Updated playwright.config.ts to use static file server in CI, dev server locally
+- Playwright browser cache at ~/.cache/ms-playwright keyed by yarn.lock hash
+- Files changed: .github/workflows/e2e.yml (new), packages/e2e/playwright.config.ts
+- **Learnings for future iterations:**
+  - @nx/web:file-server executor provides serve-static target but triggers rebuild — use 
+px serve for pre-built output
+  - Playwright CI config: orbidOnly: true, etries: 2, workers: 1 — already in config via process.env.CI
+  - 
+px serve --single enables SPA fallback routing (equivalent to 404.html redirect)
+  - Separate browser install (--with-deps) from system deps (install-deps) for cache optimization
+  - Set VITE_* env vars at workflow level so both build and test steps have access
 ---

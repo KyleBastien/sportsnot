@@ -372,7 +372,7 @@
         "Typecheck passes"
       ],
       "priority": 20,
-      "passes": false,
+      "passes": true,
       "notes": "Use page.route() with delayed fulfillment to test loading states. Use page.route() returning error status codes for error states."
     },
     {
@@ -390,7 +390,7 @@
         "Typecheck passes"
       ],
       "priority": 21,
-      "passes": false,
+      "passes": true,
       "notes": "Environment variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set in the CI environment with mock values."
     }
   ]
