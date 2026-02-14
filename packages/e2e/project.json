@@ -1,0 +1,15 @@
+{
+  "name": "@sportsnot/e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/e2e",
+  "projectType": "application",
+  "targets": {
+    "e2e": {
+      "executor": "@nx/playwright:playwright",
+      "outputs": ["{workspaceRoot}/packages/e2e/playwright-report"],
+      "options": {
+        "config": "packages/e2e/playwright.config.ts"
+      }
+    }
+  }
+}

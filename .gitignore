@@ -55,6 +55,11 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
 # Ralph working files
 scripts/ralph/prd.json
 scripts/ralph/progress.txt
