@@ -1,3 +1,5 @@
+export { GameCard } from './lib/GameCard';
+export type { GameCardProps, GameCardTeam } from './lib/GameCard';
 export { LiveIndicator } from './lib/LiveIndicator';
 export type { LiveIndicatorProps } from './lib/LiveIndicator';
 export { PlayerCard } from './lib/PlayerCard';
