@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@mantine/core/styles.css';
 
 import { AuthProvider } from './app/context/AuthContext';
+import { CompareProvider } from './app/context/CompareContext';
 import App from './app/app';
 
 const queryClient = new QueryClient({
@@ -24,7 +25,9 @@ root.render(
       <MantineProvider>
         <BrowserRouter>
           <AuthProvider>
-            <App />
+            <CompareProvider>
+              <App />
+            </CompareProvider>
           </AuthProvider>
         </BrowserRouter>
       </MantineProvider>
