@@ -184,7 +184,7 @@ export function LeagueDashboardPage() {
         </Card>
 
         {/* Live Games */}
-        <LiveGamesWidget />
+        <LiveGamesWidget leagueId={leagueId} />
 
         {/* Members / Standings */}
         <Card shadow="sm" padding="md" radius="md" withBorder>
