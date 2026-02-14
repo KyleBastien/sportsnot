@@ -19,7 +19,10 @@ import {
   Table,
   ScrollArea,
   Tooltip,
+  Tabs,
+  Affix,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, usePlayoffPlayers, usePlayoffTeams } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
@@ -480,33 +483,239 @@ export function DraftPage() {
     setConfirmPlayer(null);
   };
 
+  const isMobile = useMediaQuery('(max-width: 768px)');
+
+  const myPicks = picks.filter((p: any) => p.league_members?.user_id === user?.id);
+
+  const onSelectPlayer = (player: DraftablePlayer) => {
+    setConfirmPlayer(player);
+    setConfirmPosition(
+      player.position === 'G'
+        ? 'G'
+        : player.position === 'D'
+          ? 'D'
+          : 'F'
+    );
+  };
+
+  // Draft header / turn indicator — always visible
+  const draftHeader = (
+    <Card padding="sm" radius="md" withBorder>
+      <Group justify="space-between" wrap="wrap">
+        <div>
+          <Title order={isMobile ? 4 : 2}>Draft Room</Title>
+          <Text c="dimmed" size="sm">Round {draft.round}</Text>
+        </div>
+        <Group gap="xs" align="center">
+          <Text size="sm" c="dimmed">Pick #{draft.current_pick}</Text>
+          <Text fw={700}>{currentPicker ? (currentPicker as any).team_name : 'Unknown'}</Text>
+          {isMyTurn && <Badge color="green">Your Turn!</Badge>}
+        </Group>
+      </Group>
+    </Card>
+  );
+
+  // Filters section
+  const filtersSection = (
+    <Stack gap="xs">
+      <SegmentedControl
+        value={positionFilter}
+        onChange={setPositionFilter}
+        size={isMobile ? 'xs' : 'sm'}
+        data={[
+          { label: 'All', value: 'ALL' },
+          { label: 'Fwd', value: 'F' },
+          { label: 'Def', value: 'D' },
+          { label: 'Goal', value: 'G' },
+        ]}
+        fullWidth={!!isMobile}
+      />
+      <TextInput
+        placeholder="Search players..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.currentTarget.value)}
+        size={isMobile ? 'sm' : 'md'}
+      />
+    </Stack>
+  );
+
+  // Available players content
+  const playersContent = (
+    <>
+      {filtersSection}
+      {!playerStats?.length && !teamStats?.length ? (
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            No player data available yet. Ensure the NHL stats sync edge function has been run to populate playoff player data.
+          </Text>
+          {isMyTurn ? (
+            <Alert color="green" title="It's your turn!">
+              Once player data is synced, you'll see a selectable list here.
+            </Alert>
+          ) : (
+            <Alert color="blue">
+              Waiting for {currentPicker ? (currentPicker as any).team_name : 'the next drafter'} to make their pick...
+            </Alert>
+          )}
+        </Stack>
+      ) : (
+        <AvailablePlayerBoard
+          playerStats={playerStats ?? []}
+          teamStats={teamStats ?? []}
+          draftedPlayerIds={draftedPlayerIds}
+          draftedTeamIds={draftedTeamIds}
+          positionFilter={positionFilter}
+          searchQuery={searchQuery}
+          isMyTurn={isMyTurn}
+          onSelectPlayer={onSelectPlayer}
+          comparePlayers={comparePlayers}
+          isCompareFull={isCompareFull}
+          onCompareToggle={handleCompareToggle}
+        />
+      )}
+    </>
+  );
+
+  // Draft board content (draft history / all picks as a grid)
+  const boardContent = (
+    <Stack gap="sm">
+      <Text fw={600} size="sm">Draft Board</Text>
+      {picks.length === 0 ? (
+        <Text c="dimmed" size="sm">No picks yet</Text>
+      ) : (
+        <ScrollArea h={isMobile ? 400 : undefined}>
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>#</Table.Th>
+                <Table.Th>Team</Table.Th>
+                <Table.Th>Pick</Table.Th>
+                <Table.Th>Pos</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {[...picks]
+                .sort((a: any, b: any) => (a.pick_number ?? 0) - (b.pick_number ?? 0))
+                .map((pick: any) => (
+                  <Table.Tr key={pick.id}>
+                    <Table.Td>{pick.pick_number}</Table.Td>
+                    <Table.Td>{pick.league_members?.team_name ?? 'Unknown'}</Table.Td>
+                    <Table.Td>{pick.player_id ? `Player #${pick.player_id}` : pick.team_id ? `Team #${pick.team_id}` : '—'}</Table.Td>
+                    <Table.Td><Badge variant="light" size="xs">{pick.position}</Badge></Table.Td>
+                  </Table.Tr>
+                ))}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
+      )}
+    </Stack>
+  );
+
+  // My Picks content
+  const myPicksContent = (
+    <Stack gap="sm">
+      <Text fw={600} size="sm">My Picks ({myPicks.length})</Text>
+      {myPicks.length === 0 ? (
+        <Text c="dimmed" size="sm">You haven't made any picks yet</Text>
+      ) : (
+        <Stack gap="xs">
+          {[...myPicks]
+            .sort((a: any, b: any) => (a.pick_number ?? 0) - (b.pick_number ?? 0))
+            .map((pick: any) => (
+              <Card key={pick.id} padding="xs" radius="sm" withBorder>
+                <Group justify="space-between">
+                  <Group gap="xs">
+                    <Text size="sm" fw={600}>#{pick.pick_number}</Text>
+                    <Text size="sm">{pick.player_id ? `Player #${pick.player_id}` : pick.team_id ? `Team #${pick.team_id}` : '—'}</Text>
+                  </Group>
+                  <Badge variant="light" size="sm">{pick.position}</Badge>
+                </Group>
+              </Card>
+            ))}
+        </Stack>
+      )}
+    </Stack>
+  );
+
+  // Confirm pick modal
+  const confirmModal = (
+    <Modal
+      opened={!!confirmPlayer}
+      onClose={() => setConfirmPlayer(null)}
+      title="Confirm Draft Pick"
+      fullScreen={!!isMobile}
+    >
+      {confirmPlayer && (
+        <Stack gap="md">
+          <Text>
+            Draft <strong>{confirmPlayer.fullName}</strong> ({confirmPlayer.team})?
+          </Text>
+          <SegmentedControl
+            value={confirmPosition}
+            onChange={(val) => setConfirmPosition(val as Position)}
+            data={
+              confirmPlayer.position === 'G'
+                ? [{ label: 'Goalie', value: 'G' }]
+                : confirmPlayer.position === 'D'
+                  ? [
+                      { label: 'Defense', value: 'D' },
+                      { label: 'IR Defense', value: 'IR_D' },
+                    ]
+                  : [
+                      { label: 'Forward', value: 'F' },
+                      { label: 'IR Forward', value: 'IR_F' },
+                    ]
+            }
+          />
+          <Group justify="flex-end">
+            <Button variant="subtle" onClick={() => setConfirmPlayer(null)}>Cancel</Button>
+            <Button onClick={handleConfirmPick} loading={submitting}>Confirm Pick</Button>
+          </Group>
+        </Stack>
+      )}
+    </Modal>
+  );
+
+  // Mobile layout with tabs
+  if (isMobile) {
+    return (
+      <Container size="xl" py="sm" pb={isMyTurn ? 80 : undefined}>
+        <Stack gap="sm">
+          {draftHeader}
+          <Tabs defaultValue="players">
+            <Tabs.List grow>
+              <Tabs.Tab value="players">Players</Tabs.Tab>
+              <Tabs.Tab value="board">Board</Tabs.Tab>
+              <Tabs.Tab value="mypicks">My Picks</Tabs.Tab>
+            </Tabs.List>
+            <Tabs.Panel value="players" pt="sm">
+              {playersContent}
+            </Tabs.Panel>
+            <Tabs.Panel value="board" pt="sm">
+              {boardContent}
+            </Tabs.Panel>
+            <Tabs.Panel value="mypicks" pt="sm">
+              {myPicksContent}
+            </Tabs.Panel>
+          </Tabs>
+        </Stack>
+        {isMyTurn && (
+          <Affix position={{ bottom: 70, left: 16, right: 16 }}>
+            <Button fullWidth color="green" size="md" disabled={!isMyTurn}>
+              📋 Make Pick — Select a player above
+            </Button>
+          </Affix>
+        )}
+        {confirmModal}
+      </Container>
+    );
+  }
+
+  // Desktop layout — all sections visible side-by-side
   return (
     <Container size="xl" py="xl">
       <Stack gap="xl">
-        {/* Draft Header */}
-        <Group justify="space-between">
-          <div>
-            <Title order={2}>Draft Room</Title>
-            <Text c="dimmed">Round {draft.round}</Text>
-          </div>
-          <Card padding="md" radius="md" withBorder>
-            <Stack gap={4} align="center">
-              <Text size="sm" c="dimmed">
-                Pick #{draft.current_pick}
-              </Text>
-              <Text fw={700} size="lg">
-                {currentPicker
-                  ? (currentPicker as any).team_name
-                  : 'Unknown'}
-              </Text>
-              {isMyTurn && (
-                <Badge color="green" size="lg">
-                  Your Turn!
-                </Badge>
-              )}
-            </Stack>
-          </Card>
-        </Group>
+        {draftHeader}
 
         {/* Filters */}
         <Group>
@@ -530,30 +739,20 @@ export function DraftPage() {
 
         {/* Draft History */}
         <Card shadow="sm" padding="md" radius="md" withBorder>
-          <Title order={4} mb="sm">
-            Draft History
-          </Title>
+          <Title order={4} mb="sm">Draft History</Title>
           {picks.length === 0 ? (
-            <Text c="dimmed" size="sm">
-              No picks yet
-            </Text>
+            <Text c="dimmed" size="sm">No picks yet</Text>
           ) : (
             <Stack gap="xs">
               {[...picks]
-                .sort(
-                  (a: any, b: any) =>
-                    (b.pick_number ?? 0) - (a.pick_number ?? 0)
-                )
+                .sort((a: any, b: any) => (b.pick_number ?? 0) - (a.pick_number ?? 0))
                 .slice(0, 10)
                 .map((pick: any) => (
                   <Group key={pick.id} justify="space-between">
                     <Text size="sm">
-                      #{pick.pick_number} -{' '}
-                      {pick.league_members?.team_name ?? 'Unknown'}
+                      #{pick.pick_number} - {pick.league_members?.team_name ?? 'Unknown'}
                     </Text>
-                    <Badge variant="light" size="sm">
-                      {pick.position}
-                    </Badge>
+                    <Badge variant="light" size="sm">{pick.position}</Badge>
                   </Group>
                 ))}
             </Stack>
@@ -562,14 +761,11 @@ export function DraftPage() {
 
         {/* Available Players */}
         <Card shadow="sm" padding="md" radius="md" withBorder>
-          <Title order={4} mb="sm">
-            Available Players
-          </Title>
+          <Title order={4} mb="sm">Available Players</Title>
           {!playerStats?.length && !teamStats?.length ? (
             <Stack gap="sm">
               <Text size="sm" c="dimmed">
-                No player data available yet. Ensure the NHL stats sync edge
-                function has been run to populate playoff player data.
+                No player data available yet. Ensure the NHL stats sync edge function has been run to populate playoff player data.
               </Text>
               {isMyTurn ? (
                 <Alert color="green" title="It's your turn!">
@@ -577,11 +773,7 @@ export function DraftPage() {
                 </Alert>
               ) : (
                 <Alert color="blue">
-                  Waiting for{' '}
-                  {currentPicker
-                    ? (currentPicker as any).team_name
-                    : 'the next drafter'}{' '}
-                  to make their pick...
+                  Waiting for {currentPicker ? (currentPicker as any).team_name : 'the next drafter'} to make their pick...
                 </Alert>
               )}
             </Stack>
@@ -594,16 +786,7 @@ export function DraftPage() {
               positionFilter={positionFilter}
               searchQuery={searchQuery}
               isMyTurn={isMyTurn}
-              onSelectPlayer={(player) => {
-                setConfirmPlayer(player);
-                setConfirmPosition(
-                  player.position === 'G'
-                    ? 'G'
-                    : player.position === 'D'
-                      ? 'D'
-                      : 'F'
-                );
-              }}
+              onSelectPlayer={onSelectPlayer}
               comparePlayers={comparePlayers}
               isCompareFull={isCompareFull}
               onCompareToggle={handleCompareToggle}
@@ -611,49 +794,7 @@ export function DraftPage() {
           )}
         </Card>
 
-        {/* Confirm Pick Modal */}
-        <Modal
-          opened={!!confirmPlayer}
-          onClose={() => setConfirmPlayer(null)}
-          title="Confirm Draft Pick"
-        >
-          {confirmPlayer && (
-            <Stack gap="md">
-              <Text>
-                Draft <strong>{confirmPlayer.fullName}</strong> (
-                {confirmPlayer.team})?
-              </Text>
-              <SegmentedControl
-                value={confirmPosition}
-                onChange={(val) => setConfirmPosition(val as Position)}
-                data={
-                  confirmPlayer.position === 'G'
-                    ? [{ label: 'Goalie', value: 'G' }]
-                    : confirmPlayer.position === 'D'
-                      ? [
-                          { label: 'Defense', value: 'D' },
-                          { label: 'IR Defense', value: 'IR_D' },
-                        ]
-                      : [
-                          { label: 'Forward', value: 'F' },
-                          { label: 'IR Forward', value: 'IR_F' },
-                        ]
-                }
-              />
-              <Group justify="flex-end">
-                <Button
-                  variant="subtle"
-                  onClick={() => setConfirmPlayer(null)}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleConfirmPick} loading={submitting}>
-                  Confirm Pick
-                </Button>
-              </Group>
-            </Stack>
-          )}
-        </Modal>
+        {confirmModal}
       </Stack>
     </Container>
   );
