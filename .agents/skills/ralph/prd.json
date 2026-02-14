@@ -73,7 +73,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
