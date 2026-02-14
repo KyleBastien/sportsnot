@@ -15,6 +15,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CompareTray } from './components/CompareTray';
 import { BottomNav } from './components/BottomNav';
+import { NotificationToasts } from './components/NotificationToasts';
 
 // Route pages
 import { LoginPage } from './routes/auth/LoginPage';
@@ -213,6 +214,7 @@ export function App() {
         </AppShell.Main>
 
         <CompareTray />
+        <NotificationToasts />
       </AppShell>
     </ErrorBoundary>
   );
