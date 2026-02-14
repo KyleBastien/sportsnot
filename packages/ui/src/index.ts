@@ -5,6 +5,8 @@ export type { PointsBadgeProps } from './lib/PointsBadge';
 export { PositionBadge } from './lib/PositionBadge';
 export type { PositionBadgeProps, PositionType } from './lib/PositionBadge';
 export { ResponsiveTable } from './lib/ResponsiveTable';
+export { StatRow } from './lib/StatRow';
+export type { StatRowProps } from './lib/StatRow';
 export type { ResponsiveTableProps, ResponsiveTableColumn } from './lib/ResponsiveTable';
 export { vars } from './lib/styles/theme.css';
 export { sprinkles } from './lib/styles/sprinkles.css';
