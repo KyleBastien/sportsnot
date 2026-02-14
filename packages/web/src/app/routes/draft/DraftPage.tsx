@@ -280,6 +280,28 @@ export function DraftPage() {
   const { data: playerStats } = usePlayoffPlayers(currentSeason, currentRound);
   const { data: teamStats } = usePlayoffTeams(currentSeason, currentRound);
 
+  // Derived state — compute before early returns to keep hook order stable
+  const draftOrder: string[] = (draft?.draft_order as string[]) ?? [];
+  const picks = draft?.draft_picks ?? [];
+
+  const currentPickIndex = draft ? draft.current_pick - 1 : 0;
+  const currentPickerUserId = draftOrder[currentPickIndex];
+  const isMyTurn = currentPickerUserId === user?.id;
+  const myMember = members?.find((m: any) => m.user_id === user?.id);
+  const currentPicker = members?.find(
+    (m: any) => m.user_id === currentPickerUserId
+  );
+
+  // Track which players/teams have already been drafted
+  const draftedPlayerIds = useMemo(
+    () => new Set<number>(picks.filter((p: any) => p.player_id).map((p: any) => p.player_id as number)),
+    [picks]
+  );
+  const draftedTeamIds = useMemo(
+    () => new Set<number>(picks.filter((p: any) => p.team_id).map((p: any) => p.team_id as number)),
+    [picks]
+  );
+
   // Subscribe to real-time draft changes
   useEffect(() => {
     if (!leagueId) return;
@@ -324,27 +346,6 @@ export function DraftPage() {
       </Container>
     );
   }
-
-  const draftOrder: string[] = (draft.draft_order as string[]) ?? [];
-  const picks = draft.draft_picks ?? [];
-
-  const currentPickIndex = draft.current_pick - 1;
-  const currentPickerUserId = draftOrder[currentPickIndex];
-  const isMyTurn = currentPickerUserId === user?.id;
-  const myMember = members?.find((m: any) => m.user_id === user?.id);
-  const currentPicker = members?.find(
-    (m: any) => m.user_id === currentPickerUserId
-  );
-
-  // Track which players/teams have already been drafted
-  const draftedPlayerIds = useMemo(
-    () => new Set<number>(picks.filter((p: any) => p.player_id).map((p: any) => p.player_id as number)),
-    [picks]
-  );
-  const draftedTeamIds = useMemo(
-    () => new Set<number>(picks.filter((p: any) => p.team_id).map((p: any) => p.team_id as number)),
-    [picks]
-  );
 
   const handleConfirmPick = async () => {
     if (!confirmPlayer || !myMember || !draft) return;
