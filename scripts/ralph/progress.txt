@@ -52,6 +52,8 @@ Started: 02/13/2026 17:16:12
 - Hook tests: Mock globalThis.fetch to control nhl-api responses (getScoresNow uses fetch internally)
 - Coverage: `@rstest/coverage-istanbul` provider, config in `rstest.config.ts` coverage section, thresholds per glob pattern
 - Coverage run: `yarn test` or `npx rstest --coverage`; reports in `./coverage/`
+- Service Worker: workbox-webpack-plugin InjectManifest works with Rspack; only enable in production builds
+- SW globals: sw.ts needs `/* eslint-disable no-undef */` for ServiceWorkerGlobalScope, Request, Response
 
 ---
 
@@ -847,4 +849,27 @@ px rstest
   - The roster useMyRoster hook did not fetch league name originally - had to add name to the select query
   - For DOM mocks in rstest, save origCreateElement at describe scope not in beforeEach to avoid cascading mock issues
   - Pre-existing test failures: RosterPage/DraftPage tests fail due to missing PlayerDetailProvider
+---
+## 2026-02-14T04:41 - US-041
+- What was implemented: Service worker for offline caching using Workbox
+  - Created sw.ts with cache-first strategy for static assets (JS, CSS, images, fonts)
+  - Created stale-while-revalidate strategy for Supabase API responses (rosters, standings)
+  - Created network-first strategy for HTML navigation requests
+  - Added offline fallback page (offline.html) with retry button
+  - Configured workbox-webpack-plugin InjectManifest in rspack.config.js (production only)
+  - Registered service worker in main.tsx (production only via process.env.NODE_ENV)
+- Files changed:
+  - `packages/web/src/sw.ts` (new) - Workbox service worker source
+  - `packages/web/public/offline.html` (new) - Offline fallback page
+  - `packages/web/rspack.config.js` (modified) - Added InjectManifest plugin, offline.html asset
+  - `packages/web/src/main.tsx` (modified) - Added SW registration on load
+  - `package.json` + `yarn.lock` (modified) - Added workbox-* dependencies
+- **Learnings for future iterations:**
+  - workbox-webpack-plugin works with Rspack since Rspack is Webpack-compatible
+  - setCatchHandler is from workbox-routing, not workbox-core
+  - InjectManifest mode gives control over service worker code; GenerateSW auto-generates
+  - Only enable service worker in production to avoid dev caching issues
+  - Use process.env.NODE_ENV instead of import.meta.env.PROD for Rspack compatibility
+  - sw.ts needs eslint-disable no-undef for ServiceWorkerGlobalScope globals
+  - Pre-existing test failures in DraftPage and RosterPage are unrelated
 ---
