@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Affix,
   Badge,
@@ -11,13 +12,17 @@ import {
   Stack,
 } from '@mantine/core';
 import { useCompareContext } from '../context/CompareContext';
+import { ComparisonModal } from './ComparisonModal';
 
 export function CompareTray() {
   const { players, removePlayer, clearAll } = useCompareContext();
+  const [modalOpened, setModalOpened] = useState(false);
 
   const visible = players.length > 0;
 
   return (
+    <>
+    <ComparisonModal opened={modalOpened} onClose={() => setModalOpened(false)} />
     <Affix position={{ bottom: 80, left: 0, right: 0 }} zIndex={200}>
       <Transition transition="slide-up" mounted={visible}>
         {(styles) => (
@@ -65,7 +70,7 @@ export function CompareTray() {
                 >
                   Clear All
                 </Button>
-                <Button size="xs" disabled={players.length < 2}>
+                <Button size="xs" disabled={players.length < 2} onClick={() => setModalOpened(true)}>
                   <Group gap={4}>
                     Compare
                     <Badge size="xs" circle>
@@ -79,5 +84,6 @@ export function CompareTray() {
         )}
       </Transition>
     </Affix>
+    </>
   );
 }
