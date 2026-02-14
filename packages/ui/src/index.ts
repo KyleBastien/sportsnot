@@ -1,5 +1,7 @@
 export { PlayerCard } from './lib/PlayerCard';
 export type { PlayerCardProps } from './lib/PlayerCard';
+export { ResponsiveTable } from './lib/ResponsiveTable';
+export type { ResponsiveTableProps, ResponsiveTableColumn } from './lib/ResponsiveTable';
 export { vars } from './lib/styles/theme.css';
 export { sprinkles } from './lib/styles/sprinkles.css';
 export type { Sprinkles } from './lib/styles/sprinkles.css';
