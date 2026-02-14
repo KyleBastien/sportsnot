@@ -7,6 +7,8 @@ export type { PointsBadgeProps } from './lib/PointsBadge';
 export { PositionBadge } from './lib/PositionBadge';
 export type { PositionBadgeProps, PositionType } from './lib/PositionBadge';
 export { ResponsiveTable } from './lib/ResponsiveTable';
+export { RosterSlot } from './lib/RosterSlot';
+export type { RosterSlotProps, RosterSlotPlayer, RosterSlotAction } from './lib/RosterSlot';
 export { StatRow } from './lib/StatRow';
 export type { StatRowProps } from './lib/StatRow';
 export { TeamCard } from './lib/TeamCard';
