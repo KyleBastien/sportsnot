@@ -72,6 +72,58 @@ setCatchHandler(async ({ request }: { request: Request }) => {
   return Response.error();
 });
 
+// Handle push notifications
+self.addEventListener('push', (event) => {
+  const defaultPayload = {
+    title: 'SportsNot',
+    body: 'You have a new notification',
+    icon: '/favicon.ico',
+    clickAction: '/',
+  };
+
+  let payload = defaultPayload;
+  try {
+    if (event.data) {
+      payload = { ...defaultPayload, ...event.data.json() };
+    }
+  } catch {
+    // Fall back to text if not JSON
+    if (event.data) {
+      payload = { ...defaultPayload, body: event.data.text() };
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: payload.icon,
+      data: { clickAction: payload.clickAction },
+    })
+  );
+});
+
+// Handle notification click - navigate to the action URL
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const clickAction = event.notification.data?.clickAction || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Focus existing window if available
+      for (const client of clientList) {
+        if ('focus' in client) {
+          (client as WindowClient).focus();
+          (client as WindowClient).navigate(clickAction);
+          return;
+        }
+      }
+      // Open new window otherwise
+      return self.clients.openWindow(clickAction);
+    })
+  );
+});
+
 // Listen for skip waiting message
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
