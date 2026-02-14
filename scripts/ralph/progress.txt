@@ -41,6 +41,12 @@ Started: 02/13/2026 17:16:12
 - Page tests: vanilla-extract needs setFileScope('test') in test-setup.ts when importing @sportsnot/ui
 - Page tests: Use QueryClient with refetchOnMount/refetchInterval/refetchOnWindowFocus: false and setQueryData for cached mock data
 - Page tests: Wrap with MemoryRouter + Routes/Route for pages using useParams
+- Page tests: hooks with enabled: !!user won't load without auth; test error state instead of loading state
+- Page tests: sortable ResponsiveTable columns append sort indicator to header text; use regex for assertions
+- Page tests: avoid triggering supabase API calls (signInWithMagicLink, etc.) - they hang in jsdom
+- Hook tests: rstest has no module mocking; override methods on the imported supabase singleton directly, restore in afterEach
+- Hook tests: Use Proxy-based mock for supabase.from() chain — all chained methods return proxy, .then resolves with {data, error, count}
+- Hook tests: For mutations, use mutate() + waitFor(isSuccess/isError) instead of mutateAsync
 
 ---
 
@@ -710,4 +716,43 @@ px rstest
   - Desktop vs mobile layout: DraftPage renders different sections; desktop shows "Draft History" with picks as "#N - TeamName", mobile uses tabbed "Board" with table format
   - Query keys: playoff stats use 'playoff-players' and 'playoff-teams' (not camelCase)
   - AuthProvider works in tests because supabase is created with empty strings (no actual connection)
+---
+
+## 2026-02-14T03:37 - US-035
+- What was implemented: Page rendering tests for RosterPage, StandingsPage, and LoginPage
+  - LoginPage (9 tests): renders sign in title, magic link description, email input with type/placeholder, label, submit button, typing in input, form structure, no initial error
+  - StandingsPage (9 tests): loading state, error alert, standings title, league name + round, standings table with point totals, rank badges (1st/2nd/3rd), manager names, Unknown for null users, table column headers
+  - RosterPage (13 tests): unauthenticated error, error alert, My Roster title, round number, scoring rules text, position group headers (Forward/Defenseman/Goalie/IR), empty slot messages, player names from cached stats, total points card, Active/Inactive badges, player count badges, Activate IR button, fallback player ID
+  - All 168 tests passing (31 new), typecheck passes
+- Files changed:
+  - `packages/web/src/app/routes/auth/LoginPage.test.tsx` (new)
+  - `packages/web/src/app/routes/standings/StandingsPage.test.tsx` (new)
+  - `packages/web/src/app/routes/roster/RosterPage.test.tsx` (new)
+- **Learnings for future iterations:**
+  - RosterPage useMyRoster has `enabled: !!user` - loading state test won't work without authenticated user; test error state instead
+  - StandingsPage sortable columns render with sort indicator (arrow) appended to header text; use regex match for header assertions
+  - LoginPage signInWithMagicLink makes real HTTP calls to supabase URL - avoid async tests that trigger form submit (will hang)
+  - Page tests that don't need route params (LoginPage) can use simple MemoryRouter without Routes/Route wrapping
+  - CompareProvider requires AuthProvider as parent (uses useAuthContext internally)
+---
+
+## 2026-02-14T04:04 - US-036
+- What was implemented: Hook tests for useAuth and useLeague hooks in @sportsnot/supabase
+  - useAuth (10 tests): loading state, session restoration, null session, auth state change on sign-in/sign-out, signInWithMagicLink success/error, signOut success/error, unsubscribe on unmount
+  - useLeagues (6 tests): undefined userId returns nothing, fetch leagues, error handling, empty results, loading state, null data fallback
+  - useLeague (4 tests): undefined leagueId, fetch single league with members, error handling, loading state
+  - useCreateLeague (2 tests): create league success, creation error
+  - useJoinLeague (2 tests): join success, invalid invite code error
+  - All hooks tested with @testing-library/react renderHook
+  - Supabase client mocked by overriding methods on the singleton (no module mocking in rstest)
+  - All 192 tests passing, typecheck passes
+- Files changed:
+  - `packages/supabase/src/lib/hooks/useAuth.test.tsx` (new)
+  - `packages/supabase/src/lib/hooks/useLeague.test.tsx` (new)
+- **Learnings for future iterations:**
+  - rstest has no module mocking; override methods on the imported supabase singleton directly (save originals, restore in afterEach)
+  - Proxy-based mock for supabase.from() chain: all chained methods (.select/.eq/.single/.insert) return the proxy, .then resolves with {data, error, count}
+  - For mutation hooks (useCreateLeague, useJoinLeague), use mutate() + waitFor(isSuccess/isError) instead of mutateAsync in act() - avoids unhandled promise issues
+  - supabase.auth methods (getSession, onAuthStateChange, signInWithOtp, signOut) can be directly reassigned for testing
+  - QueryClient for hook tests needs retry: false, gcTime: 0, and all refetch options disabled
 ---
