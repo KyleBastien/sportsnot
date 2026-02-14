@@ -68,6 +68,18 @@ function useLeagueMembers(leagueId: string) {
   });
 }
 
+interface ComparePlayer {
+  id: number;
+  fullName: string;
+  position: string;
+  team: string;
+  goals: number;
+  assists: number;
+  points: number;
+}
+
+const MAX_COMPARE = 4;
+
 interface AvailablePlayerBoardProps {
   playerStats: any[];
   teamStats: any[];
@@ -77,6 +89,8 @@ interface AvailablePlayerBoardProps {
   searchQuery: string;
   isMyTurn: boolean;
   onSelectPlayer: (player: DraftablePlayer) => void;
+  comparePlayers: ComparePlayer[];
+  onToggleCompare: (player: ComparePlayer) => void;
 }
 
 function AvailablePlayerBoard({
@@ -88,6 +102,8 @@ function AvailablePlayerBoard({
   searchQuery,
   isMyTurn,
   onSelectPlayer,
+  comparePlayers,
+  onToggleCompare,
 }: AvailablePlayerBoardProps) {
   const query = searchQuery.toLowerCase();
 
@@ -157,46 +173,72 @@ function AvailablePlayerBoard({
                   <Table.Th style={{ textAlign: 'right' }}>A</Table.Th>
                   <Table.Th style={{ textAlign: 'right' }}>Pts</Table.Th>
                   <Table.Th style={{ textAlign: 'right' }}>GP</Table.Th>
+                  <Table.Th />
                   {isMyTurn && <Table.Th />}
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {filteredSkaters.map((p) => (
-                  <Table.Tr key={p.id}>
-                    <Table.Td>{p.fullName}</Table.Td>
-                    <Table.Td>
-                      <Badge size="xs" variant="light">{p.position}</Badge>
-                    </Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{p.goals}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{p.assists}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{p.points}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{p.gamesPlayed}</Table.Td>
-                    {isMyTurn && (
+                {filteredSkaters.map((p) => {
+                  const isCompared = comparePlayers.some((c) => c.id === p.id);
+                  const compareFull = comparePlayers.length >= MAX_COMPARE;
+                  return (
+                    <Table.Tr key={p.id}>
+                      <Table.Td>{p.fullName}</Table.Td>
+                      <Table.Td>
+                        <Badge size="xs" variant="light">{p.position}</Badge>
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>{p.goals}</Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>{p.assists}</Table.Td>
+                      <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{p.points}</Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>{p.gamesPlayed}</Table.Td>
                       <Table.Td>
                         <Button
                           size="xs"
-                          variant="light"
+                          variant={isCompared ? 'filled' : 'outline'}
+                          color={isCompared ? 'blue' : 'gray'}
+                          disabled={!isCompared && compareFull}
                           onClick={() =>
-                            onSelectPlayer({
+                            onToggleCompare({
                               id: p.id,
                               fullName: p.fullName,
-                              firstName: p.firstName,
-                              lastName: p.lastName,
                               position: p.position,
                               team: p.team,
-                              teamId: p.teamId,
+                              goals: p.goals,
+                              assists: p.assists,
+                              points: p.points,
                             })
                           }
                         >
-                          Draft
+                          {isCompared ? 'Compared' : 'Compare'}
                         </Button>
                       </Table.Td>
-                    )}
-                  </Table.Tr>
-                ))}
+                      {isMyTurn && (
+                        <Table.Td>
+                          <Button
+                            size="xs"
+                            variant="light"
+                            onClick={() =>
+                              onSelectPlayer({
+                                id: p.id,
+                                fullName: p.fullName,
+                                firstName: p.firstName,
+                                lastName: p.lastName,
+                                position: p.position,
+                                team: p.team,
+                                teamId: p.teamId,
+                              })
+                            }
+                          >
+                            Draft
+                          </Button>
+                        </Table.Td>
+                      )}
+                    </Table.Tr>
+                  );
+                })}
                 {filteredSkaters.length === 0 && (
                   <Table.Tr>
-                    <Table.Td colSpan={isMyTurn ? 7 : 6}>
+                    <Table.Td colSpan={isMyTurn ? 8 : 7}>
                       <Text c="dimmed" ta="center" size="sm">No available skaters match your filters</Text>
                     </Table.Td>
                   </Table.Tr>
@@ -273,6 +315,20 @@ export function DraftPage() {
   const [confirmPlayer, setConfirmPlayer] = useState<DraftablePlayer | null>(null);
   const [confirmPosition, setConfirmPosition] = useState<Position>('F');
   const [submitting, setSubmitting] = useState(false);
+  const [comparePlayers, setComparePlayers] = useState<ComparePlayer[]>([]);
+
+  const handleToggleCompare = (player: ComparePlayer) => {
+    setComparePlayers((prev) => {
+      const exists = prev.some((p) => p.id === player.id);
+      if (exists) return prev.filter((p) => p.id !== player.id);
+      if (prev.length >= MAX_COMPARE) return prev;
+      return [...prev, player];
+    });
+  };
+
+  const handleRemoveCompare = (playerId: number) => {
+    setComparePlayers((prev) => prev.filter((p) => p.id !== playerId));
+  };
 
   // Fetch cached NHL data
   const currentSeason = '20242025'; // TODO: derive from NHL API
@@ -528,9 +584,60 @@ export function DraftPage() {
                       : 'F'
                 );
               }}
+              comparePlayers={comparePlayers}
+              onToggleCompare={handleToggleCompare}
             />
           )}
         </Card>
+
+        {/* Compare Tray */}
+        {comparePlayers.length > 0 && (
+          <Card shadow="sm" padding="md" radius="md" withBorder data-testid="compare-tray">
+            <Group justify="space-between" mb="sm">
+              <Title order={4}>Compare ({comparePlayers.length})</Title>
+              <Button
+                size="xs"
+                variant="subtle"
+                color="red"
+                onClick={() => setComparePlayers([])}
+              >
+                Clear All
+              </Button>
+            </Group>
+            <Table striped>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Player</Table.Th>
+                  <Table.Th style={{ textAlign: 'right' }}>Goals</Table.Th>
+                  <Table.Th style={{ textAlign: 'right' }}>Assists</Table.Th>
+                  <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
+                  <Table.Th />
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {comparePlayers.map((p) => (
+                  <Table.Tr key={p.id}>
+                    <Table.Td>{p.fullName} ({p.team})</Table.Td>
+                    <Table.Td style={{ textAlign: 'right' }}>{p.goals}</Table.Td>
+                    <Table.Td style={{ textAlign: 'right' }}>{p.assists}</Table.Td>
+                    <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{p.points}</Table.Td>
+                    <Table.Td>
+                      <Button
+                        size="xs"
+                        variant="subtle"
+                        color="red"
+                        onClick={() => handleRemoveCompare(p.id)}
+                        aria-label={`Remove ${p.fullName}`}
+                      >
+                        ✕
+                      </Button>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Card>
+        )}
 
         {/* Confirm Pick Modal */}
         <Modal
