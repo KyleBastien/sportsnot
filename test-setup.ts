@@ -1,3 +1,7 @@
+// Polyfill vanilla-extract file scope for tests that import @sportsnot/ui
+import { setFileScope, endFileScope } from '@vanilla-extract/css/fileScope';
+setFileScope('test');
+
 // Polyfill for jsdom missing APIs needed by Mantine
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

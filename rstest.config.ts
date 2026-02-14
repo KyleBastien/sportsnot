@@ -6,4 +6,10 @@ export default defineConfig({
   testEnvironment: 'jsdom',
   plugins: [pluginReact()],
   setupFiles: ['./test-setup.ts'],
+  source: {
+    define: {
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('http://localhost:54321'),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify('test-anon-key'),
+    },
+  },
 });

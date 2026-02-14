@@ -30,6 +30,17 @@ Started: 02/13/2026 17:16:12
 - PostgreSQL NULL uniqueness: Use partial unique index (WHERE col IS NULL) instead of UNIQUE constraint for nullable columns
 - Trigger delta detection: Use TG_OP to distinguish INSERT (OLD is null) from UPDATE in trigger functions
 - Mantine Notifications: Configure `<Notifications />` inside MantineProvider, import `@mantine/notifications/styles.css`, use `notifications.show()` imperative API with onClick
+- Testing: rstest with jsdom env, `@rsbuild/plugin-react` for JSX, `test-setup.ts` for matchMedia/ResizeObserver polyfills
+- Testing cleanup: Must `afterEach(cleanup)` from @testing-library/react; rstest does NOT auto-cleanup between tests
+- Testing mocks: rstest has no `fn()` mock; use simple closures/booleans to track calls
+- Testing Mantine styles: Mantine Card doesn't pass inline `style` to DOM in jsdom; compare rendered HTML between states instead of asserting `element.style`
+- Testing duplicates: Use `getAllByText` when test data may contain duplicate text values across rows
+- Testing responsive: Override `window.matchMedia` to return `matches: true` for mobile breakpoint, restore in `afterEach`
+- rstest CLI: No `--filter` flag; run all tests with `npx rstest`
+- Page tests: import.meta.env must be defined via rstest source.define config (not test-setup.ts)
+- Page tests: vanilla-extract needs setFileScope('test') in test-setup.ts when importing @sportsnot/ui
+- Page tests: Use QueryClient with refetchOnMount/refetchInterval/refetchOnWindowFocus: false and setQueryData for cached mock data
+- Page tests: Wrap with MemoryRouter + Routes/Route for pages using useParams
 
 ---
 
@@ -624,4 +635,79 @@ Started: 02/13/2026 17:16:12
   - ResponsiveTable renderCell can use hidden _-prefixed fields in row data for conditional rendering logic
   - Mantine Pagination is 1-indexed (value prop) but useScoringEvents page param is 0-indexed
   - TextInput with type="date" works as a simple date picker alternative to Mantine DatePicker (no extra dep)
+---
+
+## 2026-02-14T02:55 - US-031
+- What was implemented: Component tests for PlayerCard, TeamCard, and PositionBadge in @sportsnot/ui
+  - PlayerCard (9 tests): renders name/position, team/jersey, missing data handling, points display, onSelect callback, compare button states
+  - TeamCard (9 tests): renders name/abbreviation, record, points, eliminated state (opacity + strikethrough), onClick, cursor styles
+  - PositionBadge (11 tests): renders all 8 positions (F/D/G/IR_F/IR_D/C/LW/RW), default light variant, filled/outline variants
+  - Configured rstest with jsdom environment, @rsbuild/plugin-react for JSX transform, and test-setup.ts for polyfills
+  - Added jsdom and @rsbuild/plugin-react as dev dependencies
+- Files changed:
+  - `packages/ui/src/lib/PlayerCard.test.tsx` (new)
+  - `packages/ui/src/lib/TeamCard.test.tsx` (new)
+  - `packages/ui/src/lib/PositionBadge.test.tsx` (new)
+  - `rstest.config.ts` (modified - added jsdom, plugin-react, setupFiles)
+  - `test-setup.ts` (new - window.matchMedia and ResizeObserver polyfills)
+  - `package.json`, `yarn.lock` (added jsdom, @rsbuild/plugin-react)
+- **Learnings for future iterations:**
+  - rstest does not have a `fn()` mock function API; use simple closures to track calls
+  - jsdom does not implement `window.matchMedia` or `ResizeObserver`; polyfill in test-setup.ts for Mantine components
+  - React Testing Library does NOT auto-cleanup between tests in rstest; must `import { cleanup } from '@testing-library/react'` and call `afterEach(cleanup)`
+  - rstest `it.each` can cause hanging/slow execution; use individual `it` blocks instead
+  - @rsbuild/plugin-react must be added to rstest plugins config for JSX transform in .tsx test files
+  - Mantine Tooltip/Popover components work in jsdom if ResizeObserver is polyfilled
+---
+
+## 2026-02-14T03:20 - US-032
+- What was implemented: Component tests for RosterSlot, PointsBadge, and StatRow in @sportsnot/ui
+- Tests cover: empty/filled/IR states, action buttons, points display, delta rendering, trend icons, highlight state, compact mode
+- 29 new tests added (11 RosterSlot, 10 PointsBadge, 8 StatRow), all passing
+- Files changed:
+  - `packages/ui/src/lib/RosterSlot.test.tsx` (new)
+  - `packages/ui/src/lib/PointsBadge.test.tsx` (new)
+  - `packages/ui/src/lib/StatRow.test.tsx` (new)
+- **Learnings for future iterations:**
+  - RosterSlot action buttons use aria-label matching ACTION_CONFIG[action].label for testing
+  - PointsBadge delta only renders when delta != null && delta !== 0
+  - StatRow trend arrows: up=triangle up, down=triangle down, neutral=right-pointing triangle
+  - Follow existing test patterns: afterEach(cleanup), renderWithMantine wrapper, MantineProvider required
+---
+
+## 2026-02-14T03:22 - US-033
+- What was implemented: Component tests for LiveIndicator, GameCard, and ResponsiveTable
+- Tests: 10 for LiveIndicator, 11 for GameCard, 12 for ResponsiveTable (33 new tests, 117 total passing)
+- Files changed:
+  - `packages/ui/src/lib/LiveIndicator.test.tsx` (new)
+  - `packages/ui/src/lib/GameCard.test.tsx` (new)
+  - `packages/ui/src/lib/ResponsiveTable.test.tsx` (new)
+- **Learnings for future iterations:**
+  - Mantine Card does not pass inline style prop directly to the DOM element in jsdom; avoid asserting on lement.style.borderColor — compare rendered HTML between states instead
+  - When test data has duplicate values (e.g., two players on same team), use getAllByText instead of getByText
+  - For ResponsiveTable mobile tests, override window.matchMedia to return matches: true for (max-width: 62em) and restore after each test
+  - rstest has no --filter flag; run all tests with 
+px rstest
+---
+
+## 2026-02-14T03:26 - US-034
+- What was implemented: Page rendering tests for DashboardPage and DraftPage
+  - DashboardPage (7 tests): renders title/welcome, action buttons, My Leagues heading, loading state, empty state, league cards, no empty state when leagues exist
+  - DraftPage (13 tests): loading state, no active draft alert, Draft Room header, round number, pick number, turn indicator, no picks message, draft board with picks, position filters, search input, available players section, no player data message, player list rendering
+  - Updated rstest.config.ts with source.define for import.meta.env (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+  - Updated test-setup.ts with vanilla-extract fileScope polyfill for @sportsnot/ui imports
+- Files changed:
+  - `packages/web/src/app/routes/dashboard/DashboardPage.test.tsx` (new)
+  - `packages/web/src/app/routes/draft/DraftPage.test.tsx` (new)
+  - `rstest.config.ts` (added source.define for Vite env vars)
+  - `test-setup.ts` (added vanilla-extract fileScope polyfill)
+- **Learnings for future iterations:**
+  - Page tests require import.meta.env polyfill via rstest source.define (not test-setup.ts) because supabase.ts accesses it at module load time
+  - Page tests importing @sportsnot/ui trigger vanilla-extract createGlobalTheme; fix by calling setFileScope('test') from @vanilla-extract/css/fileScope in test-setup.ts
+  - Without module mocking in rstest, use QueryClient.setQueryData() to pre-populate cache with mock data
+  - Set refetchOnMount: false, refetchInterval: false, refetchOnWindowFocus: false on test QueryClient to prevent queries from overriding cached data
+  - For DraftPage, use MemoryRouter with Routes/Route to provide useParams with leagueId
+  - Desktop vs mobile layout: DraftPage renders different sections; desktop shows "Draft History" with picks as "#N - TeamName", mobile uses tabbed "Board" with table format
+  - Query keys: playoff stats use 'playoff-players' and 'playoff-teams' (not camelCase)
+  - AuthProvider works in tests because supabase is created with empty strings (no actual connection)
 ---
