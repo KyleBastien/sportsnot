@@ -99,10 +99,45 @@ test.describe('Dashboard', () => {
   test('dashboard displays live games widget when games are in progress', async ({
     authenticatedPage,
   }) => {
-    // The live games widget is not yet implemented in the dashboard.
-    // This test verifies the dashboard loads correctly and is a placeholder
-    // for when the widget is added.
-    test.skip(true, 'Live games widget not yet implemented in dashboard');
+    const liveTeams = [
+      {
+        team_id: 6,
+        team_name: 'Boston Bruins',
+        team_abbreviation: 'BOS',
+        wins: 3,
+        shutouts: 1,
+        is_eliminated: false,
+      },
+      {
+        team_id: 14,
+        team_name: 'Tampa Bay Lightning',
+        team_abbreviation: 'TBL',
+        wins: 2,
+        shutouts: 0,
+        is_eliminated: false,
+      },
+    ];
+
+    await setupSupabaseMocks(authenticatedPage, {
+      team_stats_cache: mockTableList(liveTeams),
+    });
+    await authenticatedPage.goto('/');
+
+    const dashboard = new DashboardPage(authenticatedPage);
+    await expect(dashboard.heading).toBeVisible(NAV_TIMEOUT);
+
+    // Live Games section should be visible
+    await expect(
+      authenticatedPage.getByRole('heading', { name: /Live Games/i })
+    ).toBeVisible();
+
+    // Both teams should appear
+    await expect(authenticatedPage.getByText('Boston Bruins')).toBeVisible();
+    await expect(authenticatedPage.getByText('Tampa Bay Lightning')).toBeVisible();
+
+    // Badge abbreviations
+    await expect(authenticatedPage.getByText('BOS', { exact: true })).toBeVisible();
+    await expect(authenticatedPage.getByText('TBL', { exact: true })).toBeVisible();
   });
 
   test('clicking a league card navigates to /leagues/:leagueId', async ({

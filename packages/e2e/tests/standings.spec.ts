@@ -111,12 +111,59 @@ test.describe('Standings Page', () => {
     await expect(authenticatedPage.getByText('3rd')).toBeVisible();
   });
 
-  test.skip('points breakdown columns are displayed (player points, goalie points)', async () => {
-    // StandingsPage currently shows only total_points — breakdown columns not implemented yet
+  test('points breakdown columns are displayed (player points, goalie points)', async ({
+    authenticatedPage,
+  }) => {
+    const membersWithBreakdown = membersData.map((m) => ({
+      ...m,
+      player_points: Math.floor(m.total_points * 0.7),
+      goalie_points: m.total_points - Math.floor(m.total_points * 0.7),
+    }));
+
+    await setupSupabaseMocks(authenticatedPage, {
+      leagues: mockTableData([], leagueData),
+      league_members: mockTableList(membersWithBreakdown),
+    });
+
+    const standings = new StandingsPage(authenticatedPage);
+    await standings.goto(LEAGUE_ID);
+    await expect(standings.heading).toBeVisible(NAV_TIMEOUT);
+
+    // Breakdown column headers should be visible
+    await expect(authenticatedPage.getByText('Player Pts')).toBeVisible();
+    await expect(authenticatedPage.getByText('Goalie Pts')).toBeVisible();
+
+    // First row (Alice) — player_points = 43, goalie_points = 19
+    const firstRow = standings.getMemberRows().nth(0);
+    await expect(firstRow.getByText('43')).toBeVisible();
+    await expect(firstRow.getByText('19')).toBeVisible();
   });
 
-  test.skip('round-by-round point columns are shown', async () => {
-    // StandingsPage currently shows only a single total_points column — round columns not implemented yet
+  test('round-by-round point columns are shown', async ({
+    authenticatedPage,
+  }) => {
+    const membersWithRounds = membersData.map((m) => ({
+      ...m,
+      round_points: { 1: Math.floor(m.total_points * 0.6), 2: m.total_points - Math.floor(m.total_points * 0.6) },
+    }));
+
+    await setupSupabaseMocks(authenticatedPage, {
+      leagues: mockTableData([], leagueData),
+      league_members: mockTableList(membersWithRounds),
+    });
+
+    const standings = new StandingsPage(authenticatedPage);
+    await standings.goto(LEAGUE_ID);
+    await expect(standings.heading).toBeVisible(NAV_TIMEOUT);
+
+    // Round column headers
+    await expect(authenticatedPage.getByText('R1')).toBeVisible();
+    await expect(authenticatedPage.getByText('R2')).toBeVisible();
+
+    // Alice round 1 = 37, round 2 = 25
+    const firstRow = standings.getMemberRows().nth(0);
+    await expect(firstRow.getByText('37')).toBeVisible();
+    await expect(firstRow.getByText('25')).toBeVisible();
   });
 
   test('current user row is visually highlighted', async ({
@@ -141,7 +188,26 @@ test.describe('Standings Page', () => {
     await expect(userRow.getByText('2nd')).toBeVisible();
   });
 
-  test.skip('CSV export button triggers download of standings data', async () => {
-    // StandingsPage does not have a CSV export button yet
+  test('CSV export button triggers download of standings data', async ({
+    authenticatedPage,
+  }) => {
+    await setupStandingsMocks(authenticatedPage);
+    const standings = new StandingsPage(authenticatedPage);
+    await standings.goto(LEAGUE_ID);
+    await expect(standings.heading).toBeVisible(NAV_TIMEOUT);
+
+    // CSV export button should be visible
+    const exportButton = authenticatedPage.getByRole('button', {
+      name: /Export CSV/i,
+    });
+    await expect(exportButton).toBeVisible();
+
+    // Set up download listener
+    const downloadPromise = authenticatedPage.waitForEvent('download');
+    await exportButton.click();
+    const download = await downloadPromise;
+
+    // Verify a file was downloaded with csv extension
+    expect(download.suggestedFilename()).toMatch(/\.csv$/);
   });
 });

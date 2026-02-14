@@ -27,6 +27,7 @@ import { RoundTransitionPage } from './routes/draft/RoundTransitionPage';
 import { RosterPage } from './routes/roster/RosterPage';
 import { RosterHistoryPage } from './routes/roster/RosterHistoryPage';
 import { StandingsPage } from './routes/standings/StandingsPage';
+import { ScoringHistoryPage } from './routes/scoring/ScoringHistoryPage';
 import { ProfilePage } from './routes/profile/ProfilePage';
 
 function UserMenu() {
@@ -191,6 +192,14 @@ export function App() {
               element={
                 <ProtectedRoute>
                   <StandingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/scoring/:leagueId"
+              element={
+                <ProtectedRoute>
+                  <ScoringHistoryPage />
                 </ProtectedRoute>
               }
             />

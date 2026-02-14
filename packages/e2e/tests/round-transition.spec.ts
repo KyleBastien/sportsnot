@@ -333,7 +333,7 @@ test.describe('Round Transition', () => {
 
     // Should navigate to draft page after successful insert
     await expect(authenticatedPage).toHaveURL(
-      new RegExp(`/draft/${LEAGUE_ID}`),
+      new RegExp(`/draft/${LEAGUE_ID}$`),
       NAV_TIMEOUT
     );
 

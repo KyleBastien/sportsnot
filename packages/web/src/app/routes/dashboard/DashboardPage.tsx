@@ -11,6 +11,7 @@ import {
   Badge,
   Loader,
   Center,
+  Alert,
 } from '@mantine/core';
 import { useAuthContext } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
@@ -26,6 +27,22 @@ interface LeagueWithMembership {
   invite_code: string;
   league_members: Array<{ team_name: string; total_points: number; user_id: string }>;
   memberCount: number;
+}
+
+function useLiveGames() {
+  return useQuery({
+    queryKey: ['live-games'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('team_stats_cache')
+        .select('team_id, team_name, team_abbreviation, wins, shutouts, is_eliminated')
+        .eq('is_eliminated', false)
+        .order('wins', { ascending: false });
+
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 }
 
 function useMyLeagues() {
@@ -66,6 +83,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuthContext();
   const { data: leagues, isLoading } = useMyLeagues();
+  const { data: liveGames } = useLiveGames();
 
   return (
     <Container size="lg" py="xl">
@@ -136,6 +154,31 @@ export function DashboardPage() {
               </Card>
             ))}
           </SimpleGrid>
+        )}
+
+        {liveGames && liveGames.length > 0 && (
+          <>
+            <Title order={3}>Live Games</Title>
+            <Alert color="green" title="Games In Progress">
+              There are currently {liveGames.length} teams competing in the
+              playoffs.
+            </Alert>
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
+              {liveGames.map((team: any) => (
+                <Card key={team.team_id} shadow="sm" padding="md" radius="md" withBorder>
+                  <Group justify="space-between">
+                    <Text fw={600}>{team.team_name}</Text>
+                    <Badge color="green" variant="light">
+                      {team.team_abbreviation}
+                    </Badge>
+                  </Group>
+                  <Text size="sm" c="dimmed">
+                    {team.wins} wins · {team.shutouts} shutouts
+                  </Text>
+                </Card>
+              ))}
+            </SimpleGrid>
+          </>
         )}
       </Stack>
     </Container>

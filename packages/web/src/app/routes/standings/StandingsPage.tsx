@@ -10,6 +10,8 @@ import {
   Loader,
   Center,
   Alert,
+  Button,
+  Group,
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
@@ -27,7 +29,7 @@ function useStandings(leagueId: string) {
 
       const { data: members, error } = await supabase
         .from('league_members')
-        .select('id, user_id, team_name, total_points, users(display_name)')
+        .select('id, user_id, team_name, total_points, player_points, goalie_points, round_points, users(display_name)')
         .eq('league_id', leagueId)
         .order('total_points', { ascending: false });
 
@@ -39,6 +41,24 @@ function useStandings(leagueId: string) {
       };
     },
   });
+}
+
+function downloadCSV(members: any[], leagueName: string) {
+  const header = 'Rank,Team,Manager,Points\n';
+  const rows = members
+    .map(
+      (m: any, i: number) =>
+        `${i + 1},"${m.team_name}","${m.users?.display_name ?? 'Unknown'}",${m.total_points ?? 0}`
+    )
+    .join('\n');
+
+  const blob = new Blob([header + rows], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${leagueName?.replace(/[^a-z0-9]/gi, '_') ?? 'standings'}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function StandingsPage() {
@@ -65,16 +85,46 @@ export function StandingsPage() {
   }
 
   const { league, members } = data;
+  const currentRound = league?.current_round ?? 0;
+
+  // Check if breakdown data exists
+  const hasBreakdown = members.some(
+    (m: any) => m.player_points != null || m.goalie_points != null
+  );
+
+  // Check if round-by-round data exists
+  const hasRoundPoints = members.some(
+    (m: any) => m.round_points && Object.keys(m.round_points).length > 0
+  );
+
+  // Collect all round numbers across all members
+  const roundNumbers = hasRoundPoints
+    ? [
+        ...new Set(
+          members.flatMap((m: any) =>
+            m.round_points ? Object.keys(m.round_points).map(Number) : []
+          )
+        ),
+      ].sort((a, b) => a - b)
+    : [];
 
   return (
     <Container size="lg" py="xl">
       <Stack gap="xl">
-        <div>
-          <Title order={2}>Standings</Title>
-          <Text c="dimmed">
-            {league?.name} · Round {league?.current_round ?? 0}
-          </Text>
-        </div>
+        <Group justify="space-between" align="flex-end">
+          <div>
+            <Title order={2}>Standings</Title>
+            <Text c="dimmed">
+              {league?.name} · Round {currentRound}
+            </Text>
+          </div>
+          <Button
+            variant="light"
+            onClick={() => downloadCSV(members, league?.name)}
+          >
+            Export CSV
+          </Button>
+        </Group>
 
         <Card shadow="sm" padding="md" radius="md" withBorder>
           <Table striped highlightOnHover>
@@ -83,6 +133,17 @@ export function StandingsPage() {
                 <Table.Th style={{ width: 60 }}>Rank</Table.Th>
                 <Table.Th>Team</Table.Th>
                 <Table.Th>Manager</Table.Th>
+                {hasBreakdown && (
+                  <>
+                    <Table.Th style={{ textAlign: 'right' }}>Player Pts</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Goalie Pts</Table.Th>
+                  </>
+                )}
+                {roundNumbers.map((r) => (
+                  <Table.Th key={r} style={{ textAlign: 'right' }}>
+                    R{r}
+                  </Table.Th>
+                ))}
                 <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -125,6 +186,28 @@ export function StandingsPage() {
                         </Badge>
                       )}
                     </Table.Td>
+                    {hasBreakdown && (
+                      <>
+                        <Table.Td
+                          style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {member.player_points ?? 0}
+                        </Table.Td>
+                        <Table.Td
+                          style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {member.goalie_points ?? 0}
+                        </Table.Td>
+                      </>
+                    )}
+                    {roundNumbers.map((r) => (
+                      <Table.Td
+                        key={r}
+                        style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {member.round_points?.[r] ?? 0}
+                      </Table.Td>
+                    ))}
                     <Table.Td
                       style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
                     >

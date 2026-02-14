@@ -12,6 +12,7 @@ const TABLES = [
   'rosters',
   'player_stats_cache',
   'team_stats_cache',
+  'scoring_events',
 ] as const;
 
 type TableName = (typeof TABLES)[number];
