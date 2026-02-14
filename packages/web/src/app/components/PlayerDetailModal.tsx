@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   Modal,
   Group,
@@ -12,6 +13,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { getPlayer, getPlayerGameLog } from '@sportsnot/nhl-api';
 import { usePlayerDetailContext } from '../context/PlayerDetailContext';
 import { useCompareContext } from '../context/CompareContext';
@@ -56,7 +58,8 @@ export function PlayerDetailModal() {
   };
 
   const isLoading = playerLoading || gameLogLoading;
-  const recentGames = (gameLog ?? []).slice(0, 10);
+  const allGames = gameLog ?? [];
+  const useVirtual = allGames.length > 20;
 
   return (
     <Modal
@@ -127,80 +130,28 @@ export function PlayerDetailModal() {
           </Group>
 
           {/* Season totals */}
-          {recentGames.length > 0 && (
+          {allGames.length > 0 && (
             <>
               <Text fw={600} size="sm">
                 Playoff Totals
               </Text>
-              <SeasonTotals games={recentGames} />
+              <SeasonTotals games={allGames} />
             </>
           )}
 
           {/* Game log */}
           <Text fw={600} size="sm">
-            Game Log (Last {recentGames.length} games)
+            Game Log ({allGames.length} games)
           </Text>
-          {recentGames.length === 0 ? (
+          {allGames.length === 0 ? (
             <Text c="dimmed" size="sm">
               No playoff game data available.
             </Text>
+          ) : useVirtual ? (
+            <VirtualizedGameLog games={allGames} />
           ) : (
             <ScrollArea>
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Date</Table.Th>
-                    <Table.Th>vs</Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>G</Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>A</Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>Pts</Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>+/-</Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>PIM</Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>SOG</Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>TOI</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {recentGames.map((game) => (
-                    <Table.Tr key={game.gameId}>
-                      <Table.Td>
-                        <Text size="sm">
-                          {new Date(game.gameDate).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm">{game.opponentAbbrev}</Text>
-                      </Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>
-                        {game.goals}
-                      </Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>
-                        {game.assists}
-                      </Table.Td>
-                      <Table.Td
-                        style={{ textAlign: 'right', fontWeight: 600 }}
-                      >
-                        {game.points}
-                      </Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>
-                        {game.plusMinus > 0 ? `+${game.plusMinus}` : game.plusMinus}
-                      </Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>
-                        {game.pim}
-                      </Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>
-                        {game.shots}
-                      </Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>
-                        {game.toi}
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+              <GameLogTable games={allGames} />
             </ScrollArea>
           )}
         </Stack>
@@ -208,6 +159,138 @@ export function PlayerDetailModal() {
         <Text c="dimmed">Player not found.</Text>
       )}
     </Modal>
+  );
+}
+
+interface GameLogEntry {
+  gameId: number;
+  gameDate: string;
+  opponentAbbrev: string;
+  goals: number;
+  assists: number;
+  points: number;
+  plusMinus: number;
+  pim: number;
+  shots: number;
+  toi: string;
+}
+
+function GameLogTableHead() {
+  return (
+    <Table.Thead>
+      <Table.Tr>
+        <Table.Th>Date</Table.Th>
+        <Table.Th>vs</Table.Th>
+        <Table.Th style={{ textAlign: 'right' }}>G</Table.Th>
+        <Table.Th style={{ textAlign: 'right' }}>A</Table.Th>
+        <Table.Th style={{ textAlign: 'right' }}>Pts</Table.Th>
+        <Table.Th style={{ textAlign: 'right' }}>+/-</Table.Th>
+        <Table.Th style={{ textAlign: 'right' }}>PIM</Table.Th>
+        <Table.Th style={{ textAlign: 'right' }}>SOG</Table.Th>
+        <Table.Th style={{ textAlign: 'right' }}>TOI</Table.Th>
+      </Table.Tr>
+    </Table.Thead>
+  );
+}
+
+function GameLogRow({ game }: { game: GameLogEntry }) {
+  return (
+    <Table.Tr key={game.gameId}>
+      <Table.Td>
+        <Text size="sm">
+          {new Date(game.gameDate).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          })}
+        </Text>
+      </Table.Td>
+      <Table.Td>
+        <Text size="sm">{game.opponentAbbrev}</Text>
+      </Table.Td>
+      <Table.Td style={{ textAlign: 'right' }}>{game.goals}</Table.Td>
+      <Table.Td style={{ textAlign: 'right' }}>{game.assists}</Table.Td>
+      <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{game.points}</Table.Td>
+      <Table.Td style={{ textAlign: 'right' }}>
+        {game.plusMinus > 0 ? `+${game.plusMinus}` : game.plusMinus}
+      </Table.Td>
+      <Table.Td style={{ textAlign: 'right' }}>{game.pim}</Table.Td>
+      <Table.Td style={{ textAlign: 'right' }}>{game.shots}</Table.Td>
+      <Table.Td style={{ textAlign: 'right' }}>{game.toi}</Table.Td>
+    </Table.Tr>
+  );
+}
+
+function GameLogTable({ games }: { games: GameLogEntry[] }) {
+  return (
+    <Table striped highlightOnHover>
+      <GameLogTableHead />
+      <Table.Tbody>
+        {games.map((game) => (
+          <GameLogRow key={game.gameId} game={game} />
+        ))}
+      </Table.Tbody>
+    </Table>
+  );
+}
+
+function VirtualizedGameLog({ games }: { games: GameLogEntry[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: games.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 36,
+    overscan: 5,
+  });
+
+  return (
+    <div ref={scrollRef} style={{ height: 400, overflow: 'auto' }}>
+      <Table striped highlightOnHover>
+        <GameLogTableHead />
+        <Table.Tbody>
+          {virtualizer.getVirtualItems().length > 0 && virtualizer.getVirtualItems()[0].start > 0 && (
+            <Table.Tr>
+              <Table.Td colSpan={9} style={{ height: virtualizer.getVirtualItems()[0].start, padding: 0 }} />
+            </Table.Tr>
+          )}
+          {virtualizer.getVirtualItems().map((virtualRow) => (
+            <Table.Tr key={games[virtualRow.index].gameId} data-index={virtualRow.index} ref={virtualizer.measureElement}>
+              <Table.Td>
+                <Text size="sm">
+                  {new Date(games[virtualRow.index].gameDate).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </Text>
+              </Table.Td>
+              <Table.Td>
+                <Text size="sm">{games[virtualRow.index].opponentAbbrev}</Text>
+              </Table.Td>
+              <Table.Td style={{ textAlign: 'right' }}>{games[virtualRow.index].goals}</Table.Td>
+              <Table.Td style={{ textAlign: 'right' }}>{games[virtualRow.index].assists}</Table.Td>
+              <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{games[virtualRow.index].points}</Table.Td>
+              <Table.Td style={{ textAlign: 'right' }}>
+                {games[virtualRow.index].plusMinus > 0 ? `+${games[virtualRow.index].plusMinus}` : games[virtualRow.index].plusMinus}
+              </Table.Td>
+              <Table.Td style={{ textAlign: 'right' }}>{games[virtualRow.index].pim}</Table.Td>
+              <Table.Td style={{ textAlign: 'right' }}>{games[virtualRow.index].shots}</Table.Td>
+              <Table.Td style={{ textAlign: 'right' }}>{games[virtualRow.index].toi}</Table.Td>
+            </Table.Tr>
+          ))}
+          {virtualizer.getVirtualItems().length > 0 && (
+            <Table.Tr>
+              <Table.Td
+                colSpan={9}
+                style={{
+                  height: virtualizer.getTotalSize() - virtualizer.getVirtualItems()[virtualizer.getVirtualItems().length - 1].end,
+                  padding: 0,
+                }}
+              />
+            </Table.Tr>
+          )}
+        </Table.Tbody>
+      </Table>
+    </div>
   );
 }
 

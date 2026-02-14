@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   ActionIcon,
@@ -24,6 +24,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { supabase, usePlayoffPlayers, usePlayoffTeams } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { useCompareContext, type ComparePlayer } from '../../context/CompareContext';
@@ -157,12 +158,21 @@ function AvailablePlayerBoard({
   const showSkaters = positionFilter !== 'G';
   const showTeams = positionFilter === 'ALL' || positionFilter === 'G';
 
+  const skaterScrollRef = useRef<HTMLDivElement>(null);
+
+  const skaterVirtualizer = useVirtualizer({
+    count: filteredSkaters.length,
+    getScrollElement: () => skaterScrollRef.current,
+    estimateSize: () => 40,
+    overscan: 10,
+  });
+
   return (
     <Stack gap="md">
       {showSkaters && (
         <>
           <Text fw={600} size="sm">Skaters ({filteredSkaters.length} available)</Text>
-          <ScrollArea h={300}>
+          <div ref={skaterScrollRef} style={{ height: 300, overflow: 'auto' }}>
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
@@ -177,82 +187,102 @@ function AvailablePlayerBoard({
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {filteredSkaters.map((p) => {
-                  const inCompare = comparePlayerIds.has(p.id);
-                  return (
-                  <Table.Tr key={p.id}>
-                    <Table.Td>
-                      <Tooltip label={inCompare ? 'Remove from compare' : isCompareFull ? 'Compare full' : 'Add to compare'}>
-                        <ActionIcon
-                          size="sm"
-                          variant={inCompare ? 'filled' : 'subtle'}
-                          color={inCompare ? 'blue' : 'gray'}
-                          disabled={!inCompare && isCompareFull}
-                          onClick={() =>
-                            onCompareToggle({
-                              playerId: p.id,
-                              name: p.fullName,
-                              teamAbbrev: p.team,
-                              position: p.position,
-                              stats: { goals: p.goals, assists: p.assists, points: p.points, gamesPlayed: p.gamesPlayed },
-                            })
-                          }
-                        >
-                          {inCompare ? '✓' : '⚖'}
-                        </ActionIcon>
-                      </Tooltip>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text
-                        size="sm"
-                        style={{ cursor: 'pointer' }}
-                        c="blue"
-                        onClick={() => openPlayerDetail(p.id)}
-                      >
-                        {p.fullName}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge size="xs" variant="light">{p.position}</Badge>
-                    </Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{p.goals}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{p.assists}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{p.points}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{p.gamesPlayed}</Table.Td>
-                    {isMyTurn && (
-                      <Table.Td>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          onClick={() =>
-                            onSelectPlayer({
-                              id: p.id,
-                              fullName: p.fullName,
-                              firstName: p.firstName,
-                              lastName: p.lastName,
-                              position: p.position,
-                              team: p.team,
-                              teamId: p.teamId,
-                            })
-                          }
-                        >
-                          Draft
-                        </Button>
-                      </Table.Td>
-                    )}
-                  </Table.Tr>
-                  );
-                })}
-                {filteredSkaters.length === 0 && (
+                {filteredSkaters.length === 0 ? (
                   <Table.Tr>
                     <Table.Td colSpan={isMyTurn ? 8 : 7}>
                       <Text c="dimmed" ta="center" size="sm">No available skaters match your filters</Text>
                     </Table.Td>
                   </Table.Tr>
+                ) : (
+                  <>
+                    {skaterVirtualizer.getVirtualItems().length > 0 && skaterVirtualizer.getVirtualItems()[0].start > 0 && (
+                      <Table.Tr>
+                        <Table.Td colSpan={isMyTurn ? 8 : 7} style={{ height: skaterVirtualizer.getVirtualItems()[0].start, padding: 0 }} />
+                      </Table.Tr>
+                    )}
+                    {skaterVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const p = filteredSkaters[virtualRow.index];
+                      const inCompare = comparePlayerIds.has(p.id);
+                      return (
+                        <Table.Tr key={p.id} data-index={virtualRow.index} ref={skaterVirtualizer.measureElement}>
+                          <Table.Td>
+                            <Tooltip label={inCompare ? 'Remove from compare' : isCompareFull ? 'Compare full' : 'Add to compare'}>
+                              <ActionIcon
+                                size="sm"
+                                variant={inCompare ? 'filled' : 'subtle'}
+                                color={inCompare ? 'blue' : 'gray'}
+                                disabled={!inCompare && isCompareFull}
+                                onClick={() =>
+                                  onCompareToggle({
+                                    playerId: p.id,
+                                    name: p.fullName,
+                                    teamAbbrev: p.team,
+                                    position: p.position,
+                                    stats: { goals: p.goals, assists: p.assists, points: p.points, gamesPlayed: p.gamesPlayed },
+                                  })
+                                }
+                              >
+                                {inCompare ? '✓' : '⚖'}
+                              </ActionIcon>
+                            </Tooltip>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text
+                              size="sm"
+                              style={{ cursor: 'pointer' }}
+                              c="blue"
+                              onClick={() => openPlayerDetail(p.id)}
+                            >
+                              {p.fullName}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Badge size="xs" variant="light">{p.position}</Badge>
+                          </Table.Td>
+                          <Table.Td style={{ textAlign: 'right' }}>{p.goals}</Table.Td>
+                          <Table.Td style={{ textAlign: 'right' }}>{p.assists}</Table.Td>
+                          <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{p.points}</Table.Td>
+                          <Table.Td style={{ textAlign: 'right' }}>{p.gamesPlayed}</Table.Td>
+                          {isMyTurn && (
+                            <Table.Td>
+                              <Button
+                                size="xs"
+                                variant="light"
+                                onClick={() =>
+                                  onSelectPlayer({
+                                    id: p.id,
+                                    fullName: p.fullName,
+                                    firstName: p.firstName,
+                                    lastName: p.lastName,
+                                    position: p.position,
+                                    team: p.team,
+                                    teamId: p.teamId,
+                                  })
+                                }
+                              >
+                                Draft
+                              </Button>
+                            </Table.Td>
+                          )}
+                        </Table.Tr>
+                      );
+                    })}
+                    {skaterVirtualizer.getVirtualItems().length > 0 && (
+                      <Table.Tr>
+                        <Table.Td
+                          colSpan={isMyTurn ? 8 : 7}
+                          style={{
+                            height: skaterVirtualizer.getTotalSize() - (skaterVirtualizer.getVirtualItems()[skaterVirtualizer.getVirtualItems().length - 1].end),
+                            padding: 0,
+                          }}
+                        />
+                      </Table.Tr>
+                    )}
+                  </>
                 )}
               </Table.Tbody>
             </Table>
-          </ScrollArea>
+          </div>
         </>
       )}
 
