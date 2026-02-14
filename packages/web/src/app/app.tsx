@@ -9,10 +9,12 @@ import {
   Text,
   UnstyledButton,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useAuthContext } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CompareTray } from './components/CompareTray';
+import { BottomNav } from './components/BottomNav';
 
 // Route pages
 import { LoginPage } from './routes/auth/LoginPage';
@@ -80,9 +82,15 @@ function UserMenu() {
 }
 
 export function App() {
+  const isMobile = useMediaQuery('(max-width: 768px)');
+
   return (
     <ErrorBoundary>
-      <AppShell header={{ height: 60 }} padding="md">
+      <AppShell
+        header={{ height: 60 }}
+        footer={isMobile ? { height: 60 } : undefined}
+        padding="md"
+      >
         <AppShell.Header>
           <Group h="100%" px="md" justify="space-between">
             <UnstyledButton component={Link} to="/">
@@ -91,6 +99,12 @@ export function App() {
             <UserMenu />
           </Group>
         </AppShell.Header>
+
+        {isMobile && (
+          <AppShell.Footer>
+            <BottomNav />
+          </AppShell.Footer>
+        )}
 
         <AppShell.Main>
           <Routes>

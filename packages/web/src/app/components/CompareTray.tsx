@@ -11,19 +11,21 @@ import {
   Avatar,
   Stack,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useCompareContext } from '../context/CompareContext';
 import { ComparisonModal } from './ComparisonModal';
 
 export function CompareTray() {
   const { players, removePlayer, clearAll } = useCompareContext();
   const [modalOpened, setModalOpened] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   const visible = players.length > 0;
 
   return (
     <>
     <ComparisonModal opened={modalOpened} onClose={() => setModalOpened(false)} />
-    <Affix position={{ bottom: 80, left: 0, right: 0 }} zIndex={200}>
+    <Affix position={{ bottom: isMobile ? 70 : 20, left: 0, right: 0 }} zIndex={200}>
       <Transition transition="slide-up" mounted={visible}>
         {(styles) => (
           <Paper
