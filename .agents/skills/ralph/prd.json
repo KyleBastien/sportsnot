@@ -89,7 +89,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -104,7 +104,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

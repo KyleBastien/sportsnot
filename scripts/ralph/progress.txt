@@ -1,0 +1,134 @@
+# Ralph Progress Log
+Started: 02/13/2026 17:16:12
+
+## Codebase Patterns
+- Context pattern: Create in `packages/web/src/app/context/`, export Provider + useXxxContext hook
+- Provider wiring: Add providers in `packages/web/src/main.tsx`, nest inside AuthProvider if auth-dependent
+- Types: Shared types in `packages/types/src/lib/types.ts` and `nhl.ts`, exported via `@sportsnot/types`
+- Monorepo: Uses Nx with Yarn, packages at `packages/{web,ui,supabase,types,utils,nhl-api}`
+- UI: Uses Mantine component library
+- Typecheck: `npx tsc -p packages/web/tsconfig.app.json --noEmit` (nx typecheck has pre-existing config issue)
+- Lint: ESLint has pre-existing false positives for `no-unused-vars` on TS interface param names (same as AuthContext)
+- Lint workaround: Use `// eslint-disable-line no-unused-vars` for interface callback params
+- Floating UI: Use Mantine's `Affix` + `Transition` for fixed-position floating components
+- App-wide components: Render inside `AppShell` in `app.tsx` (after `AppShell.Main`)
+- Responsive: `@mantine/hooks` provides `useMediaQuery`; Mantine Modal supports `fullScreen` prop
+- ComparePlayer.stats: `Record<string, number>` - use key `fantasyPoints` for fantasy points display
+- Icons: No icon library installed; use unicode/emoji characters (✓, ⚖, ✕) in ActionIcon children
+- UI package independence: `@sportsnot/ui` must not import from `@sportsnot/web`; use callback props for context-dependent behavior
+- UI package lint: `nx lint ui` not configured; use `npx eslint <file>` directly
+
+---
+
+## 2026-02-14T01:16 - US-001
+- What was implemented: CompareContext with CompareProvider and useCompareContext hook
+- ComparePlayer interface: playerId, name, teamAbbrev, position, headshot, stats
+- Context provides: addPlayer, removePlayer, clearAll, players[], isFull
+- Max 4 players enforced; duplicate prevention by playerId; resets on sign-out (watches user from AuthContext)
+- Files changed:
+  - `packages/web/src/app/context/CompareContext.tsx` (new)
+  - `packages/web/src/main.tsx` (added CompareProvider wrapping App inside AuthProvider)
+- **Learnings for future iterations:**
+  - Follow existing context pattern from AuthContext.tsx
+  - CompareProvider must be inside AuthProvider since it uses useAuthContext
+  - `nx typecheck web` fails due to tsconfig.app.json emitDeclarationOnly issue (pre-existing) - use `tsc --noEmit` directly
+  - ESLint no-unused-vars fires on interface parameter names - this is pre-existing and not a blocker
+---
+
+## 2026-02-14T01:20 - US-002
+- What was implemented: CompareTray floating UI component
+  - Fixed to bottom of viewport using Mantine's Affix component (bottom: 80px to stay above future mobile nav)
+  - Only visible when 1+ players selected via Transition slide-up animation
+  - Shows player avatars, names, team abbreviation with x remove buttons
+  - "Clear All" button to empty the tray
+  - "Compare" button with count badge, disabled when < 2 players selected
+  - Integrated into App component (app.tsx) so it appears on all pages
+- Files changed:
+  - `packages/web/src/app/components/CompareTray.tsx` (new)
+  - `packages/web/src/app/app.tsx` (added CompareTray import and render)
+- **Learnings for future iterations:**
+  - Use Mantine's Affix component for fixed-position floating UI, with Transition for enter/exit animations
+  - Components go in `packages/web/src/app/components/` as single .tsx files (flat structure)
+  - App-wide floating components should be added inside AppShell in app.tsx
+  - bottom: 80 leaves room for future bottom navigation (US-011)
+  - The Compare button is intentionally a no-op for now; US-003 will wire it to open ComparisonModal
+---
+
+## 2026-02-14T01:23 - US-003
+- What was implemented: ComparisonModal for side-by-side player stat comparison
+  - Receives players from CompareContext, displays 2-4 columns
+  - Skater stats: goals, assists, points, GP, +/-, pts/GP
+  - Goalie stats: wins, shutouts, GAA, SV%, GP
+  - Mixed groups show both stat sets
+  - Best value in each row highlighted (bold + blue accent)
+  - Player header: avatar, name, team, position badge, fantasy points (if available)
+  - Fullscreen on mobile (useMediaQuery), standard xl Modal on desktop
+  - Wired Compare button in CompareTray to open modal via useState
+- Files changed:
+  - `packages/web/src/app/components/ComparisonModal.tsx` (new)
+  - `packages/web/src/app/components/CompareTray.tsx` (modified - added state + modal + onClick)
+- **Learnings for future iterations:**
+  - ESLint base `no-unused-vars` fires on TS interface callback param names; use `// eslint-disable-line no-unused-vars` inline comment as workaround
+  - `@mantine/hooks` is installed and provides `useMediaQuery` for responsive behavior
+  - ComparePlayer.stats is Record<string, number> so any stat key can be stored; use 'fantasyPoints' key for fantasy points display
+  - For mixed player types (skaters + goalies), show both stat sets; null values display as em-dash
+---
+
+## 2026-02-14T01:28 - US-004
+- What was implemented: Added compare action button to PlayerCard in @sportsnot/ui
+  - New optional props: isInCompare, isCompareFull, onCompareToggle
+  - Button shows balance scale icon (⚖) by default, checkmark (✓) when player is in compare tray
+  - Disabled state when compare tray is full (4 players) and player not already in tray
+  - Clicking toggles player in/out of compare tray (via callback, not direct context)
+  - Uses Tooltip for hover hints (Add/Remove/Full)
+  - stopPropagation prevents triggering card's onSelect when clicking compare
+  - Props-based design keeps UI package independent of web context
+- Files changed:
+  - `packages/ui/src/lib/PlayerCard.tsx` (modified - added compare props and ActionIcon button)
+- **Learnings for future iterations:**
+  - PlayerCard is in @sportsnot/ui which must not depend on @sportsnot/web; use callback props (onCompareToggle) instead of importing CompareContext directly
+  - No icon library (e.g. @tabler/icons-react) is installed; use unicode/emoji characters in ActionIcon buttons
+  - Use `{ stopPropagation: () => void }` type for click handler param to avoid needing React import (eslint no-undef for React)
+  - UI package lint (nx lint ui) is not configured; use `npx eslint <file>` directly
+  - UI package typecheck has pre-existing rootDir errors; use web tsconfig for validation
+- Cross-page state: Extend CompareContext (or similar) with setter+state rather than prop-drilling through app-wide components
+---
+
+## 2026-02-14T01:32 - US-005
+- What was implemented: Integrated compare tray into DraftPage
+  - Added compare toggle button (⚖/✓) to each skater and team/goalie row in AvailablePlayerBoard
+  - Wired useCompareContext for add/remove player toggling
+  - Added draftedPlayerIds/draftedTeamIds state + setDraftedIds to CompareContext
+  - DraftPage syncs drafted IDs into CompareContext via useEffect (clears on unmount)
+  - ComparisonModal reads drafted IDs from context and shows "Drafted" badge (red, light variant) for already-drafted players
+  - Drafted player names dimmed in comparison view
+  - CompareTray already renders app-wide from US-002, so it appears on DraftPage without additional wiring
+- Files changed:
+  - `packages/web/src/app/routes/draft/DraftPage.tsx` (modified - added compare imports, props, buttons, toggle handler, draftedIds sync)
+  - `packages/web/src/app/components/ComparisonModal.tsx` (modified - reads draftedPlayerIds/draftedTeamIds from context, shows Drafted badge)
+  - `packages/web/src/app/context/CompareContext.tsx` (modified - added draftedPlayerIds, draftedTeamIds, setDraftedIds to context)
+- **Learnings for future iterations:**
+  - DraftPage renders players in Table rows, not PlayerCard components - compare buttons are inline ActionIcons
+  - For cross-page state (like drafted IDs), extend CompareContext rather than prop-drilling through app-wide components
+  - useEffect cleanup (return) is useful to clear draft-specific state when navigating away from DraftPage
+  - Tooltip wrapping ActionIcon provides hover hints for compare button states
+---
+
+## 2026-02-14T01:37 - US-006
+- What was implemented: Integrated compare tray into RosterPage
+  - Added compare toggle button (scale/checkmark) to each roster slot row
+  - Wired useCompareContext for add/remove player toggling
+  - Used usePlayoffPlayers/usePlayoffTeams to resolve player/team names and stats from roster slot IDs
+  - Built ComparePlayer objects with fantasy points (points_earned) for comparison
+  - Team slots use position 'G' and include wins/shutouts stats
+  - Player slots include goals/assists/points/gamesPlayed stats
+  - Compare button tooltip shows Add/Remove/Full state
+  - Player/Team names now display instead of raw IDs
+- Files changed:
+  - `packages/web/src/app/routes/roster/RosterPage.tsx` (modified - added compare imports, lookup maps, toggle handler, ActionIcon buttons)
+- **Learnings for future iterations:**
+  - Roster slots only store player_id/team_id integers; use usePlayoffPlayers/usePlayoffTeams + lookup Maps to resolve names/stats
+  - Follow DraftPage pattern for compare integration: useMemo for lookup maps, handleCompareToggle callback, Tooltip-wrapped ActionIcon
+  - The ny type warnings for roster slot data are pre-existing; roster table doesn't have generated types
+  - Points earned per roster slot is available as slot.points_earned - map it to antasyPoints stat key for comparison modal
+---

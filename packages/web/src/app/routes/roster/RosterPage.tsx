@@ -1,5 +1,6 @@
 import { useParams } from 'react-router-dom';
 import {
+  ActionIcon,
   Container,
   Title,
   Text,
@@ -13,11 +14,13 @@ import {
   Center,
   Alert,
   Modal,
+  Tooltip,
 } from '@mantine/core';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@sportsnot/supabase';
+import { supabase, usePlayoffPlayers, usePlayoffTeams } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
+import { useCompareContext, type ComparePlayer } from '../../context/CompareContext';
 import { SCORING } from '@sportsnot/types';
 
 function useMyRoster(leagueId: string) {
@@ -78,11 +81,43 @@ export function RosterPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { data, isLoading, error } = useMyRoster(leagueId!);
   const queryClient = useQueryClient();
+  const { players: comparePlayers, isFull: isCompareFull, addPlayer, removePlayer } = useCompareContext();
   const [irModal, setIrModal] = useState<{
     injuredSlotId: string;
     irSlotId: string;
   } | null>(null);
   const [activating, setActivating] = useState(false);
+
+  // Fetch cached NHL data for player/team name lookups
+  const currentSeason = '20242025'; // TODO: derive from NHL API
+  const currentRound = data?.round ?? 1;
+  const { data: playerStats } = usePlayoffPlayers(currentSeason, currentRound);
+  const { data: teamStats } = usePlayoffTeams(currentSeason, currentRound);
+
+  const playerLookup = useMemo(() => {
+    const map = new Map<number, any>();
+    playerStats?.forEach((p: any) => map.set(p.player_id, p));
+    return map;
+  }, [playerStats]);
+
+  const teamLookup = useMemo(() => {
+    const map = new Map<number, any>();
+    teamStats?.forEach((t: any) => map.set(t.team_id, t));
+    return map;
+  }, [teamStats]);
+
+  const comparePlayerIds = useMemo(
+    () => new Set(comparePlayers.map((p) => p.playerId)),
+    [comparePlayers]
+  );
+
+  const handleCompareToggle = (player: ComparePlayer) => {
+    if (comparePlayers.some((p) => p.playerId === player.playerId)) {
+      removePlayer(player.playerId);
+    } else {
+      addPlayer(player);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -177,6 +212,7 @@ export function RosterPage() {
               <Table>
                 <Table.Thead>
                   <Table.Tr>
+                    <Table.Th />
                     <Table.Th>Player/Team</Table.Th>
                     <Table.Th>Status</Table.Th>
                     <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
@@ -197,12 +233,59 @@ export function RosterPage() {
                         s.id !== slot.id
                     );
 
+                    // Resolve player/team info from stats cache
+                    const playerInfo = slot.player_id ? playerLookup.get(slot.player_id) : null;
+                    const teamInfo = slot.team_id ? teamLookup.get(slot.team_id) : null;
+                    const displayName = playerInfo?.player_name ?? (teamInfo?.team_name ?? (slot.player_id ? `Player #${slot.player_id}` : `Team #${slot.team_id}`));
+                    const compareId = slot.player_id ?? slot.team_id;
+                    const inCompare = comparePlayerIds.has(compareId);
+
+                    const buildComparePlayer = (): ComparePlayer => {
+                      if (playerInfo) {
+                        return {
+                          playerId: slot.player_id,
+                          name: playerInfo.player_name ?? `Player #${slot.player_id}`,
+                          teamAbbrev: playerInfo.team_abbreviation ?? '',
+                          position: playerInfo.position ?? slot.position,
+                          stats: {
+                            goals: playerInfo.goals ?? 0,
+                            assists: playerInfo.assists ?? 0,
+                            points: (playerInfo.goals ?? 0) + (playerInfo.assists ?? 0),
+                            gamesPlayed: playerInfo.games_played ?? 0,
+                            fantasyPoints: slot.points_earned ?? 0,
+                          },
+                        };
+                      }
+                      return {
+                        playerId: slot.team_id,
+                        name: teamInfo?.team_name ?? `Team #${slot.team_id}`,
+                        teamAbbrev: teamInfo?.team_abbreviation ?? '',
+                        position: 'G',
+                        stats: {
+                          wins: teamInfo?.wins ?? 0,
+                          shutouts: teamInfo?.shutouts ?? 0,
+                          fantasyPoints: slot.points_earned ?? 0,
+                        },
+                      };
+                    };
+
                     return (
                       <Table.Tr key={slot.id}>
                         <Table.Td>
-                          {slot.player_id
-                            ? `Player #${slot.player_id}`
-                            : `Team #${slot.team_id}`}
+                          <Tooltip label={inCompare ? 'Remove from compare' : isCompareFull ? 'Compare full' : 'Add to compare'}>
+                            <ActionIcon
+                              size="sm"
+                              variant={inCompare ? 'filled' : 'subtle'}
+                              color={inCompare ? 'blue' : 'gray'}
+                              disabled={!inCompare && isCompareFull}
+                              onClick={() => handleCompareToggle(buildComparePlayer())}
+                            >
+                              {inCompare ? '✓' : '⚖'}
+                            </ActionIcon>
+                          </Tooltip>
+                        </Table.Td>
+                        <Table.Td>
+                          {displayName}
                         </Table.Td>
                         <Table.Td>
                           {slot.is_active ? (
