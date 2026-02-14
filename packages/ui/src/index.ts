@@ -1,3 +1,5 @@
+export { LiveIndicator } from './lib/LiveIndicator';
+export type { LiveIndicatorProps } from './lib/LiveIndicator';
 export { PlayerCard } from './lib/PlayerCard';
 export type { PlayerCardProps } from './lib/PlayerCard';
 export { PointsBadge } from './lib/PointsBadge';
