@@ -7,6 +7,7 @@ import '@mantine/core/styles.css';
 
 import { AuthProvider } from './app/context/AuthContext';
 import { CompareProvider } from './app/context/CompareContext';
+import { NotificationProvider } from './app/context/NotificationContext';
 import App from './app/app';
 
 const queryClient = new QueryClient({
@@ -25,9 +26,11 @@ root.render(
       <MantineProvider>
         <BrowserRouter>
           <AuthProvider>
-            <CompareProvider>
-              <App />
-            </CompareProvider>
+            <NotificationProvider>
+              <CompareProvider>
+                <App />
+              </CompareProvider>
+            </NotificationProvider>
           </AuthProvider>
         </BrowserRouter>
       </MantineProvider>
