@@ -1,5 +1,7 @@
 export { PlayerCard } from './lib/PlayerCard';
 export type { PlayerCardProps } from './lib/PlayerCard';
+export { PositionBadge } from './lib/PositionBadge';
+export type { PositionBadgeProps, PositionType } from './lib/PositionBadge';
 export { ResponsiveTable } from './lib/ResponsiveTable';
 export type { ResponsiveTableProps, ResponsiveTableColumn } from './lib/ResponsiveTable';
 export { vars } from './lib/styles/theme.css';
