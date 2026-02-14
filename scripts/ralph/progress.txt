@@ -38,6 +38,8 @@ Started: 02/14/2026 08:16:46
 - Card DOM structure: heading → Group → Card — use `locator('../..')` to scope from heading to the Card containing the table
 - IR activation RPC: `supabase.rpc('activate_ir_player', ...)` → mock at `SUPABASE_URL/rest/v1/rpc/activate_ir_player`
 - Use `page.unrouteAll({ behavior: 'ignoreErrors' })` to swap mock data mid-test for post-mutation state
+- Round transition page sorts standings desc (best-first) but re-draft picks use worst-first `sortedMembers.length - index` — verify both orderings
+- Use `{ exact: true }` for "Round 1" text to avoid matching "Round 1 Complete!" and "Round 1 Final Standings"
 
 ## 2026-02-14T16:16 - US-001
 - Scaffolded Playwright E2E project in packages/e2e
@@ -253,4 +255,64 @@ Started: 02/14/2026 08:16:46
   - IR slot "Activate IR" button only appears when: `isIrSlot && !activated_from_ir && injuredCandidates.length > 0`
   - After activation, `activated_from_ir: true` triggers "From IR" orange badge on the slot
   - Use `page.unrouteAll({ behavior: 'ignoreErrors' })` to swap mock data mid-test for post-mutation state
+- StandingsPage queries: `leagues.select('name, current_round').single()` + `league_members.select('id, user_id, team_name, total_points, users(display_name)').order('total_points', desc)`
+- StandingsPage has Rank/Team/Manager/Points columns — no breakdown columns or CSV export yet
+- Scoring history page does not exist — no route or component; use `test.skip()` for future tests
+---
+
+## 2026-02-14T17:42 - US-016
+- Created `packages/e2e/tests/standings.spec.ts` with 5 standings E2E tests (2 passed, 3 skipped)
+- Created `packages/e2e/tests/scoring-history.spec.ts` with 2 scoring history E2E tests (0 passed, 2 skipped)
+- Tests passing: members ranked by total points with medal badges (1st/2nd/3rd), current user row highlighted with "You" badge
+- Tests skipped: points breakdown columns (not implemented), round-by-round columns (not implemented), CSV export (not implemented), scoring history page (not implemented - no route or component exists)
+- Files changed: packages/e2e/tests/standings.spec.ts (new), packages/e2e/tests/scoring-history.spec.ts (new)
+- **Learnings for future iterations:**
+  - StandingsPage queries `leagues.select('name, current_round').single()` + `league_members.select('id, user_id, team_name, total_points, users(display_name)').order('total_points', { ascending: false })`
+  - StandingsPage only has 4 columns: Rank, Team, Manager, Points - no breakdown or round-by-round columns
+  - Medal badges: 1st (gold), 2nd (gray), 3rd (orange) - 4th+ show plain number
+  - Current user identified by `member.user_id === user?.id` - gets bold text, blue background, and "You" badge
+  - No CSV export button exists on StandingsPage
+  - Scoring history page has no route, no component, and empty directory at `packages/web/src/app/routes/scoring/`
+  - Use `test.skip()` for features not yet implemented - keeps test count accurate for tracking
+---
+
+## 2026-02-14T17:45 - US-017
+- Created `packages/e2e/tests/round-transition.spec.ts` with 5 round transition E2E tests (all passing)
+- Tests: previous round final standings with ranked members table, re-draft pick order (worst-to-best snake), draft history with completed rounds, commissioner Start Re-Draft button with POST verification, non-commissioner waiting state
+- Mocked leagues table with `.single()` join (league_members + users), drafts table with completed status filter
+- 4 members with varying points: Other(40), Delta(32), Alpha(25), Gamma(15) — verifies ranking and pick order
+- Files changed: packages/e2e/tests/round-transition.spec.ts (new)
+- **Learnings for future iterations:**
+  - Round transition page sorts standings desc (best-first) but re-draft picks calc is `sortedMembers.length - index` (worst gets pick #1)
+  - `getByText('Round 1')` is ambiguous on this page — matches heading, subheading, and draft history text; use `{ exact: true }`
+  - Drafts query filters by `status=eq.completed` in URL — use `url.includes('status=eq.completed')` to distinguish from POST
+  - Commissioner action inserts new draft via POST to `drafts` table then PATCHes leagues status to 'drafting'
+  - Back to League button uses `variant="subtle"` — still matches `getByRole('button')`
+---
+
+## 2026-02-14T17:49 - US-018
+- Created `packages/e2e/tests/navigation.spec.ts` with 5 navigation and routing E2E tests (all passing)
+- Tests: main nav links (logo, user menu Dashboard/Profile), browser back/forward navigation, deep-linking to all 12 protected routes redirects unauthenticated users, deep-linking when authenticated loads correct pages, unknown routes render app shell without crashing
+- Used DashboardPage page object for consistent heading assertions
+- Files changed: packages/e2e/tests/navigation.spec.ts (new)
+- **Learnings for future iterations:**
+  - Dashboard heading is "Dashboard" (Title order={2}), not "Welcome Back" — "Welcome Back" is a subheading Text element
+  - Use DashboardPage page object `dashboard.heading` for reliable dashboard load assertions
+  - No 404 catch-all route exists — unknown routes render empty AppShell.Main with just the header
+  - UserMenu items are `menuitem` role: Dashboard, Profile, Sign Out — accessed via `getByRole('menuitem')`
+  - `goto()` + `goBack()` + `goForward()` work reliably for history navigation tests in Playwright
+---
+
+## 2026-02-14T17:53 - US-019
+- Created `packages/e2e/tests/mobile.spec.ts` with 5 mobile viewport E2E tests (all passing)
+- Tests: responsive nav (user name hidden on mobile, avatar menu works), draft page (filtering, searching, picking, modal), roster page (position groups, total points, player entries), league dashboard (league name, members, nav buttons), modals on mobile (draft confirmation modal visible and interactive)
+- All tests use `page.setViewportSize({ width: 375, height: 667 })` for iPhone SE viewport
+- Reused mock patterns from draft-board, roster, and league-dashboard tests
+- Files changed: packages/e2e/tests/mobile.spec.ts (new)
+- **Learnings for future iterations:**
+  - App uses Mantine `visibleFrom="sm"` on user display name in header -- hidden on mobile, only avatar initial shows
+  - No bottom navigation or sidebar exists -- app uses header-only layout with user menu dropdown
+  - League dashboard members are in a table, not a `role="list"` -- use `getByText()` directly, not scoped to `getByRole('list')`
+  - Mantine modals render as overlay dialogs on all viewports -- no special bottom sheet behavior on mobile
+  - `setViewportSize()` should be called before `setupSupabaseMocks()` and `goto()` for consistent rendering
 ---
