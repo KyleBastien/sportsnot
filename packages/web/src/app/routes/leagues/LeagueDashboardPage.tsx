@@ -19,6 +19,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
+import { LiveGamesWidget } from '../../components/LiveGamesWidget';
 
 function useLeague(leagueId: string) {
   return useQuery({
@@ -181,6 +182,9 @@ export function LeagueDashboardPage() {
             </CopyButton>
           </Group>
         </Card>
+
+        {/* Live Games */}
+        <LiveGamesWidget />
 
         {/* Members / Standings */}
         <Card shadow="sm" padding="md" radius="md" withBorder>

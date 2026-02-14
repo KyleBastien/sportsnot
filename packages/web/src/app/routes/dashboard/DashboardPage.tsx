@@ -15,6 +15,7 @@ import {
 import { useAuthContext } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
+import { LiveGamesWidget } from '../../components/LiveGamesWidget';
 
 interface LeagueWithMembership {
   id: string;
@@ -86,6 +87,8 @@ export function DashboardPage() {
             </Button>
           </Group>
         </Group>
+
+        <LiveGamesWidget />
 
         <Title order={3}>My Leagues</Title>
 
