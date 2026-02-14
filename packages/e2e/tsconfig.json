@@ -3,12 +3,14 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "../../dist/out-tsc/packages/e2e",
+    "rootDir": "../..",
     "module": "esnext",
     "moduleResolution": "bundler",
     "types": ["node"]
   },
   "include": [
-    "**/*.ts"
+    "**/*.ts",
+    "../../packages/types/src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
