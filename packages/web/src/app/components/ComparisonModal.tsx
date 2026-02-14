@@ -95,7 +95,7 @@ function findBestIndex(
 }
 
 export function ComparisonModal({ opened, onClose }: ComparisonModalProps) {
-  const { players } = useCompareContext();
+  const { players, draftedPlayerIds, draftedTeamIds } = useCompareContext();
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   const statDefs = getStatDefs(players);
@@ -113,7 +113,12 @@ export function ComparisonModal({ opened, onClose }: ComparisonModalProps) {
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Stat</Table.Th>
-              {players.map((player) => (
+              {players.map((player) => {
+                const isDrafted =
+                  (player.position === 'G'
+                    ? draftedTeamIds?.has(player.playerId)
+                    : draftedPlayerIds?.has(player.playerId)) ?? false;
+                return (
                 <Table.Th key={player.playerId} style={{ textAlign: 'center' }}>
                   <Stack align="center" gap={4}>
                     <Avatar
@@ -122,7 +127,7 @@ export function ComparisonModal({ opened, onClose }: ComparisonModalProps) {
                       size="md"
                       radius="xl"
                     />
-                    <Text size="sm" fw={500}>
+                    <Text size="sm" fw={500} c={isDrafted ? 'dimmed' : undefined}>
                       {player.name}
                     </Text>
                     <Group gap={4} justify="center">
@@ -133,6 +138,11 @@ export function ComparisonModal({ opened, onClose }: ComparisonModalProps) {
                         {player.position}
                       </Badge>
                     </Group>
+                    {isDrafted && (
+                      <Badge size="xs" variant="light" color="red">
+                        Drafted
+                      </Badge>
+                    )}
                     {player.stats['fantasyPoints'] != null && (
                       <Badge size="sm" variant="filled" color="green">
                         {player.stats['fantasyPoints']} pts
@@ -140,7 +150,8 @@ export function ComparisonModal({ opened, onClose }: ComparisonModalProps) {
                     )}
                   </Stack>
                 </Table.Th>
-              ))}
+                );
+              })}
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>

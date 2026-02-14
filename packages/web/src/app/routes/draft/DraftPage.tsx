@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import {
+  ActionIcon,
   Container,
   Title,
   Text,
@@ -17,10 +18,12 @@ import {
   Modal,
   Table,
   ScrollArea,
+  Tooltip,
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, usePlayoffPlayers, usePlayoffTeams } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
+import { useCompareContext, type ComparePlayer } from '../../context/CompareContext';
 import type { Position } from '@sportsnot/types';
 
 interface DraftablePlayer {
@@ -77,6 +80,9 @@ interface AvailablePlayerBoardProps {
   searchQuery: string;
   isMyTurn: boolean;
   onSelectPlayer: (player: DraftablePlayer) => void;
+  comparePlayers: ComparePlayer[];
+  isCompareFull: boolean;
+  onCompareToggle: (player: ComparePlayer) => void; // eslint-disable-line no-unused-vars
 }
 
 function AvailablePlayerBoard({
@@ -88,7 +94,11 @@ function AvailablePlayerBoard({
   searchQuery,
   isMyTurn,
   onSelectPlayer,
+  comparePlayers,
+  isCompareFull,
+  onCompareToggle,
 }: AvailablePlayerBoardProps) {
+  const comparePlayerIds = new Set(comparePlayers.map((p) => p.playerId));
   const query = searchQuery.toLowerCase();
 
   // Build skater rows from player_stats_cache
@@ -151,6 +161,7 @@ function AvailablePlayerBoard({
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
+                  <Table.Th style={{ width: 40 }} />
                   <Table.Th>Player</Table.Th>
                   <Table.Th>Pos</Table.Th>
                   <Table.Th style={{ textAlign: 'right' }}>G</Table.Th>
@@ -161,8 +172,31 @@ function AvailablePlayerBoard({
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {filteredSkaters.map((p) => (
+                {filteredSkaters.map((p) => {
+                  const inCompare = comparePlayerIds.has(p.id);
+                  return (
                   <Table.Tr key={p.id}>
+                    <Table.Td>
+                      <Tooltip label={inCompare ? 'Remove from compare' : isCompareFull ? 'Compare full' : 'Add to compare'}>
+                        <ActionIcon
+                          size="sm"
+                          variant={inCompare ? 'filled' : 'subtle'}
+                          color={inCompare ? 'blue' : 'gray'}
+                          disabled={!inCompare && isCompareFull}
+                          onClick={() =>
+                            onCompareToggle({
+                              playerId: p.id,
+                              name: p.fullName,
+                              teamAbbrev: p.team,
+                              position: p.position,
+                              stats: { goals: p.goals, assists: p.assists, points: p.points, gamesPlayed: p.gamesPlayed },
+                            })
+                          }
+                        >
+                          {inCompare ? '✓' : '⚖'}
+                        </ActionIcon>
+                      </Tooltip>
+                    </Table.Td>
                     <Table.Td>{p.fullName}</Table.Td>
                     <Table.Td>
                       <Badge size="xs" variant="light">{p.position}</Badge>
@@ -193,10 +227,11 @@ function AvailablePlayerBoard({
                       </Table.Td>
                     )}
                   </Table.Tr>
-                ))}
+                  );
+                })}
                 {filteredSkaters.length === 0 && (
                   <Table.Tr>
-                    <Table.Td colSpan={isMyTurn ? 7 : 6}>
+                    <Table.Td colSpan={isMyTurn ? 8 : 7}>
                       <Text c="dimmed" ta="center" size="sm">No available skaters match your filters</Text>
                     </Table.Td>
                   </Table.Tr>
@@ -213,6 +248,7 @@ function AvailablePlayerBoard({
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
+                <Table.Th style={{ width: 40 }} />
                 <Table.Th>Team</Table.Th>
                 <Table.Th style={{ textAlign: 'right' }}>Wins</Table.Th>
                 <Table.Th style={{ textAlign: 'right' }}>Shutouts</Table.Th>
@@ -220,8 +256,31 @@ function AvailablePlayerBoard({
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {filteredTeams.map((t) => (
+              {filteredTeams.map((t) => {
+                const inCompare = comparePlayerIds.has(t.teamId);
+                return (
                 <Table.Tr key={t.teamId}>
+                  <Table.Td>
+                    <Tooltip label={inCompare ? 'Remove from compare' : isCompareFull ? 'Compare full' : 'Add to compare'}>
+                      <ActionIcon
+                        size="sm"
+                        variant={inCompare ? 'filled' : 'subtle'}
+                        color={inCompare ? 'blue' : 'gray'}
+                        disabled={!inCompare && isCompareFull}
+                        onClick={() =>
+                          onCompareToggle({
+                            playerId: t.teamId,
+                            name: t.fullName,
+                            teamAbbrev: t.team,
+                            position: 'G',
+                            stats: { wins: t.wins, shutouts: t.shutouts },
+                          })
+                        }
+                      >
+                        {inCompare ? '✓' : '⚖'}
+                      </ActionIcon>
+                    </Tooltip>
+                  </Table.Td>
                   <Table.Td>{t.fullName}</Table.Td>
                   <Table.Td style={{ textAlign: 'right' }}>{t.wins}</Table.Td>
                   <Table.Td style={{ textAlign: 'right' }}>{t.shutouts}</Table.Td>
@@ -247,10 +306,11 @@ function AvailablePlayerBoard({
                     </Table.Td>
                   )}
                 </Table.Tr>
-              ))}
+                );
+              })}
               {filteredTeams.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={isMyTurn ? 4 : 3}>
+                  <Table.Td colSpan={isMyTurn ? 5 : 4}>
                     <Text c="dimmed" ta="center" size="sm">No available teams match your filters</Text>
                   </Table.Td>
                 </Table.Tr>
@@ -266,6 +326,7 @@ function AvailablePlayerBoard({
 export function DraftPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { user } = useAuthContext();
+  const { players: comparePlayers, isFull: isCompareFull, addPlayer, removePlayer, setDraftedIds } = useCompareContext();
   const { data: draft, isLoading: draftLoading } = useDraft(leagueId!);
   const { data: members } = useLeagueMembers(leagueId!);
   const [positionFilter, setPositionFilter] = useState('ALL');
@@ -345,6 +406,22 @@ export function DraftPage() {
     () => new Set<number>(picks.filter((p: any) => p.team_id).map((p: any) => p.team_id as number)),
     [picks]
   );
+
+  const handleCompareToggle = (player: ComparePlayer) => {
+    if (comparePlayers.some((p) => p.playerId === player.playerId)) {
+      removePlayer(player.playerId);
+    } else {
+      addPlayer(player);
+    }
+  };
+
+  // Sync drafted IDs into CompareContext for the ComparisonModal
+  useEffect(() => {
+    setDraftedIds(draftedPlayerIds, draftedTeamIds);
+    return () => {
+      setDraftedIds(new Set(), new Set());
+    };
+  }, [draftedPlayerIds, draftedTeamIds, setDraftedIds]);
 
   const handleConfirmPick = async () => {
     if (!confirmPlayer || !myMember || !draft) return;
@@ -527,6 +604,9 @@ export function DraftPage() {
                       : 'F'
                 );
               }}
+              comparePlayers={comparePlayers}
+              isCompareFull={isCompareFull}
+              onCompareToggle={handleCompareToggle}
             />
           )}
         </Card>
