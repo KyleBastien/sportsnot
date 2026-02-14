@@ -103,8 +103,8 @@ async function setupAuthMocks(page: Page, authenticated: boolean) {
     }
   );
 
-  // POST /auth/v1/otp — magic link request
-  await page.route(`${SUPABASE_URL}/auth/v1/otp`, (route) => {
+  // POST /auth/v1/otp — magic link request (glob to match query params like ?redirect_to=...)
+  await page.route(`${SUPABASE_URL}/auth/v1/otp**`, (route) => {
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
