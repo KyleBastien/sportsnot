@@ -34,6 +34,12 @@ const tabs: NavTab[] = [
     match: ['/standings'],
   },
   {
+    label: 'Scoring',
+    icon: '📊',
+    path: (id) => (id ? `/scoring/${id}` : '/'),
+    match: ['/scoring'],
+  },
+  {
     label: 'Profile',
     icon: '👤',
     path: () => '/profile',

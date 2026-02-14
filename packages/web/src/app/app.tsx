@@ -33,6 +33,7 @@ import { RosterPage } from './routes/roster/RosterPage';
 import { RosterHistoryPage } from './routes/roster/RosterHistoryPage';
 import { StandingsPage } from './routes/standings/StandingsPage';
 import { ProfilePage } from './routes/profile/ProfilePage';
+import { ScoringHistoryPage } from './routes/scoring/ScoringHistoryPage';
 
 function UserMenu() {
   const { user, signOut } = useAuthContext();
@@ -211,6 +212,14 @@ export function App() {
               element={
                 <ProtectedRoute>
                   <StandingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/scoring/:leagueId"
+              element={
+                <ProtectedRoute>
+                  <ScoringHistoryPage />
                 </ProtectedRoute>
               }
             />

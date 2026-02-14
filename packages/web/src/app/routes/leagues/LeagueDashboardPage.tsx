@@ -138,6 +138,12 @@ export function LeagueDashboardPage() {
                 >
                   Standings
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/scoring/${leagueId}`)}
+                >
+                  Scoring
+                </Button>
                 {isCommissioner && (
                   <Button
                     color="green"

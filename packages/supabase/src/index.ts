@@ -11,3 +11,5 @@ export { useRoster, useLeagueRosters, useActivateIR } from './lib/hooks/useRoste
 export { usePlayoffPlayers, usePlayoffTeams } from './lib/hooks/usePlayoffStats';
 export { useStatSync } from './lib/hooks/useStatSync';
 export { useLiveScoring } from './lib/hooks/useLiveScoring';
+export { useScoringEvents } from './lib/hooks/useScoringEvents';
+export type { ScoringEventsFilters } from './lib/hooks/useScoringEvents';
