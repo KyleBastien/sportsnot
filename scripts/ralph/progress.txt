@@ -17,6 +17,15 @@ Started: 02/13/2026 17:16:12
 - Icons: No icon library installed; use unicode/emoji characters (✓, ⚖, ✕) in ActionIcon children
 - UI package independence: `@sportsnot/ui` must not import from `@sportsnot/web`; use callback props for context-dependent behavior
 - UI package lint: `nx lint ui` not configured; use `npx eslint <file>` directly
+- Edge Functions: Deno-based, live in `packages/supabase-db/functions/<name>/index.ts`, import from `https://esm.sh/`
+- Edge Function pattern: `Deno.serve(async (req) => {...})`, use `createClient` from esm.sh, upsert with `onConflict`
+- Migrations: Sequential numbering in `packages/supabase-db/migrations/`, use `IF NOT EXISTS` where possible
+- Scoring rules: goal=1, assist=1, win=2, shutout=4 (shutout replaces win, formula: (wins-shutouts)*2 + shutouts*4)
+- PostgreSQL triggers: Split INSERT and UPDATE triggers when using `WHEN (OLD.* IS DISTINCT FROM NEW.*)` — OLD is null for inserts
+- ESLint browser globals: ESLint config missing browser env; use `/* eslint-disable no-undef */` for files using document/setInterval in supabase package
+- Cross-package imports: @sportsnot/nhl-api available in @sportsnot/supabase via tsconfig path aliases (no package.json dep needed)
+- Supabase Realtime: Use `supabase.channel('name').on('postgres_changes', {...}).subscribe()`, cleanup with `supabase.removeChannel(channel)` in useEffect
+- Live indicators: Mantine Badge `variant="dot"` with CSS animation for pulsing LIVE status; inject keyframes via `<style>` in JSX
 
 ---
 
@@ -131,4 +140,147 @@ Started: 02/13/2026 17:16:12
   - Follow DraftPage pattern for compare integration: useMemo for lookup maps, handleCompareToggle callback, Tooltip-wrapped ActionIcon
   - The ny type warnings for roster slot data are pre-existing; roster table doesn't have generated types
   - Points earned per roster slot is available as slot.points_earned - map it to antasyPoints stat key for comparison modal
+---
+
+
+## 2026-02-14T01:42 - US-007
+- What was implemented: Two new Supabase Edge Functions for stat syncing
+  - sync-player-stats: Accepts player_ids array, season, playoff_round in request body. Fetches each player's playoff game log from NHL API, aggregates goals/assists/games_played, and upserts into player_stats_cache table.
+  - sync-team-stats: Accepts team_abbreviations array, season, playoff_round in request body. Fetches playoff bracket to determine team IDs and elimination status. Fetches recent scores to count wins/shutouts. Upserts into team_stats_cache table with is_eliminated flag.
+  - Both functions use onConflict upsert to prevent duplicates
+  - Both return JSON with updated count, total, and any errors
+  - Input validation: returns 400 if required array is empty
+  - Error handling: individual player/team failures don't stop the batch
+- Files changed:
+  - packages/supabase-db/functions/sync-player-stats/index.ts (new)
+  - packages/supabase-db/functions/sync-team-stats/index.ts (new)
+- **Learnings for future iterations:**
+  - Edge Functions are Deno-based; imports use https://esm.sh/ URLs, not npm packages
+  - Each Edge Function lives in its own directory under packages/supabase-db/functions/<name>/index.ts
+  - supabase-db has no tsconfig; Edge Functions are not typechecked by the web tsconfig (they use Deno types)
+  - NHL playoff bracket API at /playoff-bracket/{season} provides team IDs, names, and abbreviations via topSeedTeam/bottomSeedTeam
+  - Team abbreviations from the bracket use the .abbrev field (not .abbreviation as in some other APIs)
+  - Functions are callable via supabase.functions.invoke('sync-player-stats', { body: { player_ids: [...], season, playoff_round } })
+---
+
+## 2026-02-14T01:45 - US-008
+- What was implemented: PostgreSQL triggers for auto-recalculating roster and member points when stats change
+  - `recalculate_player_points()` function: fires on player_stats_cache INSERT/UPDATE, calculates points as goals + assists (1 pt each), updates all active roster slots referencing the player, then recalculates league_members.total_points
+  - `recalculate_team_points()` function: fires on team_stats_cache INSERT/UPDATE, calculates points as (wins - shutouts) * 2 + shutouts * 4 (shutout replaces win points), updates all active roster slots referencing the team, then recalculates league_members.total_points
+  - Separate INSERT and UPDATE triggers: INSERT fires on all new rows, UPDATE uses `WHEN (OLD.* IS DISTINCT FROM NEW.*)` to avoid unnecessary recalculations
+  - Idempotent: re-running produces the same result since points are recalculated from current stats (not deltas)
+- Files changed:
+  - `packages/supabase-db/migrations/002_stats_recalculate_triggers.sql` (new)
+- **Learnings for future iterations:**
+  - PostgreSQL `WHEN (OLD.* IS DISTINCT FROM NEW.*)` clause is only valid for UPDATE triggers, not INSERT (OLD is null for inserts) — split into separate INSERT and UPDATE triggers
+  - Scoring rules: goal=1, assist=1, win=2, shutout=4 where shutout replaces win points (a shutout IS a win, so formula is (wins-shutouts)*2 + shutouts*4)
+  - Triggers iterate over all active rosters matching the player_id/team_id — this means all leagues are updated when stats change
+  - league_members.total_points is recalculated by SUM of active roster slot points_earned
+  - Migration files go in packages/supabase-db/migrations/ with sequential numbering
+---
+
+## 2026-02-14T01:47 - US-009
+- What was implemented: useStatSync(leagueId) polling hook in @sportsnot/supabase
+  - Polls NHL scores via getScoresNow() from @sportsnot/nhl-api every 60s using React Query's refetchInterval
+  - Detects live games (gameState === 'LIVE' or 'PRE') and auto-triggers stat sync
+  - Calls sync-player-stats and sync-team-stats Edge Functions with roster player/team IDs
+  - Pauses polling when browser tab is hidden (document.visibilitychange)
+  - Exposes: lastSyncedAt, isSyncing, syncNow() (manual trigger), isLive
+  - Invalidates playoff-players, playoff-teams, roster, league-rosters query caches after sync
+  - Uses syncInProgress ref to prevent concurrent sync calls
+- Files changed:
+  - `packages/supabase/src/lib/hooks/useStatSync.ts` (new)
+  - `packages/supabase/src/index.ts` (added useStatSync export)
+- **Learnings for future iterations:**
+  - ESLint config is missing browser globals (document, setInterval, etc.) - use `/* eslint-disable no-undef */` at top of files using browser APIs in supabase package
+  - @sportsnot/nhl-api is available to @sportsnot/supabase via tsconfig.base.json path aliases (no package.json dependency needed)
+  - React Query refetchInterval can be set to `false` to pause polling, useful for tab-visibility-based pausing
+  - Use useRef for preventing concurrent async operations (syncInProgress) instead of state to avoid re-renders
+---
+
+## 2026-02-14T01:51 - US-010
+- What was implemented: Live scoring indicators on StandingsPage and RosterPage
+  - Created `useLiveScoring(leagueId)` hook in @sportsnot/supabase with Supabase Realtime subscriptions
+  - Subscribes to `league_members` table UPDATE events (filtered by league_id) for point total changes
+  - Subscribes to `rosters` table UPDATE events for individual slot point changes
+  - Tracks point deltas (memberDeltas, slotDeltas) for animation, auto-clears after 2 seconds
+  - StandingsPage: Added LIVE badge (green, pulsing), "Updated Xm ago" timestamp, 200ms pulse animation on point cells, +N delta text
+  - RosterPage: Added LIVE badge next to round info, "Updated Xm ago" timestamp, pulse animation on slot points, +N delta text
+  - Both pages use useStatSync for isLive/lastSyncedAt and useLiveScoring for Realtime deltas
+  - CSS keyframes injected via `<style>` tag: scorePulse (200ms bg flash), deltaFade (2s fade-out + slide-up)
+- Files changed:
+  - `packages/supabase/src/lib/hooks/useLiveScoring.ts` (new)
+  - `packages/supabase/src/index.ts` (added useLiveScoring export)
+  - `packages/web/src/app/routes/standings/StandingsPage.tsx` (modified - added live indicators, animations, realtime deltas)
+  - `packages/web/src/app/routes/roster/RosterPage.tsx` (modified - added live indicators, animations, realtime deltas)
+- **Learnings for future iterations:**
+  - Supabase Realtime pattern: `supabase.channel('name').on('postgres_changes', { event, schema, table, filter }, callback).subscribe()`
+  - Realtime UPDATE payload has `payload.old` and `payload.new` for computing deltas
+  - Follow useDraft.ts pattern for channel setup/cleanup with `supabase.removeChannel(channel)` in useEffect cleanup
+  - CSS keyframe animations can be injected via `<style>{string}</style>` in JSX - no CSS module needed
+  - `window.setTimeout`/`window.clearTimeout` needed instead of `setTimeout` due to ESLint no-undef in supabase package
+  - Use `formatTimeAgo()` utility for "Updated Xm ago" relative timestamps
+  - Mantine Badge `variant="dot"` gives a nice pulsing dot indicator for live status
+---
+
+## 2026-02-14T01:55 - US-011
+- What was implemented: Bottom navigation bar for mobile screens
+  - Created BottomNav component with 5 tabs: Home (🏠), Draft (📋), Roster (👥), Standings (🏆), Profile (👤)
+  - Uses AppShell.Footer (height: 60px) that only renders on screens ≤768px via useMediaQuery
+  - Active tab highlighted with blue color and bold text based on current route (useLocation)
+  - League-specific tabs (Draft, Roster, Standings) extract leagueId from URL params and navigate to correct league routes
+  - Tabs without leagueId context are disabled (dimmed) to prevent navigation to invalid routes
+  - Header already shows only logo + avatar on mobile (displayName Text has visibleFrom="sm")
+  - AppShell.Footer handles fixed positioning and content padding automatically
+  - Updated CompareTray bottom position to 70px on mobile (above footer) vs 20px on desktop
+- Files changed:
+  - packages/web/src/app/components/BottomNav.tsx (new)
+  - packages/web/src/app/app.tsx (modified - added AppShell.Footer with BottomNav for mobile)
+  - packages/web/src/app/components/CompareTray.tsx (modified - responsive bottom position)
+- **Learnings for future iterations:**
+  - Mantine AppShell.Footer automatically handles fixed positioning and main content padding offset
+  - useMediaQuery('(max-width: 768px)') matches Mantine's sm breakpoint for mobile detection
+  - Conditionally pass footer config to AppShell: ooter={isMobile ? { height: 60 } : undefined}
+  - League-specific nav tabs need leagueId from useParams; disable tabs when no leagueId available
+  - CompareTray Affix bottom position should be responsive: higher on mobile to clear footer
+---
+
+## 2026-02-14T01:58 - US-012
+- What was implemented: ResponsiveTable component in @sportsnot/ui
+  - Desktop (md+ / >62em): renders standard Mantine Table with striped rows and hover highlight
+  - Mobile (<62em): renders vertical Stack of Cards, each showing column values as labeled key-value pairs
+  - Sorting: clickable column headers (desktop) or sort buttons (mobile) with asc/desc toggle
+  - Props: columns ({key, label, sortable?}), data (Record<string, unknown>[]), onRowClick, sortable
+  - Null/undefined values display as em-dash
+  - Sort indicators: ↕ (unsorted), ↑ (asc), ↓ (desc)
+  - Exported ResponsiveTable, ResponsiveTableProps, ResponsiveTableColumn from @sportsnot/ui
+- Files changed:
+  - `packages/ui/src/lib/ResponsiveTable.tsx` (new)
+  - `packages/ui/src/index.ts` (added exports)
+- **Learnings for future iterations:**
+  - Mantine v8 useMediaQuery accepts CSS media query string like '(max-width: 62em)' for md breakpoint
+  - UI components in @sportsnot/ui should use callback props (onRowClick) not context imports
+  - Mantine Table uses Table.Thead/Table.Tr/Table.Th/Table.Tbody/Table.Td subcomponents in v8
+  - For mobile card layouts, Mantine's Card + Stack provides clean key-value pair display
+---
+
+## 2026-02-14T02:01 - US-013
+- What was implemented: Tabbed mobile layout for DraftPage
+  - Mobile (<768px): Three tabs - 'Players', 'Board', 'My Picks' using Mantine Tabs
+  - 'Players' tab shows filters + available player list (AvailablePlayerBoard)
+  - 'Board' tab shows full draft board as a sortable table (pick #, team, pick, position)
+  - 'My Picks' tab shows current user's picks as cards
+  - Draft timer/turn indicator always visible at top on mobile (Card with pick # and team name)
+  - Sticky footer 'Make Pick' button on mobile when it's user's turn (Affix positioned above bottom nav)
+  - Desktop layout unchanged - all sections visible side-by-side
+  - Confirm pick modal uses fullScreen on mobile
+  - Filters use compact sizing on mobile (xs SegmentedControl, sm TextInput)
+- Files changed:
+  - `packages/web/src/app/routes/draft/DraftPage.tsx` (modified - added Tabs/Affix imports, useMediaQuery, refactored into mobile/desktop layouts)
+- **Learnings for future iterations:**
+  - Mantine Tabs component: use Tabs.List (with grow for full-width), Tabs.Tab, Tabs.Panel
+  - Reuse Affix for sticky footer buttons on mobile, positioned at bottom: 70 to clear BottomNav
+  - Extract content sections into variables (playersContent, boardContent, etc.) for reuse across mobile/desktop layouts
+  - useMediaQuery('(max-width: 768px)') for mobile detection, matching Mantine sm breakpoint
+  - SegmentedControl has fullWidth prop for mobile-friendly full-width display
 ---

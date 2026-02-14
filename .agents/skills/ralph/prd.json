@@ -120,7 +120,7 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Edge Functions in packages/supabase-db/functions/"
     },
     {
@@ -139,7 +139,7 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -156,7 +156,7 @@
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -173,7 +173,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -192,7 +192,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -211,7 +211,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -230,7 +230,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
