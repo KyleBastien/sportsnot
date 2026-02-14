@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nx serve @sportsnot/web",
     "build": "nx build @sportsnot/web",
-    "test": "rstest",
+    "test": "rstest --coverage",
     "lint": "nx run-many -t lint",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -23,6 +23,7 @@
     "@rspack/dev-server": "^1.1.4",
     "@rspack/plugin-react-refresh": "^1.0.0",
     "@rstest/core": "^0.8.4",
+    "@rstest/coverage-istanbul": "^0.2.1",
     "@swc-node/register": "~1.11.1",
     "@swc/core": "~1.15.5",
     "@swc/helpers": "~0.5.18",
