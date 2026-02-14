@@ -10,6 +10,7 @@ import '@mantine/notifications/styles.css';
 import { AuthProvider } from './app/context/AuthContext';
 import { CompareProvider } from './app/context/CompareContext';
 import { NotificationProvider } from './app/context/NotificationContext';
+import { PlayerDetailProvider } from './app/context/PlayerDetailContext';
 import App from './app/app';
 
 const queryClient = new QueryClient({
@@ -31,7 +32,9 @@ root.render(
           <AuthProvider>
             <NotificationProvider>
               <CompareProvider>
-                <App />
+                <PlayerDetailProvider>
+                  <App />
+                </PlayerDetailProvider>
               </CompareProvider>
             </NotificationProvider>
           </AuthProvider>

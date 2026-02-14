@@ -17,6 +17,7 @@ import { CompareTray } from './components/CompareTray';
 import { BottomNav } from './components/BottomNav';
 import { NotificationToasts } from './components/NotificationToasts';
 import { NotificationCenter } from './components/NotificationCenter';
+import { PlayerDetailModal } from './components/PlayerDetailModal';
 
 // Route pages
 import { LoginPage } from './routes/auth/LoginPage';
@@ -227,6 +228,7 @@ export function App() {
         </AppShell.Main>
 
         <CompareTray />
+        <PlayerDetailModal />
         <NotificationToasts />
       </AppShell>
     </ErrorBoundary>

@@ -10,6 +10,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useCompareContext, type ComparePlayer } from '../context/CompareContext';
+import { usePlayerDetailContext } from '../context/PlayerDetailContext';
 
 interface ComparisonModalProps {
   opened: boolean;
@@ -96,6 +97,7 @@ function findBestIndex(
 
 export function ComparisonModal({ opened, onClose }: ComparisonModalProps) {
   const { players, draftedPlayerIds, draftedTeamIds } = useCompareContext();
+  const { openPlayerDetail } = usePlayerDetailContext();
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   const statDefs = getStatDefs(players);
@@ -127,7 +129,13 @@ export function ComparisonModal({ opened, onClose }: ComparisonModalProps) {
                       size="md"
                       radius="xl"
                     />
-                    <Text size="sm" fw={500} c={isDrafted ? 'dimmed' : undefined}>
+                    <Text
+                      size="sm"
+                      fw={500}
+                      c={isDrafted ? 'dimmed' : 'blue'}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => openPlayerDetail(player.playerId)}
+                    >
                       {player.name}
                     </Text>
                     <Group gap={4} justify="center">

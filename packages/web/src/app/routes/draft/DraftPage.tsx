@@ -27,6 +27,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase, usePlayoffPlayers, usePlayoffTeams } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { useCompareContext, type ComparePlayer } from '../../context/CompareContext';
+import { usePlayerDetailContext } from '../../context/PlayerDetailContext';
 import type { Position } from '@sportsnot/types';
 
 interface DraftablePlayer {
@@ -101,6 +102,7 @@ function AvailablePlayerBoard({
   isCompareFull,
   onCompareToggle,
 }: AvailablePlayerBoardProps) {
+  const { openPlayerDetail } = usePlayerDetailContext();
   const comparePlayerIds = new Set(comparePlayers.map((p) => p.playerId));
   const query = searchQuery.toLowerCase();
 
@@ -200,7 +202,16 @@ function AvailablePlayerBoard({
                         </ActionIcon>
                       </Tooltip>
                     </Table.Td>
-                    <Table.Td>{p.fullName}</Table.Td>
+                    <Table.Td>
+                      <Text
+                        size="sm"
+                        style={{ cursor: 'pointer' }}
+                        c="blue"
+                        onClick={() => openPlayerDetail(p.id)}
+                      >
+                        {p.fullName}
+                      </Text>
+                    </Table.Td>
                     <Table.Td>
                       <Badge size="xs" variant="light">{p.position}</Badge>
                     </Table.Td>

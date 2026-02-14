@@ -21,6 +21,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, usePlayoffPlayers, usePlayoffTeams, useStatSync, useLiveScoring } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { useCompareContext, type ComparePlayer } from '../../context/CompareContext';
+import { usePlayerDetailContext } from '../../context/PlayerDetailContext';
 import { SCORING } from '@sportsnot/types';
 import { ResponsiveTable, type ResponsiveTableColumn } from '@sportsnot/ui';
 
@@ -104,6 +105,7 @@ export function RosterPage() {
   const { data, isLoading, error } = useMyRoster(leagueId!);
   const queryClient = useQueryClient();
   const { players: comparePlayers, isFull: isCompareFull, addPlayer, removePlayer } = useCompareContext();
+  const { openPlayerDetail } = usePlayerDetailContext();
   const [irModal, setIrModal] = useState<{
     injuredSlotId: string;
     irSlotId: string;
@@ -265,8 +267,15 @@ export function RosterPage() {
       }
 
       if (key === 'name') {
+        const clickableId = slot.player_id;
         return (
-          <Text size="sm" truncate="end" style={{ maxWidth: 180 }}>
+          <Text
+            size="sm"
+            truncate="end"
+            style={{ maxWidth: 180, cursor: clickableId ? 'pointer' : undefined }}
+            c={clickableId ? 'blue' : undefined}
+            onClick={clickableId ? () => openPlayerDetail(clickableId) : undefined}
+          >
             {String(value)}
           </Text>
         );
@@ -348,7 +357,7 @@ export function RosterPage() {
 
       return <>{value != null ? String(value) : '—'}</>;
     },
-    [comparePlayerIds, isCompareFull, handleCompareToggle, slotDeltas, slots]
+    [comparePlayerIds, isCompareFull, handleCompareToggle, slotDeltas, slots, openPlayerDetail]
   );
 
   const handleActivateIR = async () => {
