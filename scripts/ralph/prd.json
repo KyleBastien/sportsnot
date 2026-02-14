@@ -1,0 +1,397 @@
+{
+  "project": "SportsNot",
+  "branchName": "ralph/playwright-e2e-tests",
+  "description": "Add comprehensive Playwright E2E test suite covering all critical user flows with Supabase mocked at the network level",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Scaffold Playwright project with @nx/playwright",
+      "description": "As a developer, I need a working Playwright project in the monorepo scaffolded via @nx/playwright so that I can write and run E2E tests.",
+      "acceptanceCriteria": [
+        "Install @nx/playwright as a dev dependency in the workspace root",
+        "Create packages/e2e directory with package.json (name: @sportsnot/e2e)",
+        "Run nx g @nx/playwright:configuration to scaffold the project, or manually create equivalent config",
+        "playwright.config.ts exists with Chromium-only project, baseURL http://localhost:4200",
+        "webServer config starts nx serve @sportsnot/web automatically before tests",
+        "project.json has e2e target using @nx/playwright:playwright executor",
+        "A placeholder smoke test exists and passes with npx playwright test",
+        ".gitignore updated to ignore test-results/, playwright-report/, blob-report/",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "This must be done first — all other stories depend on the Playwright project existing. Use VITE_SUPABASE_URL=http://localhost:54321 and VITE_SUPABASE_ANON_KEY=mock-anon-key as env vars for the web server."
+    },
+    {
+      "id": "US-002",
+      "title": "Create Supabase auth mock fixtures",
+      "description": "As a developer, I need reusable Playwright fixtures that mock Supabase auth so that tests can simulate authenticated and unauthenticated states.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/fixtures/auth.fixture.ts with Playwright test.extend() fixtures",
+        "authenticatedPage fixture intercepts Supabase auth endpoints and returns a valid session with mock user",
+        "unauthenticatedPage fixture intercepts Supabase auth endpoints and returns no session",
+        "Mock user data includes id, email, display_name, and avatar_url fields",
+        "Auth token refresh endpoint is mocked to prevent hanging requests",
+        "Fixtures export a custom test object that other test files import",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Intercept routes matching the VITE_SUPABASE_URL pattern. Supabase auth uses /auth/v1/token, /auth/v1/user, /auth/v1/signout endpoints."
+    },
+    {
+      "id": "US-003",
+      "title": "Create Supabase REST and Realtime mock fixtures",
+      "description": "As a developer, I need reusable fixtures that mock Supabase PostgREST and Realtime so that tests have deterministic data.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/fixtures/supabase-mock.fixture.ts with page.route() interceptors for PostgREST endpoints",
+        "Mock responses match PostgREST shape: arrays for .select(), single objects for .single(), proper error shapes",
+        "Supabase Realtime WebSocket connections are stubbed via page.routeWebSocket() or equivalent to prevent hanging",
+        "Fixtures are composable — tests can override specific route mocks while keeping defaults",
+        "Default mocks return empty arrays for list queries and 404 for single-record queries",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "PostgREST endpoints follow pattern: SUPABASE_URL/rest/v1/TABLE_NAME. Include mocks for leagues, league_members, drafts, draft_picks, rosters, player_stats_cache, team_stats_cache tables."
+    },
+    {
+      "id": "US-004",
+      "title": "Create mock data factory functions",
+      "description": "As a developer, I need factory functions that generate realistic mock data matching @sportsnot/types interfaces.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/fixtures/data-factories.ts with factory functions",
+        "createMockUser() returns a valid User object with sensible defaults",
+        "createMockLeague() returns a valid League with invite_code, commissioner_id, status",
+        "createMockLeagueMember() returns a valid LeagueMember with team_name and total_points",
+        "createMockDraft() returns a valid Draft with draft_order and status",
+        "createMockDraftPick() returns a valid DraftPick with player_id, position, pick_number",
+        "createMockRoster() returns valid Roster entries for a full team (5F, 3D, 1G, IR slots)",
+        "createMockPlayerStats() and createMockTeamStats() return stat cache entries",
+        "All factories accept partial overrides to customize specific fields",
+        "Factories import and match types from @sportsnot/types",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "Use realistic NHL player names and team IDs. Scoring: goals=1pt, assists=1pt, wins=2pts, shutouts=4pts."
+    },
+    {
+      "id": "US-005",
+      "title": "Create page object models for complex pages",
+      "description": "As a developer, I need page object models so that tests use semantic methods instead of brittle selectors.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/page-objects/ directory",
+        "DashboardPage class with methods: getLeagueCards(), getCreateLeagueCTA(), getJoinLeagueCTA(), navigateToLeague(id)",
+        "DraftPage class with methods: getAvailablePlayers(), filterByPosition(pos), searchPlayer(name), pickPlayer(name), getMyRoster(), getCompareTray()",
+        "RosterPage class with methods: getActiveSlots(), getIRSlots(), getTotalPoints(), activateIR(playerName)",
+        "StandingsPage class with methods: getMemberRows(), getCurrentUserRow(), exportCSV()",
+        "Each page object takes a Playwright Page in constructor and exposes locators via data-testid or accessible roles",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Use Playwright's getByRole(), getByTestId(), getByText() locators. If data-testid attributes don't exist in the app yet, use role-based or text-based selectors as fallback."
+    },
+    {
+      "id": "US-006",
+      "title": "Write authentication flow E2E tests",
+      "description": "As a developer, I want E2E tests covering login, logout, and auth redirects so that auth regressions are caught.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/auth.spec.ts",
+        "Test: unauthenticated user visiting / is redirected to /auth/login",
+        "Test: login page renders magic link email form with email input and submit button",
+        "Test: submitting email shows check your email confirmation message",
+        "Test: auth callback route /auth/callback with valid token sets session and redirects to dashboard",
+        "Test: authenticated user can sign out and is redirected to login",
+        "Test: expired/invalid session redirects to login page",
+        "All tests use the auth mock fixtures from US-002",
+        "Tests pass with npx playwright test tests/auth.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Write dashboard E2E tests",
+      "description": "As a developer, I want E2E tests for the main dashboard to verify the landing experience.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/dashboard.spec.ts",
+        "Test: authenticated user sees dashboard page with heading",
+        "Test: dashboard shows league list when user has leagues (mock 2-3 leagues)",
+        "Test: dashboard shows no leagues empty state when user has no leagues",
+        "Test: dashboard displays live games widget when games are in progress (mocked NHL data)",
+        "Test: clicking a league card navigates to /leagues/:leagueId",
+        "Test: Create League and Join League CTAs are visible and navigate correctly",
+        "Tests pass with npx playwright test tests/dashboard.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Write league creation flow E2E tests",
+      "description": "As a developer, I want E2E tests for the league creation form and flow.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/league-create.spec.ts",
+        "Test: navigating to /leagues/create shows league creation form",
+        "Test: form validates required fields — league name and team name cannot be empty",
+        "Test: form enforces max participants range 2 to 12",
+        "Test: successful submission mocks POST to Supabase and navigates to league dashboard",
+        "Test: new league dashboard shows invite code and commissioner controls",
+        "Test: invite code copy button interaction works (mock clipboard API)",
+        "Tests pass with npx playwright test tests/league-create.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Write join league flow E2E tests",
+      "description": "As a developer, I want E2E tests for joining a league via invite code.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/league-join.spec.ts",
+        "Test: navigating to /leagues/join shows invite code input field",
+        "Test: entering invalid invite code shows error message",
+        "Test: entering valid invite code shows league preview and team name prompt",
+        "Test: submitting team name joins league and navigates to league dashboard",
+        "Test: attempting to join a full league shows full league error",
+        "Test: attempting to join an already-joined league shows already a member message",
+        "Tests pass with npx playwright test tests/league-join.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Write league dashboard and settings E2E tests",
+      "description": "As a developer, I want E2E tests for the league dashboard and commissioner settings page.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/league-dashboard.spec.ts",
+        "Test: league dashboard shows league name, status, member list, and standings",
+        "Test: non-commissioner user sees no settings controls",
+        "Test: commissioner sees settings link and can navigate to settings page",
+        "Test: commissioner can edit league name from settings (mock PATCH request)",
+        "Test: commissioner can regenerate invite code",
+        "Test: Start Draft button appears for commissioner when league status is setup",
+        "Tests pass with npx playwright test tests/league-dashboard.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "Use two different mock user fixtures — one as commissioner (commissioner_id matches user), one as regular member."
+    },
+    {
+      "id": "US-011",
+      "title": "Write draft lobby E2E tests",
+      "description": "As a developer, I want E2E tests for the pre-draft lobby waiting room.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/draft-lobby.spec.ts",
+        "Test: navigating to /draft/:leagueId/lobby shows member list with ready status",
+        "Test: draft order snake visualization is displayed correctly",
+        "Test: commissioner sees Start Draft button in lobby",
+        "Test: non-commissioner sees waiting state without start button",
+        "Tests pass with npx playwright test tests/draft-lobby.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Write draft board and player selection E2E tests",
+      "description": "As a developer, I want E2E tests for the core drafting experience — browsing, filtering, and picking players.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/draft-board.spec.ts",
+        "Test: draft page renders available players list",
+        "Test: players can be filtered by position F, D, and G/Team",
+        "Test: players can be searched by name via search input",
+        "Test: players can be sorted by stats (goals, assists, points)",
+        "Test: eliminated players appear as unavailable or greyed out",
+        "Test: clicking a player shows draft confirmation modal",
+        "Test: confirming a pick adds player to user roster sidebar and advances current pick",
+        "Test: roster sidebar shows filled and empty slots with position requirements",
+        "Tests pass with npx playwright test tests/draft-board.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": "Mock a draft in active status with current user's turn. Provide 20+ mock players across F/D/G positions."
+    },
+    {
+      "id": "US-013",
+      "title": "Write player comparison E2E tests",
+      "description": "As a developer, I want E2E tests for the player comparison feature used during drafts.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/player-compare.spec.ts",
+        "Test: adding a player to compare tray shows the compare bar",
+        "Test: up to 4 players can be compared side-by-side",
+        "Test: compare tray shows stat comparison with goals, assists, and points",
+        "Test: players can be removed from the compare tray",
+        "Test: compare tray persists across draft page interactions like filtering",
+        "Tests pass with npx playwright test tests/player-compare.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": "These tests run on the draft page — reuse draft board mock setup from US-012."
+    },
+    {
+      "id": "US-014",
+      "title": "Write roster management E2E tests",
+      "description": "As a developer, I want E2E tests for viewing roster slots and player stats.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/roster.spec.ts",
+        "Test: roster page shows all active slots — 5F, 3D, 1G — with player details",
+        "Test: IR slots IR_F and IR_D are displayed with correct state",
+        "Test: each player shows current round stats and earned points",
+        "Test: total team points are calculated and displayed correctly",
+        "Test: roster page is accessible via league dashboard navigation link",
+        "Tests pass with npx playwright test tests/roster.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "Mock a full roster with 5F + 3D + 1G active and 1 IR_F + 1 IR_D filled."
+    },
+    {
+      "id": "US-015",
+      "title": "Write IR activation flow E2E tests",
+      "description": "As a developer, I want E2E tests for the injured reserve activation modal and retroactive point calculation.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/ir-activation.spec.ts",
+        "Test: injured player on roster shows IR activation option/button",
+        "Test: clicking activate opens IR activation modal",
+        "Test: modal shows eligible replacement players of the same position only",
+        "Test: modal displays point differential preview between current and replacement player",
+        "Test: confirming activation mocks the update request and shows updated roster and recalculated points",
+        "Test: position mismatch replacements are not offered in the modal",
+        "Tests pass with npx playwright test tests/ir-activation.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "Mock a roster with one injured Forward and one IR_F replacement available. Verify position filtering works."
+    },
+    {
+      "id": "US-016",
+      "title": "Write standings and scoring history E2E tests",
+      "description": "As a developer, I want E2E tests for the standings page and scoring event history.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/standings.spec.ts",
+        "Test: standings page shows all league members ranked by total points",
+        "Test: points breakdown columns are displayed (player points, goalie points)",
+        "Test: round-by-round point columns are shown",
+        "Test: current user row is visually highlighted",
+        "Test: CSV export button triggers download of standings data",
+        "Create packages/e2e/tests/scoring-history.spec.ts",
+        "Test: scoring history page shows scoring events list",
+        "Test: scoring events can be filtered by player, team, and date",
+        "Tests pass with npx playwright test tests/standings.spec.ts tests/scoring-history.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "Mock 4-6 league members with varying point totals. Mock 10+ scoring events across different types (goal, assist, win, shutout)."
+    },
+    {
+      "id": "US-017",
+      "title": "Write round transition E2E tests",
+      "description": "As a developer, I want E2E tests for the round transition and re-draft flow.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/round-transition.spec.ts",
+        "Test: round transition page shows previous round final standings",
+        "Test: new draft order worst-to-best snake is displayed",
+        "Test: eliminated players are shown as removed from draft pool",
+        "Test: commissioner can trigger new round draft via button",
+        "Tests pass with npx playwright test tests/round-transition.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Write navigation and routing E2E tests",
+      "description": "As a developer, I want E2E tests verifying app navigation, deep-linking, and routing guards.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/navigation.spec.ts",
+        "Test: all main nav links navigate to the correct pages",
+        "Test: browser back and forward navigation works correctly",
+        "Test: deep-linking to any protected route redirects to /auth/login when unauthenticated",
+        "Test: deep-linking to a valid route when authenticated loads the correct page",
+        "Test: unknown routes show 404 error page or redirect to dashboard",
+        "Tests pass with npx playwright test tests/navigation.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Write mobile viewport E2E tests",
+      "description": "As a developer, I want E2E tests that verify the app is usable on mobile screen sizes.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/mobile.spec.ts",
+        "Test: mobile viewport 375x667 shows bottom navigation instead of desktop sidebar",
+        "Test: draft page is usable on mobile — scrolling, filtering, and picking work",
+        "Test: roster page renders correctly on mobile viewport",
+        "Test: league dashboard is navigable on mobile",
+        "Test: modals render as bottom sheets on mobile viewports",
+        "Use page.setViewportSize({ width: 375, height: 667 }) for all mobile tests",
+        "Tests pass with npx playwright test tests/mobile.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Write error state and edge case E2E tests",
+      "description": "As a developer, I want E2E tests for error handling, loading states, and empty states.",
+      "acceptanceCriteria": [
+        "Create packages/e2e/tests/error-states.spec.ts",
+        "Test: network failure during data fetch shows error boundary or fallback UI",
+        "Test: Supabase returning 401 triggers re-authentication flow redirect to login",
+        "Test: submitting forms with server-side validation errors shows error messages",
+        "Test: loading states are displayed while data is being fetched (mock slow responses)",
+        "Test: empty states are shown for leagues with no members, drafts with no picks, etc.",
+        "Tests pass with npx playwright test tests/error-states.spec.ts",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": "Use page.route() with delayed fulfillment to test loading states. Use page.route() returning error status codes for error states."
+    },
+    {
+      "id": "US-021",
+      "title": "Add Playwright E2E tests to GitHub Actions CI",
+      "description": "As a developer, I want Playwright tests to run automatically in CI on every pull request so regressions are caught before merge.",
+      "acceptanceCriteria": [
+        "Add Playwright E2E job to existing CI workflow in .github/workflows/ or create dedicated e2e.yml workflow",
+        "CI installs Playwright browsers via npx playwright install --with-deps chromium",
+        "CI builds the web app with nx build @sportsnot/web before running tests",
+        "Playwright runs against the built output using a static file server, not dev server",
+        "Test results HTML report and trace files on failure are uploaded as CI artifacts via actions/upload-artifact",
+        "CI job fails the PR if any Playwright test fails",
+        "Playwright browser binaries are cached via actions/cache on ~/.cache/ms-playwright path",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": "Environment variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set in the CI environment with mock values."
+    }
+  ]
+}
