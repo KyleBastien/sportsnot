@@ -457,7 +457,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 26,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on NotificationContext (US-024)"
     },
     {
@@ -475,7 +475,7 @@
         "Typecheck passes"
       ],
       "priority": 27,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -492,7 +492,7 @@
         "Typecheck passes"
       ],
       "priority": 28,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on scoring_events table (US-027) and stat triggers (US-008)"
     },
     {

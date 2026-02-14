@@ -27,6 +27,8 @@ Started: 02/13/2026 17:16:12
 - Cross-package imports: @sportsnot/nhl-api available in @sportsnot/supabase via tsconfig path aliases (no package.json dep needed)
 - Supabase Realtime: Use `supabase.channel('name').on('postgres_changes', {...}).subscribe()`, cleanup with `supabase.removeChannel(channel)` in useEffect
 - Live indicators: Mantine Badge `variant="dot"` with CSS animation for pulsing LIVE status; inject keyframes via `<style>` in JSX
+- PostgreSQL NULL uniqueness: Use partial unique index (WHERE col IS NULL) instead of UNIQUE constraint for nullable columns
+- Trigger delta detection: Use TG_OP to distinguish INSERT (OLD is null) from UPDATE in trigger functions
 - Mantine Notifications: Configure `<Notifications />` inside MantineProvider, import `@mantine/notifications/styles.css`, use `notifications.show()` imperative API with onClick
 
 ---
@@ -518,4 +520,66 @@ Started: 02/13/2026 17:16:12
   - Use `notifications.hide(id)` to programmatically close a toast after click
   - Use a ref-based Set to track shown notification IDs to prevent re-displaying on re-renders
   - @mantine/notifications CSS must be imported separately: `@mantine/notifications/styles.css`
+---
+
+## 2026-02-14T02:38 - US-026
+- What was implemented: Notification center bell icon in AppShell header
+  - Bell icon (🔔) with Mantine Indicator showing unread count badge (red, processing animation)
+  - Clicking bell opens Popover dropdown (360px wide) listing all notifications
+  - Each notification shows: type icon (📋/⚡/🏒/⚙️), title, message preview (2-line clamp), relative timestamp
+  - Unread notifications visually distinct: bold title, blue accent left-border, blue-light background
+  - 'Mark all as read' button at top of list (only shown when unread > 0)
+  - Clicking a notification marks it read, navigates to relevant context (draft/roster/league), closes popover
+  - Empty state: 🔕 icon + 'No notifications yet' text
+  - Positioned in header between logo and UserMenu
+- Files changed:
+  - `packages/web/src/app/components/NotificationCenter.tsx` (new)
+  - `packages/web/src/app/app.tsx` (modified - added NotificationCenter import, placed in header Group)
+- **Learnings for future iterations:**
+  - Mantine Indicator component wraps ActionIcon for badge-on-icon pattern; `processing` prop adds pulse animation
+  - Mantine Popover with `position="bottom-end"` anchors dropdown to right side of trigger
+  - Reuse getNavigationPath pattern from NotificationToasts for consistent notification click routing
+  - ScrollArea.Autosize with mah constrains dropdown height while enabling scrolling for many notifications
+  - No `/* eslint-disable no-undef */` needed in web package components (only supabase package lacks browser globals)
+---
+
+## 2026-02-14T02:41 - US-027
+- What was implemented: scoring_events database table migration and TypeScript types
+  - Created migration 003_scoring_events.sql with full table definition
+  - Table columns: id (uuid PK), league_id, member_id, roster_id, player_id (nullable), team_id (nullable), event_type (goal|assist|win|shutout), points (integer), game_id, game_date, description (text), created_at
+  - Foreign keys to leagues, league_members, and rosters (all with CASCADE delete)
+  - Index on (league_id, member_id, created_at) for efficient history queries
+  - Unique constraint on (game_id, player_id, event_type) for idempotency
+  - RLS policy: users can SELECT scoring events for leagues they belong to
+  - Realtime enabled via ALTER PUBLICATION
+  - Added ScoringEventType and ScoringEvent TypeScript types to @sportsnot/types
+- Files changed:
+  - `packages/supabase-db/migrations/003_scoring_events.sql` (new)
+  - `packages/types/src/lib/types.ts` (modified - added ScoringEventType and ScoringEvent)
+- **Learnings for future iterations:**
+  - Follow existing migration naming pattern: sequential 00X_ prefix
+  - Use IF NOT EXISTS for CREATE TABLE / CREATE INDEX in migrations
+  - RLS SELECT policy pattern: check league_id IN (SELECT league_id FROM league_members WHERE user_id = auth.uid())
+  - ScoringEvent type uses camelCase field names matching other interfaces in types.ts
+---
+
+## 2026-02-14T02:43 - US-028
+- What was implemented: Extended stat sync trigger functions to populate scoring_events table
+  - recalculate_player_points: now creates 'goal' and 'assist' scoring events on stat deltas
+  - recalculate_team_points: now creates 'win' and 'shutout' scoring events on stat deltas
+  - Delta detection: compares NEW vs OLD values (OLD treated as 0 for INSERTs via TG_OP check)
+  - Idempotency: uses cumulative stat number as game_id (e.g., goal #4 -> game_id=4)
+  - Player events use existing unique constraint (game_id, player_id, event_type) with ON CONFLICT DO NOTHING
+  - Team events: added partial unique index (game_id, team_id, event_type) WHERE player_id IS NULL
+  - Shutout/win separation: shutout wins get 'shutout' event (4pts), non-shutout wins get 'win' event (2pts)
+  - Events linked to correct roster slot and league member via roster loop
+  - Description includes player/team name for readable history
+- Files changed:
+  - `packages/supabase-db/migrations/004_scoring_events_triggers.sql` (new)
+- **Learnings for future iterations:**
+  - PostgreSQL unique constraints don't work with NULL values; use partial unique index (WHERE col IS NULL) for nullable column uniqueness
+  - TG_OP variable in PostgreSQL triggers returns 'INSERT' or 'UPDATE' - use to detect first-time vs update
+  - FOR i IN (start)...(end) does nothing in PostgreSQL when start > end, so no GREATEST() guard needed
+  - CREATE OR REPLACE FUNCTION safely replaces existing trigger functions without dropping triggers
+  - Stat caches store aggregates, not per-game data - use cumulative count as synthetic game_id for event uniqueness
 ---
