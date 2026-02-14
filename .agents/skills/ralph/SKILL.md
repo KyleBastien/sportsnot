@@ -12,7 +12,7 @@ Converts existing PRDs to the prd.json format that Ralph uses for autonomous exe
 
 ## The Job
 
-Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph directory.
+Take a PRD (markdown file or text) and convert it to `scripts/ralph/prd.json` (the directory where `ralph.ps1` lives, NOT the `.agents/skills/ralph/` directory where this skill file lives).
 
 ---
 
@@ -234,10 +234,10 @@ Add ability to mark tasks with different statuses.
 
 **Before writing a new prd.json, check if there is an existing one from a different feature:**
 
-1. Read the current `prd.json` if it exists
+1. Read the current `scripts/ralph/prd.json` if it exists
 2. Check if `branchName` differs from the new feature's branch name
-3. If different AND `progress.txt` has content beyond the header:
-   - Create archive folder: `archive/YYYY-MM-DD-feature-name/`
+3. If different AND `scripts/ralph/progress.txt` has content beyond the header:
+   - Create archive folder: `scripts/ralph/archive/YYYY-MM-DD-feature-name/`
    - Copy current `prd.json` and `progress.txt` to archive
    - Reset `progress.txt` with fresh header
 
@@ -247,7 +247,7 @@ Add ability to mark tasks with different statuses.
 
 ## Checklist Before Saving
 
-Before writing prd.json, verify:
+Before writing prd.json to `scripts/ralph/prd.json`, verify:
 
 - [ ] **Previous run archived** (if prd.json exists with different branchName, archive it first)
 - [ ] Each story is completable in one iteration (small enough)
