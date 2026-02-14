@@ -11,11 +11,13 @@ import {
   Alert,
   Group,
   Box,
+  Button,
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, useStatSync, useLiveScoring } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { ResponsiveTable, type ResponsiveTableColumn } from '@sportsnot/ui';
+import { downloadCsv } from '@sportsnot/utils';
 import { type ReactNode, useMemo, useCallback } from 'react';
 
 function useStandings(leagueId: string) {
@@ -92,6 +94,19 @@ export function StandingsPage() {
 
   const { league, members } = data;
   const displayTime = lastUpdated ?? lastSyncedAt ?? null;
+
+  const handleExportCsv = () => {
+    const headers = ['Rank', 'Team', 'Manager', 'Points'];
+    const rows = members.map((member: any, index: number) => [
+      index + 1,
+      member.team_name ?? '',
+      member.users?.display_name ?? 'Unknown',
+      member.total_points ?? 0,
+    ]);
+    const date = new Date().toISOString().slice(0, 10);
+    const safeName = (league?.name ?? 'league').replace(/[^a-zA-Z0-9]/g, '-');
+    downloadCsv(headers, rows, `sportsnot-standings-${safeName}-${date}.csv`);
+  };
 
   const standingsColumns: ResponsiveTableColumn[] = [
     { key: 'rank', label: 'Rank' },
@@ -203,7 +218,11 @@ export function StandingsPage() {
               {league?.name} · Round {league?.current_round ?? 0}
             </Text>
           </div>
-          <Stack gap={4} align="flex-end">
+          <Group gap="sm" align="flex-start">
+            <Button variant="outline" size="sm" onClick={handleExportCsv}>
+              Export CSV
+            </Button>
+            <Stack gap={4} align="flex-end">
             {isLive && (
               <Badge
                 color="green"
@@ -224,6 +243,7 @@ export function StandingsPage() {
               </Text>
             )}
           </Stack>
+          </Group>
         </Group>
 
         <Card shadow="sm" padding="md" radius="md" withBorder>

@@ -24,6 +24,7 @@ import { useCompareContext, type ComparePlayer } from '../../context/CompareCont
 import { usePlayerDetailContext } from '../../context/PlayerDetailContext';
 import { SCORING } from '@sportsnot/types';
 import { ResponsiveTable, type ResponsiveTableColumn } from '@sportsnot/ui';
+import { downloadCsv } from '@sportsnot/utils';
 
 function useMyRoster(leagueId: string) {
   const { user } = useAuthContext();
@@ -44,7 +45,7 @@ function useMyRoster(leagueId: string) {
       // Get the league to know current round
       const { data: league } = await supabase
         .from('leagues')
-        .select('current_round')
+        .select('name, current_round')
         .eq('id', leagueId)
         .single();
 
@@ -62,6 +63,7 @@ function useMyRoster(leagueId: string) {
       return {
         memberId: member.id,
         round: league.current_round,
+        leagueName: league.name ?? '',
         slots: roster ?? [],
       };
     },
@@ -163,8 +165,30 @@ export function RosterPage() {
     );
   }
 
-  const { slots, round } = data;
+  const { slots, round, leagueName } = data;
   const displayTime = lastUpdated ?? lastSyncedAt ?? null;
+
+  const handleExportCsv = () => {
+    const headers = ['Position', 'Player/Team', 'Status', 'Points'];
+    const rows = slots.map((slot: any) => {
+      const playerInfo = slot.player_id ? playerLookup.get(slot.player_id) : null;
+      const teamInfo = slot.team_id ? teamLookup.get(slot.team_id) : null;
+      const displayName =
+        playerInfo?.player_name ??
+        teamInfo?.team_name ??
+        (slot.player_id ? `Player #${slot.player_id}` : `Team #${slot.team_id}`);
+
+      return [
+        POSITION_LABELS[slot.position] ?? slot.position,
+        displayName,
+        slot.is_active ? 'Active' : 'Inactive',
+        slot.points_earned ?? 0,
+      ];
+    });
+    const date = new Date().toISOString().slice(0, 10);
+    const safeName = leagueName.replace(/[^a-zA-Z0-9]/g, '-') || 'league';
+    downloadCsv(headers, rows, `sportsnot-roster-${safeName}-${date}.csv`);
+  };
 
   // Group slots by position
   const groupedSlots = POSITION_ORDER.map((pos) => ({
@@ -419,6 +443,9 @@ export function RosterPage() {
               </Text>
             </Stack>
           </Card>
+          <Button variant="outline" size="sm" onClick={handleExportCsv}>
+            Export CSV
+          </Button>
         </Group>
 
         <Text size="sm" c="dimmed">

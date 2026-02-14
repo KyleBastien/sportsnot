@@ -78,3 +78,35 @@ export function generateInviteCode(): string {
   }
   return result;
 }
+
+/**
+ * Convert tabular data to a CSV string and trigger a download.
+ * @param headers Array of column header strings
+ * @param rows Array of arrays, each inner array is a row of cell values
+ * @param filename Filename for the downloaded CSV
+ */
+export function downloadCsv(
+  headers: string[],
+  rows: (string | number | null | undefined)[][],
+  filename: string
+): void {
+  const escape = (val: string | number | null | undefined): string => {
+    const str = val == null ? '' : String(val);
+    return str.includes(',') || str.includes('"') || str.includes('\n')
+      ? `"${str.replace(/"/g, '""')}"`
+      : str;
+  };
+
+  const csvContent = [
+    headers.map(escape).join(','),
+    ...rows.map((row) => row.map(escape).join(',')),
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}

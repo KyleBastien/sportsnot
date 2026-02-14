@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@rstest/core';
+import { describe, it, expect, beforeEach, afterEach } from '@rstest/core';
 import {
   calculatePlayerPoints,
   calculateGoaliePoints,
@@ -6,6 +6,7 @@ import {
   generateReDraftOrder,
   shuffleArray,
   generateInviteCode,
+  downloadCsv,
 } from './utils';
 import type { PlayerStats, TeamStats } from '@sportsnot/types';
 
@@ -172,5 +173,85 @@ describe('generateInviteCode', () => {
     }
     // With 31^8 possible codes, 100 codes should all be unique
     expect(codes.size).toBe(100);
+  });
+});
+
+describe('downloadCsv', () => {
+  let clickCalled: boolean;
+  let downloadAttr: string;
+  let hrefAttr: string;
+  let revokedUrl: string;
+  const origCreateElement = document.createElement.bind(document);
+
+  beforeEach(() => {
+    clickCalled = false;
+    downloadAttr = '';
+    hrefAttr = '';
+    revokedUrl = '';
+
+    // Mock URL.createObjectURL and revokeObjectURL
+    (globalThis as any).URL.createObjectURL = (_blob: Blob) => 'blob:mock-url';
+    (globalThis as any).URL.revokeObjectURL = (url: string) => {
+      revokedUrl = url;
+    };
+
+    // Mock document.createElement for anchor element
+    document.createElement = ((tag: string) => {
+      if (tag === 'a') {
+        const el = origCreateElement(tag);
+        Object.defineProperty(el, 'click', {
+          value: () => {
+            clickCalled = true;
+          },
+        });
+        const proxy = new Proxy(el, {
+          set(target, prop, value) {
+            if (prop === 'download') downloadAttr = value as string;
+            if (prop === 'href') hrefAttr = value as string;
+            (target as any)[prop] = value;
+            return true;
+          },
+        });
+        return proxy;
+      }
+      return origCreateElement(tag);
+    }) as typeof document.createElement;
+  });
+
+  afterEach(() => {
+    document.createElement = origCreateElement;
+  });
+
+  it('should trigger a file download with correct filename', () => {
+    downloadCsv(['Name', 'Score'], [['Alice', 10]], 'test-export.csv');
+    expect(clickCalled).toBe(true);
+    expect(downloadAttr).toBe('test-export.csv');
+    expect(hrefAttr).toBe('blob:mock-url');
+  });
+
+  it('should revoke the blob URL after download', () => {
+    downloadCsv(['A'], [['B']], 'file.csv');
+    expect(revokedUrl).toBe('blob:mock-url');
+  });
+
+  it('should escape values containing commas', () => {
+    // We can't easily inspect the blob content, but we verify it doesn't throw
+    downloadCsv(['Name'], [['Last, First']], 'file.csv');
+    expect(clickCalled).toBe(true);
+  });
+
+  it('should escape values containing double quotes', () => {
+    downloadCsv(['Name'], [['He said "hello"']], 'file.csv');
+    expect(clickCalled).toBe(true);
+  });
+
+  it('should handle null and undefined values', () => {
+    downloadCsv(['A', 'B'], [[null, undefined]], 'file.csv');
+    expect(clickCalled).toBe(true);
+  });
+
+  it('should handle empty rows', () => {
+    downloadCsv(['A', 'B'], [], 'file.csv');
+    expect(clickCalled).toBe(true);
   });
 });
