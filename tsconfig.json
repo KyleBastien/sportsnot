@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/web"
+    },
+    {
+      "path": "./packages/types"
+    },
+    {
+      "path": "./packages/utils"
+    },
+    {
+      "path": "./packages/nhl-api"
+    },
+    {
+      "path": "./packages/supabase"
+    },
+    {
+      "path": "./packages/ui"
+    }
+  ]
+}
