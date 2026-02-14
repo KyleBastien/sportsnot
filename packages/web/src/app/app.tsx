@@ -16,6 +16,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { CompareTray } from './components/CompareTray';
 import { BottomNav } from './components/BottomNav';
 import { NotificationToasts } from './components/NotificationToasts';
+import { NotificationCenter } from './components/NotificationCenter';
 
 // Route pages
 import { LoginPage } from './routes/auth/LoginPage';
@@ -97,7 +98,10 @@ export function App() {
             <UnstyledButton component={Link} to="/">
               <Title order={3}>🏒 SportsNot</Title>
             </UnstyledButton>
-            <UserMenu />
+            <Group gap="xs">
+              <NotificationCenter />
+              <UserMenu />
+            </Group>
           </Group>
         </AppShell.Header>
 
