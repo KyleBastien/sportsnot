@@ -508,7 +508,7 @@
         "Typecheck passes"
       ],
       "priority": 29,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on scoring_events table (US-027)"
     },
     {
@@ -527,7 +527,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 30,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on useScoringEvents hook (US-029) and ResponsiveTable (US-012)"
     },
     {

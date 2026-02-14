@@ -583,3 +583,45 @@ Started: 02/13/2026 17:16:12
   - CREATE OR REPLACE FUNCTION safely replaces existing trigger functions without dropping triggers
   - Stat caches store aggregates, not per-game data - use cumulative count as synthetic game_id for event uniqueness
 ---
+
+## 2026-02-14T02:50 - US-029
+- What was implemented: useScoringEvents data hook and scoring history route
+  - Created useScoringEvents(leagueId, filters?, page?) hook in @sportsnot/supabase
+  - Hook supports filters: memberId, eventType, dateFrom/dateTo, playerId, teamId
+  - Hook supports pagination (20 events per page) using Supabase range()
+  - Added /scoring/:leagueId route with ScoringHistoryPage placeholder component
+  - Added Scoring button to LeagueDashboardPage (in active league buttons)
+  - Added Scoring tab to BottomNav mobile navigation
+  - Exported useScoringEvents and ScoringEventsFilters from @sportsnot/supabase
+- Files changed:
+  - `packages/supabase/src/lib/hooks/useScoringEvents.ts` (new)
+  - `packages/supabase/src/index.ts` (added exports)
+  - `packages/web/src/app/routes/scoring/ScoringHistoryPage.tsx` (new)
+  - `packages/web/src/app/app.tsx` (added route + import)
+  - `packages/web/src/app/components/BottomNav.tsx` (added Scoring tab)
+  - `packages/web/src/app/routes/leagues/LeagueDashboardPage.tsx` (added Scoring button)
+- **Learnings for future iterations:**
+  - supabase package tsconfig.lib.json uses node16 moduleResolution - cannot import @sportsnot/types; use inline type definitions instead
+  - ScoringHistoryPage is a placeholder; US-030 will build the full UI
+  - Supabase range() is 0-indexed inclusive on both ends; range(0, 19) returns 20 rows
+  - BottomNav now has 6 tabs - may need to adjust spacing for smaller screens
+---
+## 2026-02-14T02:52 - US-030
+- What was implemented: Full scoring history page UI with timeline, filters, and pagination
+  - Chronological timeline of scoring events grouped by game date (newest first)
+  - Each event shows: event type icon+label, description, points badge (color-coded), team name, date, time
+  - Filters: event type (Select dropdown), date range (From/To date inputs), 'Show only my events' toggle
+  - 'Show only my events' uses league member lookup to match current user to member_id
+  - Events grouped by game date with Badge date headers
+  - Pagination controls (Mantine Pagination) for 20 events per page
+  - Uses ResponsiveTable from @sportsnot/ui for mobile compatibility
+  - Custom renderCell for color-coded points badges (grape=shutout, teal=win, blue=goal/assist)
+- Files changed:
+  - `packages/web/src/app/routes/scoring/ScoringHistoryPage.tsx` (modified - replaced placeholder with full UI)
+- **Learnings for future iterations:**
+  - useLeague hook returns league_members array with nested users object; access via m.users?.display_name
+  - Supabase snake_case fields (member_id, event_type, game_date) map to hook's ScoringEventsFilters camelCase
+  - ResponsiveTable renderCell can use hidden _-prefixed fields in row data for conditional rendering logic
+  - Mantine Pagination is 1-indexed (value prop) but useScoringEvents page param is 0-indexed
+  - TextInput with type="date" works as a simple date picker alternative to Mantine DatePicker (no extra dep)
+---
