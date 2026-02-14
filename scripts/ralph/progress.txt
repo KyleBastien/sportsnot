@@ -3,6 +3,7 @@ Started: 02/13/2026 17:16:12
 
 ## Codebase Patterns
 - Context pattern: Create in `packages/web/src/app/context/`, export Provider + useXxxContext hook
+- PlayerDetailContext: Use `openPlayerDetail(playerId)` to open modal from any component; renders at app level in app.tsx
 - ResponsiveTable: Extended with optional `renderCell` and `rowStyle` props for custom cell rendering and row styling
 - Provider wiring: Add providers in `packages/web/src/main.tsx`, nest inside AuthProvider if auth-dependent
 - Types: Shared types in `packages/types/src/lib/types.ts` and `nhl.ts`, exported via `@sportsnot/types`
@@ -802,4 +803,48 @@ px rstest
   - rstest --coverage flag can be used in CLI or coverage.enabled: true in config
   - Coverage reports go to ./coverage/ directory (already in .gitignore)
   - Current coverage is low for web and nhl-api packages; thresholds set to current levels to avoid CI failure
+---
+
+## 2026-02-14T04:26 - US-039
+- What was implemented: PlayerDetailModal with PlayerDetailContext
+  - PlayerDetailContext manages modal open/close state, provides openPlayerDetail(playerId) from anywhere
+  - PlayerDetailModal fetches player info via getPlayer() and game log via getPlayerGameLog() from @sportsnot/nhl-api
+  - Shows: headshot, name, team, position, jersey number, height/weight, shoots
+  - Playoff totals summary (G, A, Pts, +/-, PIM, SOG, GP)
+  - Game-by-game log table for last 10 games (date, opponent, G, A, Pts, +/-, PIM, SOG, TOI)
+  - Add to Compare / Remove from Compare button in header using CompareContext
+  - Loading skeleton while data fetches
+  - Responsive: fullScreen on mobile via useMediaQuery
+  - Made player names clickable (blue text, pointer cursor) in DraftPage, RosterPage, ComparisonModal
+- Files changed:
+  - packages/web/src/app/context/PlayerDetailContext.tsx (new)
+  - packages/web/src/app/components/PlayerDetailModal.tsx (new)
+  - packages/web/src/main.tsx (added PlayerDetailProvider)
+  - packages/web/src/app/app.tsx (added PlayerDetailModal)
+  - packages/web/src/app/routes/draft/DraftPage.tsx (clickable player names)
+  - packages/web/src/app/routes/roster/RosterPage.tsx (clickable player names)
+  - packages/web/src/app/components/ComparisonModal.tsx (clickable player names)
+- **Learnings for future iterations:**
+  - PlayerDetailContext pattern: simple context with selectedPlayerId state + open/close callbacks
+  - Team/goalie entries (team_id based) should not open PlayerDetailModal since they represent teams, not individual players
+  - RosterPage uses useCallback for renderRosterCell; add new dependencies to the array when adding new closures
+  - getPlayerGameLog(playerId, season, 3) returns playoff game log; gameType=3 is playoffs
+  - CURRENT_SEASON hardcoded as '20252026'; may need to be dynamic in future
+---
+
+## 2026-02-14T04:32 - US-040
+- What was implemented: CSV export functionality for RosterPage and StandingsPage
+  - Created downloadCsv utility function in @sportsnot/utils
+  - Added Export CSV button to RosterPage and StandingsPage headers
+  - CSV files named sportsnot-{type}-{leagueName}-{date}.csv
+  - Added 6 tests for downloadCsv utility achieving 100% utils coverage
+- Files changed:
+  - packages/utils/src/lib/utils.ts (added downloadCsv function)
+  - packages/utils/src/lib/utils.test.ts (added 6 tests for downloadCsv)
+  - packages/web/src/app/routes/roster/RosterPage.tsx (added export button, fetched league name)
+  - packages/web/src/app/routes/standings/StandingsPage.tsx (added export button)
+- Learnings for future iterations:
+  - The roster useMyRoster hook did not fetch league name originally - had to add name to the select query
+  - For DOM mocks in rstest, save origCreateElement at describe scope not in beforeEach to avoid cascading mock issues
+  - Pre-existing test failures: RosterPage/DraftPage tests fail due to missing PlayerDetailProvider
 ---

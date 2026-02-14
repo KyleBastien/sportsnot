@@ -672,7 +672,7 @@
         "Verify in browser if browser testing tools are available"
       ],
       "priority": 39,
-      "passes": false,
+      "passes": true,
       "notes": "P2 feature"
     },
     {
@@ -688,7 +688,7 @@
         "Typecheck passes"
       ],
       "priority": 40,
-      "passes": false,
+      "passes": true,
       "notes": "P2 feature"
     },
     {
