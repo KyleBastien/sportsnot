@@ -47,6 +47,10 @@ Started: 02/13/2026 17:16:12
 - Hook tests: rstest has no module mocking; override methods on the imported supabase singleton directly, restore in afterEach
 - Hook tests: Use Proxy-based mock for supabase.from() chain — all chained methods return proxy, .then resolves with {data, error, count}
 - Hook tests: For mutations, use mutate() + waitFor(isSuccess/isError) instead of mutateAsync
+- Hook tests: supabase.functions is a getter on prototype; use Object.defineProperty to mock, delete instance property to restore
+- Hook tests: Mock globalThis.fetch to control nhl-api responses (getScoresNow uses fetch internally)
+- Coverage: `@rstest/coverage-istanbul` provider, config in `rstest.config.ts` coverage section, thresholds per glob pattern
+- Coverage run: `yarn test` or `npx rstest --coverage`; reports in `./coverage/`
 
 ---
 
@@ -755,4 +759,47 @@ px rstest
   - For mutation hooks (useCreateLeague, useJoinLeague), use mutate() + waitFor(isSuccess/isError) instead of mutateAsync in act() - avoids unhandled promise issues
   - supabase.auth methods (getSession, onAuthStateChange, signInWithOtp, signOut) can be directly reassigned for testing
   - QueryClient for hook tests needs retry: false, gcTime: 0, and all refetch options disabled
+---
+
+## 2026-02-14T04:10 - US-037
+- What was implemented: Hook tests for draft, roster, and stat sync hooks
+  - useDraft.test.tsx: 13 tests covering useDraft (fetch, error, realtime channel setup/cleanup), useMakePick (success, insert error, advance error, null IDs), useStartDraft (success, creation error)
+  - useRoster.test.tsx: 12 tests covering useRoster (fetch, empty, null data, error), useLeagueRosters (fetch, no members, error), useActivateIR (RPC success, RPC error with param verification)
+  - useStatSync.test.tsx: 11 tests covering useStatSync (no leagueId, isLive detection for OFF/LIVE/PRE, tab visibility pause, syncNow edge function calls, skip conditions, player-only sync, error handling)
+- Files changed:
+  - `packages/supabase/src/lib/hooks/useDraft.test.tsx` (new)
+  - `packages/supabase/src/lib/hooks/useRoster.test.tsx` (new)
+  - `packages/supabase/src/lib/hooks/useStatSync.test.tsx` (new)
+- **Learnings for future iterations:**
+  - supabase.functions is a GETTER on the prototype that returns a new FunctionsClient each time — setting supabase.functions.invoke directly does NOT work
+  - To mock functions.invoke, use Object.defineProperty(supabase, 'functions', { configurable: true, get: () => ({ invoke: handler }) })
+  - Restore by deleting the instance property: delete (supabase as any).functions (falls back to prototype getter)
+  - supabase.rpc is directly overridable on the instance (unlike functions.invoke)
+  - For useStatSync, mock globalThis.fetch to control getScoresNow() responses (since rstest has no module mocking)
+  - When testing syncNow manually, wait for initial query to settle with waitFor before calling syncNow
+---
+
+## 2026-02-14T04:21 - US-038
+- What was implemented: Coverage targets and reporting configuration
+  - Installed @rstest/coverage-istanbul for Istanbul-based code coverage
+  - Configured rstest.config.ts with coverage section: enabled, provider, reporters, include/exclude, thresholds
+  - Reporters: text (console), html (browser), json, lcov
+  - Per-package thresholds set based on current coverage levels:
+    - utils: 90% (all categories) - currently at 100%
+    - ui: 80% (all categories) - currently at ~87-92%
+    - supabase: 70% stmts/funcs/lines, 50% branches - currently at ~71/55/81/73%
+    - nhl-api: 35% stmts/lines, 55% branches, 15% funcs - currently at ~38/60/19/38%
+    - web: 20% stmts/funcs/lines, 15% branches - currently at ~23/20/22/24%
+  - Updated yarn test script to stest --coverage so coverage is always generated
+  - Aspirational targets documented in comment: utils=90%, nhl-api=70%, supabase=70%, ui=80%, web=60%
+- Files changed:
+  - stest.config.ts (modified - added coverage configuration)
+  - package.json (modified - test script now includes --coverage)
+  - yarn.lock (modified - added @rstest/coverage-istanbul dependency)
+- **Learnings for future iterations:**
+  - rstest coverage uses @rstest/coverage-istanbul package (must be installed separately)
+  - Coverage config: coverage.thresholds supports glob-based per-package thresholds via ThresholdGlobRecord
+  - rstest --coverage flag can be used in CLI or coverage.enabled: true in config
+  - Coverage reports go to ./coverage/ directory (already in .gitignore)
+  - Current coverage is low for web and nhl-api packages; thresholds set to current levels to avoid CI failure
 ---
