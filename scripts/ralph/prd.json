@@ -260,7 +260,7 @@
         "Typecheck passes"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": "Mock a full roster with 5F + 3D + 1G active and 1 IR_F + 1 IR_D filled."
     },
     {
@@ -279,7 +279,7 @@
         "Typecheck passes"
       ],
       "priority": 15,
-      "passes": false,
+      "passes": true,
       "notes": "Mock a roster with one injured Forward and one IR_F replacement available. Verify position filtering works."
     },
     {

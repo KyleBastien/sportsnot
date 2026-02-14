@@ -4,6 +4,7 @@ Started: 02/14/2026 08:16:46
 
 ## Codebase Patterns
 - Use `npx nx sync` after adding new packages — it updates TypeScript project references automatically
+- Use `{ exact: true }` for position heading selectors (e.g., `getByRole('heading', { name: 'Forward', exact: true })`) to avoid matching "IR Forward"
 - Mantine SegmentedControl renders hidden `<input type="radio">` — use `locator('label:has-text("...")')` to click, not `getByRole('radio')`
 - DraftPage hooks: all useMemo/useEffect calls must appear BEFORE early returns to avoid React hooks order violations
 - DraftPage uses `currentSeason = '20242025'` hardcoded — mock data season doesn't matter since PostgREST mocks ignore query params
@@ -34,6 +35,9 @@ Started: 02/14/2026 08:16:46
 - "Test User" display_name appears in both nav bar and member list — scope assertions to `getByRole('list')` to avoid strict mode violations
 - Use `{ exact: true }` for number text assertions (e.g., `getByText('3', { exact: true })`) to avoid matching substrings like `33`
 - Compare tray has `data-testid="compare-tray"` — scope text assertions to avoid matching both table rows and compare tray
+- Card DOM structure: heading → Group → Card — use `locator('../..')` to scope from heading to the Card containing the table
+- IR activation RPC: `supabase.rpc('activate_ir_player', ...)` → mock at `SUPABASE_URL/rest/v1/rpc/activate_ir_player`
+- Use `page.unrouteAll({ behavior: 'ignoreErrors' })` to swap mock data mid-test for post-mutation state
 
 ## 2026-02-14T16:16 - US-001
 - Scaffolded Playwright E2E project in packages/e2e
@@ -221,4 +225,32 @@ Started: 02/14/2026 08:16:46
   - ComparePlayer interface stores stats (goals, assists, points) at add-time -- no re-fetch needed
   - Compare button toggles between 'Compare' (outline) and 'Compared' (filled) states; disabled when tray is full (4 players)
   - Compare tray state lives in React useState -- persists across filter/search changes within the same page render
+---
+
+## 2026-02-14T17:32 - US-014
+- Created `packages/e2e/tests/roster.spec.ts` with 5 roster management E2E tests
+- Tests: all active slots (5F, 3D, 1G) with player details and count badges, IR slots (IR_F, IR_D) with Inactive badges and Activate IR buttons, round stats and earned points per player, total active points calculated correctly, roster accessible via league dashboard "My Roster" button
+- Mocked league_members (single for current user), leagues (single for current_round), rosters (list of 11 slots: 5F+3D+1G active, 1 IR_F+1 IR_D inactive)
+- RosterPage displays players as "Player #ID" or "Team #ID" — no player name resolution at the roster level
+- Files changed: packages/e2e/tests/roster.spec.ts (new)
+- **Learnings for future iterations:**
+  - RosterPage `useMyRoster` hook does 3 sequential queries: league_members.single() → leagues.single() → rosters.select() list
+  - Position group headings: "Forward", "Defenseman", "Goalie", "IR Forward", "IR Defenseman" — use `{ exact: true }` for "Forward"/"Defenseman" to avoid matching IR variants
+  - Active slots have green "Active" badge, IR slots have gray "Inactive" badge
+  - Activate IR button only appears on IR slots when there are active candidates at the matching base position
+  - Total points sums only `is_active: true` slots' `points_earned` values
+  - League dashboard "My Roster" button only visible when `league.status === 'active'`
+---
+
+## 2026-02-14T17:37 - US-015
+- Created `packages/e2e/tests/ir-activation.spec.ts` with 6 IR activation flow E2E tests
+- Tests: IR activation button visible on IR slots, clicking opens modal, modal shows same-position replacement players, modal displays point warning/differential, confirming activation calls RPC and shows "From IR" badge, position mismatch (no active Forwards) hides Activate IR button
+- Mocked `activate_ir_player` RPC endpoint, used `unrouteAll` + re-mock pattern to swap roster data after activation
+- Files changed: packages/e2e/tests/ir-activation.spec.ts (new)
+- **Learnings for future iterations:**
+  - Card DOM structure: heading → Group → Card — use `locator('../..')` (two levels up) to scope from heading to the full Card containing the table
+  - IR activation calls `supabase.rpc('activate_ir_player', ...)` → mocked at `SUPABASE_URL/rest/v1/rpc/activate_ir_player`
+  - IR slot "Activate IR" button only appears when: `isIrSlot && !activated_from_ir && injuredCandidates.length > 0`
+  - After activation, `activated_from_ir: true` triggers "From IR" orange badge on the slot
+  - Use `page.unrouteAll({ behavior: 'ignoreErrors' })` to swap mock data mid-test for post-mutation state
 ---
