@@ -22,6 +22,20 @@ const queryClient = new QueryClient({
   },
 });
 
+// Register service worker for offline caching
+if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') { // eslint-disable-line no-undef
+  window.addEventListener('load', () => { // eslint-disable-line no-undef
+    navigator.serviceWorker // eslint-disable-line no-undef
+      .register('/sw.js')
+      .then((registration) => {
+        console.warn('SW registered:', registration.scope); // eslint-disable-line no-undef
+      })
+      .catch((error) => {
+        console.error('SW registration failed:', error); // eslint-disable-line no-undef
+      });
+  });
+}
+
 const root = createRoot(document.getElementById('root') as HTMLElement);
 root.render(
   <StrictMode>
