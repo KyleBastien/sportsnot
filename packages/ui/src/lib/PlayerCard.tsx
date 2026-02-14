@@ -1,4 +1,4 @@
-import { Card, Group, Text, Badge, Avatar, Stack } from '@mantine/core';
+import { Card, Group, Text, Badge, Avatar, Stack, ActionIcon, Tooltip } from '@mantine/core';
 import type { NHLPlayer } from '@sportsnot/types';
 
 export interface PlayerCardProps {
@@ -6,6 +6,12 @@ export interface PlayerCardProps {
   points?: number;
   isSelected?: boolean;
   onSelect?: (player: NHLPlayer) => void;
+  /** Whether this player is currently in the compare tray */
+  isInCompare?: boolean;
+  /** Whether the compare tray is full (4 players) */
+  isCompareFull?: boolean;
+  /** Called when the compare button is clicked; receives the player */
+  onCompareToggle?: (player: NHLPlayer) => void; // eslint-disable-line no-unused-vars
 }
 
 export function PlayerCard({
@@ -13,6 +19,9 @@ export function PlayerCard({
   points,
   isSelected = false,
   onSelect,
+  isInCompare = false,
+  isCompareFull = false,
+  onCompareToggle,
 }: PlayerCardProps) {
   return (
     <Card
@@ -56,6 +65,30 @@ export function PlayerCard({
           <Badge size="lg" variant="filled" color="green">
             {points} pts
           </Badge>
+        )}
+        {onCompareToggle && (
+          <Tooltip
+            label={
+              isInCompare
+                ? 'Remove from compare'
+                : isCompareFull
+                  ? 'Compare tray full'
+                  : 'Add to compare'
+            }
+          >
+            <ActionIcon
+              variant={isInCompare ? 'filled' : 'light'}
+              color={isInCompare ? 'blue' : 'gray'}
+              disabled={!isInCompare && isCompareFull}
+              onClick={(e: { stopPropagation: () => void }) => {
+                e.stopPropagation();
+                onCompareToggle(player);
+              }}
+              aria-label={isInCompare ? 'Remove from compare' : 'Add to compare'}
+            >
+              {isInCompare ? '✓' : '⚖'}
+            </ActionIcon>
+          </Tooltip>
         )}
       </Group>
     </Card>
