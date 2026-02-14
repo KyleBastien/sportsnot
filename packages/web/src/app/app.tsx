@@ -12,6 +12,7 @@ import {
 import { useAuthContext } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { CompareTray } from './components/CompareTray';
 
 // Route pages
 import { LoginPage } from './routes/auth/LoginPage';
@@ -196,6 +197,8 @@ export function App() {
             />
           </Routes>
         </AppShell.Main>
+
+        <CompareTray />
       </AppShell>
     </ErrorBoundary>
   );
