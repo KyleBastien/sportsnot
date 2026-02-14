@@ -1,0 +1,11 @@
+{
+  "name": "@sportsnot/nhl-api",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/nhl-api/src",
+  "projectType": "library",
+  "targets": {
+    "test": {
+      "command": "yarn rstest --root packages/nhl-api"
+    }
+  }
+}

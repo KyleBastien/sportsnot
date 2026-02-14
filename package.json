@@ -3,14 +3,6 @@
   "version": "0.0.0",
   "license": "MIT",
   "private": true,
-  "scripts": {
-    "dev": "nx serve @sportsnot/web",
-    "build": "nx build @sportsnot/web",
-    "test": "rstest",
-    "lint": "nx run-many -t lint",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
-  },
   "devDependencies": {
     "@babel/core": "^7.14.5",
     "@babel/preset-react": "^7.14.5",
