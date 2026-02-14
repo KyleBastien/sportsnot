@@ -99,6 +99,23 @@ export interface TeamStats {
   lastUpdated: string;
 }
 
+export type ScoringEventType = 'goal' | 'assist' | 'win' | 'shutout';
+
+export interface ScoringEvent {
+  id: string;
+  leagueId: string;
+  memberId: string;
+  rosterId: string;
+  playerId: number | null;
+  teamId: number | null;
+  eventType: ScoringEventType;
+  points: number;
+  gameId: number;
+  gameDate: string;
+  description: string | null;
+  createdAt: string;
+}
+
 // Roster composition constants
 export const ROSTER_COMPOSITION = {
   forwards: 5,
