@@ -3,5 +3,12 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "packages/mock-data/src",
   "projectType": "library",
-  "targets": {}
+  "targets": {
+    "download": {
+      "command": "tsx packages/mock-data/src/scripts/download.ts",
+      "options": {
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
 }
