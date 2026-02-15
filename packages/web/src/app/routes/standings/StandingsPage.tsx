@@ -106,25 +106,24 @@ export function StandingsPage() {
   }
 
   const { league, members } = data;
+  const typedMembers = members as StandingsMemberRow[];
   const currentRound = league?.current_round ?? 0;
 
   // Check if breakdown data exists
-  const hasBreakdown = members.some(
-    (m: StandingsMemberRow) =>
-      m.player_points != null || m.goalie_points != null
+  const hasBreakdown = typedMembers.some(
+    (m) => m.player_points != null || m.goalie_points != null
   );
 
   // Check if round-by-round data exists
-  const hasRoundPoints = members.some(
-    (m: StandingsMemberRow) =>
-      m.round_points && Object.keys(m.round_points).length > 0
+  const hasRoundPoints = typedMembers.some(
+    (m) => m.round_points && Object.keys(m.round_points).length > 0
   );
 
   // Collect all round numbers across all members
   const roundNumbers = hasRoundPoints
     ? [
         ...new Set(
-          members.flatMap((m: StandingsMemberRow) =>
+          typedMembers.flatMap((m) =>
             m.round_points ? Object.keys(m.round_points).map(Number) : []
           )
         ),
@@ -143,7 +142,7 @@ export function StandingsPage() {
           </div>
           <Button
             variant="light"
-            onClick={() => downloadCSV(members, league?.name)}
+            onClick={() => downloadCSV(typedMembers, league?.name)}
           >
             Export CSV
           </Button>
@@ -175,7 +174,7 @@ export function StandingsPage() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {members.map((member: StandingsMemberRow, index: number) => {
+              {typedMembers.map((member, index) => {
                 const isMe = member.user_id === user?.id;
                 return (
                   <Table.Tr

@@ -4,6 +4,10 @@
   "sourceRoot": "packages/web/src",
   "projectType": "application",
   "targets": {
+    "typecheck": {
+      "command": "tsc --noEmit -p tsconfig.app.json",
+      "options": { "cwd": "{projectRoot}" }
+    },
     "test": {
       "command": "rstest",
       "options": { "cwd": "{projectRoot}" }

@@ -73,6 +73,7 @@ The `packages/web/src/mock/` directory contains all mock infrastructure. The hoo
 - **Routing:** react-router-dom v7 with `<ProtectedRoute>` wrapper. Auth state flows through `AuthContext`.
 - **Package exports:** Library packages use `"main": "./src/index.ts"` pointing to raw TypeScript source (no pre-compilation step for libraries). Rspack/Nx handles compilation.
 - **TypeScript paths:** Import shared packages via `@sportsnot/<package>` aliases defined in `tsconfig.base.json`.
+- **Nx CLI:** Always use `yarn nx`, never `npx nx`. Yarn is the package manager for this repo.
 - **ESLint rules:** Unused vars prefixed with `_` are never allowed. Any console usage (including warn or error) is not allowed. Never use any in code, it is 100% not allowed.
 - **Prettier:** Single quotes, trailing commas (es5), 2-space indent, 80 char width.
 - **E2E tests:** Use page object pattern (`packages/e2e/page-objects/`) with test fixtures (`packages/e2e/fixtures/`).

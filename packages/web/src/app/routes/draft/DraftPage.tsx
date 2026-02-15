@@ -442,10 +442,8 @@ export function DraftPage() {
   const currentPickIndex = draft ? draft.current_pick - 1 : 0;
   const currentPickerUserId = draftOrder[currentPickIndex];
   const isMyTurn = currentPickerUserId === user?.id;
-  const myMember = members?.find((m: DraftMemberRow) => m.user_id === user?.id);
-  const currentPicker = members?.find(
-    (m: DraftMemberRow) => m.user_id === currentPickerUserId
-  );
+  const myMember = members?.find((m) => m.user_id === user?.id);
+  const currentPicker = members?.find((m) => m.user_id === currentPickerUserId);
 
   // Track which players/teams have already been drafted
   const draftedPlayerIds = useMemo(
