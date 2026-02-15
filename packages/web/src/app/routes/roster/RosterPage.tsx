@@ -19,8 +19,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { SCORING } from '@sportsnot/types';
+import { useMockRoster, useMockActivateIR } from '../../../mock/hooks/useMockRoster';
 
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
+
+/* eslint-disable react-hooks/rules-of-hooks */
 function useMyRoster(leagueId: string) {
+  if (IS_MOCK) return useMockRoster(leagueId);
+
   const { user } = useAuthContext();
 
   return useQuery({
@@ -63,6 +69,7 @@ function useMyRoster(leagueId: string) {
     enabled: !!user,
   });
 }
+/* eslint-enable react-hooks/rules-of-hooks */
 
 const POSITION_LABELS: Record<string, string> = {
   F: 'Forward',
@@ -83,6 +90,8 @@ export function RosterPage() {
     irSlotId: string;
   } | null>(null);
   const [activating, setActivating] = useState(false);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const mockActivateIR = IS_MOCK ? useMockActivateIR() : null;
 
   if (isLoading) {
     return (
@@ -118,6 +127,16 @@ export function RosterPage() {
   const handleActivateIR = async () => {
     if (!irModal) return;
     setActivating(true);
+
+    if (IS_MOCK && mockActivateIR) {
+      mockActivateIR.mutate({
+        leagueMemberId: data.memberId,
+        slotId: irModal.irSlotId,
+      });
+      setActivating(false);
+      setIrModal(null);
+      return;
+    }
 
     const { error: activateError } = await supabase.rpc('activate_ir_player', {
       p_league_member_id: data.memberId,

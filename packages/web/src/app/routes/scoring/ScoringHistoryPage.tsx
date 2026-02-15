@@ -17,6 +17,9 @@ import {
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
+import { useMockScoringHistory } from '../../../mock/hooks/useMockScoringHistory';
+
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
 interface ScoringEvent {
   id: string;
@@ -28,7 +31,10 @@ interface ScoringEvent {
   league_member_team: string;
 }
 
+/* eslint-disable react-hooks/rules-of-hooks */
 function useScoringHistory(leagueId: string) {
+  if (IS_MOCK) return useMockScoringHistory(leagueId);
+
   return useQuery({
     queryKey: ['scoring-history', leagueId],
     queryFn: async () => {
@@ -43,6 +49,7 @@ function useScoringHistory(leagueId: string) {
     },
   });
 }
+/* eslint-enable react-hooks/rules-of-hooks */
 
 const EVENT_COLORS: Record<string, string> = {
   goal: 'red',

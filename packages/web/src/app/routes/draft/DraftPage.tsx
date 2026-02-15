@@ -22,6 +22,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase, usePlayoffPlayers, usePlayoffTeams } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import type { Position } from '@sportsnot/types';
+import { useMockDraft, useMockLeagueMembers, useMockMakePick } from '../../../mock/hooks/useMockDraft';
+import { useMockPlayoffPlayers, useMockPlayoffTeams } from '../../../mock/hooks/useMockNhlApi';
+
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
 interface DraftablePlayer {
   id: number;
@@ -34,7 +38,10 @@ interface DraftablePlayer {
   headshot?: string;
 }
 
+/* eslint-disable react-hooks/rules-of-hooks */
 function useDraft(leagueId: string) {
+  if (IS_MOCK) return useMockDraft(leagueId);
+
   return useQuery({
     queryKey: ['draft', leagueId],
     queryFn: async () => {
@@ -54,6 +61,8 @@ function useDraft(leagueId: string) {
 }
 
 function useLeagueMembers(leagueId: string) {
+  if (IS_MOCK) return useMockLeagueMembers(leagueId);
+
   return useQuery({
     queryKey: ['league-members', leagueId],
     queryFn: async () => {
@@ -67,6 +76,7 @@ function useLeagueMembers(leagueId: string) {
     },
   });
 }
+/* eslint-enable react-hooks/rules-of-hooks */
 
 interface ComparePlayer {
   id: number;
@@ -316,6 +326,8 @@ export function DraftPage() {
   const [confirmPosition, setConfirmPosition] = useState<Position>('F');
   const [submitting, setSubmitting] = useState(false);
   const [comparePlayers, setComparePlayers] = useState<ComparePlayer[]>([]);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const mockMakePick = IS_MOCK ? useMockMakePick() : null;
 
   const handleToggleCompare = (player: ComparePlayer) => {
     setComparePlayers((prev) => {
@@ -331,10 +343,16 @@ export function DraftPage() {
   };
 
   // Fetch cached NHL data
+  /* eslint-disable react-hooks/rules-of-hooks */
   const currentSeason = '20242025'; // TODO: derive from NHL API
   const currentRound = draft?.round ?? 1;
-  const { data: playerStats } = usePlayoffPlayers(currentSeason, currentRound);
-  const { data: teamStats } = usePlayoffTeams(currentSeason, currentRound);
+  const { data: playerStats } = IS_MOCK
+    ? useMockPlayoffPlayers(currentSeason, currentRound)
+    : usePlayoffPlayers(currentSeason, currentRound);
+  const { data: teamStats } = IS_MOCK
+    ? useMockPlayoffTeams(currentSeason, currentRound)
+    : usePlayoffTeams(currentSeason, currentRound);
+  /* eslint-enable react-hooks/rules-of-hooks */
 
   // Derived state — compute before early returns to keep hook order stable
   const draftOrder: string[] = (draft?.draft_order as string[]) ?? [];
@@ -358,9 +376,9 @@ export function DraftPage() {
     [picks]
   );
 
-  // Subscribe to real-time draft changes
+  // Subscribe to real-time draft changes (no-op in mock mode)
   useEffect(() => {
-    if (!leagueId) return;
+    if (!leagueId || IS_MOCK) return;
 
     const channel = supabase
       .channel(`draft-${leagueId}`)
@@ -409,6 +427,20 @@ export function DraftPage() {
     setSubmitting(true);
 
     const isGoalie = confirmPosition === 'G';
+
+    if (IS_MOCK && mockMakePick) {
+      mockMakePick.mutate({
+        draftId: draft.id,
+        leagueMemberId: myMember.id,
+        pickNumber: draft.current_pick,
+        playerId: isGoalie ? null : confirmPlayer.id,
+        teamId: isGoalie ? confirmPlayer.teamId : null,
+        position: confirmPosition,
+      });
+      setSubmitting(false);
+      setConfirmPlayer(null);
+      return;
+    }
 
     const { error } = await supabase.from('draft_picks').insert({
       draft_id: draft.id,

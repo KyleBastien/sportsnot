@@ -14,6 +14,9 @@ import {
 import { useAuthContext } from '../../context/AuthContext';
 import { supabase } from '@sportsnot/supabase';
 import { generateInviteCode } from '@sportsnot/utils';
+import { useMockCreateLeague } from '../../../mock/hooks/useMockLeagues';
+
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
 export function CreateLeaguePage() {
   const navigate = useNavigate();
@@ -23,6 +26,8 @@ export function CreateLeaguePage() {
   const [maxParticipants, setMaxParticipants] = useState<number>(8);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const mockCreateLeague = IS_MOCK ? useMockCreateLeague() : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +35,22 @@ export function CreateLeaguePage() {
 
     setLoading(true);
     setError(null);
+
+    if (IS_MOCK && mockCreateLeague) {
+      try {
+        const result = await mockCreateLeague.mutateAsync({
+          name,
+          maxParticipants,
+          teamName,
+        });
+        setLoading(false);
+        navigate(`/leagues/${result.id}`);
+      } catch (err: any) {
+        setError(err.message);
+        setLoading(false);
+      }
+      return;
+    }
 
     const inviteCode = generateInviteCode();
 

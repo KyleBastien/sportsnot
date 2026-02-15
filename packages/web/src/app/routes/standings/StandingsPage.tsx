@@ -16,8 +16,14 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
+import { useMockStandings } from '../../../mock/hooks/useMockStandings';
 
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
+
+/* eslint-disable react-hooks/rules-of-hooks */
 function useStandings(leagueId: string) {
+  if (IS_MOCK) return useMockStandings(leagueId);
+
   return useQuery({
     queryKey: ['standings', leagueId],
     queryFn: async () => {
@@ -42,6 +48,7 @@ function useStandings(leagueId: string) {
     },
   });
 }
+/* eslint-enable react-hooks/rules-of-hooks */
 
 function downloadCSV(members: any[], leagueName: string) {
   const header = 'Rank,Team,Manager,Points\n';

@@ -19,8 +19,14 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
+import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
+
+/* eslint-disable react-hooks/rules-of-hooks */
 function useLeague(leagueId: string) {
+  if (IS_MOCK) return useMockLeague(leagueId);
+
   return useQuery({
     queryKey: ['league', leagueId],
     queryFn: async () => {
@@ -43,6 +49,7 @@ function useLeague(leagueId: string) {
     },
   });
 }
+/* eslint-enable react-hooks/rules-of-hooks */
 
 const STATUS_COLORS: Record<string, string> = {
   setup: 'blue',

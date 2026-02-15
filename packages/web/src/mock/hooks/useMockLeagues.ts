@@ -103,6 +103,31 @@ function makeMockMutation<TData, TVariables>(
   };
 }
 
+// ── useMyLeagues ───────────────────────────────────────────────────────
+// Returns mock leagues matching the shape returned by DashboardPage's
+// inline useMyLeagues() — league-centric with embedded league_members.
+export function useMockMyLeagues() {
+  const { state } = useMockData();
+
+  const data = state.leagues.map((league) => ({
+    id: league.id,
+    name: league.name,
+    status: league.status,
+    current_round: league.currentRound,
+    max_participants: league.maxParticipants,
+    commissioner_id: league.commissionerId,
+    invite_code: league.inviteCode,
+    league_members: league.members.map((m) => ({
+      team_name: m.teamName,
+      total_points: m.totalPoints,
+      user_id: m.userId,
+    })),
+    memberCount: league.members.length,
+  }));
+
+  return makeMockQuery(data);
+}
+
 // ── useLeagues ─────────────────────────────────────────────────────────
 // Returns all mock leagues the mock user belongs to, matching the shape
 // returned by the real useLeagues() (league_members rows with nested league).

@@ -16,6 +16,10 @@ import {
 import { useAuthContext } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
+import { useMockMyLeagues } from '../../../mock/hooks/useMockLeagues';
+import { useMockLiveGamesTeamStats } from '../../../mock/hooks/useMockLiveGames';
+
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
 interface LeagueWithMembership {
   id: string;
@@ -29,7 +33,10 @@ interface LeagueWithMembership {
   memberCount: number;
 }
 
+/* eslint-disable react-hooks/rules-of-hooks */
 function useLiveGames() {
+  if (IS_MOCK) return useMockLiveGamesTeamStats();
+
   return useQuery({
     queryKey: ['live-games'],
     queryFn: async () => {
@@ -46,6 +53,8 @@ function useLiveGames() {
 }
 
 function useMyLeagues() {
+  if (IS_MOCK) return useMockMyLeagues();
+
   const { user } = useAuthContext();
 
   return useQuery({
@@ -71,6 +80,7 @@ function useMyLeagues() {
     enabled: !!user,
   });
 }
+/* eslint-enable react-hooks/rules-of-hooks */
 
 const STATUS_COLORS: Record<string, string> = {
   setup: 'blue',

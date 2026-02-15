@@ -23,6 +23,7 @@ import {
   playerGameLogs,
 } from '@sportsnot/mock-data';
 import { BotAutoPickRunner } from './bot/BotAutoPickRunner';
+import { mockHooksRegistry, type MockHooksRegistry } from './mockHooksRegistry';
 
 // ── Mock user ──────────────────────────────────────────────────────────
 export interface MockUser {
@@ -372,6 +373,7 @@ function mockReducer(state: MockState, action: MockAction): MockState {
 interface MockDataContextValue {
   state: MockState;
   dispatch: Dispatch<MockAction>;
+  hooks: MockHooksRegistry;
 }
 
 const MockDataContext = createContext<MockDataContextValue | null>(null);
@@ -381,7 +383,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(mockReducer, undefined, getInitialState);
 
   return (
-    <MockDataContext.Provider value={{ state, dispatch }}>
+    <MockDataContext.Provider value={{ state, dispatch, hooks: mockHooksRegistry }}>
       <BotAutoPickRunner />
       {children}
     </MockDataContext.Provider>

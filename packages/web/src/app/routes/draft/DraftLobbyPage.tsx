@@ -17,14 +17,16 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
+import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
+import { useMockDraft, useMockStartDraft } from '../../../mock/hooks/useMockDraft';
 
-export function DraftLobbyPage() {
-  const { leagueId } = useParams<{ leagueId: string }>();
-  const { user } = useAuthContext();
-  const navigate = useNavigate();
-  const [starting, setStarting] = useState(false);
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
-  const { data: league, isLoading } = useQuery({
+/* eslint-disable react-hooks/rules-of-hooks */
+function useLeagueForLobby(leagueId: string) {
+  if (IS_MOCK) return useMockLeague(leagueId);
+
+  return useQuery({
     queryKey: ['draft-lobby', leagueId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -32,7 +34,7 @@ export function DraftLobbyPage() {
         .select(
           '*, league_members(id, user_id, team_name, users(display_name))'
         )
-        .eq('id', leagueId!)
+        .eq('id', leagueId)
         .single();
 
       if (error) throw error;
@@ -41,15 +43,24 @@ export function DraftLobbyPage() {
     enabled: !!leagueId,
     refetchInterval: 5000,
   });
+}
 
-  // Check for active draft and redirect
-  const { data: activeDraft } = useQuery({
+function useActiveDraftCheck(leagueId: string) {
+  if (IS_MOCK) {
+    const result = useMockDraft(leagueId);
+    return {
+      ...result,
+      data: result.data?.status === 'active' ? result.data : null,
+    };
+  }
+
+  return useQuery({
     queryKey: ['active-draft-check', leagueId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('drafts')
         .select('id, status')
-        .eq('league_id', leagueId!)
+        .eq('league_id', leagueId)
         .eq('status', 'active')
         .maybeSingle();
 
@@ -59,6 +70,19 @@ export function DraftLobbyPage() {
     enabled: !!leagueId,
     refetchInterval: 3000,
   });
+}
+/* eslint-enable react-hooks/rules-of-hooks */
+
+export function DraftLobbyPage() {
+  const { leagueId } = useParams<{ leagueId: string }>();
+  const { user } = useAuthContext();
+  const navigate = useNavigate();
+  const [starting, setStarting] = useState(false);
+
+  const { data: league, isLoading } = useLeagueForLobby(leagueId!);
+  const { data: activeDraft } = useActiveDraftCheck(leagueId!);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const mockStartDraft = IS_MOCK ? useMockStartDraft() : null;
 
   useEffect(() => {
     if (activeDraft?.status === 'active') {
@@ -73,6 +97,16 @@ export function DraftLobbyPage() {
   const handleStartDraft = async () => {
     if (!league || members.length < 2) return;
     setStarting(true);
+
+    if (IS_MOCK && mockStartDraft) {
+      mockStartDraft.mutate({
+        leagueId: leagueId!,
+        round: nextRound,
+      });
+      navigate(`/draft/${leagueId}`);
+      setStarting(false);
+      return;
+    }
 
     const memberUserIds = members.map((m: any) => m.user_id);
     const shuffled = [...memberUserIds].sort(() => Math.random() - 0.5);
