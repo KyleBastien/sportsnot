@@ -16,3 +16,4 @@ export {
   usePlayoffPlayers,
   usePlayoffTeams,
 } from './lib/hooks/usePlayoffStats';
+export { useRegularSeasonPlayers } from './lib/hooks/useRegularSeasonStats';

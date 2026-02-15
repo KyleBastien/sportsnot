@@ -236,16 +236,61 @@ export async function getPlayer(playerId: number): Promise<NHLPlayer> {
 }
 
 /**
- * Get player game log (playoff stats)
+ * Get player game log.
+ * @param gameType 2 = regular season, 3 = playoffs
  */
 export async function getPlayerGameLog(
   playerId: number,
   season: string,
-  gameType: 3 // 3 = playoffs
+  gameType: 2 | 3
 ): Promise<NHLPlayerStats[]> {
   const url = `${NHL_API_BASE}/player/${playerId}/game-log/${season}/${gameType}`;
   const data = await fetchJson<{ gameLog: NHLPlayerStats[] }>(url);
   return data.gameLog ?? [];
+}
+
+/**
+ * Fetch regular season stats for a batch of player IDs.
+ * Returns aggregated totals (goals, assists, points, gamesPlayed) per player.
+ */
+export async function getRegularSeasonStats(
+  playerIds: number[],
+  season: string
+): Promise<
+  Array<{
+    playerId: number;
+    goals: number;
+    assists: number;
+    points: number;
+    gamesPlayed: number;
+  }>
+> {
+  const results = await Promise.allSettled(
+    playerIds.map(async (playerId) => {
+      const logs = await getPlayerGameLog(playerId, season, 2);
+      const goals = logs.reduce((sum, g) => sum + g.goals, 0);
+      const assists = logs.reduce((sum, g) => sum + g.assists, 0);
+      return {
+        playerId,
+        goals,
+        assists,
+        points: goals + assists,
+        gamesPlayed: logs.length,
+      };
+    })
+  );
+
+  return results
+    .filter(
+      (r): r is PromiseFulfilledResult<{
+        playerId: number;
+        goals: number;
+        assists: number;
+        points: number;
+        gamesPlayed: number;
+      }> => r.status === 'fulfilled'
+    )
+    .map((r) => r.value);
 }
 
 /**
@@ -392,6 +437,7 @@ export const nhlApi = {
   getTeamRoster,
   getPlayer,
   getPlayerGameLog,
+  getRegularSeasonStats,
   getTeams,
   getSchedule,
   getPlayoffSchedule,

@@ -31,6 +31,7 @@ import { useMockPlayoffBracket } from './hooks/useMockPlayoffBracket';
 import {
   useMockPlayoffPlayers,
   useMockPlayoffTeams,
+  useMockRegularSeasonPlayers,
 } from './hooks/useMockNhlApi';
 import { useMockAuth } from './hooks/useMockAuth';
 
@@ -64,6 +65,7 @@ export interface MockHooksRegistry {
   // NHL API
   useMockPlayoffPlayers: typeof useMockPlayoffPlayers;
   useMockPlayoffTeams: typeof useMockPlayoffTeams;
+  useMockRegularSeasonPlayers: typeof useMockRegularSeasonPlayers;
 }
 
 export const mockHooksRegistry: MockHooksRegistry = {
@@ -88,4 +90,5 @@ export const mockHooksRegistry: MockHooksRegistry = {
   useMockPlayoffBracket,
   useMockPlayoffPlayers,
   useMockPlayoffTeams,
+  useMockRegularSeasonPlayers,
 };

@@ -12,6 +12,7 @@ import {
   gamesR2,
   gamesCf,
   gamesScf,
+  regularSeasonStats,
 } from '@sportsnot/mock-data';
 
 // ── Mock NHL API functions ─────────────────────────────────────────────
@@ -125,4 +126,48 @@ export function useMockPlayoffTeams(_season: string, _round: number) {
   }));
 
   return makeMockQuery(allTeams);
+}
+
+/**
+ * Mock replacement for useRegularSeasonPlayers from @sportsnot/supabase.
+ * Returns regular season stats for all skaters from the fixture data.
+ * Only returns data when enabled is true (mirrors the real hook).
+ */
+export function useMockRegularSeasonPlayers(_season: string, enabled: boolean) {
+  if (!enabled) {
+    return makeMockQuery(
+      [] as Array<{
+        player_id: number;
+        player_name: string;
+        position: string;
+        team_abbreviation: string;
+        goals: number;
+        assists: number;
+        points: number;
+        games_played: number;
+        nhl_season: string;
+      }>
+    );
+  }
+
+  const allPlayers = Object.entries(players).flatMap(([teamAbbr, roster]) =>
+    roster
+      .filter((p) => p.primaryPosition.type !== 'Goalie')
+      .map((p) => {
+        const stats = regularSeasonStats[String(p.id)];
+        return {
+          player_id: p.id,
+          player_name: p.fullName,
+          position: p.primaryPosition.type === 'Forward' ? 'F' : 'D',
+          team_abbreviation: teamAbbr,
+          goals: stats?.goals ?? 0,
+          assists: stats?.assists ?? 0,
+          points: stats?.points ?? 0,
+          games_played: stats?.gamesPlayed ?? 0,
+          nhl_season: _season,
+        };
+      })
+  );
+
+  return makeMockQuery(allPlayers);
 }

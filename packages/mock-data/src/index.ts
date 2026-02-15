@@ -7,3 +7,5 @@ export { gamesR2 } from './data/games-r2.js';
 export { gamesCf } from './data/games-cf.js';
 export { gamesScf } from './data/games-scf.js';
 export { playerGameLogs } from './data/player-game-logs.js';
+export { regularSeasonStats } from './data/regular-season-stats.js';
+export type { RegularSeasonPlayerStats } from './data/regular-season-stats.js';
