@@ -18,15 +18,24 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
-import { useMockDraft, useMockStartDraft } from '../../../mock/hooks/useMockDraft';
+import {
+  useMockDraft,
+  useMockStartDraft,
+} from '../../../mock/hooks/useMockDraft';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
-/* eslint-disable react-hooks/rules-of-hooks */
-function useLeagueForLobby(leagueId: string) {
-  if (IS_MOCK) return useMockLeague(leagueId);
+interface LobbyMember {
+  id: string;
+  user_id: string;
+  team_name: string;
+  users?: { display_name?: string } | null;
+}
 
-  return useQuery({
+function useLeagueForLobby(leagueId: string) {
+  const mockResult = useMockLeague(leagueId);
+
+  const queryResult = useQuery({
     queryKey: ['draft-lobby', leagueId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -40,21 +49,17 @@ function useLeagueForLobby(leagueId: string) {
       if (error) throw error;
       return data;
     },
-    enabled: !!leagueId,
-    refetchInterval: 5000,
+    enabled: !IS_MOCK && !!leagueId,
+    refetchInterval: IS_MOCK ? false : 5000,
   });
+
+  return IS_MOCK ? mockResult : queryResult;
 }
 
 function useActiveDraftCheck(leagueId: string) {
-  if (IS_MOCK) {
-    const result = useMockDraft(leagueId);
-    return {
-      ...result,
-      data: result.data?.status === 'active' ? result.data : null,
-    };
-  }
+  const mockDraftResult = useMockDraft(leagueId);
 
-  return useQuery({
+  const queryResult = useQuery({
     queryKey: ['active-draft-check', leagueId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -67,11 +72,20 @@ function useActiveDraftCheck(leagueId: string) {
       if (error) throw error;
       return data;
     },
-    enabled: !!leagueId,
-    refetchInterval: 3000,
+    enabled: !IS_MOCK && !!leagueId,
+    refetchInterval: IS_MOCK ? false : 3000,
   });
+
+  if (IS_MOCK) {
+    return {
+      ...mockDraftResult,
+      data:
+        mockDraftResult.data?.status === 'active' ? mockDraftResult.data : null,
+    };
+  }
+
+  return queryResult;
 }
-/* eslint-enable react-hooks/rules-of-hooks */
 
 export function DraftLobbyPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -81,8 +95,7 @@ export function DraftLobbyPage() {
 
   const { data: league, isLoading } = useLeagueForLobby(leagueId!);
   const { data: activeDraft } = useActiveDraftCheck(leagueId!);
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const mockStartDraft = IS_MOCK ? useMockStartDraft() : null;
+  const mockStartDraft = useMockStartDraft();
 
   useEffect(() => {
     if (activeDraft?.status === 'active') {
@@ -108,7 +121,7 @@ export function DraftLobbyPage() {
       return;
     }
 
-    const memberUserIds = members.map((m: any) => m.user_id);
+    const memberUserIds = members.map((m: LobbyMember) => m.user_id);
     const shuffled = [...memberUserIds].sort(() => Math.random() - 0.5);
 
     const { error } = await supabase.from('drafts').insert({
@@ -196,12 +209,10 @@ export function DraftLobbyPage() {
           <Stack gap="md">
             <Title order={4}>Participants</Title>
             <List spacing="sm">
-              {members.map((m: any) => (
+              {members.map((m: LobbyMember) => (
                 <List.Item key={m.id}>
                   <Group gap="sm">
-                    <Text fw={500}>
-                      {(m.users as any)?.display_name ?? 'Unknown'}
-                    </Text>
+                    <Text fw={500}>{m.users?.display_name ?? 'Unknown'}</Text>
                     <Text c="dimmed" size="sm">
                       ({m.team_name})
                     </Text>

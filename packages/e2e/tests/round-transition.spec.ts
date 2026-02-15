@@ -149,9 +149,7 @@ test.describe('Round Transition', () => {
     await expect(authenticatedPage.getByText('Playoff League')).toBeVisible();
 
     // Full Re-Draft alert
-    await expect(
-      authenticatedPage.getByText(/Full Re-Draft/i)
-    ).toBeVisible();
+    await expect(authenticatedPage.getByText(/Full Re-Draft/i)).toBeVisible();
     await expect(
       authenticatedPage.getByText(/All players return to the pool/i)
     ).toBeVisible();
@@ -360,7 +358,7 @@ test.describe('Round Transition', () => {
     // Start Re-Draft button should NOT be visible
     await expect(
       authenticatedPage.getByRole('button', { name: /Start.*Re-Draft/i })
-    ).not.toBeVisible();
+    ).toBeHidden();
 
     // Waiting for Commissioner alert
     await expect(

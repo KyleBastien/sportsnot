@@ -18,7 +18,6 @@ import {
 // These mirror the signatures in @sportsnot/nhl-api but return fixture data.
 
 export async function mockGetPlayoffBracket(
-  // eslint-disable-next-line no-unused-vars
   _season: string
 ): Promise<NHLPlayoffSeries[]> {
   return [...bracket];
@@ -26,7 +25,7 @@ export async function mockGetPlayoffBracket(
 
 export async function mockGetTeamRoster(
   teamAbbreviation: string,
-  // eslint-disable-next-line no-unused-vars
+
   _season: string
 ): Promise<NHLPlayer[]> {
   return [...(players[teamAbbreviation] ?? [])];
@@ -45,7 +44,6 @@ export async function mockGetTeams(): Promise<NHLTeam[]> {
 }
 
 export async function mockGetPlayoffSchedule(
-  // eslint-disable-next-line no-unused-vars
   _season: string
 ): Promise<NHLGame[]> {
   return [

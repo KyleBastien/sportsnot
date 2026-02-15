@@ -50,20 +50,130 @@ const leagueData = {
 // ---------------------------------------------------------------------------
 const rosterSlots = [
   // 5 Forwards (active)
-  { id: 'slot-f1', league_member_id: MEMBER_ID, round: 1, player_id: 8478402, team_id: null, position: 'F', is_active: true, points_earned: 8, activated_from_ir: false },
-  { id: 'slot-f2', league_member_id: MEMBER_ID, round: 1, player_id: 8479318, team_id: null, position: 'F', is_active: true, points_earned: 5, activated_from_ir: false },
-  { id: 'slot-f3', league_member_id: MEMBER_ID, round: 1, player_id: 8471675, team_id: null, position: 'F', is_active: true, points_earned: 6, activated_from_ir: false },
-  { id: 'slot-f4', league_member_id: MEMBER_ID, round: 1, player_id: 8477934, team_id: null, position: 'F', is_active: true, points_earned: 7, activated_from_ir: false },
-  { id: 'slot-f5', league_member_id: MEMBER_ID, round: 1, player_id: 8479339, team_id: null, position: 'F', is_active: true, points_earned: 3, activated_from_ir: false },
+  {
+    id: 'slot-f1',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8478402,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 8,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f2',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8479318,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 5,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f3',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8471675,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 6,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f4',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8477934,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 7,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f5',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8479339,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 3,
+    activated_from_ir: false,
+  },
   // 3 Defensemen (active)
-  { id: 'slot-d1', league_member_id: MEMBER_ID, round: 1, player_id: 8480069, team_id: null, position: 'D', is_active: true, points_earned: 4, activated_from_ir: false },
-  { id: 'slot-d2', league_member_id: MEMBER_ID, round: 1, player_id: 8479323, team_id: null, position: 'D', is_active: true, points_earned: 2, activated_from_ir: false },
-  { id: 'slot-d3', league_member_id: MEMBER_ID, round: 1, player_id: 8480145, team_id: null, position: 'D', is_active: true, points_earned: 3, activated_from_ir: false },
+  {
+    id: 'slot-d1',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8480069,
+    team_id: null,
+    position: 'D',
+    is_active: true,
+    points_earned: 4,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-d2',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8479323,
+    team_id: null,
+    position: 'D',
+    is_active: true,
+    points_earned: 2,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-d3',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8480145,
+    team_id: null,
+    position: 'D',
+    is_active: true,
+    points_earned: 3,
+    activated_from_ir: false,
+  },
   // 1 Goalie (active, uses team_id)
-  { id: 'slot-g1', league_member_id: MEMBER_ID, round: 1, player_id: null, team_id: 14, position: 'G', is_active: true, points_earned: 6, activated_from_ir: false },
+  {
+    id: 'slot-g1',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: null,
+    team_id: 14,
+    position: 'G',
+    is_active: true,
+    points_earned: 6,
+    activated_from_ir: false,
+  },
   // IR slots (inactive)
-  { id: 'slot-irf', league_member_id: MEMBER_ID, round: 1, player_id: 8477492, team_id: null, position: 'IR_F', is_active: false, points_earned: 4, activated_from_ir: false },
-  { id: 'slot-ird', league_member_id: MEMBER_ID, round: 1, player_id: 8477939, team_id: null, position: 'IR_D', is_active: false, points_earned: 2, activated_from_ir: false },
+  {
+    id: 'slot-irf',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8477492,
+    team_id: null,
+    position: 'IR_F',
+    is_active: false,
+    points_earned: 4,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-ird',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8477939,
+    team_id: null,
+    position: 'IR_D',
+    is_active: false,
+    points_earned: 2,
+    activated_from_ir: false,
+  },
 ];
 
 // Total active points: 8+5+6+7+3+4+2+3+6 = 44
@@ -153,7 +263,10 @@ test.describe('Roster Management', () => {
       authenticatedPage.getByRole('heading', { name: 'Forward', exact: true })
     ).toBeVisible();
     await expect(
-      authenticatedPage.getByRole('heading', { name: 'Defenseman', exact: true })
+      authenticatedPage.getByRole('heading', {
+        name: 'Defenseman',
+        exact: true,
+      })
     ).toBeVisible();
     await expect(
       authenticatedPage.getByRole('heading', { name: 'Goalie', exact: true })
@@ -280,9 +393,7 @@ test.describe('Roster Management', () => {
     ).toBeVisible(NAV_TIMEOUT);
 
     // Click the "My Roster" button on the dashboard
-    await authenticatedPage
-      .getByRole('button', { name: /My Roster/i })
-      .click();
+    await authenticatedPage.getByRole('button', { name: /My Roster/i }).click();
 
     // Should navigate to roster page
     await expect(

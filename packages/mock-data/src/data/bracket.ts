@@ -5,7 +5,11 @@ export const bracket: NHLPlayoffSeries[] = [
     seriesCode: 'A',
     round: 1,
     topSeedTeam: { id: 13, name: 'Florida Panthers', abbreviation: 'FLA' },
-    bottomSeedTeam: { id: 12, name: 'Carolina Hurricanes', abbreviation: 'CAR' },
+    bottomSeedTeam: {
+      id: 12,
+      name: 'Carolina Hurricanes',
+      abbreviation: 'CAR',
+    },
     topSeedWins: 4,
     bottomSeedWins: 2,
     matchupTeams: {

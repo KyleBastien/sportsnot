@@ -44,6 +44,12 @@
       }
     },
     {
+      "plugin": "@nx/eslint/plugin",
+      "options": {
+        "targetName": "lint"
+      }
+    },
+    {
       "plugin": "@nx/rspack/plugin",
       "options": {
         "buildTargetName": "build",

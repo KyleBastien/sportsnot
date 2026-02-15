@@ -195,7 +195,7 @@ test.describe('Draft Lobby', () => {
     // Start Draft button should NOT be visible
     await expect(
       authenticatedPage.getByRole('button', { name: /Start.*Draft/i })
-    ).not.toBeVisible();
+    ).toBeHidden();
 
     // Waiting for Commissioner alert should be visible
     await expect(

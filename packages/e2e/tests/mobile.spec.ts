@@ -73,22 +73,138 @@ const membersListData = [
 
 // Mock players for draft page
 const mockForwards = [
-  { player_id: 8478402, nhl_season: '20252026', playoff_round: 1, player_name: 'Connor McDavid', team_abbreviation: 'EDM', position: 'F', goals: 8, assists: 12, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8479318, nhl_season: '20252026', playoff_round: 1, player_name: 'Auston Matthews', team_abbreviation: 'TOR', position: 'F', goals: 6, assists: 5, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8471675, nhl_season: '20252026', playoff_round: 1, player_name: 'Sidney Crosby', team_abbreviation: 'PIT', position: 'F', goals: 5, assists: 8, games_played: 6, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8477934, nhl_season: '20252026', playoff_round: 1, player_name: 'Leon Draisaitl', team_abbreviation: 'EDM', position: 'F', goals: 7, assists: 6, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8479339, nhl_season: '20252026', playoff_round: 1, player_name: 'Mitch Marner', team_abbreviation: 'TOR', position: 'F', goals: 3, assists: 10, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8477492, nhl_season: '20252026', playoff_round: 1, player_name: 'Nathan MacKinnon', team_abbreviation: 'COL', position: 'F', goals: 4, assists: 9, games_played: 6, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
+  {
+    player_id: 8478402,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Connor McDavid',
+    team_abbreviation: 'EDM',
+    position: 'F',
+    goals: 8,
+    assists: 12,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8479318,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Auston Matthews',
+    team_abbreviation: 'TOR',
+    position: 'F',
+    goals: 6,
+    assists: 5,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8471675,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Sidney Crosby',
+    team_abbreviation: 'PIT',
+    position: 'F',
+    goals: 5,
+    assists: 8,
+    games_played: 6,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8477934,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Leon Draisaitl',
+    team_abbreviation: 'EDM',
+    position: 'F',
+    goals: 7,
+    assists: 6,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8479339,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Mitch Marner',
+    team_abbreviation: 'TOR',
+    position: 'F',
+    goals: 3,
+    assists: 10,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8477492,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Nathan MacKinnon',
+    team_abbreviation: 'COL',
+    position: 'F',
+    goals: 4,
+    assists: 9,
+    games_played: 6,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
 ];
 
 const mockDefensemen = [
-  { player_id: 8480069, nhl_season: '20252026', playoff_round: 1, player_name: 'Cale Makar', team_abbreviation: 'COL', position: 'D', goals: 4, assists: 8, games_played: 6, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8479323, nhl_season: '20252026', playoff_round: 1, player_name: 'Victor Hedman', team_abbreviation: 'TBL', position: 'D', goals: 2, assists: 6, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
+  {
+    player_id: 8480069,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Cale Makar',
+    team_abbreviation: 'COL',
+    position: 'D',
+    goals: 4,
+    assists: 8,
+    games_played: 6,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8479323,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Victor Hedman',
+    team_abbreviation: 'TBL',
+    position: 'D',
+    goals: 2,
+    assists: 6,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
 ];
 
 const mockTeams = [
-  { team_id: 22, nhl_season: '20252026', playoff_round: 1, team_name: 'Edmonton Oilers', team_abbreviation: 'EDM', wins: 4, shutouts: 1, is_eliminated: false, last_updated: '2026-02-14T00:00:00Z' },
-  { team_id: 10, nhl_season: '20252026', playoff_round: 1, team_name: 'Toronto Maple Leafs', team_abbreviation: 'TOR', wins: 3, shutouts: 0, is_eliminated: false, last_updated: '2026-02-14T00:00:00Z' },
+  {
+    team_id: 22,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    team_name: 'Edmonton Oilers',
+    team_abbreviation: 'EDM',
+    wins: 4,
+    shutouts: 1,
+    is_eliminated: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    team_id: 10,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    team_name: 'Toronto Maple Leafs',
+    team_abbreviation: 'TOR',
+    wins: 3,
+    shutouts: 0,
+    is_eliminated: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
 ];
 
 const allPlayers = [...mockForwards, ...mockDefensemen];
@@ -96,15 +212,105 @@ const allTeams = [...mockTeams];
 
 // Roster slots for roster page
 const rosterSlots = [
-  { id: 'slot-f1', league_member_id: MEMBER_ID, round: 1, player_id: 8478402, team_id: null, position: 'F', is_active: true, points_earned: 8, activated_from_ir: false },
-  { id: 'slot-f2', league_member_id: MEMBER_ID, round: 1, player_id: 8479318, team_id: null, position: 'F', is_active: true, points_earned: 5, activated_from_ir: false },
-  { id: 'slot-f3', league_member_id: MEMBER_ID, round: 1, player_id: 8471675, team_id: null, position: 'F', is_active: true, points_earned: 6, activated_from_ir: false },
-  { id: 'slot-f4', league_member_id: MEMBER_ID, round: 1, player_id: 8477934, team_id: null, position: 'F', is_active: true, points_earned: 7, activated_from_ir: false },
-  { id: 'slot-f5', league_member_id: MEMBER_ID, round: 1, player_id: 8479339, team_id: null, position: 'F', is_active: true, points_earned: 3, activated_from_ir: false },
-  { id: 'slot-d1', league_member_id: MEMBER_ID, round: 1, player_id: 8480069, team_id: null, position: 'D', is_active: true, points_earned: 4, activated_from_ir: false },
-  { id: 'slot-d2', league_member_id: MEMBER_ID, round: 1, player_id: 8479323, team_id: null, position: 'D', is_active: true, points_earned: 2, activated_from_ir: false },
-  { id: 'slot-d3', league_member_id: MEMBER_ID, round: 1, player_id: 8480069, team_id: null, position: 'D', is_active: true, points_earned: 3, activated_from_ir: false },
-  { id: 'slot-g1', league_member_id: MEMBER_ID, round: 1, player_id: null, team_id: 22, position: 'G', is_active: true, points_earned: 6, activated_from_ir: false },
+  {
+    id: 'slot-f1',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8478402,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 8,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f2',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8479318,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 5,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f3',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8471675,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 6,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f4',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8477934,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 7,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f5',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8479339,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 3,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-d1',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8480069,
+    team_id: null,
+    position: 'D',
+    is_active: true,
+    points_earned: 4,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-d2',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8479323,
+    team_id: null,
+    position: 'D',
+    is_active: true,
+    points_earned: 2,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-d3',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8480069,
+    team_id: null,
+    position: 'D',
+    is_active: true,
+    points_earned: 3,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-g1',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: null,
+    team_id: 22,
+    position: 'G',
+    is_active: true,
+    points_earned: 6,
+    activated_from_ir: false,
+  },
 ];
 
 // Draft builder
@@ -231,7 +437,7 @@ test.describe('Mobile Viewport', () => {
     const nameText = authenticatedPage
       .locator('header')
       .getByText(displayName, { exact: true });
-    await expect(nameText).not.toBeVisible();
+    await expect(nameText).toBeHidden();
 
     // Avatar initial should still be visible and menu should work
     const menuTrigger = authenticatedPage.locator('header button').last();
@@ -301,9 +507,7 @@ test.describe('Mobile Viewport', () => {
     // Filter by position — Mantine SegmentedControl works on mobile
     await authenticatedPage.locator('label:has-text("Defense")').click();
     await expect(authenticatedPage.getByText('Cale Makar')).toBeVisible();
-    await expect(
-      authenticatedPage.getByText('Connor McDavid')
-    ).not.toBeVisible();
+    await expect(authenticatedPage.getByText('Connor McDavid')).toBeHidden();
 
     // Switch back to All
     await authenticatedPage.locator('label:has-text("All")').click();
@@ -313,9 +517,7 @@ test.describe('Mobile Viewport', () => {
     const searchInput = authenticatedPage.getByPlaceholder(/Search players/i);
     await searchInput.fill('Crosby');
     await expect(authenticatedPage.getByText('Sidney Crosby')).toBeVisible();
-    await expect(
-      authenticatedPage.getByText('Connor McDavid')
-    ).not.toBeVisible();
+    await expect(authenticatedPage.getByText('Connor McDavid')).toBeHidden();
     await searchInput.clear();
 
     // Click Draft button — modal should appear and be usable
@@ -327,16 +529,14 @@ test.describe('Mobile Viewport', () => {
     const modal = authenticatedPage.getByRole('dialog');
     await expect(modal).toBeVisible();
     await expect(modal.getByText(/Confirm Draft Pick/i)).toBeVisible();
-    await expect(
-      modal.getByRole('button', { name: /Cancel/i })
-    ).toBeVisible();
+    await expect(modal.getByRole('button', { name: /Cancel/i })).toBeVisible();
     await expect(
       modal.getByRole('button', { name: /Confirm Pick/i })
     ).toBeVisible();
 
     // Cancel the modal
     await modal.getByRole('button', { name: /Cancel/i }).click();
-    await expect(modal).not.toBeVisible();
+    await expect(modal).toBeHidden();
   });
 
   test('roster page renders correctly on mobile viewport', async ({
@@ -475,6 +675,6 @@ test.describe('Mobile Viewport', () => {
 
     // Close the modal via Cancel
     await cancelBtn.click();
-    await expect(modal).not.toBeVisible();
+    await expect(modal).toBeHidden();
   });
 });

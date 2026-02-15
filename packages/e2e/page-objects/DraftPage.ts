@@ -15,7 +15,9 @@ export class DraftPage {
     this.heading = page.getByRole('heading', { name: /Draft Room/i });
     this.searchInput = page.getByPlaceholder(/Search players/i);
     this.confirmPickModal = page.getByRole('dialog');
-    this.confirmPickButton = page.getByRole('button', { name: /Confirm Pick/i });
+    this.confirmPickButton = page.getByRole('button', {
+      name: /Confirm Pick/i,
+    });
   }
 
   /** Navigate to the draft page for a given league */

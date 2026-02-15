@@ -52,21 +52,131 @@ const leagueData = {
 // ---------------------------------------------------------------------------
 const rosterSlots = [
   // 5 Forwards (active) — one is "injured" (conceptually, the IR slot can replace an active F)
-  { id: 'slot-f1', league_member_id: MEMBER_ID, round: 1, player_id: 8478402, team_id: null, position: 'F', is_active: true, points_earned: 8, activated_from_ir: false },
-  { id: 'slot-f2', league_member_id: MEMBER_ID, round: 1, player_id: 8479318, team_id: null, position: 'F', is_active: true, points_earned: 5, activated_from_ir: false },
-  { id: 'slot-f3', league_member_id: MEMBER_ID, round: 1, player_id: 8471675, team_id: null, position: 'F', is_active: true, points_earned: 6, activated_from_ir: false },
-  { id: 'slot-f4', league_member_id: MEMBER_ID, round: 1, player_id: 8477934, team_id: null, position: 'F', is_active: true, points_earned: 7, activated_from_ir: false },
-  { id: 'slot-f5', league_member_id: MEMBER_ID, round: 1, player_id: 8479339, team_id: null, position: 'F', is_active: true, points_earned: 3, activated_from_ir: false },
+  {
+    id: 'slot-f1',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8478402,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 8,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f2',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8479318,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 5,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f3',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8471675,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 6,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f4',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8477934,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 7,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-f5',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8479339,
+    team_id: null,
+    position: 'F',
+    is_active: true,
+    points_earned: 3,
+    activated_from_ir: false,
+  },
   // 3 Defensemen (active)
-  { id: 'slot-d1', league_member_id: MEMBER_ID, round: 1, player_id: 8480069, team_id: null, position: 'D', is_active: true, points_earned: 4, activated_from_ir: false },
-  { id: 'slot-d2', league_member_id: MEMBER_ID, round: 1, player_id: 8479323, team_id: null, position: 'D', is_active: true, points_earned: 2, activated_from_ir: false },
-  { id: 'slot-d3', league_member_id: MEMBER_ID, round: 1, player_id: 8480145, team_id: null, position: 'D', is_active: true, points_earned: 3, activated_from_ir: false },
+  {
+    id: 'slot-d1',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8480069,
+    team_id: null,
+    position: 'D',
+    is_active: true,
+    points_earned: 4,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-d2',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8479323,
+    team_id: null,
+    position: 'D',
+    is_active: true,
+    points_earned: 2,
+    activated_from_ir: false,
+  },
+  {
+    id: 'slot-d3',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8480145,
+    team_id: null,
+    position: 'D',
+    is_active: true,
+    points_earned: 3,
+    activated_from_ir: false,
+  },
   // 1 Goalie (active, uses team_id)
-  { id: 'slot-g1', league_member_id: MEMBER_ID, round: 1, player_id: null, team_id: 14, position: 'G', is_active: true, points_earned: 6, activated_from_ir: false },
+  {
+    id: 'slot-g1',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: null,
+    team_id: 14,
+    position: 'G',
+    is_active: true,
+    points_earned: 6,
+    activated_from_ir: false,
+  },
   // IR Forward slot (inactive) — can replace an active Forward
-  { id: 'slot-irf', league_member_id: MEMBER_ID, round: 1, player_id: 8477492, team_id: null, position: 'IR_F', is_active: false, points_earned: 10, activated_from_ir: false },
+  {
+    id: 'slot-irf',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8477492,
+    team_id: null,
+    position: 'IR_F',
+    is_active: false,
+    points_earned: 10,
+    activated_from_ir: false,
+  },
   // IR Defenseman slot (inactive) — can replace an active Defenseman
-  { id: 'slot-ird', league_member_id: MEMBER_ID, round: 1, player_id: 8477939, team_id: null, position: 'IR_D', is_active: false, points_earned: 5, activated_from_ir: false },
+  {
+    id: 'slot-ird',
+    league_member_id: MEMBER_ID,
+    round: 1,
+    player_id: 8477939,
+    team_id: null,
+    position: 'IR_D',
+    is_active: false,
+    points_earned: 5,
+    activated_from_ir: false,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -197,19 +307,13 @@ test.describe('IR Activation Flow', () => {
     // Modal should open with "Activate IR Player" title
     const modal = authenticatedPage.getByRole('dialog');
     await expect(modal).toBeVisible();
-    await expect(
-      modal.getByText('Activate IR Player').first()
-    ).toBeVisible();
+    await expect(modal.getByText('Activate IR Player').first()).toBeVisible();
 
     // Modal shows warning about retroactive points
-    await expect(
-      modal.getByText(/retroactively grant/i)
-    ).toBeVisible();
+    await expect(modal.getByText(/retroactively grant/i)).toBeVisible();
 
     // Modal has Cancel and Activate IR Player buttons
-    await expect(
-      modal.getByRole('button', { name: /Cancel/i })
-    ).toBeVisible();
+    await expect(modal.getByRole('button', { name: /Cancel/i })).toBeVisible();
     await expect(
       modal.getByRole('button', { name: /Activate IR Player/i })
     ).toBeVisible();
@@ -230,9 +334,7 @@ test.describe('IR Activation Flow', () => {
     const irForwardSection = authenticatedPage
       .getByRole('heading', { name: 'IR Forward' })
       .locator('../..');
-    await expect(
-      irForwardSection.getByText('Player #8477492')
-    ).toBeVisible();
+    await expect(irForwardSection.getByText('Player #8477492')).toBeVisible();
 
     // The Activate IR button is present for IR_F because there are active Forwards
     await expect(
@@ -243,9 +345,7 @@ test.describe('IR Activation Flow', () => {
     const irDefenseSection = authenticatedPage
       .getByRole('heading', { name: 'IR Defenseman' })
       .locator('../..');
-    await expect(
-      irDefenseSection.getByText('Player #8477939')
-    ).toBeVisible();
+    await expect(irDefenseSection.getByText('Player #8477939')).toBeVisible();
     await expect(
       irDefenseSection.getByRole('button', { name: /Activate IR/i })
     ).toBeVisible();
@@ -331,20 +431,18 @@ test.describe('IR Activation Flow', () => {
     );
 
     // Click "Activate IR Player" to confirm
-    await modal
-      .getByRole('button', { name: /Activate IR Player/i })
-      .click();
+    await modal.getByRole('button', { name: /Activate IR Player/i }).click();
 
     // Modal should close
-    await expect(modal).not.toBeVisible();
+    await expect(modal).toBeHidden();
 
     // Verify the RPC was called
     expect(rpcCalled).toBe(true);
 
     // After activation, the IR Forward should show "From IR" badge
-    await expect(
-      authenticatedPage.getByText('From IR')
-    ).toBeVisible(NAV_TIMEOUT);
+    await expect(authenticatedPage.getByText('From IR')).toBeVisible(
+      NAV_TIMEOUT
+    );
   });
 
   test('position mismatch replacements are not offered in the modal', async ({
@@ -377,14 +475,12 @@ test.describe('IR Activation Flow', () => {
       .locator('../..');
 
     // Verify the IR_F player is shown
-    await expect(
-      irForwardSection.getByText('Player #8477492')
-    ).toBeVisible();
+    await expect(irForwardSection.getByText('Player #8477492')).toBeVisible();
 
     // No Activate IR button should be present in the IR Forward section
     await expect(
       irForwardSection.getByRole('button', { name: /Activate IR/i })
-    ).not.toBeVisible();
+    ).toBeHidden();
 
     // IR Defenseman should still have the Activate IR button since D slots exist
     const irDefenseSection = authenticatedPage

@@ -19,17 +19,30 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { SCORING } from '@sportsnot/types';
-import { useMockRoster, useMockActivateIR } from '../../../mock/hooks/useMockRoster';
+import {
+  useMockRoster,
+  useMockActivateIR,
+} from '../../../mock/hooks/useMockRoster';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
-/* eslint-disable react-hooks/rules-of-hooks */
-function useMyRoster(leagueId: string) {
-  if (IS_MOCK) return useMockRoster(leagueId);
+interface RosterSlotRow {
+  id: string;
+  league_member_id: string;
+  round: number;
+  player_id: number | null;
+  team_id: number | null;
+  position: string;
+  is_active: boolean;
+  points_earned: number;
+  activated_from_ir: boolean;
+}
 
+function useMyRoster(leagueId: string) {
+  const mockResult = useMockRoster(leagueId);
   const { user } = useAuthContext();
 
-  return useQuery({
+  const queryResult = useQuery({
     queryKey: ['roster', leagueId, user?.id],
     queryFn: async () => {
       // Get the member for this league
@@ -66,10 +79,11 @@ function useMyRoster(leagueId: string) {
         slots: roster ?? [],
       };
     },
-    enabled: !!user,
+    enabled: !IS_MOCK && !!user,
   });
+
+  return IS_MOCK ? mockResult : queryResult;
 }
-/* eslint-enable react-hooks/rules-of-hooks */
 
 const POSITION_LABELS: Record<string, string> = {
   F: 'Forward',
@@ -90,8 +104,7 @@ export function RosterPage() {
     irSlotId: string;
   } | null>(null);
   const [activating, setActivating] = useState(false);
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const mockActivateIR = IS_MOCK ? useMockActivateIR() : null;
+  const mockActivateIR = useMockActivateIR();
 
   if (isLoading) {
     return (
@@ -117,12 +130,12 @@ export function RosterPage() {
   const groupedSlots = POSITION_ORDER.map((pos) => ({
     position: pos,
     label: POSITION_LABELS[pos],
-    players: slots.filter((s: any) => s.position === pos),
+    players: slots.filter((s: RosterSlotRow) => s.position === pos),
   }));
 
   const totalPoints = slots
-    .filter((s: any) => s.is_active)
-    .reduce((sum: number, s: any) => sum + (s.points_earned ?? 0), 0);
+    .filter((s: RosterSlotRow) => s.is_active)
+    .reduce((sum: number, s: RosterSlotRow) => sum + (s.points_earned ?? 0), 0);
 
   const handleActivateIR = async () => {
     if (!irModal) return;
@@ -179,7 +192,13 @@ export function RosterPage() {
         </Text>
 
         {groupedSlots.map((group) => (
-          <Card key={group.position} shadow="sm" padding="md" radius="md" withBorder>
+          <Card
+            key={group.position}
+            shadow="sm"
+            padding="md"
+            radius="md"
+            withBorder
+          >
             <Group justify="space-between" mb="sm">
               <Title order={4}>{group.label}</Title>
               <Badge variant="light">
@@ -203,14 +222,14 @@ export function RosterPage() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {group.players.map((slot: any) => {
+                  {group.players.map((slot: RosterSlotRow) => {
                     const isIrSlot =
                       slot.position === 'IR_F' || slot.position === 'IR_D';
                     const matchingPosition =
                       slot.position === 'IR_F' ? 'F' : 'D';
                     // Find an active injured player at the matching position
                     const injuredCandidates = slots.filter(
-                      (s: any) =>
+                      (s: RosterSlotRow) =>
                         s.position === matchingPosition &&
                         s.is_active &&
                         s.id !== slot.id

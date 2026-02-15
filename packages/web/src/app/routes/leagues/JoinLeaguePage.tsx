@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -44,7 +44,9 @@ export function JoinLeaguePage() {
       return;
     }
 
-    const memberCount = (league as any).league_members?.length ?? 0;
+    const memberCount =
+      (league as { league_members?: { id: string }[] }).league_members
+        ?.length ?? 0;
 
     if (memberCount >= league.max_participants) {
       setError('This league is full.');
@@ -68,13 +70,11 @@ export function JoinLeaguePage() {
     setLoading(true);
     setError(null);
 
-    const { error: joinError } = await supabase
-      .from('league_members')
-      .insert({
-        league_id: leaguePreview.id,
-        user_id: user.id,
-        team_name: teamName,
-      });
+    const { error: joinError } = await supabase.from('league_members').insert({
+      league_id: leaguePreview.id,
+      user_id: user.id,
+      team_name: teamName,
+    });
 
     if (joinError) {
       if (joinError.message.includes('unique')) {

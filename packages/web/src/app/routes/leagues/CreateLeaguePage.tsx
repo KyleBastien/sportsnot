@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -26,8 +26,7 @@ export function CreateLeaguePage() {
   const [maxParticipants, setMaxParticipants] = useState<number>(8);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const mockCreateLeague = IS_MOCK ? useMockCreateLeague() : null;
+  const mockCreateLeague = useMockCreateLeague();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,8 +44,8 @@ export function CreateLeaguePage() {
         });
         setLoading(false);
         navigate(`/leagues/${result.id}`);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError((err as Error).message);
         setLoading(false);
       }
       return;

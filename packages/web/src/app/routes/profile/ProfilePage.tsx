@@ -54,9 +54,7 @@ export function ProfilePage() {
   };
 
   const initial =
-    displayName?.[0]?.toUpperCase() ??
-    user?.email?.[0]?.toUpperCase() ??
-    '?';
+    displayName?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? '?';
 
   return (
     <Container size="sm" py="xl">

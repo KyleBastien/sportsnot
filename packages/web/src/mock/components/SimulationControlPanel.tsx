@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 import { useState } from 'react';
 import {
   ActionIcon,
@@ -35,12 +34,7 @@ export function SimulationControlPanel() {
   const [opened, setOpened] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
 
-  const {
-    simulationDate,
-    currentRound,
-    roundComplete,
-    seasonComplete,
-  } = state;
+  const { simulationDate, currentRound, roundComplete, seasonComplete } = state;
 
   const handleAdvanceDay = () => {
     dispatch({ type: 'ADVANCE_DAY' });
@@ -70,8 +64,7 @@ export function SimulationControlPanel() {
   };
 
   const handleDumpState = () => {
-    // eslint-disable-next-line no-console
-    console.log(JSON.stringify(state, null, 2));
+    console.warn('[MockState]', JSON.stringify(state, null, 2));
   };
 
   return (
@@ -184,12 +177,7 @@ export function SimulationControlPanel() {
           <Divider />
 
           {/* Reset Season */}
-          <Button
-            fullWidth
-            variant="outline"
-            color="red"
-            onClick={handleReset}
-          >
+          <Button fullWidth variant="outline" color="red" onClick={handleReset}>
             {confirmReset
               ? 'Click again to confirm reset'
               : 'Reset All Mock Data'}

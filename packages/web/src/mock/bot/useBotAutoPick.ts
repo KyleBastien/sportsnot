@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 import { useEffect, useRef } from 'react';
 import { useMockData } from '../MockDataProvider';
 import { selectBotPick, getCurrentBotUserId, getBotMemberId } from './autoPick';

@@ -23,7 +23,9 @@ export class DashboardPage {
 
   /** Get all league card elements */
   getLeagueCards(): Locator {
-    return this.page.locator('[class*="Card"]').filter({ has: this.page.getByRole('heading', { level: 4 }) });
+    return this.page
+      .locator('[class*="Card"]')
+      .filter({ has: this.page.getByRole('heading', { level: 4 }) });
   }
 
   /** Get the Create League CTA button */
@@ -38,6 +40,8 @@ export class DashboardPage {
 
   /** Click a league card to navigate to its dashboard */
   async navigateToLeague(leagueName: string) {
-    await this.page.getByRole('heading', { name: leagueName, level: 4 }).click();
+    await this.page
+      .getByRole('heading', { name: leagueName, level: 4 })
+      .click();
   }
 }

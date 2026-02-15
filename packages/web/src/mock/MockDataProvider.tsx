@@ -57,7 +57,10 @@ export interface MockState {
   currentRound: number; // 1-4
   roundComplete: boolean;
   seasonComplete: boolean;
-  playerStats: Record<number, { goals: number; assists: number; gamesPlayed: number }>;
+  playerStats: Record<
+    number,
+    { goals: number; assists: number; gamesPlayed: number }
+  >;
   mockUser: MockUser;
 }
 
@@ -73,7 +76,9 @@ const ROUND_GAMES: Record<number, NHLGame[]> = {
 };
 
 /** Get the first and last game dates for a given round */
-export function getRoundDateBounds(round: number): { firstDate: string; lastDate: string } | null {
+export function getRoundDateBounds(
+  round: number
+): { firstDate: string; lastDate: string } | null {
   const games = ROUND_GAMES[round];
   if (!games || games.length === 0) return null;
   const dates = games.map((g) => g.gameDate).sort();
@@ -86,9 +91,12 @@ export function getRoundDateBounds(round: number): { firstDate: string; lastDate
  */
 export function accumulatePlayerStats(
   logs: Record<number, NHLPlayerStats[]>,
-  throughDate: string,
+  throughDate: string
 ): Record<number, { goals: number; assists: number; gamesPlayed: number }> {
-  const result: Record<number, { goals: number; assists: number; gamesPlayed: number }> = {};
+  const result: Record<
+    number,
+    { goals: number; assists: number; gamesPlayed: number }
+  > = {};
   for (const [playerIdStr, entries] of Object.entries(logs)) {
     const playerId = Number(playerIdStr);
     let goals = 0;
@@ -139,7 +147,10 @@ export type MockAction =
   | { type: 'ADVANCE_DAY' }
   | { type: 'ADVANCE_ROUND' }
   | { type: 'ACTIVATE_IR'; payload: { leagueMemberId: string; slotId: string } }
-  | { type: 'DEACTIVATE_IR'; payload: { leagueMemberId: string; slotId: string } }
+  | {
+      type: 'DEACTIVATE_IR';
+      payload: { leagueMemberId: string; slotId: string };
+    }
   | { type: 'RESET_ALL' };
 
 // ── Reducer ────────────────────────────────────────────────────────────
@@ -158,7 +169,7 @@ function mockReducer(state: MockState, action: MockAction): MockState {
       const updated = state.leagues.map((l) =>
         l.id === action.payload.leagueId
           ? { ...l, members: [...l.members, action.payload.member] }
-          : l,
+          : l
       );
       return { ...state, leagues: updated };
     }
@@ -166,7 +177,7 @@ function mockReducer(state: MockState, action: MockAction): MockState {
       // Also update the league status to 'drafting'
       const leagueId = action.payload.draftState.draft.leagueId;
       const updatedLeagues = state.leagues.map((l) =>
-        l.id === leagueId ? { ...l, status: 'drafting' as const } : l,
+        l.id === leagueId ? { ...l, status: 'drafting' as const } : l
       );
       return {
         ...state,
@@ -195,7 +206,9 @@ function mockReducer(state: MockState, action: MockAction): MockState {
         ...ds.draft,
         currentPick: nextPick,
         status: isComplete ? ('completed' as const) : ds.draft.status,
-        completedAt: isComplete ? new Date().toISOString() : ds.draft.completedAt,
+        completedAt: isComplete
+          ? new Date().toISOString()
+          : ds.draft.completedAt,
       };
 
       // If draft is complete, update league status to 'active' and populate rosters
@@ -203,9 +216,7 @@ function mockReducer(state: MockState, action: MockAction): MockState {
       let rostersAfterPick = state.rosters;
       if (isComplete) {
         leaguesAfterPick = state.leagues.map((l) =>
-          l.id === ds.draft.leagueId
-            ? { ...l, status: 'active' as const }
-            : l,
+          l.id === ds.draft.leagueId ? { ...l, status: 'active' as const } : l
         );
 
         // Build rosters from all draft picks, grouped by league member
@@ -215,7 +226,9 @@ function mockReducer(state: MockState, action: MockAction): MockState {
           const memberIds = league.members.map((m) => m.id);
           rostersAfterPick = { ...state.rosters };
           for (const memberId of memberIds) {
-            const memberPicks = allPicks.filter((p) => p.leagueMemberId === memberId);
+            const memberPicks = allPicks.filter(
+              (p) => p.leagueMemberId === memberId
+            );
             const slots: RosterSlot[] = memberPicks.map((p, idx) => ({
               id: `mock-roster-${memberId}-${idx}`,
               leagueMemberId: memberId,
@@ -269,7 +282,7 @@ function mockReducer(state: MockState, action: MockAction): MockState {
       const newDate = addOneDay(state.simulationDate);
       const newStats = accumulatePlayerStats(
         playerGameLogs as unknown as Record<number, NHLPlayerStats[]>,
-        newDate,
+        newDate
       );
 
       // Check if current round is complete (simulationDate >= lastDate of round)
@@ -305,7 +318,7 @@ function mockReducer(state: MockState, action: MockAction): MockState {
 
       const newStats = accumulatePlayerStats(
         playerGameLogs as unknown as Record<number, NHLPlayerStats[]>,
-        dayBeforeNext,
+        dayBeforeNext
       );
 
       return {
@@ -329,7 +342,7 @@ function mockReducer(state: MockState, action: MockAction): MockState {
 
       // Find an active player at the matching position to deactivate (the injured one)
       const injuredSlot = memberSlots.find(
-        (s) => s.position === matchingPos && s.isActive && s.id !== slotId,
+        (s) => s.position === matchingPos && s.isActive && s.id !== slotId
       );
 
       const updatedSlots = memberSlots.map((s) => {
@@ -348,7 +361,8 @@ function mockReducer(state: MockState, action: MockAction): MockState {
       };
     }
     case 'DEACTIVATE_IR': {
-      const { leagueMemberId: memberId, slotId: deactivateSlotId } = action.payload;
+      const { leagueMemberId: memberId, slotId: deactivateSlotId } =
+        action.payload;
       const slots = state.rosters[memberId];
       if (!slots) return state;
 
@@ -383,18 +397,39 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(mockReducer, undefined, getInitialState);
 
   return (
-    <MockDataContext.Provider value={{ state, dispatch, hooks: mockHooksRegistry }}>
+    <MockDataContext.Provider
+      value={{ state, dispatch, hooks: mockHooksRegistry }}
+    >
       <BotAutoPickRunner />
       {children}
     </MockDataContext.Provider>
   );
 }
 
+// Safe empty state for when MockDataProvider is not mounted (non-mock mode).
+// This allows mock hooks to be called unconditionally without violating
+// react-hooks/rules-of-hooks, while returning harmless empty data.
+const EMPTY_MOCK_STATE: MockState = {
+  leagues: [],
+  currentLeague: null,
+  draftState: null,
+  rosters: {},
+  simulationDate: '',
+  currentRound: 1,
+  roundComplete: false,
+  seasonComplete: false,
+  playerStats: {},
+  mockUser: { id: '', email: '', displayName: '', avatarUrl: '' },
+};
+
+const EMPTY_CONTEXT: MockDataContextValue = {
+  state: EMPTY_MOCK_STATE,
+  dispatch: () => {},
+  hooks: mockHooksRegistry,
+};
+
 // ── Hook ───────────────────────────────────────────────────────────────
 export function useMockData(): MockDataContextValue {
   const ctx = useContext(MockDataContext);
-  if (!ctx) {
-    throw new Error('useMockData must be used within a MockDataProvider');
-  }
-  return ctx;
+  return ctx ?? EMPTY_CONTEXT;
 }

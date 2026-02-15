@@ -71,9 +71,13 @@ test.describe('Scoring History', () => {
     await expect(table).toBeVisible();
 
     // Verify player names appear
-    await expect(authenticatedPage.getByText('Connor McDavid').first()).toBeVisible();
+    await expect(
+      authenticatedPage.getByText('Connor McDavid').first()
+    ).toBeVisible();
     await expect(authenticatedPage.getByText('Auston Matthews')).toBeVisible();
-    await expect(authenticatedPage.getByText('Andrei Vasilevskiy')).toBeVisible();
+    await expect(
+      authenticatedPage.getByText('Andrei Vasilevskiy')
+    ).toBeVisible();
   });
 
   test('scoring events can be filtered by player, team, and date', async ({
@@ -104,7 +108,9 @@ test.describe('Scoring History', () => {
     await expect(rows).toHaveCount(4);
 
     // Filter by team using the select dropdown
-    await authenticatedPage.getByRole('textbox', { name: 'Filter by team' }).click();
+    await authenticatedPage
+      .getByRole('textbox', { name: 'Filter by team' })
+      .click();
     await authenticatedPage.getByRole('option', { name: 'TOR' }).click();
 
     // Only TOR events (1 row)

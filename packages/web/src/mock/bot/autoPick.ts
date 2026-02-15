@@ -3,12 +3,20 @@ import { players } from '@sportsnot/mock-data';
 import type { MockDraftState, MockState } from '../MockDataProvider';
 
 // ── Roster composition targets (10 total: 5F + 3D + 2G) ───────────────
-const ROSTER_TARGETS: Record<string, number> = { Forward: 5, Defenseman: 3, Goalie: 2 };
+const ROSTER_TARGETS: Record<string, number> = {
+  Forward: 5,
+  Defenseman: 3,
+  Goalie: 2,
+};
 const TOTAL_ROSTER_SIZE = 10;
 
 // ── Flat player lookup ─────────────────────────────────────────────────
-const ALL_PLAYERS: NHLPlayer[] = Object.values(players).flat() as unknown as NHLPlayer[];
-const PLAYER_MAP = new Map<number, NHLPlayer>(ALL_PLAYERS.map((p) => [p.id, p]));
+const ALL_PLAYERS: NHLPlayer[] = Object.values(
+  players
+).flat() as unknown as NHLPlayer[];
+const PLAYER_MAP = new Map<number, NHLPlayer>(
+  ALL_PLAYERS.map((p) => [p.id, p])
+);
 
 /** Returns position type string for a player */
 function positionType(player: NHLPlayer): string {
@@ -18,9 +26,13 @@ function positionType(player: NHLPlayer): string {
 /** Count how many of each position type a member has already drafted */
 function countPositions(
   draftState: MockDraftState,
-  memberUserId: string,
+  memberUserId: string
 ): Record<string, number> {
-  const counts: Record<string, number> = { Forward: 0, Defenseman: 0, Goalie: 0 };
+  const counts: Record<string, number> = {
+    Forward: 0,
+    Defenseman: 0,
+    Goalie: 0,
+  };
   for (const pick of draftState.picks) {
     // Find the userId for this pick's league member from the draft order
     const pickIndex = pick.pickNumber - 1;
@@ -61,7 +73,7 @@ function greatestNeed(counts: Record<string, number>): string {
  */
 export function selectBotPick(
   draftState: MockDraftState,
-  botUserId: string,
+  botUserId: string
 ): { playerId: number; position: string } | null {
   const counts = countPositions(draftState, botUserId);
   const need = greatestNeed(counts);
@@ -69,7 +81,7 @@ export function selectBotPick(
 
   // Filter to players matching the needed position type
   let candidates = ALL_PLAYERS.filter(
-    (p) => available.has(p.id) && positionType(p) === need,
+    (p) => available.has(p.id) && positionType(p) === need
   );
 
   // Fallback: if no candidates for the needed position, pick any available player
@@ -84,8 +96,12 @@ export function selectBotPick(
 
   const picked = candidates[0];
   // Map position type to draft position code
-  const posCode = picked.primaryPosition.type === 'Goalie' ? 'G'
-    : picked.primaryPosition.type === 'Defenseman' ? 'D' : 'F';
+  const posCode =
+    picked.primaryPosition.type === 'Goalie'
+      ? 'G'
+      : picked.primaryPosition.type === 'Defenseman'
+        ? 'D'
+        : 'F';
 
   return { playerId: picked.id, position: posCode };
 }
@@ -111,7 +127,10 @@ export function getCurrentBotUserId(state: MockState): string | null {
 /**
  * Get the league member ID for a given userId in the current draft's league.
  */
-export function getBotMemberId(state: MockState, botUserId: string): string | null {
+export function getBotMemberId(
+  state: MockState,
+  botUserId: string
+): string | null {
   const ds = state.draftState;
   if (!ds) return null;
 
@@ -126,7 +145,10 @@ export function getBotMemberId(state: MockState, botUserId: string): string | nu
  * Compute the number of total roster slots that have been filled.
  * Used to check if the draft is running out of picks.
  */
-export function botPickCount(draftState: MockDraftState, botUserId: string): number {
+export function botPickCount(
+  draftState: MockDraftState,
+  botUserId: string
+): number {
   return draftState.picks.filter((pick) => {
     const pickIndex = pick.pickNumber - 1;
     return draftState.draft.draftOrder[pickIndex] === botUserId;

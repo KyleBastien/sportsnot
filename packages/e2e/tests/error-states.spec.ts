@@ -94,7 +94,8 @@ test.describe('Error States and Edge Cases', () => {
             status: 400,
             contentType: 'application/json',
             body: JSON.stringify({
-              message: 'new row violates check constraint "leagues_name_length"',
+              message:
+                'new row violates check constraint "leagues_name_length"',
               details: null,
               hint: null,
               code: '23514',

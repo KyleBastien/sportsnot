@@ -22,7 +22,7 @@ function makeBotUser(id: string, name: string): User {
 
 function generateBotMembers(
   leagueId: string,
-  botCount: number,
+  botCount: number
 ): LeagueMember[] {
   return Array.from({ length: botCount }, (_, i) => {
     const botId = `bot-user-${String(i + 1).padStart(3, '0')}`;
@@ -70,7 +70,7 @@ function makeMockQuery<T>(data: T): MockQueryResult<T> {
 }
 
 // ── Mock mutation helper ───────────────────────────────────────────────
-/* eslint-disable no-unused-vars */
+
 interface MockMutationResult<TData, TVariables> {
   mutateAsync: (v: TVariables) => Promise<TData>;
   mutate: (v: TVariables) => void;
@@ -82,11 +82,9 @@ interface MockMutationResult<TData, TVariables> {
   data: undefined;
   status: 'idle';
 }
-/* eslint-enable no-unused-vars */
 
 function makeMockMutation<TData, TVariables>(
-  // eslint-disable-next-line no-unused-vars
-  fn: (v: TVariables) => TData,
+  fn: (v: TVariables) => TData
 ): MockMutationResult<TData, TVariables> {
   return {
     mutateAsync: (v) => Promise.resolve(fn(v)),
@@ -131,14 +129,12 @@ export function useMockMyLeagues() {
 // ── useLeagues ─────────────────────────────────────────────────────────
 // Returns all mock leagues the mock user belongs to, matching the shape
 // returned by the real useLeagues() (league_members rows with nested league).
-// eslint-disable-next-line no-unused-vars
+
 export function useMockLeagues(_userId: string | undefined) {
   const { state } = useMockData();
 
   const data = state.leagues.map((league) => {
-    const myMember = league.members.find(
-      (m) => m.userId === state.mockUser.id,
-    );
+    const myMember = league.members.find((m) => m.userId === state.mockUser.id);
     return {
       id: myMember?.id ?? league.id,
       team_name: myMember?.teamName ?? 'My Team',
@@ -165,7 +161,7 @@ export function useMockLeague(leagueId: string | undefined) {
   const { state } = useMockData();
 
   const league = leagueId
-    ? state.leagues.find((l) => l.id === leagueId) ?? null
+    ? (state.leagues.find((l) => l.id === leagueId) ?? null)
     : null;
 
   const data = league
@@ -210,11 +206,11 @@ export function useMockCreateLeague() {
       teamName?: string;
       botCount?: number;
     }) => {
-      const leagueId = `mock-league-${Date.now()}`;
+      const leagueId = `mock-league-${crypto.randomUUID()}`;
       const now = new Date().toISOString();
       const totalBots = Math.min(
-        (params.botCount ?? params.maxParticipants - 1),
-        params.maxParticipants - 1,
+        params.botCount ?? params.maxParticipants - 1,
+        params.maxParticipants - 1
       );
 
       // Commissioner member (mock user)
@@ -261,7 +257,7 @@ export function useMockCreateLeague() {
         commissioner_id: league.commissionerId,
         status: league.status,
       };
-    },
+    }
   );
 }
 
@@ -273,7 +269,7 @@ export function useMockJoinLeague() {
   return makeMockMutation(
     (params: { inviteCode: string; userId: string; teamName: string }) => {
       const league = state.leagues.find(
-        (l) => l.inviteCode === params.inviteCode,
+        (l) => l.inviteCode === params.inviteCode
       );
       if (!league) throw new Error('Invalid invite code');
       if (league.members.length >= league.maxParticipants)
@@ -282,7 +278,7 @@ export function useMockJoinLeague() {
         throw new Error('You already belong to this league');
 
       const member: LeagueMember = {
-        id: `member-${league.id}-${Date.now()}`,
+        id: `member-${league.id}-${crypto.randomUUID()}`,
         leagueId: league.id,
         userId: params.userId,
         teamName: params.teamName,
@@ -296,6 +292,6 @@ export function useMockJoinLeague() {
       });
 
       return league;
-    },
+    }
   );
 }

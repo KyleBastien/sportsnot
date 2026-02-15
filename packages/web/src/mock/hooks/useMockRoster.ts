@@ -29,7 +29,6 @@ function makeMockQuery<T>(data: T): MockQueryResult<T> {
   return result;
 }
 
-/* eslint-disable no-unused-vars */
 interface MockMutationResult<TData, TVariables> {
   mutateAsync: (v: TVariables) => Promise<TData>;
   mutate: (v: TVariables) => void;
@@ -41,11 +40,9 @@ interface MockMutationResult<TData, TVariables> {
   data: undefined;
   status: 'idle';
 }
-/* eslint-enable no-unused-vars */
 
 function makeMockMutation<TData, TVariables>(
-  // eslint-disable-next-line no-unused-vars
-  fn: (v: TVariables) => TData,
+  fn: (v: TVariables) => TData
 ): MockMutationResult<TData, TVariables> {
   return {
     mutateAsync: (v) => Promise.resolve(fn(v)),
@@ -63,11 +60,10 @@ function makeMockMutation<TData, TVariables>(
 }
 
 // ── Points calculation helper ──────────────────────────────────────────
-function calculatePlayerPoints(
-  playerId: number,
-  throughDate: string,
-): number {
-  const logs = (playerGameLogs as unknown as Record<number, NHLPlayerStats[]>)[playerId];
+function calculatePlayerPoints(playerId: number, throughDate: string): number {
+  const logs = (playerGameLogs as unknown as Record<number, NHLPlayerStats[]>)[
+    playerId
+  ];
   if (!logs) return 0;
 
   let points = 0;
@@ -96,9 +92,7 @@ export function useMockRoster(leagueId: string | undefined) {
   }
 
   // Find the mock user's member entry
-  const member = league.members.find(
-    (m) => m.userId === state.mockUser.id,
-  );
+  const member = league.members.find((m) => m.userId === state.mockUser.id);
   if (!member) {
     return makeMockQuery(null);
   }
@@ -180,7 +174,7 @@ export function useMockActivateIR() {
           slotId: params.slotId,
         },
       });
-    },
+    }
   );
 }
 
@@ -197,6 +191,6 @@ export function useMockDeactivateIR() {
           slotId: params.slotId,
         },
       });
-    },
+    }
   );
 }

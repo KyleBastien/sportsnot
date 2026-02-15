@@ -1,4 +1,3 @@
-/* eslint-disable no-undef, no-unused-vars */
 import type { User, Session } from '@supabase/supabase-js';
 
 const mockUser = {
@@ -35,11 +34,15 @@ export function useMockAuth() {
     session: mockSession,
     loading: false,
     signInWithMagicLink: async (_email: string) => {
-      console.warn('[Mock Mode] Auth disabled — already signed in as Mock User');
+      console.warn(
+        '[Mock Mode] Auth disabled — already signed in as Mock User'
+      );
       return { error: null as Error | null };
     },
     signOut: async () => {
-      console.warn('[Mock Mode] Auth disabled — sign-out is a no-op in mock mode');
+      console.warn(
+        '[Mock Mode] Auth disabled — sign-out is a no-op in mock mode'
+      );
       alert('🧪 Mock mode — auth disabled');
       return { error: null as Error | null };
     },

@@ -41,7 +41,9 @@ test.describe('League Creation Flow', () => {
     ).toBeVisible(NAV_TIMEOUT);
 
     // Click submit without filling required fields
-    await authenticatedPage.getByRole('button', { name: /create league/i }).click();
+    await authenticatedPage
+      .getByRole('button', { name: /create league/i })
+      .click();
 
     // Should stay on the same page (HTML5 validation prevents submission)
     await expect(authenticatedPage).toHaveURL(/\/leagues\/create/);
@@ -86,7 +88,7 @@ test.describe('League Creation Flow', () => {
         if (method === 'POST') {
           postRequests.push({
             url: request.url(),
-            body: await request.postData() ?? '',
+            body: (await request.postData()) ?? '',
           });
           // Return the created league
           return route.fulfill({
@@ -152,7 +154,7 @@ test.describe('League Creation Flow', () => {
         if (method === 'POST') {
           postRequests.push({
             url: request.url(),
-            body: await request.postData() ?? '',
+            body: (await request.postData()) ?? '',
           });
           return route.fulfill({
             status: 201,
@@ -184,7 +186,9 @@ test.describe('League Creation Flow', () => {
       .fill(teamName);
 
     // Submit
-    await authenticatedPage.getByRole('button', { name: /create league/i }).click();
+    await authenticatedPage
+      .getByRole('button', { name: /create league/i })
+      .click();
 
     // Should navigate to league dashboard
     await expect(authenticatedPage).toHaveURL(
@@ -280,7 +284,9 @@ test.describe('League Creation Flow', () => {
     const inviteCode = 'COPY1234';
 
     // Grant clipboard permissions
-    await authenticatedPage.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await authenticatedPage
+      .context()
+      .grantPermissions(['clipboard-read', 'clipboard-write']);
 
     await setupSupabaseMocks(authenticatedPage, {
       leagues: async (route) => {
@@ -337,7 +343,9 @@ test.describe('League Creation Flow', () => {
     await copyButton.click();
 
     // After clicking, the button shows checkmark instead of clipboard emoji
-    await expect(authenticatedPage.getByRole('button', { name: '✓' })).toBeVisible();
+    await expect(
+      authenticatedPage.getByRole('button', { name: '✓' })
+    ).toBeVisible();
 
     // Verify clipboard content
     const clipboardText = await authenticatedPage.evaluate(() =>

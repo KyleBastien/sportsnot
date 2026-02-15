@@ -39,7 +39,8 @@ export function RosterHistoryPage() {
   });
 
   const myMember = (league?.league_members ?? []).find(
-    (m: any) => m.user_id === user?.id
+    (m: { id: string; user_id: string; team_name: string }) =>
+      m.user_id === user?.id
   );
 
   const { data: rosters, isLoading: rostersLoading } = useQuery({

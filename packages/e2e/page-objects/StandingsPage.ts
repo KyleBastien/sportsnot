@@ -21,7 +21,9 @@ export class StandingsPage {
 
   /** Get all member rows in the standings table (excluding header) */
   getMemberRows(): Locator {
-    return this.table.getByRole('row').filter({ has: this.page.getByRole('cell') });
+    return this.table
+      .getByRole('row')
+      .filter({ has: this.page.getByRole('cell') });
   }
 
   /** Get the row for the current user (identified by "You" badge) */
@@ -31,6 +33,8 @@ export class StandingsPage {
 
   /** Click the CSV export button (if present) */
   async exportCSV() {
-    await this.page.getByRole('button', { name: /Export|CSV|Download/i }).click();
+    await this.page
+      .getByRole('button', { name: /Export|CSV|Download/i })
+      .click();
   }
 }

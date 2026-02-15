@@ -63,8 +63,7 @@ export async function setupSupabaseMocks(
         // .single() sends this Accept header — return 406 (no rows)
         if (accept.includes('vnd.pgrst.object+json')) {
           const error: PostgRESTError = {
-            message:
-              'JSON object requested, multiple (or no) rows returned',
+            message: 'JSON object requested, multiple (or no) rows returned',
             details:
               'Results contain 0 rows, application/vnd.pgrst.object+json requires 1 row',
             hint: null,
@@ -157,8 +156,7 @@ export function mockTableData<T>(listData: T[], singleData?: T) {
         }
         // No single data — return PostgREST 406
         const error: PostgRESTError = {
-          message:
-            'JSON object requested, multiple (or no) rows returned',
+          message: 'JSON object requested, multiple (or no) rows returned',
           details:
             'Results contain 0 rows, application/vnd.pgrst.object+json requires 1 row',
           hint: null,

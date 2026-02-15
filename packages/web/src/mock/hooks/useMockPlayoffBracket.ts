@@ -36,7 +36,7 @@ function countSeriesWins(
   round: number,
   topSeedId: number,
   bottomSeedId: number,
-  throughDate: string,
+  throughDate: string
 ): WinCounts {
   const games = ROUND_GAMES[round] ?? [];
   const key = seriesKey(topSeedId, bottomSeedId);
@@ -96,7 +96,7 @@ function makeMockQuery<T>(data: T): MockQueryResult<T> {
  */
 function deriveBracketState(
   simulationDate: string,
-  currentRound: number,
+  currentRound: number
 ): NHLPlayoffSeries[] {
   const baseBracket = bracket as unknown as NHLPlayoffSeries[];
 
@@ -137,7 +137,7 @@ function deriveBracketState(
       series.round,
       topId,
       bottomId,
-      simulationDate,
+      simulationDate
     );
 
     const isComplete = topSeedWins >= 4 || bottomSeedWins >= 4;
@@ -145,9 +145,15 @@ function deriveBracketState(
     let seriesWinner: NHLPlayoffSeries['seriesWinner'];
     if (isComplete) {
       if (topSeedWins >= 4 && series.topSeedTeam) {
-        seriesWinner = { id: series.topSeedTeam.id, name: series.topSeedTeam.name };
+        seriesWinner = {
+          id: series.topSeedTeam.id,
+          name: series.topSeedTeam.name,
+        };
       } else if (bottomSeedWins >= 4 && series.bottomSeedTeam) {
-        seriesWinner = { id: series.bottomSeedTeam.id, name: series.bottomSeedTeam.name };
+        seriesWinner = {
+          id: series.bottomSeedTeam.id,
+          name: series.bottomSeedTeam.name,
+        };
       }
     }
 
@@ -207,7 +213,7 @@ export function useMockPlayoffBracket() {
  */
 export async function mockGetPlayoffBracketForDate(
   simulationDate: string,
-  currentRound: number,
+  currentRound: number
 ): Promise<NHLPlayoffSeries[]> {
   return deriveBracketState(simulationDate, currentRound);
 }

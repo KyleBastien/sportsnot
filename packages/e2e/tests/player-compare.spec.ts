@@ -1,5 +1,8 @@
 import { test, expect } from '../fixtures/supabase-mock.fixture';
-import { setupSupabaseMocks, mockTableList } from '../fixtures/supabase-mock.fixture';
+import {
+  setupSupabaseMocks,
+  mockTableList,
+} from '../fixtures/supabase-mock.fixture';
 import { mockUser } from '../fixtures/auth.fixture';
 
 const NAV_TIMEOUT = { timeout: 15000 };
@@ -76,16 +79,98 @@ function buildDraft() {
 // Mock data: players
 // ---------------------------------------------------------------------------
 const mockPlayers = [
-  { player_id: 8478402, nhl_season: '20252026', playoff_round: 1, player_name: 'Connor McDavid', team_abbreviation: 'EDM', position: 'F', goals: 8, assists: 12, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8479318, nhl_season: '20252026', playoff_round: 1, player_name: 'Auston Matthews', team_abbreviation: 'TOR', position: 'F', goals: 6, assists: 5, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8471675, nhl_season: '20252026', playoff_round: 1, player_name: 'Sidney Crosby', team_abbreviation: 'PIT', position: 'F', goals: 5, assists: 8, games_played: 6, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8477934, nhl_season: '20252026', playoff_round: 1, player_name: 'Leon Draisaitl', team_abbreviation: 'EDM', position: 'F', goals: 7, assists: 6, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8479339, nhl_season: '20252026', playoff_round: 1, player_name: 'Mitch Marner', team_abbreviation: 'TOR', position: 'F', goals: 3, assists: 10, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8480069, nhl_season: '20252026', playoff_round: 1, player_name: 'Cale Makar', team_abbreviation: 'COL', position: 'D', goals: 4, assists: 8, games_played: 6, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
+  {
+    player_id: 8478402,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Connor McDavid',
+    team_abbreviation: 'EDM',
+    position: 'F',
+    goals: 8,
+    assists: 12,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8479318,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Auston Matthews',
+    team_abbreviation: 'TOR',
+    position: 'F',
+    goals: 6,
+    assists: 5,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8471675,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Sidney Crosby',
+    team_abbreviation: 'PIT',
+    position: 'F',
+    goals: 5,
+    assists: 8,
+    games_played: 6,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8477934,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Leon Draisaitl',
+    team_abbreviation: 'EDM',
+    position: 'F',
+    goals: 7,
+    assists: 6,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8479339,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Mitch Marner',
+    team_abbreviation: 'TOR',
+    position: 'F',
+    goals: 3,
+    assists: 10,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8480069,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Cale Makar',
+    team_abbreviation: 'COL',
+    position: 'D',
+    goals: 4,
+    assists: 8,
+    games_played: 6,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
 ];
 
 const mockTeams = [
-  { team_id: 22, nhl_season: '20252026', playoff_round: 1, team_name: 'Edmonton Oilers', team_abbreviation: 'EDM', wins: 4, shutouts: 1, is_eliminated: false, last_updated: '2026-02-14T00:00:00Z' },
+  {
+    team_id: 22,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    team_name: 'Edmonton Oilers',
+    team_abbreviation: 'EDM',
+    wins: 4,
+    shutouts: 1,
+    is_eliminated: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -95,10 +180,21 @@ function leagueHandler() {
   return async (route: import('@playwright/test').Route) => {
     const request = route.request();
     const accept = request.headers()['accept'] ?? '';
-    if (request.method() === 'GET' && accept.includes('vnd.pgrst.object+json')) {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(leagueData) });
+    if (
+      request.method() === 'GET' &&
+      accept.includes('vnd.pgrst.object+json')
+    ) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(leagueData),
+      });
     }
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
   };
 }
 
@@ -107,13 +203,28 @@ function draftHandler() {
   return async (route: import('@playwright/test').Route) => {
     const request = route.request();
     const accept = request.headers()['accept'] ?? '';
-    if (request.method() === 'GET' && accept.includes('vnd.pgrst.object+json')) {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(draft) });
+    if (
+      request.method() === 'GET' &&
+      accept.includes('vnd.pgrst.object+json')
+    ) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(draft),
+      });
     }
     if (request.method() === 'GET') {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([draft]) });
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([draft]),
+      });
     }
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(draft) });
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(draft),
+    });
   };
 }
 
@@ -147,10 +258,12 @@ test.describe('Player Comparison', () => {
     ).toBeVisible(NAV_TIMEOUT);
 
     // Compare tray should not be visible initially
-    await expect(authenticatedPage.getByTestId('compare-tray')).not.toBeVisible();
+    await expect(authenticatedPage.getByTestId('compare-tray')).toBeHidden();
 
     // Click Compare button on McDavid's row
-    const row = authenticatedPage.getByRole('row').filter({ hasText: 'Connor McDavid' });
+    const row = authenticatedPage
+      .getByRole('row')
+      .filter({ hasText: 'Connor McDavid' });
     await row.getByRole('button', { name: /Compare/i }).click();
 
     // Compare tray should now appear
@@ -171,7 +284,12 @@ test.describe('Player Comparison', () => {
     ).toBeVisible(NAV_TIMEOUT);
 
     // Add 4 players to compare
-    const playerNames = ['Connor McDavid', 'Auston Matthews', 'Sidney Crosby', 'Leon Draisaitl'];
+    const playerNames = [
+      'Connor McDavid',
+      'Auston Matthews',
+      'Sidney Crosby',
+      'Leon Draisaitl',
+    ];
     for (const name of playerNames) {
       const row = authenticatedPage.getByRole('row').filter({ hasText: name });
       await row.getByRole('button', { name: /Compare/i }).click();
@@ -185,8 +303,12 @@ test.describe('Player Comparison', () => {
     }
 
     // 5th player compare button should be disabled
-    const marnerRow = authenticatedPage.getByRole('row').filter({ hasText: 'Mitch Marner' });
-    await expect(marnerRow.getByRole('button', { name: /Compare/i })).toBeDisabled();
+    const marnerRow = authenticatedPage
+      .getByRole('row')
+      .filter({ hasText: 'Mitch Marner' });
+    await expect(
+      marnerRow.getByRole('button', { name: /Compare/i })
+    ).toBeDisabled();
   });
 
   test('compare tray shows stat comparison with goals, assists, and points', async ({
@@ -200,24 +322,38 @@ test.describe('Player Comparison', () => {
     ).toBeVisible(NAV_TIMEOUT);
 
     // Add two players
-    const mcdavidRow = authenticatedPage.getByRole('row').filter({ hasText: 'Connor McDavid' });
+    const mcdavidRow = authenticatedPage
+      .getByRole('row')
+      .filter({ hasText: 'Connor McDavid' });
     await mcdavidRow.getByRole('button', { name: /Compare/i }).click();
-    const matthewsRow = authenticatedPage.getByRole('row').filter({ hasText: 'Auston Matthews' });
+    const matthewsRow = authenticatedPage
+      .getByRole('row')
+      .filter({ hasText: 'Auston Matthews' });
     await matthewsRow.getByRole('button', { name: /Compare/i }).click();
 
     const tray = authenticatedPage.getByTestId('compare-tray');
 
     // Verify column headers in compare table
-    await expect(tray.getByRole('columnheader', { name: 'Goals' })).toBeVisible();
-    await expect(tray.getByRole('columnheader', { name: 'Assists' })).toBeVisible();
-    await expect(tray.getByRole('columnheader', { name: 'Points' })).toBeVisible();
+    await expect(
+      tray.getByRole('columnheader', { name: 'Goals' })
+    ).toBeVisible();
+    await expect(
+      tray.getByRole('columnheader', { name: 'Assists' })
+    ).toBeVisible();
+    await expect(
+      tray.getByRole('columnheader', { name: 'Points' })
+    ).toBeVisible();
 
     // Verify McDavid's stats in compare (8G, 12A, 20Pts)
-    const mcdavidCompareRow = tray.getByRole('row').filter({ hasText: 'Connor McDavid' });
+    const mcdavidCompareRow = tray
+      .getByRole('row')
+      .filter({ hasText: 'Connor McDavid' });
     await expect(mcdavidCompareRow).toBeVisible();
 
     // Verify Matthews stats in compare (6G, 5A, 11Pts)
-    const matthewsCompareRow = tray.getByRole('row').filter({ hasText: 'Auston Matthews' });
+    const matthewsCompareRow = tray
+      .getByRole('row')
+      .filter({ hasText: 'Auston Matthews' });
     await expect(matthewsCompareRow).toBeVisible();
   });
 
@@ -232,9 +368,13 @@ test.describe('Player Comparison', () => {
     ).toBeVisible(NAV_TIMEOUT);
 
     // Add two players
-    const mcdavidRow = authenticatedPage.getByRole('row').filter({ hasText: 'Connor McDavid' });
+    const mcdavidRow = authenticatedPage
+      .getByRole('row')
+      .filter({ hasText: 'Connor McDavid' });
     await mcdavidRow.getByRole('button', { name: /Compare/i }).click();
-    const matthewsRow = authenticatedPage.getByRole('row').filter({ hasText: 'Auston Matthews' });
+    const matthewsRow = authenticatedPage
+      .getByRole('row')
+      .filter({ hasText: 'Auston Matthews' });
     await matthewsRow.getByRole('button', { name: /Compare/i }).click();
 
     const tray = authenticatedPage.getByTestId('compare-tray');
@@ -245,12 +385,12 @@ test.describe('Player Comparison', () => {
 
     // Tray should now show 1 player
     await expect(tray.getByText(/Compare \(1\)/i)).toBeVisible();
-    await expect(tray.getByText(/Connor McDavid/)).not.toBeVisible();
+    await expect(tray.getByText(/Connor McDavid/)).toBeHidden();
     await expect(tray.getByText(/Auston Matthews/)).toBeVisible();
 
     // Remove last player — tray disappears
     await tray.getByRole('button', { name: /Remove Auston Matthews/i }).click();
-    await expect(authenticatedPage.getByTestId('compare-tray')).not.toBeVisible();
+    await expect(authenticatedPage.getByTestId('compare-tray')).toBeHidden();
   });
 
   test('compare tray persists across draft page interactions like filtering', async ({
@@ -264,7 +404,9 @@ test.describe('Player Comparison', () => {
     ).toBeVisible(NAV_TIMEOUT);
 
     // Add a forward to compare
-    const mcdavidRow = authenticatedPage.getByRole('row').filter({ hasText: 'Connor McDavid' });
+    const mcdavidRow = authenticatedPage
+      .getByRole('row')
+      .filter({ hasText: 'Connor McDavid' });
     await mcdavidRow.getByRole('button', { name: /Compare/i }).click();
 
     const tray = authenticatedPage.getByTestId('compare-tray');
@@ -274,8 +416,10 @@ test.describe('Player Comparison', () => {
     await authenticatedPage.locator('label:has-text("Defense")').click();
     await expect(authenticatedPage.getByText('Cale Makar')).toBeVisible();
     // McDavid should not be in the available players table (but still in compare tray)
-    const skatersSection = authenticatedPage.getByText(/Skaters \(/i).locator('..');
-    await expect(skatersSection.getByText('Connor McDavid')).not.toBeVisible();
+    const skatersSection = authenticatedPage
+      .getByText(/Skaters \(/i)
+      .locator('..');
+    await expect(skatersSection.getByText('Connor McDavid')).toBeHidden();
 
     // Compare tray should still show McDavid
     await expect(tray.getByText(/Connor McDavid/)).toBeVisible();

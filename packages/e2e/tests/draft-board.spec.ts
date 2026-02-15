@@ -1,5 +1,8 @@
 import { test, expect } from '../fixtures/supabase-mock.fixture';
-import { setupSupabaseMocks, mockTableList } from '../fixtures/supabase-mock.fixture';
+import {
+  setupSupabaseMocks,
+  mockTableList,
+} from '../fixtures/supabase-mock.fixture';
 import { mockUser } from '../fixtures/auth.fixture';
 
 const NAV_TIMEOUT = { timeout: 15000 };
@@ -77,42 +80,314 @@ function buildDraft(overrides: Record<string, unknown> = {}) {
 // Mock data: 20+ players across F/D/G and teams
 // ---------------------------------------------------------------------------
 const mockForwards = [
-  { player_id: 8478402, nhl_season: '20252026', playoff_round: 1, player_name: 'Connor McDavid', team_abbreviation: 'EDM', position: 'F', goals: 8, assists: 12, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8479318, nhl_season: '20252026', playoff_round: 1, player_name: 'Auston Matthews', team_abbreviation: 'TOR', position: 'F', goals: 6, assists: 5, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8471675, nhl_season: '20252026', playoff_round: 1, player_name: 'Sidney Crosby', team_abbreviation: 'PIT', position: 'F', goals: 5, assists: 8, games_played: 6, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8477934, nhl_season: '20252026', playoff_round: 1, player_name: 'Leon Draisaitl', team_abbreviation: 'EDM', position: 'F', goals: 7, assists: 6, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8479339, nhl_season: '20252026', playoff_round: 1, player_name: 'Mitch Marner', team_abbreviation: 'TOR', position: 'F', goals: 3, assists: 10, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8477492, nhl_season: '20252026', playoff_round: 1, player_name: 'Nathan MacKinnon', team_abbreviation: 'COL', position: 'F', goals: 4, assists: 9, games_played: 6, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8478483, nhl_season: '20252026', playoff_round: 1, player_name: 'Jack Eichel', team_abbreviation: 'VGK', position: 'F', goals: 5, assists: 4, games_played: 5, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8480012, nhl_season: '20252026', playoff_round: 1, player_name: 'Brady Tkachuk', team_abbreviation: 'OTT', position: 'F', goals: 4, assists: 3, games_played: 6, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8478427, nhl_season: '20252026', playoff_round: 1, player_name: 'Sebastian Aho', team_abbreviation: 'CAR', position: 'F', goals: 3, assists: 5, games_played: 5, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8480064, nhl_season: '20252026', playoff_round: 1, player_name: 'Elias Pettersson', team_abbreviation: 'VAN', position: 'F', goals: 2, assists: 6, games_played: 5, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8480001, nhl_season: '20252026', playoff_round: 1, player_name: 'Kyle Connor', team_abbreviation: 'WPG', position: 'F', goals: 4, assists: 4, games_played: 6, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8480002, nhl_season: '20252026', playoff_round: 1, player_name: 'Nikita Kucherov', team_abbreviation: 'TBL', position: 'F', goals: 6, assists: 7, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
+  {
+    player_id: 8478402,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Connor McDavid',
+    team_abbreviation: 'EDM',
+    position: 'F',
+    goals: 8,
+    assists: 12,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8479318,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Auston Matthews',
+    team_abbreviation: 'TOR',
+    position: 'F',
+    goals: 6,
+    assists: 5,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8471675,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Sidney Crosby',
+    team_abbreviation: 'PIT',
+    position: 'F',
+    goals: 5,
+    assists: 8,
+    games_played: 6,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8477934,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Leon Draisaitl',
+    team_abbreviation: 'EDM',
+    position: 'F',
+    goals: 7,
+    assists: 6,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8479339,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Mitch Marner',
+    team_abbreviation: 'TOR',
+    position: 'F',
+    goals: 3,
+    assists: 10,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8477492,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Nathan MacKinnon',
+    team_abbreviation: 'COL',
+    position: 'F',
+    goals: 4,
+    assists: 9,
+    games_played: 6,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8478483,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Jack Eichel',
+    team_abbreviation: 'VGK',
+    position: 'F',
+    goals: 5,
+    assists: 4,
+    games_played: 5,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8480012,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Brady Tkachuk',
+    team_abbreviation: 'OTT',
+    position: 'F',
+    goals: 4,
+    assists: 3,
+    games_played: 6,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8478427,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Sebastian Aho',
+    team_abbreviation: 'CAR',
+    position: 'F',
+    goals: 3,
+    assists: 5,
+    games_played: 5,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8480064,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Elias Pettersson',
+    team_abbreviation: 'VAN',
+    position: 'F',
+    goals: 2,
+    assists: 6,
+    games_played: 5,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8480001,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Kyle Connor',
+    team_abbreviation: 'WPG',
+    position: 'F',
+    goals: 4,
+    assists: 4,
+    games_played: 6,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8480002,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Nikita Kucherov',
+    team_abbreviation: 'TBL',
+    position: 'F',
+    goals: 6,
+    assists: 7,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
 ];
 
 const mockInjuredForward = {
-  player_id: 8480099, nhl_season: '20252026', playoff_round: 1, player_name: 'Injured Forward', team_abbreviation: 'BOS', position: 'F', goals: 1, assists: 1, games_played: 2, is_injured: true, last_updated: '2026-02-14T00:00:00Z',
+  player_id: 8480099,
+  nhl_season: '20252026',
+  playoff_round: 1,
+  player_name: 'Injured Forward',
+  team_abbreviation: 'BOS',
+  position: 'F',
+  goals: 1,
+  assists: 1,
+  games_played: 2,
+  is_injured: true,
+  last_updated: '2026-02-14T00:00:00Z',
 };
 
 const mockDefensemen = [
-  { player_id: 8480069, nhl_season: '20252026', playoff_round: 1, player_name: 'Cale Makar', team_abbreviation: 'COL', position: 'D', goals: 4, assists: 8, games_played: 6, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8479323, nhl_season: '20252026', playoff_round: 1, player_name: 'Victor Hedman', team_abbreviation: 'TBL', position: 'D', goals: 2, assists: 6, games_played: 7, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8480145, nhl_season: '20252026', playoff_round: 1, player_name: 'Quinn Hughes', team_abbreviation: 'VAN', position: 'D', goals: 1, assists: 7, games_played: 5, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8477939, nhl_season: '20252026', playoff_round: 1, player_name: 'Adam Fox', team_abbreviation: 'NYR', position: 'D', goals: 3, assists: 5, games_played: 6, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
-  { player_id: 8479400, nhl_season: '20252026', playoff_round: 1, player_name: 'Miro Heiskanen', team_abbreviation: 'DAL', position: 'D', goals: 2, assists: 4, games_played: 5, is_injured: false, last_updated: '2026-02-14T00:00:00Z' },
+  {
+    player_id: 8480069,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Cale Makar',
+    team_abbreviation: 'COL',
+    position: 'D',
+    goals: 4,
+    assists: 8,
+    games_played: 6,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8479323,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Victor Hedman',
+    team_abbreviation: 'TBL',
+    position: 'D',
+    goals: 2,
+    assists: 6,
+    games_played: 7,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8480145,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Quinn Hughes',
+    team_abbreviation: 'VAN',
+    position: 'D',
+    goals: 1,
+    assists: 7,
+    games_played: 5,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8477939,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Adam Fox',
+    team_abbreviation: 'NYR',
+    position: 'D',
+    goals: 3,
+    assists: 5,
+    games_played: 6,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    player_id: 8479400,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    player_name: 'Miro Heiskanen',
+    team_abbreviation: 'DAL',
+    position: 'D',
+    goals: 2,
+    assists: 4,
+    games_played: 5,
+    is_injured: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
 ];
 
 const mockTeams = [
-  { team_id: 22, nhl_season: '20252026', playoff_round: 1, team_name: 'Edmonton Oilers', team_abbreviation: 'EDM', wins: 4, shutouts: 1, is_eliminated: false, last_updated: '2026-02-14T00:00:00Z' },
-  { team_id: 10, nhl_season: '20252026', playoff_round: 1, team_name: 'Toronto Maple Leafs', team_abbreviation: 'TOR', wins: 3, shutouts: 0, is_eliminated: false, last_updated: '2026-02-14T00:00:00Z' },
-  { team_id: 21, nhl_season: '20252026', playoff_round: 1, team_name: 'Colorado Avalanche', team_abbreviation: 'COL', wins: 3, shutouts: 1, is_eliminated: false, last_updated: '2026-02-14T00:00:00Z' },
-  { team_id: 52, nhl_season: '20252026', playoff_round: 1, team_name: 'Winnipeg Jets', team_abbreviation: 'WPG', wins: 2, shutouts: 0, is_eliminated: false, last_updated: '2026-02-14T00:00:00Z' },
-  { team_id: 14, nhl_season: '20252026', playoff_round: 1, team_name: 'Tampa Bay Lightning', team_abbreviation: 'TBL', wins: 2, shutouts: 1, is_eliminated: false, last_updated: '2026-02-14T00:00:00Z' },
+  {
+    team_id: 22,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    team_name: 'Edmonton Oilers',
+    team_abbreviation: 'EDM',
+    wins: 4,
+    shutouts: 1,
+    is_eliminated: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    team_id: 10,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    team_name: 'Toronto Maple Leafs',
+    team_abbreviation: 'TOR',
+    wins: 3,
+    shutouts: 0,
+    is_eliminated: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    team_id: 21,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    team_name: 'Colorado Avalanche',
+    team_abbreviation: 'COL',
+    wins: 3,
+    shutouts: 1,
+    is_eliminated: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    team_id: 52,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    team_name: 'Winnipeg Jets',
+    team_abbreviation: 'WPG',
+    wins: 2,
+    shutouts: 0,
+    is_eliminated: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
+  {
+    team_id: 14,
+    nhl_season: '20252026',
+    playoff_round: 1,
+    team_name: 'Tampa Bay Lightning',
+    team_abbreviation: 'TBL',
+    wins: 2,
+    shutouts: 1,
+    is_eliminated: false,
+    last_updated: '2026-02-14T00:00:00Z',
+  },
 ];
 
 const mockEliminatedTeam = {
-  team_id: 99, nhl_season: '20252026', playoff_round: 1, team_name: 'Eliminated Team', team_abbreviation: 'ELM', wins: 0, shutouts: 0, is_eliminated: true, last_updated: '2026-02-14T00:00:00Z',
+  team_id: 99,
+  nhl_season: '20252026',
+  playoff_round: 1,
+  team_name: 'Eliminated Team',
+  team_abbreviation: 'ELM',
+  wins: 0,
+  shutouts: 0,
+  is_eliminated: true,
+  last_updated: '2026-02-14T00:00:00Z',
 };
 
 const allPlayers = [...mockForwards, mockInjuredForward, ...mockDefensemen];
@@ -260,7 +535,7 @@ test.describe('Draft Board', () => {
     await expect(authenticatedPage.getByText('Cale Makar')).toBeVisible();
 
     // Injured forward should NOT appear
-    await expect(authenticatedPage.getByText('Injured Forward')).not.toBeVisible();
+    await expect(authenticatedPage.getByText('Injured Forward')).toBeHidden();
   });
 
   test('players can be filtered by position F, D, and G/Team', async ({
@@ -278,23 +553,25 @@ test.describe('Draft Board', () => {
     await authenticatedPage.locator('label:has-text("Forwards")').click();
     await expect(authenticatedPage.getByText('Connor McDavid')).toBeVisible();
     // Defenseman should not be visible when filtered to Forwards
-    await expect(authenticatedPage.getByText('Cale Makar')).not.toBeVisible();
+    await expect(authenticatedPage.getByText('Cale Makar')).toBeHidden();
 
     // Filter by Defense
     await authenticatedPage.locator('label:has-text("Defense")').click();
     await expect(authenticatedPage.getByText('Cale Makar')).toBeVisible();
     await expect(authenticatedPage.getByText('Victor Hedman')).toBeVisible();
     // Forward should not be visible
-    await expect(authenticatedPage.getByText('Connor McDavid')).not.toBeVisible();
+    await expect(authenticatedPage.getByText('Connor McDavid')).toBeHidden();
 
     // Filter by Goalies — shows teams table
     await authenticatedPage.locator('label:has-text("Goalies")').click();
     await expect(authenticatedPage.getByText('Edmonton Oilers')).toBeVisible();
-    await expect(authenticatedPage.getByText('Toronto Maple Leafs')).toBeVisible();
+    await expect(
+      authenticatedPage.getByText('Toronto Maple Leafs')
+    ).toBeVisible();
     // Skater should not be visible
-    await expect(authenticatedPage.getByText('Connor McDavid')).not.toBeVisible();
+    await expect(authenticatedPage.getByText('Connor McDavid')).toBeHidden();
     // Eliminated team should not appear
-    await expect(authenticatedPage.getByText('Eliminated Team')).not.toBeVisible();
+    await expect(authenticatedPage.getByText('Eliminated Team')).toBeHidden();
 
     // Filter back to All
     await authenticatedPage.locator('label:has-text("All")').click();
@@ -318,8 +595,8 @@ test.describe('Draft Board', () => {
     // Only matching player should be visible
     await expect(authenticatedPage.getByText('Connor McDavid')).toBeVisible();
     // Non-matching players should be hidden
-    await expect(authenticatedPage.getByText('Auston Matthews')).not.toBeVisible();
-    await expect(authenticatedPage.getByText('Cale Makar')).not.toBeVisible();
+    await expect(authenticatedPage.getByText('Auston Matthews')).toBeHidden();
+    await expect(authenticatedPage.getByText('Cale Makar')).toBeHidden();
 
     // Clear search
     await searchInput.clear();
@@ -343,10 +620,18 @@ test.describe('Draft Board', () => {
     await expect(skatersTable).toBeVisible();
 
     // Column headers should be present
-    await expect(skatersTable.getByRole('columnheader', { name: 'Player' })).toBeVisible();
-    await expect(skatersTable.getByRole('columnheader', { name: 'G', exact: true })).toBeVisible();
-    await expect(skatersTable.getByRole('columnheader', { name: 'A', exact: true })).toBeVisible();
-    await expect(skatersTable.getByRole('columnheader', { name: 'Pts' })).toBeVisible();
+    await expect(
+      skatersTable.getByRole('columnheader', { name: 'Player' })
+    ).toBeVisible();
+    await expect(
+      skatersTable.getByRole('columnheader', { name: 'G', exact: true })
+    ).toBeVisible();
+    await expect(
+      skatersTable.getByRole('columnheader', { name: 'A', exact: true })
+    ).toBeVisible();
+    await expect(
+      skatersTable.getByRole('columnheader', { name: 'Pts' })
+    ).toBeVisible();
 
     // Top scorer (McDavid with 8 goals) should appear in the list
     await expect(skatersTable.getByText('Connor McDavid')).toBeVisible();
@@ -364,13 +649,13 @@ test.describe('Draft Board', () => {
     ).toBeVisible(NAV_TIMEOUT);
 
     // Injured forward should not appear in skaters list
-    await expect(authenticatedPage.getByText('Injured Forward')).not.toBeVisible();
+    await expect(authenticatedPage.getByText('Injured Forward')).toBeHidden();
 
     // Switch to Goalies to check teams
     await authenticatedPage.locator('label:has-text("Goalies")').click();
 
     // Eliminated team should not appear
-    await expect(authenticatedPage.getByText('Eliminated Team')).not.toBeVisible();
+    await expect(authenticatedPage.getByText('Eliminated Team')).toBeHidden();
 
     // Active teams should still be visible
     await expect(authenticatedPage.getByText('Edmonton Oilers')).toBeVisible();
@@ -388,7 +673,9 @@ test.describe('Draft Board', () => {
     ).toBeVisible(NAV_TIMEOUT);
 
     // Click the Draft button on McDavid's row
-    const row = authenticatedPage.getByRole('row').filter({ hasText: 'Connor McDavid' });
+    const row = authenticatedPage
+      .getByRole('row')
+      .filter({ hasText: 'Connor McDavid' });
     await row.getByRole('button', { name: /Draft/i }).click();
 
     // Confirmation modal should appear
@@ -399,7 +686,9 @@ test.describe('Draft Board', () => {
 
     // Cancel and Confirm buttons
     await expect(modal.getByRole('button', { name: /Cancel/i })).toBeVisible();
-    await expect(modal.getByRole('button', { name: /Confirm Pick/i })).toBeVisible();
+    await expect(
+      modal.getByRole('button', { name: /Confirm Pick/i })
+    ).toBeVisible();
   });
 
   test('confirming a pick adds player to draft history and advances current pick', async ({
@@ -501,7 +790,9 @@ test.describe('Draft Board', () => {
     await expect(authenticatedPage.getByText(/No picks yet/i)).toBeVisible();
 
     // Click Draft on McDavid
-    const row = authenticatedPage.getByRole('row').filter({ hasText: 'Connor McDavid' });
+    const row = authenticatedPage
+      .getByRole('row')
+      .filter({ hasText: 'Connor McDavid' });
     await row.getByRole('button', { name: /Draft/i }).click();
 
     // Confirm the pick
@@ -509,9 +800,9 @@ test.describe('Draft Board', () => {
     await modal.getByRole('button', { name: /Confirm Pick/i }).click();
 
     // Draft History should update to show the pick (after refetch)
-    await expect(
-      authenticatedPage.getByText('#1 - My Draft Team')
-    ).toBeVisible({ timeout: 10000 });
+    await expect(authenticatedPage.getByText('#1 - My Draft Team')).toBeVisible(
+      { timeout: 10000 }
+    );
   });
 
   test('roster sidebar shows filled and empty slots with position requirements', async ({
@@ -540,7 +831,10 @@ test.describe('Draft Board', () => {
           player_id: 8479318,
           position: 'F',
           picked_at: '2026-02-14T12:00:02Z',
-          league_members: { team_name: 'Opponent Team', user_id: OTHER_USER_ID },
+          league_members: {
+            team_name: 'Opponent Team',
+            user_id: OTHER_USER_ID,
+          },
         },
       ],
     });
@@ -564,7 +858,9 @@ test.describe('Draft Board', () => {
     ).toBeVisible();
 
     // Position badges should be visible in history
-    const historySection = authenticatedPage.getByText(/Draft History/i).locator('..');
+    const historySection = authenticatedPage
+      .getByText(/Draft History/i)
+      .locator('..');
     await expect(historySection.getByText('F').first()).toBeVisible();
   });
 });

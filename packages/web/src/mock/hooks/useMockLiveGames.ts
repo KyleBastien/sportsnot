@@ -44,7 +44,7 @@ function computeSeriesStatus(
   round: number,
   homeTeamId: number,
   awayTeamId: number,
-  throughDate: string,
+  throughDate: string
 ): SeriesStatus {
   const roundGames = ROUND_GAMES[round] ?? [];
   const key = seriesKey(homeTeamId, awayTeamId);
@@ -76,7 +76,10 @@ function computeSeriesStatus(
 
   let label: string;
   if (homeWins === awayWins) {
-    label = homeWins === 0 ? 'Series not started' : `Series tied ${homeWins}-${awayWins}`;
+    label =
+      homeWins === 0
+        ? 'Series not started'
+        : `Series tied ${homeWins}-${awayWins}`;
   } else if (homeWins > awayWins) {
     label = `${homeAbbr} leads ${homeWins}-${awayWins}`;
   } else {
@@ -91,7 +94,8 @@ function getTeamAbbr(teamId: number): string {
   // Check bracket data first (has abbreviation)
   for (const s of bracket) {
     if (s.topSeedTeam?.id === teamId) return s.topSeedTeam.abbreviation ?? '';
-    if (s.bottomSeedTeam?.id === teamId) return s.bottomSeedTeam.abbreviation ?? '';
+    if (s.bottomSeedTeam?.id === teamId)
+      return s.bottomSeedTeam.abbreviation ?? '';
   }
   // Fallback: search games
   for (const g of ALL_GAMES) {
@@ -172,7 +176,7 @@ export function useMockLiveGames() {
           r,
           game.homeTeam.id,
           game.awayTeam.id,
-          simulationDate,
+          simulationDate
         );
         todaysGames.push({ game, seriesStatus });
       }
@@ -200,7 +204,14 @@ export function useMockLiveGamesTeamStats() {
   // Gather all teams that have games played through simulationDate
   const teamStats = new Map<
     number,
-    { team_id: number; team_name: string; team_abbreviation: string; wins: number; shutouts: number; is_eliminated: boolean }
+    {
+      team_id: number;
+      team_name: string;
+      team_abbreviation: string;
+      wins: number;
+      shutouts: number;
+      is_eliminated: boolean;
+    }
   >();
 
   for (const game of ALL_GAMES) {

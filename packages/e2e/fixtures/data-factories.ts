@@ -116,7 +116,7 @@ export function createMockLeague(overrides?: Partial<League>): League {
 // ---------------------------------------------------------------------------
 
 export function createMockLeagueMember(
-  overrides?: Partial<LeagueMember>,
+  overrides?: Partial<LeagueMember>
 ): LeagueMember {
   const s = seq();
   return {
@@ -151,9 +151,7 @@ export function createMockDraft(overrides?: Partial<Draft>): Draft {
 // Factory: DraftPick
 // ---------------------------------------------------------------------------
 
-export function createMockDraftPick(
-  overrides?: Partial<DraftPick>,
-): DraftPick {
+export function createMockDraftPick(overrides?: Partial<DraftPick>): DraftPick {
   const s = seq();
   const fwd = NHL_FORWARDS[s % NHL_FORWARDS.length];
   return {
@@ -173,7 +171,7 @@ export function createMockDraftPick(
 // ---------------------------------------------------------------------------
 
 export function createMockRosterSlot(
-  overrides?: Partial<RosterSlot>,
+  overrides?: Partial<RosterSlot>
 ): RosterSlot {
   const fwd = NHL_FORWARDS[seq() % NHL_FORWARDS.length];
   return {
@@ -195,18 +193,18 @@ export function createMockRosterSlot(
  */
 export function createMockRoster(
   leagueMemberId: string,
-  overrides?: { round?: number },
+  overrides?: { round?: number }
 ): RosterSlot[] {
   const round = overrides?.round ?? 1;
-  let slotIdx = 0;
+  let _slotIdx = 0;
 
   function slot(
     position: Position,
     playerId: number | undefined,
     teamId: number | undefined,
-    isActive: boolean,
+    isActive: boolean
   ): RosterSlot {
-    slotIdx++;
+    _slotIdx++;
     return {
       id: uuid(),
       leagueMemberId,
@@ -244,7 +242,7 @@ export function createMockRoster(
 // ---------------------------------------------------------------------------
 
 export function createMockPlayerStats(
-  overrides?: Partial<PlayerStats>,
+  overrides?: Partial<PlayerStats>
 ): PlayerStats {
   const fwd = NHL_FORWARDS[seq() % NHL_FORWARDS.length];
   return {
@@ -267,9 +265,7 @@ export function createMockPlayerStats(
 // Factory: TeamStats
 // ---------------------------------------------------------------------------
 
-export function createMockTeamStats(
-  overrides?: Partial<TeamStats>,
-): TeamStats {
+export function createMockTeamStats(overrides?: Partial<TeamStats>): TeamStats {
   const team = NHL_TEAMS[seq() % NHL_TEAMS.length];
   return {
     teamId: team.id,

@@ -29,35 +29,51 @@ interface LeagueWithMembership {
   max_participants: number;
   commissioner_id: string;
   invite_code: string;
-  league_members: Array<{ team_name: string; total_points: number; user_id: string }>;
+  league_members: Array<{
+    team_name: string;
+    total_points: number;
+    user_id: string;
+  }>;
   memberCount: number;
 }
 
-/* eslint-disable react-hooks/rules-of-hooks */
-function useLiveGames() {
-  if (IS_MOCK) return useMockLiveGamesTeamStats();
+interface TeamStatRow {
+  team_id: number;
+  team_name: string;
+  team_abbreviation: string;
+  wins: number;
+  shutouts: number;
+  is_eliminated: boolean;
+}
 
-  return useQuery({
+function useLiveGames() {
+  const mockResult = useMockLiveGamesTeamStats();
+
+  const queryResult = useQuery({
     queryKey: ['live-games'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('team_stats_cache')
-        .select('team_id, team_name, team_abbreviation, wins, shutouts, is_eliminated')
+        .select(
+          'team_id, team_name, team_abbreviation, wins, shutouts, is_eliminated'
+        )
         .eq('is_eliminated', false)
         .order('wins', { ascending: false });
 
       if (error) throw error;
       return data ?? [];
     },
+    enabled: !IS_MOCK,
   });
+
+  return IS_MOCK ? mockResult : queryResult;
 }
 
 function useMyLeagues() {
-  if (IS_MOCK) return useMockMyLeagues();
-
+  const mockResult = useMockMyLeagues();
   const { user } = useAuthContext();
 
-  return useQuery({
+  const queryResult = useQuery({
     queryKey: ['my-leagues', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -72,15 +88,24 @@ function useMyLeagues() {
 
       if (error) throw error;
 
-      return (data ?? []).map((league: any) => ({
-        ...league,
-        memberCount: league.league_members?.length ?? 0,
-      })) as LeagueWithMembership[];
+      return (data ?? []).map(
+        (league: {
+          league_members?: {
+            team_name: string;
+            total_points: number;
+            user_id: string;
+          }[];
+        }) => ({
+          ...league,
+          memberCount: league.league_members?.length ?? 0,
+        })
+      ) as LeagueWithMembership[];
     },
-    enabled: !!user,
+    enabled: !IS_MOCK && !!user,
   });
+
+  return IS_MOCK ? mockResult : queryResult;
 }
-/* eslint-enable react-hooks/rules-of-hooks */
 
 const STATUS_COLORS: Record<string, string> = {
   setup: 'blue',
@@ -102,7 +127,8 @@ export function DashboardPage() {
           <div>
             <Title order={2}>Dashboard</Title>
             <Text c="dimmed">
-              Welcome back, {user?.user_metadata?.['display_name'] ?? user?.email}
+              Welcome back,{' '}
+              {user?.user_metadata?.['display_name'] ?? user?.email}
             </Text>
           </div>
           <Group>
@@ -174,8 +200,14 @@ export function DashboardPage() {
               playoffs.
             </Alert>
             <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
-              {liveGames.map((team: any) => (
-                <Card key={team.team_id} shadow="sm" padding="md" radius="md" withBorder>
+              {liveGames.map((team: TeamStatRow) => (
+                <Card
+                  key={team.team_id}
+                  shadow="sm"
+                  padding="md"
+                  radius="md"
+                  withBorder
+                >
                   <Group justify="space-between">
                     <Text fw={600}>{team.team_name}</Text>
                     <Badge color="green" variant="light">

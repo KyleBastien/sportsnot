@@ -56,9 +56,7 @@ test.describe('Authentication Flow', () => {
     await expect(
       unauthenticatedPage.getByText(/check your email/i)
     ).toBeVisible(NAV_TIMEOUT);
-    await expect(
-      unauthenticatedPage.getByText(/user@test\.com/)
-    ).toBeVisible();
+    await expect(unauthenticatedPage.getByText(/user@test\.com/)).toBeVisible();
   });
 
   test('auth callback with valid token sets session and redirects to dashboard', async ({
@@ -93,26 +91,20 @@ test.describe('Authentication Flow', () => {
     await authenticatedPage.goto('/');
 
     // Wait for the authenticated dashboard to load
-    await authenticatedPage.waitForLoadState('networkidle');
+    await authenticatedPage.waitForLoadState('domcontentloaded');
 
     // The user menu trigger is an UnstyledButton containing the user's avatar
-    // and display name. Click it to open the dropdown.
+    // and display name. Use .or() to handle small viewports where text is hidden.
     const displayName = mockUser.user_metadata.display_name;
-    const menuTrigger = authenticatedPage.getByRole('button').filter({
-      has: authenticatedPage.getByText(displayName),
-    });
-
-    // If display name text is hidden on small viewports, fall back to avatar
-    const triggerCount = await menuTrigger.count();
-    if (triggerCount > 0) {
-      await menuTrigger.first().click();
-    } else {
-      // Click the avatar button in the header
-      await authenticatedPage
-        .locator('header button')
-        .filter({ hasText: displayName[0].toUpperCase() })
-        .click();
-    }
+    const menuTrigger = authenticatedPage
+      .getByRole('button')
+      .filter({ has: authenticatedPage.getByText(displayName) })
+      .or(
+        authenticatedPage
+          .locator('header button')
+          .filter({ hasText: displayName[0].toUpperCase() })
+      );
+    await menuTrigger.first().click();
 
     // Click Sign Out in the dropdown menu
     await authenticatedPage

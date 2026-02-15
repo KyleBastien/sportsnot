@@ -1,6 +1,13 @@
 import { useMockData, getRoundDateBounds } from '../MockDataProvider';
 import { SCORING } from '@sportsnot/types';
-import { playerGameLogs, players, gamesR1, gamesR2, gamesCf, gamesScf } from '@sportsnot/mock-data';
+import {
+  playerGameLogs,
+  players,
+  gamesR1,
+  gamesR2,
+  gamesCf,
+  gamesScf,
+} from '@sportsnot/mock-data';
 import type { NHLPlayerStats, NHLGame, NHLPlayer } from '@sportsnot/types';
 
 // ── Mock TanStack query helper ─────────────────────────────────────────
@@ -32,7 +39,9 @@ function makeMockQuery<T>(data: T): MockQueryResult<T> {
 // ── Player info lookup ─────────────────────────────────────────────────
 const allPlayers = players as unknown as Record<string, NHLPlayer[]>;
 
-function getPlayerInfo(playerId: number): { name: string; teamAbbrev: string; isGoalie: boolean } | null {
+function getPlayerInfo(
+  playerId: number
+): { name: string; teamAbbrev: string; isGoalie: boolean } | null {
   for (const [teamAbbrev, teamPlayers] of Object.entries(allPlayers)) {
     const p = teamPlayers.find((pl) => pl.id === playerId);
     if (p) {
@@ -62,8 +71,13 @@ for (const g of ALL_GAMES) {
 // ── Points calculation per member ──────────────────────────────────────
 function calculateMemberPoints(
   playerIds: number[],
-  throughDate: string,
-): { total: number; playerPts: number; goaliePts: number; roundPts: Record<number, number> } {
+  throughDate: string
+): {
+  total: number;
+  playerPts: number;
+  goaliePts: number;
+  roundPts: Record<number, number>;
+} {
   let playerPts = 0;
   let goaliePts = 0;
   const roundPts: Record<number, number> = {};
@@ -84,8 +98,12 @@ function calculateMemberPoints(
         const game = GAME_MAP.get(entry.gameId);
         if (game) {
           const isHome = game.homeTeam.abbreviation === entry.teamAbbrev;
-          const teamScore = isHome ? (game.homeTeam.score ?? 0) : (game.awayTeam.score ?? 0);
-          const oppScore = isHome ? (game.awayTeam.score ?? 0) : (game.homeTeam.score ?? 0);
+          const teamScore = isHome
+            ? (game.homeTeam.score ?? 0)
+            : (game.awayTeam.score ?? 0);
+          const oppScore = isHome
+            ? (game.awayTeam.score ?? 0)
+            : (game.homeTeam.score ?? 0);
           if (teamScore > oppScore) {
             // Shutout replaces win points
             entryPoints = oppScore === 0 ? SCORING.shutout : SCORING.win;
@@ -93,7 +111,8 @@ function calculateMemberPoints(
         }
         goaliePts += entryPoints;
       } else {
-        entryPoints = entry.goals * SCORING.goal + entry.assists * SCORING.assist;
+        entryPoints =
+          entry.goals * SCORING.goal + entry.assists * SCORING.assist;
         playerPts += entryPoints;
       }
 
@@ -101,7 +120,11 @@ function calculateMemberPoints(
       if (entryPoints > 0) {
         for (let r = 1; r <= 4; r++) {
           const bounds = getRoundDateBounds(r);
-          if (bounds && entry.gameDate >= bounds.firstDate && entry.gameDate <= bounds.lastDate) {
+          if (
+            bounds &&
+            entry.gameDate >= bounds.firstDate &&
+            entry.gameDate <= bounds.lastDate
+          ) {
             roundPts[r] = (roundPts[r] ?? 0) + entryPoints;
             break;
           }

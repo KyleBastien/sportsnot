@@ -5,12 +5,13 @@ import {
 } from '../fixtures/supabase-mock.fixture';
 import { createMockLeague } from '../fixtures/data-factories';
 import { DashboardPage } from '../page-objects';
+import type { League } from '@sportsnot/types';
 
 const NAV_TIMEOUT = { timeout: 15000 };
 
 /** Build a minimal league mock that satisfies dashboard + league dashboard queries */
-function createLeagueResponse(overrides?: Record<string, unknown>) {
-  const league = createMockLeague(overrides as any);
+function createLeagueResponse(overrides?: Partial<League>) {
+  const league = createMockLeague(overrides);
   return {
     id: league.id,
     name: league.name,
@@ -47,38 +48,30 @@ test.describe('Navigation and Routing', () => {
     const dashboard = new DashboardPage(authenticatedPage);
     await expect(dashboard.heading).toBeVisible(NAV_TIMEOUT);
 
-    // Open user menu and navigate to Profile
+    // Open user menu and navigate to Profile — use .or() for responsive layouts
     const displayName = mockUser.user_metadata.display_name;
-    const menuTrigger = authenticatedPage.getByRole('button').filter({
-      has: authenticatedPage.getByText(displayName),
-    });
-    const triggerCount = await menuTrigger.count();
-    if (triggerCount > 0) {
-      await menuTrigger.first().click();
-    } else {
-      await authenticatedPage
-        .locator('header button')
-        .filter({ hasText: displayName[0].toUpperCase() })
-        .click();
-    }
-    await authenticatedPage
-      .getByRole('menuitem', { name: /profile/i })
-      .click();
+    const menuTrigger = authenticatedPage
+      .getByRole('button')
+      .filter({ has: authenticatedPage.getByText(displayName) })
+      .or(
+        authenticatedPage
+          .locator('header button')
+          .filter({ hasText: displayName[0].toUpperCase() })
+      );
+    await menuTrigger.first().click();
+    await authenticatedPage.getByRole('menuitem', { name: /profile/i }).click();
     await expect(authenticatedPage).toHaveURL(/\/profile/, NAV_TIMEOUT);
 
     // Navigate to Dashboard via user menu
-    const menuTrigger2 = authenticatedPage.getByRole('button').filter({
-      has: authenticatedPage.getByText(displayName),
-    });
-    const trigger2Count = await menuTrigger2.count();
-    if (trigger2Count > 0) {
-      await menuTrigger2.first().click();
-    } else {
-      await authenticatedPage
-        .locator('header button')
-        .filter({ hasText: displayName[0].toUpperCase() })
-        .click();
-    }
+    const menuTrigger2 = authenticatedPage
+      .getByRole('button')
+      .filter({ has: authenticatedPage.getByText(displayName) })
+      .or(
+        authenticatedPage
+          .locator('header button')
+          .filter({ hasText: displayName[0].toUpperCase() })
+      );
+    await menuTrigger2.first().click();
     await authenticatedPage
       .getByRole('menuitem', { name: /dashboard/i })
       .click();
@@ -158,10 +151,7 @@ test.describe('Navigation and Routing', () => {
 
     for (const route of protectedRoutes) {
       await unauthenticatedPage.goto(route);
-      await expect(unauthenticatedPage).toHaveURL(
-        /\/auth\/login/,
-        NAV_TIMEOUT
-      );
+      await expect(unauthenticatedPage).toHaveURL(/\/auth\/login/, NAV_TIMEOUT);
     }
   });
 
@@ -174,10 +164,7 @@ test.describe('Navigation and Routing', () => {
     });
 
     await setupSupabaseMocks(authenticatedPage, {
-      leagues: mockTableData(
-        [league],
-        league
-      ),
+      leagues: mockTableData([league], league),
     });
     // Deep-link to profile
     await authenticatedPage.goto('/profile');
@@ -208,7 +195,7 @@ test.describe('Navigation and Routing', () => {
 
     // Navigate to a route that doesn't exist
     await authenticatedPage.goto('/this-route-does-not-exist');
-    await authenticatedPage.waitForLoadState('networkidle');
+    await authenticatedPage.waitForLoadState('domcontentloaded');
 
     // Since no catch-all route is defined, the page will either:
     // 1. Show a 404 message, OR
@@ -222,11 +209,11 @@ test.describe('Navigation and Routing', () => {
     // Verify the page is NOT the dashboard (no "Dashboard" heading)
     await expect(
       authenticatedPage.getByRole('heading', { name: /^Dashboard$/i })
-    ).not.toBeVisible();
+    ).toBeHidden();
 
     // Also test a nested unknown route
     await authenticatedPage.goto('/leagues/unknown-id/nonexistent-page');
-    await authenticatedPage.waitForLoadState('networkidle');
+    await authenticatedPage.waitForLoadState('domcontentloaded');
     await expect(
       authenticatedPage.getByRole('heading', { name: /sportsnot/i })
     ).toBeVisible(NAV_TIMEOUT);

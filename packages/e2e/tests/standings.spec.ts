@@ -144,7 +144,10 @@ test.describe('Standings Page', () => {
   }) => {
     const membersWithRounds = membersData.map((m) => ({
       ...m,
-      round_points: { 1: Math.floor(m.total_points * 0.6), 2: m.total_points - Math.floor(m.total_points * 0.6) },
+      round_points: {
+        1: Math.floor(m.total_points * 0.6),
+        2: m.total_points - Math.floor(m.total_points * 0.6),
+      },
     }));
 
     await setupSupabaseMocks(authenticatedPage, {

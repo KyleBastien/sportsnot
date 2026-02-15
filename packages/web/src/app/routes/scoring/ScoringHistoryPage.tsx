@@ -31,11 +31,10 @@ interface ScoringEvent {
   league_member_team: string;
 }
 
-/* eslint-disable react-hooks/rules-of-hooks */
 function useScoringHistory(leagueId: string) {
-  if (IS_MOCK) return useMockScoringHistory(leagueId);
+  const mockResult = useMockScoringHistory(leagueId);
 
-  return useQuery({
+  const queryResult = useQuery({
     queryKey: ['scoring-history', leagueId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -47,9 +46,11 @@ function useScoringHistory(leagueId: string) {
       if (error) throw error;
       return (data ?? []) as ScoringEvent[];
     },
+    enabled: !IS_MOCK,
   });
+
+  return IS_MOCK ? mockResult : queryResult;
 }
-/* eslint-enable react-hooks/rules-of-hooks */
 
 const EVENT_COLORS: Record<string, string> = {
   goal: 'red',
@@ -90,7 +91,10 @@ export function ScoringHistoryPage() {
 
   // Apply filters
   const filtered = allEvents.filter((e) => {
-    if (playerFilter && !e.player_name.toLowerCase().includes(playerFilter.toLowerCase())) {
+    if (
+      playerFilter &&
+      !e.player_name.toLowerCase().includes(playerFilter.toLowerCase())
+    ) {
       return false;
     }
     if (teamFilter && e.team_abbreviation !== teamFilter) {
@@ -167,7 +171,12 @@ export function ScoringHistoryPage() {
                         {event.event_type}
                       </Badge>
                     </Table.Td>
-                    <Table.Td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    <Table.Td
+                      style={{
+                        textAlign: 'right',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
                       +{event.points}
                     </Table.Td>
                     <Table.Td>{event.game_date}</Table.Td>

@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 /**
  * Download 2025 NHL Playoff fixture data from the NHL API.
  *
@@ -48,7 +47,7 @@ function log(msg: string) {
 async function batchAll<T>(
   tasks: (() => Promise<T>)[],
   concurrency: number,
-  delayMs: number,
+  delayMs: number
 ): Promise<T[]> {
   const results: T[] = [];
   for (let i = 0; i < tasks.length; i += concurrency) {
@@ -72,7 +71,11 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function serializeConst(name: string, value: unknown, typeName: string): string {
+function serializeConst(
+  name: string,
+  value: unknown,
+  typeName: string
+): string {
   const json = JSON.stringify(value, null, 2);
   return `import type { ${typeName} } from '@sportsnot/types';\n\nexport const ${name} = ${json} as const satisfies readonly ${typeName}[];\n`;
 }
@@ -81,7 +84,7 @@ function serializeRecordConst(
   name: string,
   value: Record<string, unknown>,
   keyType: string,
-  valueType: string,
+  valueType: string
 ): string {
   const json = JSON.stringify(value, null, 2);
   return `import type { ${valueType} } from '@sportsnot/types';\n\nexport const ${name} = ${json} as const satisfies Readonly<Record<${keyType}, readonly ${valueType}[]>>;\n`;
@@ -140,14 +143,16 @@ async function main() {
 
   await writeTs(
     'bracket.ts',
-    serializeConst('bracket', bracket, 'NHLPlayoffSeries'),
+    serializeConst('bracket', bracket, 'NHLPlayoffSeries')
   );
 
   // Extract unique team abbreviations from bracket
   const teamAbbrs = new Set<string>();
   for (const series of bracket) {
-    if (series.topSeedTeam?.abbreviation) teamAbbrs.add(series.topSeedTeam.abbreviation);
-    if (series.bottomSeedTeam?.abbreviation) teamAbbrs.add(series.bottomSeedTeam.abbreviation);
+    if (series.topSeedTeam?.abbreviation)
+      teamAbbrs.add(series.topSeedTeam.abbreviation);
+    if (series.bottomSeedTeam?.abbreviation)
+      teamAbbrs.add(series.bottomSeedTeam.abbreviation);
   }
   const abbrs = [...teamAbbrs].sort();
   log(`  Found ${abbrs.length} teams: ${abbrs.join(', ')}`);
@@ -163,14 +168,18 @@ async function main() {
     return { abbr, players };
   });
 
-  const rosterResults = await batchAll(rosterTasks, MAX_CONCURRENT, BATCH_DELAY_MS);
+  const rosterResults = await batchAll(
+    rosterTasks,
+    MAX_CONCURRENT,
+    BATCH_DELAY_MS
+  );
   for (const { abbr, players } of rosterResults) {
     allPlayers[abbr] = players;
     // Build a NHLTeam entry from the first player's currentTeam, or from bracket data
     const bracketSeries = bracket.find(
       (s) =>
         s.topSeedTeam?.abbreviation === abbr ||
-        s.bottomSeedTeam?.abbreviation === abbr,
+        s.bottomSeedTeam?.abbreviation === abbr
     );
     const seedTeam =
       bracketSeries?.topSeedTeam?.abbreviation === abbr
@@ -192,7 +201,7 @@ async function main() {
   await writeTs('teams.ts', serializeConst('teams', allTeams, 'NHLTeam'));
   await writeTs(
     'players.ts',
-    serializeRecordConst('players', allPlayers, 'string', 'NHLPlayer'),
+    serializeRecordConst('players', allPlayers, 'string', 'NHLPlayer')
   );
 
   // 3. Playoff schedule → split by round
@@ -206,7 +215,12 @@ async function main() {
     log('  Falling back to empty game lists');
   }
 
-  const gamesByRound: Record<number, NHLGame[]> = { 1: [], 2: [], 3: [], 4: [] };
+  const gamesByRound: Record<number, NHLGame[]> = {
+    1: [],
+    2: [],
+    3: [],
+    4: [],
+  };
   for (const game of games) {
     const round = gameRound(game);
     if (gamesByRound[round]) {
@@ -228,7 +242,10 @@ async function main() {
   const allPlayerIds: { id: number; name: string }[] = [];
   for (const players of Object.values(allPlayers)) {
     for (const p of players) {
-      allPlayerIds.push({ id: p.id, name: p.fullName ?? `${p.firstName} ${p.lastName}` });
+      allPlayerIds.push({
+        id: p.id,
+        name: p.fullName ?? `${p.firstName} ${p.lastName}`,
+      });
     }
   }
   log(`  ${allPlayerIds.length} players total`);
@@ -253,7 +270,9 @@ async function main() {
       playersWithLogs++;
     }
   }
-  log(`  ✓ Got game logs for ${playersWithLogs}/${allPlayerIds.length} players`);
+  log(
+    `  ✓ Got game logs for ${playersWithLogs}/${allPlayerIds.length} players`
+  );
 
   await writeTs(
     'player-game-logs.ts',
@@ -261,8 +280,8 @@ async function main() {
       'playerGameLogs',
       playerGameLogs as unknown as Record<string, unknown>,
       'number',
-      'NHLPlayerStats',
-    ),
+      'NHLPlayerStats'
+    )
   );
 
   log('\n✅ All fixture data downloaded successfully!');

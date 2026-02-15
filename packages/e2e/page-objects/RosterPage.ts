@@ -23,7 +23,9 @@ export class RosterPage {
 
   /** Get active position slot sections (Forward, Defenseman, Goalie) */
   getActiveSlots(): Locator {
-    return this.page.getByRole('heading', { name: /^(Forward|Defenseman|Goalie)$/i }).locator('..');
+    return this.page
+      .getByRole('heading', { name: /^(Forward|Defenseman|Goalie)$/i })
+      .locator('..');
   }
 
   /** Get IR slot sections (IR Forward, IR Defenseman) */

@@ -23,11 +23,18 @@ import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
-/* eslint-disable react-hooks/rules-of-hooks */
-function useLeague(leagueId: string) {
-  if (IS_MOCK) return useMockLeague(leagueId);
+interface LeagueMemberRow {
+  id: string;
+  user_id: string;
+  team_name: string;
+  total_points: number;
+  users?: { display_name?: string; avatar_url?: string } | null;
+}
 
-  return useQuery({
+function useLeague(leagueId: string) {
+  const mockResult = useMockLeague(leagueId);
+
+  const queryResult = useQuery({
     queryKey: ['league', leagueId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -47,9 +54,11 @@ function useLeague(leagueId: string) {
       if (error) throw error;
       return data;
     },
+    enabled: !IS_MOCK,
   });
+
+  return IS_MOCK ? mockResult : queryResult;
 }
-/* eslint-enable react-hooks/rules-of-hooks */
 
 const STATUS_COLORS: Record<string, string> = {
   setup: 'blue',
@@ -85,7 +94,8 @@ export function LeagueDashboardPage() {
   const isCommissioner = league.commissioner_id === user?.id;
   const members = league.league_members ?? [];
   const sortedMembers = [...members].sort(
-    (a: any, b: any) => (b.total_points ?? 0) - (a.total_points ?? 0)
+    (a: LeagueMemberRow, b: LeagueMemberRow) =>
+      (b.total_points ?? 0) - (a.total_points ?? 0)
   );
 
   return (
@@ -204,19 +214,16 @@ export function LeagueDashboardPage() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {sortedMembers.map((member: any, index: number) => (
+              {sortedMembers.map((member: LeagueMemberRow, index: number) => (
                 <Table.Tr
                   key={member.id}
                   style={{
-                    fontWeight:
-                      member.user_id === user?.id ? 700 : undefined,
+                    fontWeight: member.user_id === user?.id ? 700 : undefined,
                   }}
                 >
                   <Table.Td>{index + 1}</Table.Td>
                   <Table.Td>{member.team_name}</Table.Td>
-                  <Table.Td>
-                    {member.users?.display_name ?? 'Unknown'}
-                  </Table.Td>
+                  <Table.Td>{member.users?.display_name ?? 'Unknown'}</Table.Td>
                   <Table.Td style={{ textAlign: 'right' }}>
                     {member.total_points ?? 0}
                   </Table.Td>

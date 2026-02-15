@@ -28,7 +28,6 @@ function makeMockQuery<T>(data: T): MockQueryResult<T> {
   return result;
 }
 
-/* eslint-disable no-unused-vars */
 interface MockMutationResult<TData, TVariables> {
   mutateAsync: (v: TVariables) => Promise<TData>;
   mutate: (v: TVariables) => void;
@@ -40,11 +39,9 @@ interface MockMutationResult<TData, TVariables> {
   data: undefined;
   status: 'idle';
 }
-/* eslint-enable no-unused-vars */
 
 function makeMockMutation<TData, TVariables>(
-  // eslint-disable-next-line no-unused-vars
-  fn: (v: TVariables) => TData,
+  fn: (v: TVariables) => TData
 ): MockMutationResult<TData, TVariables> {
   return {
     mutateAsync: (v) => Promise.resolve(fn(v)),
@@ -71,7 +68,7 @@ const ALL_PLAYER_IDS: number[] = Object.values(players)
 // Round 1: 1,2,3,...N  Round 2: N,...,3,2,1  Round 3: 1,2,3,...N  etc.
 export function generateSnakeDraftOrder(
   memberUserIds: string[],
-  totalRounds: number,
+  totalRounds: number
 ): string[] {
   const order: string[] = [];
   for (let round = 0; round < totalRounds; round++) {
@@ -145,7 +142,7 @@ export function useMockStartDraft() {
         params.draftOrder ??
         generateSnakeDraftOrder(memberUserIds, totalDraftRounds);
 
-      const draftId = `mock-draft-${params.leagueId}-${Date.now()}`;
+      const draftId = `mock-draft-${params.leagueId}-${crypto.randomUUID()}`;
 
       const draftState: MockDraftState = {
         draft: {
@@ -171,7 +168,7 @@ export function useMockStartDraft() {
         current_pick: 1,
         draft_order: draftOrder,
       };
-    },
+    }
   );
 }
 
@@ -200,7 +197,7 @@ export function useMockMakePick() {
       };
 
       dispatch({ type: 'MAKE_PICK', payload: { pick } });
-    },
+    }
   );
 }
 
@@ -209,9 +206,7 @@ export function useMockMakePick() {
 export function useMockLeagueMembers(leagueId: string | undefined) {
   const { state } = useMockData();
 
-  const league = leagueId
-    ? state.leagues.find((l) => l.id === leagueId)
-    : null;
+  const league = leagueId ? state.leagues.find((l) => l.id === leagueId) : null;
 
   const data = league
     ? league.members.map((m) => ({
@@ -219,9 +214,7 @@ export function useMockLeagueMembers(leagueId: string | undefined) {
         user_id: m.userId,
         team_name: m.teamName,
         total_points: m.totalPoints,
-        users: m.user
-          ? { display_name: m.user.displayName }
-          : null,
+        users: m.user ? { display_name: m.user.displayName } : null,
       }))
     : [];
 

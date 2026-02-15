@@ -175,8 +175,7 @@ test.describe('Join League Flow', () => {
                   team_name: teamName,
                   total_points: 0,
                   users: {
-                    display_name:
-                      mockUser.user_metadata.display_name,
+                    display_name: mockUser.user_metadata.display_name,
                     avatar_url: mockUser.user_metadata.avatar_url,
                   },
                 },

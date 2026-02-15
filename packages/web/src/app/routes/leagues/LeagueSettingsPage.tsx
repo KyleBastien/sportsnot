@@ -24,6 +24,14 @@ import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { generateInviteCode } from '@sportsnot/utils';
 
+interface SettingsMemberRow {
+  id: string;
+  user_id: string;
+  team_name: string;
+  total_points: number;
+  users?: { display_name?: string } | null;
+}
+
 export function LeagueSettingsPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { user } = useAuthContext();
@@ -95,7 +103,9 @@ export function LeagueSettingsPage() {
     if (updateError) {
       setError(updateError.message);
     } else {
-      queryClient.invalidateQueries({ queryKey: ['league-settings', leagueId] });
+      queryClient.invalidateQueries({
+        queryKey: ['league-settings', leagueId],
+      });
       setSuccess('Invite code regenerated!');
       setTimeout(() => setSuccess(''), 3000);
     }
@@ -130,7 +140,7 @@ export function LeagueSettingsPage() {
     }
 
     // Randomize draft order for round 1
-    const memberUserIds = members.map((m: any) => m.user_id);
+    const memberUserIds = members.map((m: SettingsMemberRow) => m.user_id);
     const shuffled = [...memberUserIds].sort(() => Math.random() - 0.5);
 
     const { error: draftError } = await supabase.from('drafts').insert({
@@ -281,10 +291,10 @@ export function LeagueSettingsPage() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {members.map((m: any) => (
+                {members.map((m: SettingsMemberRow) => (
                   <Table.Tr key={m.id}>
                     <Table.Td>
-                      {(m.users as any)?.display_name ?? 'Unknown'}
+                      {m.users?.display_name ?? 'Unknown'}
                       {m.user_id === league.commissioner_id && ' 👑'}
                     </Table.Td>
                     <Table.Td>{m.team_name}</Table.Td>
@@ -341,16 +351,15 @@ export function LeagueSettingsPage() {
               Are you sure you want to remove this member from the league?
             </Text>
             <Group justify="flex-end">
-              <Button
-                variant="subtle"
-                onClick={() => setRemoveMemberId(null)}
-              >
+              <Button variant="subtle" onClick={() => setRemoveMemberId(null)}>
                 Cancel
               </Button>
               <Button
                 color="red"
                 loading={removeMember.isPending}
-                onClick={() => removeMemberId && removeMember.mutate(removeMemberId)}
+                onClick={() =>
+                  removeMemberId && removeMember.mutate(removeMemberId)
+                }
               >
                 Remove
               </Button>

@@ -20,11 +20,21 @@ import { useMockStandings } from '../../../mock/hooks/useMockStandings';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
-/* eslint-disable react-hooks/rules-of-hooks */
-function useStandings(leagueId: string) {
-  if (IS_MOCK) return useMockStandings(leagueId);
+interface StandingsMemberRow {
+  id: string;
+  user_id: string;
+  team_name: string;
+  total_points: number;
+  player_points?: number | null;
+  goalie_points?: number | null;
+  round_points?: Record<string, number> | null;
+  users?: { display_name?: string } | null;
+}
 
-  return useQuery({
+function useStandings(leagueId: string) {
+  const mockResult = useMockStandings(leagueId);
+
+  const queryResult = useQuery({
     queryKey: ['standings', leagueId],
     queryFn: async () => {
       const { data: league } = await supabase
@@ -35,7 +45,9 @@ function useStandings(leagueId: string) {
 
       const { data: members, error } = await supabase
         .from('league_members')
-        .select('id, user_id, team_name, total_points, player_points, goalie_points, round_points, users(display_name)')
+        .select(
+          'id, user_id, team_name, total_points, player_points, goalie_points, round_points, users(display_name)'
+        )
         .eq('league_id', leagueId)
         .order('total_points', { ascending: false });
 
@@ -46,15 +58,17 @@ function useStandings(leagueId: string) {
         members: members ?? [],
       };
     },
+    enabled: !IS_MOCK,
   });
-}
-/* eslint-enable react-hooks/rules-of-hooks */
 
-function downloadCSV(members: any[], leagueName: string) {
+  return IS_MOCK ? mockResult : queryResult;
+}
+
+function downloadCSV(members: StandingsMemberRow[], leagueName: string) {
   const header = 'Rank,Team,Manager,Points\n';
   const rows = members
     .map(
-      (m: any, i: number) =>
+      (m, i: number) =>
         `${i + 1},"${m.team_name}","${m.users?.display_name ?? 'Unknown'}",${m.total_points ?? 0}`
     )
     .join('\n');
@@ -96,19 +110,21 @@ export function StandingsPage() {
 
   // Check if breakdown data exists
   const hasBreakdown = members.some(
-    (m: any) => m.player_points != null || m.goalie_points != null
+    (m: StandingsMemberRow) =>
+      m.player_points != null || m.goalie_points != null
   );
 
   // Check if round-by-round data exists
   const hasRoundPoints = members.some(
-    (m: any) => m.round_points && Object.keys(m.round_points).length > 0
+    (m: StandingsMemberRow) =>
+      m.round_points && Object.keys(m.round_points).length > 0
   );
 
   // Collect all round numbers across all members
   const roundNumbers = hasRoundPoints
     ? [
         ...new Set(
-          members.flatMap((m: any) =>
+          members.flatMap((m: StandingsMemberRow) =>
             m.round_points ? Object.keys(m.round_points).map(Number) : []
           )
         ),
@@ -142,8 +158,12 @@ export function StandingsPage() {
                 <Table.Th>Manager</Table.Th>
                 {hasBreakdown && (
                   <>
-                    <Table.Th style={{ textAlign: 'right' }}>Player Pts</Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>Goalie Pts</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>
+                      Player Pts
+                    </Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>
+                      Goalie Pts
+                    </Table.Th>
                   </>
                 )}
                 {roundNumbers.map((r) => (
@@ -155,7 +175,7 @@ export function StandingsPage() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {members.map((member: any, index: number) => {
+              {members.map((member: StandingsMemberRow, index: number) => {
                 const isMe = member.user_id === user?.id;
                 return (
                   <Table.Tr
@@ -196,12 +216,18 @@ export function StandingsPage() {
                     {hasBreakdown && (
                       <>
                         <Table.Td
-                          style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                          style={{
+                            textAlign: 'right',
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
                         >
                           {member.player_points ?? 0}
                         </Table.Td>
                         <Table.Td
-                          style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                          style={{
+                            textAlign: 'right',
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
                         >
                           {member.goalie_points ?? 0}
                         </Table.Td>
@@ -210,13 +236,19 @@ export function StandingsPage() {
                     {roundNumbers.map((r) => (
                       <Table.Td
                         key={r}
-                        style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                        style={{
+                          textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
                       >
                         {member.round_points?.[r] ?? 0}
                       </Table.Td>
                     ))}
                     <Table.Td
-                      style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                      style={{
+                        textAlign: 'right',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
                     >
                       {member.total_points ?? 0}
                     </Table.Td>

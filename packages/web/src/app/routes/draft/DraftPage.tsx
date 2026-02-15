@@ -19,11 +19,22 @@ import {
   ScrollArea,
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
-import { supabase, usePlayoffPlayers, usePlayoffTeams } from '@sportsnot/supabase';
+import {
+  supabase,
+  usePlayoffPlayers,
+  usePlayoffTeams,
+} from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import type { Position } from '@sportsnot/types';
-import { useMockDraft, useMockLeagueMembers, useMockMakePick } from '../../../mock/hooks/useMockDraft';
-import { useMockPlayoffPlayers, useMockPlayoffTeams } from '../../../mock/hooks/useMockNhlApi';
+import {
+  useMockDraft,
+  useMockLeagueMembers,
+  useMockMakePick,
+} from '../../../mock/hooks/useMockDraft';
+import {
+  useMockPlayoffPlayers,
+  useMockPlayoffTeams,
+} from '../../../mock/hooks/useMockNhlApi';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -38,11 +49,47 @@ interface DraftablePlayer {
   headshot?: string;
 }
 
-/* eslint-disable react-hooks/rules-of-hooks */
-function useDraft(leagueId: string) {
-  if (IS_MOCK) return useMockDraft(leagueId);
+interface DraftMemberRow {
+  id: string;
+  user_id: string;
+  team_name: string;
+  total_points: number;
+  users?: { display_name?: string } | null;
+}
 
-  return useQuery({
+interface DraftPickRow {
+  id: string;
+  pick_number: number;
+  player_id: number | null;
+  team_id: number | null;
+  position: string;
+  league_members?: { team_name: string; user_id: string } | null;
+}
+
+interface PlayerStatRow {
+  player_id: number;
+  player_name: string;
+  position: string;
+  team_abbreviation: string;
+  is_injured: boolean;
+  goals: number;
+  assists: number;
+  games_played: number;
+}
+
+interface TeamStatRow {
+  team_id: number;
+  team_name: string;
+  team_abbreviation: string;
+  is_eliminated: boolean;
+  wins: number;
+  shutouts: number;
+}
+
+function useDraft(leagueId: string) {
+  const mockResult = useMockDraft(leagueId);
+
+  const queryResult = useQuery({
     queryKey: ['draft', leagueId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -56,14 +103,17 @@ function useDraft(leagueId: string) {
       if (error) throw error;
       return data;
     },
-    refetchInterval: 3000, // Poll every 3s for real-time feel
+    enabled: !IS_MOCK,
+    refetchInterval: IS_MOCK ? false : 3000,
   });
+
+  return IS_MOCK ? mockResult : queryResult;
 }
 
 function useLeagueMembers(leagueId: string) {
-  if (IS_MOCK) return useMockLeagueMembers(leagueId);
+  const mockResult = useMockLeagueMembers(leagueId);
 
-  return useQuery({
+  const queryResult = useQuery({
     queryKey: ['league-members', leagueId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -74,9 +124,11 @@ function useLeagueMembers(leagueId: string) {
       if (error) throw error;
       return data ?? [];
     },
+    enabled: !IS_MOCK,
   });
+
+  return IS_MOCK ? mockResult : queryResult;
 }
-/* eslint-enable react-hooks/rules-of-hooks */
 
 interface ComparePlayer {
   id: number;
@@ -91,8 +143,8 @@ interface ComparePlayer {
 const MAX_COMPARE = 4;
 
 interface AvailablePlayerBoardProps {
-  playerStats: any[];
-  teamStats: any[];
+  playerStats: PlayerStatRow[];
+  teamStats: TeamStatRow[];
   draftedPlayerIds: Set<number>;
   draftedTeamIds: Set<number>;
   positionFilter: string;
@@ -152,7 +204,12 @@ function AvailablePlayerBoard({
     }));
 
   const filteredSkaters = skaterRows.filter((p) => {
-    if (positionFilter !== 'ALL' && positionFilter !== 'F' && positionFilter !== 'D') return false;
+    if (
+      positionFilter !== 'ALL' &&
+      positionFilter !== 'F' &&
+      positionFilter !== 'D'
+    )
+      return false;
     if (positionFilter === 'F' && p.position !== 'F') return false;
     if (positionFilter === 'D' && p.position !== 'D') return false;
     if (query && !p.fullName.toLowerCase().includes(query)) return false;
@@ -172,7 +229,9 @@ function AvailablePlayerBoard({
     <Stack gap="md">
       {showSkaters && (
         <>
-          <Text fw={600} size="sm">Skaters ({filteredSkaters.length} available)</Text>
+          <Text fw={600} size="sm">
+            Skaters ({filteredSkaters.length} available)
+          </Text>
           <ScrollArea h={300}>
             <Table striped highlightOnHover>
               <Table.Thead>
@@ -195,12 +254,22 @@ function AvailablePlayerBoard({
                     <Table.Tr key={p.id}>
                       <Table.Td>{p.fullName}</Table.Td>
                       <Table.Td>
-                        <Badge size="xs" variant="light">{p.position}</Badge>
+                        <Badge size="xs" variant="light">
+                          {p.position}
+                        </Badge>
                       </Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>{p.goals}</Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>{p.assists}</Table.Td>
-                      <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{p.points}</Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>{p.gamesPlayed}</Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>
+                        {p.goals}
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>
+                        {p.assists}
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
+                        {p.points}
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>
+                        {p.gamesPlayed}
+                      </Table.Td>
                       <Table.Td>
                         <Button
                           size="xs"
@@ -249,7 +318,9 @@ function AvailablePlayerBoard({
                 {filteredSkaters.length === 0 && (
                   <Table.Tr>
                     <Table.Td colSpan={isMyTurn ? 8 : 7}>
-                      <Text c="dimmed" ta="center" size="sm">No available skaters match your filters</Text>
+                      <Text c="dimmed" ta="center" size="sm">
+                        No available skaters match your filters
+                      </Text>
                     </Table.Td>
                   </Table.Tr>
                 )}
@@ -261,7 +332,9 @@ function AvailablePlayerBoard({
 
       {showTeams && (
         <>
-          <Text fw={600} size="sm">Teams / Goaltending ({filteredTeams.length} available)</Text>
+          <Text fw={600} size="sm">
+            Teams / Goaltending ({filteredTeams.length} available)
+          </Text>
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
@@ -276,7 +349,9 @@ function AvailablePlayerBoard({
                 <Table.Tr key={t.teamId}>
                   <Table.Td>{t.fullName}</Table.Td>
                   <Table.Td style={{ textAlign: 'right' }}>{t.wins}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{t.shutouts}</Table.Td>
+                  <Table.Td style={{ textAlign: 'right' }}>
+                    {t.shutouts}
+                  </Table.Td>
                   {isMyTurn && (
                     <Table.Td>
                       <Button
@@ -303,7 +378,9 @@ function AvailablePlayerBoard({
               {filteredTeams.length === 0 && (
                 <Table.Tr>
                   <Table.Td colSpan={isMyTurn ? 4 : 3}>
-                    <Text c="dimmed" ta="center" size="sm">No available teams match your filters</Text>
+                    <Text c="dimmed" ta="center" size="sm">
+                      No available teams match your filters
+                    </Text>
                   </Table.Td>
                 </Table.Tr>
               )}
@@ -322,12 +399,13 @@ export function DraftPage() {
   const { data: members } = useLeagueMembers(leagueId!);
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [confirmPlayer, setConfirmPlayer] = useState<DraftablePlayer | null>(null);
+  const [confirmPlayer, setConfirmPlayer] = useState<DraftablePlayer | null>(
+    null
+  );
   const [confirmPosition, setConfirmPosition] = useState<Position>('F');
   const [submitting, setSubmitting] = useState(false);
   const [comparePlayers, setComparePlayers] = useState<ComparePlayer[]>([]);
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const mockMakePick = IS_MOCK ? useMockMakePick() : null;
+  const mockMakePick = useMockMakePick();
 
   const handleToggleCompare = (player: ComparePlayer) => {
     setComparePlayers((prev) => {
@@ -343,36 +421,45 @@ export function DraftPage() {
   };
 
   // Fetch cached NHL data
-  /* eslint-disable react-hooks/rules-of-hooks */
   const currentSeason = '20242025'; // TODO: derive from NHL API
   const currentRound = draft?.round ?? 1;
+  const mockPlayerResult = useMockPlayoffPlayers(currentSeason, currentRound);
+  const supabasePlayerResult = usePlayoffPlayers(currentSeason, currentRound);
   const { data: playerStats } = IS_MOCK
-    ? useMockPlayoffPlayers(currentSeason, currentRound)
-    : usePlayoffPlayers(currentSeason, currentRound);
-  const { data: teamStats } = IS_MOCK
-    ? useMockPlayoffTeams(currentSeason, currentRound)
-    : usePlayoffTeams(currentSeason, currentRound);
-  /* eslint-enable react-hooks/rules-of-hooks */
+    ? mockPlayerResult
+    : supabasePlayerResult;
+  const mockTeamResult = useMockPlayoffTeams(currentSeason, currentRound);
+  const supabaseTeamResult = usePlayoffTeams(currentSeason, currentRound);
+  const { data: teamStats } = IS_MOCK ? mockTeamResult : supabaseTeamResult;
 
   // Derived state — compute before early returns to keep hook order stable
   const draftOrder: string[] = (draft?.draft_order as string[]) ?? [];
-  const picks = draft?.draft_picks ?? [];
+  const picks = useMemo(
+    () => (draft?.draft_picks ?? []) as DraftPickRow[],
+    [draft?.draft_picks]
+  );
 
   const currentPickIndex = draft ? draft.current_pick - 1 : 0;
   const currentPickerUserId = draftOrder[currentPickIndex];
   const isMyTurn = currentPickerUserId === user?.id;
-  const myMember = members?.find((m: any) => m.user_id === user?.id);
+  const myMember = members?.find((m: DraftMemberRow) => m.user_id === user?.id);
   const currentPicker = members?.find(
-    (m: any) => m.user_id === currentPickerUserId
+    (m: DraftMemberRow) => m.user_id === currentPickerUserId
   );
 
   // Track which players/teams have already been drafted
   const draftedPlayerIds = useMemo(
-    () => new Set<number>(picks.filter((p: any) => p.player_id).map((p: any) => p.player_id as number)),
+    () =>
+      new Set<number>(
+        picks.filter((p) => p.player_id).map((p) => p.player_id as number)
+      ),
     [picks]
   );
   const draftedTeamIds = useMemo(
-    () => new Set<number>(picks.filter((p: any) => p.team_id).map((p: any) => p.team_id as number)),
+    () =>
+      new Set<number>(
+        picks.filter((p) => p.team_id).map((p) => p.team_id as number)
+      ),
     [picks]
   );
 
@@ -508,7 +595,7 @@ export function DraftPage() {
               </Text>
               <Text fw={700} size="lg">
                 {currentPicker
-                  ? (currentPicker as any).team_name
+                  ? (currentPicker as DraftMemberRow).team_name
                   : 'Unknown'}
               </Text>
               {isMyTurn && (
@@ -552,12 +639,9 @@ export function DraftPage() {
           ) : (
             <Stack gap="xs">
               {[...picks]
-                .sort(
-                  (a: any, b: any) =>
-                    (b.pick_number ?? 0) - (a.pick_number ?? 0)
-                )
+                .sort((a, b) => (b.pick_number ?? 0) - (a.pick_number ?? 0))
                 .slice(0, 10)
-                .map((pick: any) => (
+                .map((pick) => (
                   <Group key={pick.id} justify="space-between">
                     <Text size="sm">
                       #{pick.pick_number} -{' '}
@@ -591,7 +675,7 @@ export function DraftPage() {
                 <Alert color="blue">
                   Waiting for{' '}
                   {currentPicker
-                    ? (currentPicker as any).team_name
+                    ? (currentPicker as DraftMemberRow).team_name
                     : 'the next drafter'}{' '}
                   to make their pick...
                 </Alert>
@@ -624,7 +708,13 @@ export function DraftPage() {
 
         {/* Compare Tray */}
         {comparePlayers.length > 0 && (
-          <Card shadow="sm" padding="md" radius="md" withBorder data-testid="compare-tray">
+          <Card
+            shadow="sm"
+            padding="md"
+            radius="md"
+            withBorder
+            data-testid="compare-tray"
+          >
             <Group justify="space-between" mb="sm">
               <Title order={4}>Compare ({comparePlayers.length})</Title>
               <Button
@@ -649,10 +739,18 @@ export function DraftPage() {
               <Table.Tbody>
                 {comparePlayers.map((p) => (
                   <Table.Tr key={p.id}>
-                    <Table.Td>{p.fullName} ({p.team})</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{p.goals}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{p.assists}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>{p.points}</Table.Td>
+                    <Table.Td>
+                      {p.fullName} ({p.team})
+                    </Table.Td>
+                    <Table.Td style={{ textAlign: 'right' }}>
+                      {p.goals}
+                    </Table.Td>
+                    <Table.Td style={{ textAlign: 'right' }}>
+                      {p.assists}
+                    </Table.Td>
+                    <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
+                      {p.points}
+                    </Table.Td>
                     <Table.Td>
                       <Button
                         size="xs"
@@ -701,10 +799,7 @@ export function DraftPage() {
                 }
               />
               <Group justify="flex-end">
-                <Button
-                  variant="subtle"
-                  onClick={() => setConfirmPlayer(null)}
-                >
+                <Button variant="subtle" onClick={() => setConfirmPlayer(null)}>
                   Cancel
                 </Button>
                 <Button onClick={handleConfirmPick} loading={submitting}>

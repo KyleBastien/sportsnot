@@ -1,6 +1,13 @@
 import { useMockData } from '../MockDataProvider';
 import { SCORING } from '@sportsnot/types';
-import { playerGameLogs, players, gamesR1, gamesR2, gamesCf, gamesScf } from '@sportsnot/mock-data';
+import {
+  playerGameLogs,
+  players,
+  gamesR1,
+  gamesR2,
+  gamesCf,
+  gamesScf,
+} from '@sportsnot/mock-data';
 import type { NHLPlayerStats, NHLGame, NHLPlayer } from '@sportsnot/types';
 
 // ── Mock TanStack query helper ─────────────────────────────────────────
@@ -32,7 +39,9 @@ function makeMockQuery<T>(data: T): MockQueryResult<T> {
 // ── Player info lookup ─────────────────────────────────────────────────
 const allPlayers = players as unknown as Record<string, NHLPlayer[]>;
 
-function getPlayerInfo(playerId: number): { name: string; teamAbbrev: string; isGoalie: boolean } | null {
+function getPlayerInfo(
+  playerId: number
+): { name: string; teamAbbrev: string; isGoalie: boolean } | null {
   for (const [teamAbbrev, teamPlayers] of Object.entries(allPlayers)) {
     const p = teamPlayers.find((pl) => pl.id === playerId);
     if (p) {
@@ -102,8 +111,12 @@ export function useMockScoringHistory(leagueId: string) {
           const game = GAME_MAP.get(entry.gameId);
           if (game) {
             const isHome = game.homeTeam.abbreviation === entry.teamAbbrev;
-            const teamScore = isHome ? (game.homeTeam.score ?? 0) : (game.awayTeam.score ?? 0);
-            const oppScore = isHome ? (game.awayTeam.score ?? 0) : (game.homeTeam.score ?? 0);
+            const teamScore = isHome
+              ? (game.homeTeam.score ?? 0)
+              : (game.awayTeam.score ?? 0);
+            const oppScore = isHome
+              ? (game.awayTeam.score ?? 0)
+              : (game.homeTeam.score ?? 0);
             if (teamScore > oppScore) {
               if (oppScore === 0) {
                 events.push({

@@ -6,19 +6,13 @@ import {
 import { mockUser } from '../fixtures/auth.fixture';
 import { createMockLeague } from '../fixtures/data-factories';
 import { DashboardPage } from '../page-objects';
+import type { League } from '@sportsnot/types';
 
 const NAV_TIMEOUT = { timeout: 15000 };
 
 /** Build league response objects that match the shape the dashboard query returns */
-function createLeagueWithMembers(
-  overrides?: Partial<{
-    name: string;
-    status: string;
-    current_round: number;
-    id: string;
-  }>
-) {
-  const league = createMockLeague(overrides as any);
+function createLeagueWithMembers(overrides?: Partial<League>) {
+  const league = createMockLeague(overrides);
   return {
     id: league.id,
     name: league.name,
@@ -48,18 +42,28 @@ test.describe('Dashboard', () => {
 
     const dashboard = new DashboardPage(authenticatedPage);
     await expect(dashboard.heading).toBeVisible(NAV_TIMEOUT);
-    await expect(
-      authenticatedPage.getByText(/welcome back/i)
-    ).toBeVisible();
+    await expect(authenticatedPage.getByText(/welcome back/i)).toBeVisible();
   });
 
   test('dashboard shows league list when user has leagues', async ({
     authenticatedPage,
   }) => {
     const leagues = [
-      createLeagueWithMembers({ name: 'Playoff Legends', status: 'active', current_round: 2 }),
-      createLeagueWithMembers({ name: 'Office Pool', status: 'setup', current_round: 1 }),
-      createLeagueWithMembers({ name: 'Family League', status: 'drafting', current_round: 1 }),
+      createLeagueWithMembers({
+        name: 'Playoff Legends',
+        status: 'active',
+        currentRound: 2,
+      }),
+      createLeagueWithMembers({
+        name: 'Office Pool',
+        status: 'setup',
+        currentRound: 1,
+      }),
+      createLeagueWithMembers({
+        name: 'Family League',
+        status: 'drafting',
+        currentRound: 1,
+      }),
     ];
 
     await setupSupabaseMocks(authenticatedPage, {
@@ -133,11 +137,17 @@ test.describe('Dashboard', () => {
 
     // Both teams should appear
     await expect(authenticatedPage.getByText('Boston Bruins')).toBeVisible();
-    await expect(authenticatedPage.getByText('Tampa Bay Lightning')).toBeVisible();
+    await expect(
+      authenticatedPage.getByText('Tampa Bay Lightning')
+    ).toBeVisible();
 
     // Badge abbreviations
-    await expect(authenticatedPage.getByText('BOS', { exact: true })).toBeVisible();
-    await expect(authenticatedPage.getByText('TBL', { exact: true })).toBeVisible();
+    await expect(
+      authenticatedPage.getByText('BOS', { exact: true })
+    ).toBeVisible();
+    await expect(
+      authenticatedPage.getByText('TBL', { exact: true })
+    ).toBeVisible();
   });
 
   test('clicking a league card navigates to /leagues/:leagueId', async ({

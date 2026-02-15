@@ -108,7 +108,9 @@ test.describe('League Dashboard', () => {
     await expect(authenticatedPage.getByText('setup')).toBeVisible();
 
     // Member count
-    await expect(authenticatedPage.getByText(/3\s*\/\s*8 members/)).toBeVisible();
+    await expect(
+      authenticatedPage.getByText(/3\s*\/\s*8 members/)
+    ).toBeVisible();
 
     // Standings heading
     await expect(
@@ -144,12 +146,12 @@ test.describe('League Dashboard', () => {
     // Settings button should NOT be visible
     await expect(
       authenticatedPage.getByRole('button', { name: /settings/i })
-    ).not.toBeVisible();
+    ).toBeHidden();
 
     // Start Draft button should NOT be visible (not commissioner)
     await expect(
       authenticatedPage.getByRole('button', { name: /start draft/i })
-    ).not.toBeVisible();
+    ).toBeHidden();
   });
 
   test('commissioner sees settings link and can navigate to settings page', async ({
@@ -244,9 +246,9 @@ test.describe('League Dashboard', () => {
       .click();
 
     // Should show success alert
-    await expect(
-      authenticatedPage.getByText(/settings saved/i)
-    ).toBeVisible(NAV_TIMEOUT);
+    await expect(authenticatedPage.getByText(/settings saved/i)).toBeVisible(
+      NAV_TIMEOUT
+    );
 
     // Verify PATCH was sent
     expect(patchRequests.length).toBeGreaterThan(0);
