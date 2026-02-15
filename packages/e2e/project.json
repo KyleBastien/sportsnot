@@ -7,6 +7,12 @@
     "e2e": {
       "executor": "@nx/playwright:playwright",
       "outputs": ["{workspaceRoot}/packages/e2e/playwright-report"],
+      "dependsOn": [
+        {
+          "projects": ["@sportsnot/web"],
+          "target": "serve-static"
+        }
+      ],
       "options": {
         "config": "packages/e2e/playwright.config.ts"
       }

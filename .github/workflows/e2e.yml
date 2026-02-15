@@ -73,12 +73,8 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      - name: Build web app
-        run: npx nx build @sportsnot/web
-
       - name: Run Playwright tests
-        working-directory: packages/e2e
-        run: npx playwright test
+        run: npx nx e2e @sportsnot/e2e
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
