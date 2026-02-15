@@ -33,6 +33,15 @@ const MockDataProvider =
       )
     : null;
 
+const SimulationControlPanel =
+  import.meta.env.VITE_MOCK_MODE === 'true'
+    ? lazy(() =>
+        import('../mock/components/SimulationControlPanel').then((m) => ({
+          default: m.SimulationControlPanel,
+        }))
+      )
+    : null;
+
 // Route pages
 import { LoginPage } from './routes/auth/LoginPage';
 import { AuthCallbackPage } from './routes/auth/AuthCallbackPage';
@@ -103,7 +112,14 @@ function MockWrapper({ children }: { children: ReactNode }) {
   if (!MockDataProvider) return <>{children}</>;
   return (
     <Suspense fallback={null}>
-      <MockDataProvider>{children}</MockDataProvider>
+      <MockDataProvider>
+        {children}
+        {SimulationControlPanel && (
+          <Suspense fallback={null}>
+            <SimulationControlPanel />
+          </Suspense>
+        )}
+      </MockDataProvider>
     </Suspense>
   );
 }
