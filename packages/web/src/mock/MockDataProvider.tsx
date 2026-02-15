@@ -11,7 +11,16 @@ import type {
   Draft,
   DraftPick,
   RosterSlot,
+  NHLPlayerStats,
+  NHLGame,
 } from '@sportsnot/types';
+import {
+  gamesR1,
+  gamesR2,
+  gamesCf,
+  gamesScf,
+  playerGameLogs,
+} from '@sportsnot/mock-data';
 import { BotAutoPickRunner } from './bot/BotAutoPickRunner';
 
 // ── Mock user ──────────────────────────────────────────────────────────
@@ -52,6 +61,57 @@ export interface MockState {
 
 // Initial simulation date: day before first R1 game (2025-04-18)
 const INITIAL_SIMULATION_DATE = '2025-04-18';
+
+// ── Round game fixtures ────────────────────────────────────────────────
+const ROUND_GAMES: Record<number, NHLGame[]> = {
+  1: gamesR1 as unknown as NHLGame[],
+  2: gamesR2 as unknown as NHLGame[],
+  3: gamesCf as unknown as NHLGame[],
+  4: gamesScf as unknown as NHLGame[],
+};
+
+/** Get the first and last game dates for a given round */
+export function getRoundDateBounds(round: number): { firstDate: string; lastDate: string } | null {
+  const games = ROUND_GAMES[round];
+  if (!games || games.length === 0) return null;
+  const dates = games.map((g) => g.gameDate).sort();
+  return { firstDate: dates[0], lastDate: dates[dates.length - 1] };
+}
+
+/**
+ * Pure function: accumulate player stats from fixture data through a given date.
+ * Returns cumulative stats keyed by player ID.
+ */
+export function accumulatePlayerStats(
+  logs: Record<number, NHLPlayerStats[]>,
+  throughDate: string,
+): Record<number, { goals: number; assists: number; gamesPlayed: number }> {
+  const result: Record<number, { goals: number; assists: number; gamesPlayed: number }> = {};
+  for (const [playerIdStr, entries] of Object.entries(logs)) {
+    const playerId = Number(playerIdStr);
+    let goals = 0;
+    let assists = 0;
+    let gamesPlayed = 0;
+    for (const entry of entries) {
+      if (entry.gameDate <= throughDate) {
+        goals += entry.goals;
+        assists += entry.assists;
+        gamesPlayed += 1;
+      }
+    }
+    if (gamesPlayed > 0) {
+      result[playerId] = { goals, assists, gamesPlayed };
+    }
+  }
+  return result;
+}
+
+/** Advance an ISO date string by one calendar day */
+function addOneDay(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00Z'); // noon to avoid DST issues
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 function getInitialState(): MockState {
   return {
@@ -156,10 +216,60 @@ function mockReducer(state: MockState, action: MockAction): MockState {
         leagues: leaguesAfterPick,
       };
     }
-    case 'ADVANCE_DAY':
-      return state;
-    case 'ADVANCE_ROUND':
-      return state;
+    case 'ADVANCE_DAY': {
+      if (state.seasonComplete) return state;
+      if (state.roundComplete) return state;
+
+      const newDate = addOneDay(state.simulationDate);
+      const newStats = accumulatePlayerStats(
+        playerGameLogs as unknown as Record<number, NHLPlayerStats[]>,
+        newDate,
+      );
+
+      // Check if current round is complete (simulationDate >= lastDate of round)
+      const bounds = getRoundDateBounds(state.currentRound);
+      const isRoundComplete = bounds ? newDate >= bounds.lastDate : false;
+
+      // If this is round 4 and it's complete, season is done
+      const isSeasonComplete = isRoundComplete && state.currentRound === 4;
+
+      return {
+        ...state,
+        simulationDate: newDate,
+        playerStats: newStats,
+        roundComplete: isRoundComplete,
+        seasonComplete: isSeasonComplete,
+      };
+    }
+    case 'ADVANCE_ROUND': {
+      if (!state.roundComplete) return state;
+      if (state.seasonComplete) return state;
+      if (state.currentRound >= 4) return state;
+
+      const nextRound = state.currentRound + 1;
+      const nextBounds = getRoundDateBounds(nextRound);
+      // Set simulationDate to the day before the next round's first game
+      const dayBeforeNext = nextBounds
+        ? (() => {
+            const d = new Date(nextBounds.firstDate + 'T12:00:00Z');
+            d.setUTCDate(d.getUTCDate() - 1);
+            return d.toISOString().slice(0, 10);
+          })()
+        : state.simulationDate;
+
+      const newStats = accumulatePlayerStats(
+        playerGameLogs as unknown as Record<number, NHLPlayerStats[]>,
+        dayBeforeNext,
+      );
+
+      return {
+        ...state,
+        currentRound: nextRound,
+        simulationDate: dayBeforeNext,
+        roundComplete: false,
+        playerStats: newStats,
+      };
+    }
     case 'ACTIVATE_IR':
       return state;
     case 'DEACTIVATE_IR':

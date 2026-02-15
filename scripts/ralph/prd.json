@@ -140,7 +140,7 @@
         "Playwright tests pass"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Check how AuthContext and ProtectedRoute work in the existing codebase to ensure the mock auth integrates seamlessly."
     },
     {
@@ -159,7 +159,7 @@
         "Playwright tests pass"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Check how existing hooks like usePlayoffPlayers and usePlayoffTeams are consumed by components to match the return shape exactly."
     },
     {
@@ -180,7 +180,7 @@
         "Playwright tests pass"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "League settings (roster size, scoring rules) should match the real league creation flow. Store leagues in the MockDataProvider state via dispatch."
     },
     {
@@ -200,7 +200,7 @@
         "Playwright tests pass"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "This story handles draft state management only. Bot auto-pick AI is a separate story. The available player pool comes from the mock-data fixture players."
     },
     {
@@ -221,7 +221,7 @@
         "Playwright tests pass"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "The bot strategy doesn't need to be sophisticated — just avoid degenerate rosters (all goalies). Use a simple ranking: sort available players by position need, then by some stat or alphabetical as tiebreaker."
     },
     {
@@ -243,7 +243,7 @@
         "Playwright tests pass"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "The initial simulationDate after draft should be the day before the first R1 game in the fixture data. The stat accumulation function should handle both skater stats (NHLPlayerStats) and goalie stats."
     },
     {

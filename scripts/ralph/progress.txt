@@ -23,6 +23,19 @@ Started: 02/14/2026 21:14:25
 - Playwright tests need `--config packages/e2e/playwright.config.ts` flag (bare `npx playwright test` picks up rstest files)
 - MockWrapper pattern in app.tsx: conditionally wrap children with lazy-loaded provider using `if (!Comp) return <>{children}</>` guard
 - Playwright full suite (86 tests) is slow; use smoke test (`packages/e2e/tests/smoke.spec.ts`) for quick validation
+- AuthContext and AuthContextValue are exported from AuthContext.tsx — mock/test providers can reuse the same context
+- Mock auth pattern: MockAuthProvider in main.tsx uses same AuthContext, lazy-loaded behind build-time guard
+- Mock TanStack Query pattern: use makeMockQuery() helper that returns { data, isLoading: false, error: null, ... } matching UseQueryResult shape
+- Mock TanStack Mutation pattern: use makeMockMutation() helper that returns { mutateAsync, mutate, isLoading: false, ... } matching UseMutationResult shape
+- DraftPage inline useDraft returns Supabase snake_case: { draft_order, current_pick, draft_picks: [{ pick_number, player_id, league_members: { team_name, user_id } }] }
+- Snake draft order is pre-expanded into flat array (members × rounds) — generateSnakeDraftOrder in useMockDraft.ts
+- LeagueMember.user is typed as User (camelCase: displayName, avatarUrl), not snake_case — but Supabase responses use snake_case (display_name, avatar_url)
+- Bot names pool: pull from fixture data players for realistic names
+- Bot auto-pick: use BotAutoPickRunner (invisible component) inside MockDataProvider — triggers useBotAutoPick hook that monitors draft state
+- Bot strategy: pick best available player by greatest positional need (5F/3D/2G targets), alphabetical tiebreaker
+- Browser globals (setTimeout/clearTimeout) need `/* eslint-disable no-undef */` in web package files too
+- Simulation state: accumulatePlayerStats and getRoundDateBounds are exported from MockDataProvider for reuse by standings/roster/scoring hooks
+- Round game fixtures mapped in ROUND_GAMES: { 1: gamesR1, 2: gamesR2, 3: gamesCf, 4: gamesScf }
 
 ---
 
@@ -105,4 +118,103 @@ Started: 02/14/2026 21:14:25
   - Initial simulationDate is '2025-04-18' (day before first R1 game in fixture data)
   - Playwright full suite (86 tests) takes very long to run; use smoke test for quick validation
   - Navigation test failures are pre-existing (auth/profile route) — not caused by mock changes
+---
+
+## 2026-02-15T06:52:00Z - US-007
+- Created mock auth provider that bypasses Supabase auth with automatic mock user login
+- useMockAuth.ts returns deterministic mock user (id: mock-user-001, display_name: Mock User) with compatible Supabase User/Session types
+- MockAuthProvider.tsx provides mock auth through the same AuthContext used by real AuthProvider
+- main.tsx conditionally lazy-loads MockAuthProvider when VITE_MOCK_MODE=true, otherwise uses real AuthProvider
+- Sign-out shows alert('🧪 Mock mode — auth disabled') and remains logged in
+- All auth-gated routes (ProtectedRoute) work normally with mock user
+- No Supabase network requests in mock mode (useAuth from @sportsnot/supabase is never called)
+- Files changed: packages/web/src/mock/hooks/useMockAuth.ts (new), packages/web/src/mock/MockAuthProvider.tsx (new), packages/web/src/app/context/AuthContext.tsx (exported AuthContext + AuthContextValue), packages/web/src/main.tsx (conditional auth wrapper)
+- **Learnings for future iterations:**
+  - AuthContext and AuthContextValue are now exported from AuthContext.tsx — mock providers can reuse the same context
+  - MockAuthProvider uses the same lazy-load + build-time guard pattern as MockModeBanner/MockDataProvider in main.tsx
+  - Supabase User type has many required fields — use `as unknown as User` cast for mock objects with the fields actually used by app code
+  - The AuthWrapper pattern in main.tsx mirrors the MockWrapper pattern in app.tsx
+  - Sign-out in mock mode is a no-op — mock user stays logged in
+---
+
+## 2026-02-15T07:10:00Z - US-008
+- Created packages/web/src/mock/hooks/useMockNhlApi.ts with mock implementations of NHL API functions and Supabase hooks
+- Mock functions: mockGetPlayoffBracket, mockGetTeamRoster, mockGetPlayer, mockGetTeams, mockGetPlayoffSchedule — all return fixture data from @sportsnot/mock-data
+- Mock hooks: useMockPlayoffPlayers and useMockPlayoffTeams — return data shaped like player_stats_cache and team_stats_cache tables, wrapped in TanStack Query-compatible response objects
+- No network requests to NHL API or Supabase when mocks are active
+- Files changed: packages/web/src/mock/hooks/useMockNhlApi.ts (new)
+- **Learnings for future iterations:**
+  - DraftPage.tsx consumes usePlayoffPlayers/usePlayoffTeams from @sportsnot/supabase — mock data must match the Supabase table column shapes (player_id, player_name, position, team_abbreviation, goals, assists, games_played, is_injured for players; team_id, team_name, team_abbreviation, wins, shutouts, is_eliminated for teams)
+  - TanStack Query result shape needs: data, isLoading, isError, error, isFetching, isSuccess, status, refetch — a makeMockQuery helper function simplifies this
+  - ESLint no-unused-vars doesn't respect underscore prefix — use eslint-disable comments for placeholder params
+  - `as unknown as NHLGame[]` cast needed for `as const` fixture arrays to match mutable type signatures
+---
+
+## 2026-02-15T07:31:00Z - US-009
+- Created packages/web/src/mock/hooks/useMockLeagues.ts with mock league hooks
+- Hooks: useMockLeagues, useMockLeague, useMockCreateLeague, useMockJoinLeague
+- Implemented CREATE_LEAGUE and JOIN_LEAGUE reducer actions in MockDataProvider.tsx
+- Bot members generated with NHL player names from fixture data (players.ts)
+- Mock leagues include `isMock: true` flag for UI badge display
+- makeMockMutation helper mirrors makeMockQuery for TanStack mutation-shaped returns
+- Files changed: packages/web/src/mock/hooks/useMockLeagues.ts (new), packages/web/src/mock/MockDataProvider.tsx
+- **Learnings for future iterations:**
+  - User type uses camelCase (displayName, avatarUrl) but Supabase responses from useLeague return snake_case (display_name, avatar_url) — mock hooks must map between the two
+  - ESLint no-unused-vars flags function type parameter names in interfaces — use eslint-disable comments around interface blocks
+  - makeMockMutation pattern: fn parameter called with `v` to avoid unused-var lint issues, uses `mutateAsync` and `mutate` to match TanStack mutation shape
+  - CREATE_LEAGUE reducer sets currentLeague to the new league ID for navigation
+  - Bot member IDs follow pattern `bot-member-{leagueId}-{index}`, user IDs follow `bot-user-{paddedIndex}`
+---
+
+## 2026-02-15T07:46:00Z - US-010
+- Created packages/web/src/mock/hooks/useMockDraft.ts with mock draft hooks
+- Hooks: useMockDraft, useMockStartDraft, useMockMakePick, useMockLeagueMembers
+- Implemented START_DRAFT and MAKE_PICK reducer actions in MockDataProvider.tsx
+- Snake draft ordering: generateSnakeDraftOrder creates 1-2-3...3-2-1 pattern for N members × T rounds
+- Draft completion: when currentPick exceeds draftOrder length, status → 'completed', league → 'active'
+- All hooks return Supabase snake_case shaped data (draft_order, current_pick, draft_picks, pick_number, league_members)
+- Files changed: packages/web/src/mock/hooks/useMockDraft.ts (new), packages/web/src/mock/MockDataProvider.tsx
+- **Learnings for future iterations:**
+  - DraftPage uses inline useDraft hook (not from @sportsnot/supabase) that returns Supabase snake_case fields
+  - Draft data shape from Supabase: { id, league_id, round, status, current_pick, draft_order, draft_picks: [{ pick_number, player_id, team_id, position, league_members: { team_name, user_id } }] }
+  - Snake draft order is pre-expanded: draftOrder array contains all picks in sequence (e.g., 60 entries for 6 members × 10 rounds)
+  - DraftPick.playerId/teamId in types are optional (number | undefined) but Supabase returns null — mock hooks use `?? null` for compatibility
+  - Draft completion check: `nextPick > draftOrder.length` (1-indexed currentPick)
+  - generateSnakeDraftOrder is exported for reuse by bot auto-pick (US-011)
+---
+
+## 2026-02-15T08:00:00Z - US-011
+- Created bot auto-pick AI for mock drafts with 'best available by position need' strategy
+- autoPick.ts: selectBotPick evaluates unfilled roster slots (5F/3D/2G targets), picks best available by positional need with alphabetical tiebreaker
+- useBotAutoPick.ts: React hook monitors draft state, triggers MAKE_PICK dispatch after 1-2s random delay when it's a bot's turn
+- BotAutoPickRunner.tsx: invisible component mounted inside MockDataProvider that activates the hook
+- Bot picks update draft board in real-time via state updates (same MAKE_PICK dispatch as manual picks)
+- Bots cannot pick already-drafted players (filtered by availablePlayerIds)
+- Files changed: packages/web/src/mock/bot/autoPick.ts (new), packages/web/src/mock/bot/useBotAutoPick.ts (new), packages/web/src/mock/bot/BotAutoPickRunner.tsx (new), packages/web/src/mock/MockDataProvider.tsx
+- **Learnings for future iterations:**
+  - BotAutoPickRunner pattern: invisible component inside provider that runs a hook — avoids conditional hook calls
+  - Bot position counting uses draftOrder index to map picks back to user IDs (since picks store leagueMemberId, not userId)
+  - ESLint no-undef applies to setTimeout/clearTimeout in web package too — use eslint-disable comment
+  - useEffect with state dependency re-fires on each state change, which naturally chains bot picks (bot1 picks → state changes → hook re-runs → bot2 picks)
+  - Goalie picks use teamId (not playerId) matching the real DraftPage pattern
+---
+
+## 2026-02-15T08:15:00Z - US-012
+- Implemented ADVANCE_DAY and ADVANCE_ROUND reducer actions in MockDataProvider.tsx
+- Created pure function accumulatePlayerStats(logs, throughDate) that sums per-game stats from player-game-logs.ts where gameDate <= throughDate
+- Created getRoundDateBounds(round) to get firstDate/lastDate boundaries per round from fixture data
+- ADVANCE_DAY: increments simulationDate by one day, recalculates cumulative playerStats, sets roundComplete when date >= round's lastDate, sets seasonComplete when round 4 completes
+- ADVANCE_ROUND: increments currentRound (1→2→3→4), sets simulationDate to day before next round's first game, resets roundComplete, recalculates stats
+- Both actions are no-ops when seasonComplete is true; ADVANCE_ROUND requires roundComplete=true
+- RESET_ALL already resets to initial state (simulationDate='2025-04-18', currentRound=1, empty stats)
+- Imported fixture game data (gamesR1/R2/Cf/Scf) and playerGameLogs from @sportsnot/mock-data
+- Exported accumulatePlayerStats and getRoundDateBounds for use by future hooks (standings, roster, etc.)
+- Files changed: packages/web/src/mock/MockDataProvider.tsx
+- **Learnings for future iterations:**
+  - Round date boundaries derived from fixture game files — each round's games define firstDate and lastDate
+  - Stat accumulation is a pure function: (logs, throughDate) → cumulative stats map, suitable for use by standings/roster hooks
+  - ADVANCE_DAY guards: no-op if seasonComplete or roundComplete (user must advance round first)
+  - ADVANCE_ROUND guards: no-op if !roundComplete or seasonComplete or currentRound >= 4
+  - `as unknown as NHLGame[]` cast needed because fixture data uses `as const` (readonly arrays)
+  - addOneDay uses noon UTC to avoid DST edge cases in date arithmetic
 ---
