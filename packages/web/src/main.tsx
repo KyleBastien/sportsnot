@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { MantineProvider } from '@mantine/core';
@@ -7,6 +7,27 @@ import '@mantine/core/styles.css';
 
 import { AuthProvider } from './app/context/AuthContext';
 import App from './app/app';
+
+// Mock mode — lazy-load MockAuthProvider only when VITE_MOCK_MODE is 'true'
+const MockAuthProvider =
+  import.meta.env.VITE_MOCK_MODE === 'true'
+    ? lazy(() =>
+        import('./mock/MockAuthProvider').then((m) => ({
+          default: m.MockAuthProvider,
+        }))
+      )
+    : null;
+
+function AuthWrapper({ children }: { children: ReactNode }) {
+  if (MockAuthProvider) {
+    return (
+      <Suspense fallback={null}>
+        <MockAuthProvider>{children}</MockAuthProvider>
+      </Suspense>
+    );
+  }
+  return <AuthProvider>{children}</AuthProvider>;
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,9 +44,9 @@ root.render(
     <QueryClientProvider client={queryClient}>
       <MantineProvider>
         <BrowserRouter>
-          <AuthProvider>
+          <AuthWrapper>
             <App />
-          </AuthProvider>
+          </AuthWrapper>
         </BrowserRouter>
       </MantineProvider>
     </QueryClientProvider>

@@ -2,7 +2,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 import { useAuth } from '@sportsnot/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 
-interface AuthContextValue {
+export interface AuthContextValue {
   user: User | null;
   session: Session | null;
   loading: boolean;
@@ -10,7 +10,7 @@ interface AuthContextValue {
   signOut: () => Promise<{ error: Error | null }>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
