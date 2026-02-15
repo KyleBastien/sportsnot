@@ -1,8 +1,8 @@
 {
-  "name": "@sportsnot/nhl-api",
+  "name": "@sportsnot/web",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "packages/nhl-api/src",
-  "projectType": "library",
+  "sourceRoot": "packages/web/src",
+  "projectType": "application",
   "targets": {
     "test": {
       "command": "rstest",

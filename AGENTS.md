@@ -39,10 +39,10 @@ yarn nx serve @sportsnot/web
 yarn nx lint @sportsnot/utils                       # single package
 yarn nx affected -t lint                            # affected packages
 
-# Unit tests (rstest)
-yarn rstest                                          # all unit tests
-yarn rstest --root packages/utils                    # single package
-yarn rstest --root packages/nhl-api --testPathPattern="nhl-api.test.ts"  # single file
+# Unit tests (rstest via Nx)
+yarn nx test @sportsnot/utils                       # single package
+yarn nx test @sportsnot/nhl-api                     # single package
+yarn nx run-many -t test --all                      # all packages with tests
 
 # Typecheck
 yarn nx affected -t typecheck

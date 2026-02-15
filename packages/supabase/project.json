@@ -1,7 +1,7 @@
 {
-  "name": "@sportsnot/nhl-api",
+  "name": "@sportsnot/supabase",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "packages/nhl-api/src",
+  "sourceRoot": "packages/supabase/src",
   "projectType": "library",
   "targets": {
     "test": {

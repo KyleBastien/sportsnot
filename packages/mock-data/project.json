@@ -4,6 +4,10 @@
   "sourceRoot": "packages/mock-data/src",
   "projectType": "library",
   "targets": {
+    "test": {
+      "command": "rstest",
+      "options": { "cwd": "{projectRoot}" }
+    },
     "download": {
       "command": "tsx packages/mock-data/src/scripts/download.ts",
       "options": {
