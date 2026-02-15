@@ -85,11 +85,20 @@ function mockReducer(state: MockState, action: MockAction): MockState {
     case 'RESET_ALL':
       return getInitialState();
 
-    // Stub handlers — return state unchanged (implemented in subsequent stories)
     case 'CREATE_LEAGUE':
-      return state;
-    case 'JOIN_LEAGUE':
-      return state;
+      return {
+        ...state,
+        leagues: [...state.leagues, action.payload.league],
+        currentLeague: action.payload.league.id,
+      };
+    case 'JOIN_LEAGUE': {
+      const updated = state.leagues.map((l) =>
+        l.id === action.payload.leagueId
+          ? { ...l, members: [...l.members, action.payload.member] }
+          : l,
+      );
+      return { ...state, leagues: updated };
+    }
     case 'START_DRAFT':
       return state;
     case 'MAKE_PICK':
