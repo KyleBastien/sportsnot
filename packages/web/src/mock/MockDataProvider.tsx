@@ -13,6 +13,7 @@ import type {
   RosterSlot,
   NHLPlayerStats,
   NHLGame,
+  Position,
 } from '@sportsnot/types';
 import {
   gamesR1,
@@ -196,14 +197,57 @@ function mockReducer(state: MockState, action: MockAction): MockState {
         completedAt: isComplete ? new Date().toISOString() : ds.draft.completedAt,
       };
 
-      // If draft is complete, update league status to 'active'
+      // If draft is complete, update league status to 'active' and populate rosters
       let leaguesAfterPick = state.leagues;
+      let rostersAfterPick = state.rosters;
       if (isComplete) {
         leaguesAfterPick = state.leagues.map((l) =>
           l.id === ds.draft.leagueId
             ? { ...l, status: 'active' as const }
             : l,
         );
+
+        // Build rosters from all draft picks, grouped by league member
+        const league = state.leagues.find((l) => l.id === ds.draft.leagueId);
+        if (league) {
+          const allPicks = newPicks;
+          const memberIds = league.members.map((m) => m.id);
+          rostersAfterPick = { ...state.rosters };
+          for (const memberId of memberIds) {
+            const memberPicks = allPicks.filter((p) => p.leagueMemberId === memberId);
+            const slots: RosterSlot[] = memberPicks.map((p, idx) => ({
+              id: `mock-roster-${memberId}-${idx}`,
+              leagueMemberId: memberId,
+              round: ds.draft.round,
+              playerId: p.playerId,
+              teamId: p.teamId,
+              position: p.position,
+              isActive: true,
+              pointsEarned: 0,
+              activatedFromIr: false,
+            }));
+            // Add IR slots (1 IR_F and 1 IR_D per member)
+            slots.push({
+              id: `mock-roster-${memberId}-ir-f`,
+              leagueMemberId: memberId,
+              round: ds.draft.round,
+              position: 'IR_F' as Position,
+              isActive: false,
+              pointsEarned: 0,
+              activatedFromIr: false,
+            });
+            slots.push({
+              id: `mock-roster-${memberId}-ir-d`,
+              leagueMemberId: memberId,
+              round: ds.draft.round,
+              position: 'IR_D' as Position,
+              isActive: false,
+              pointsEarned: 0,
+              activatedFromIr: false,
+            });
+            rostersAfterPick[memberId] = slots;
+          }
+        }
       }
 
       return {
@@ -213,6 +257,7 @@ function mockReducer(state: MockState, action: MockAction): MockState {
           picks: newPicks,
           availablePlayerIds: newAvailable,
         },
+        rosters: rostersAfterPick,
         leagues: leaguesAfterPick,
       };
     }
@@ -270,10 +315,54 @@ function mockReducer(state: MockState, action: MockAction): MockState {
         playerStats: newStats,
       };
     }
-    case 'ACTIVATE_IR':
-      return state;
-    case 'DEACTIVATE_IR':
-      return state;
+    case 'ACTIVATE_IR': {
+      const { leagueMemberId, slotId } = action.payload;
+      const memberSlots = state.rosters[leagueMemberId];
+      if (!memberSlots) return state;
+
+      const irSlot = memberSlots.find((s) => s.id === slotId);
+      if (!irSlot) return state;
+
+      // Find matching position for the IR slot (IR_F -> F, IR_D -> D)
+      const matchingPos = irSlot.position === 'IR_F' ? 'F' : 'D';
+
+      // Find an active player at the matching position to deactivate (the injured one)
+      const injuredSlot = memberSlots.find(
+        (s) => s.position === matchingPos && s.isActive && s.id !== slotId,
+      );
+
+      const updatedSlots = memberSlots.map((s) => {
+        if (s.id === slotId) {
+          return { ...s, isActive: true, activatedFromIr: true };
+        }
+        if (injuredSlot && s.id === injuredSlot.id) {
+          return { ...s, isActive: false };
+        }
+        return s;
+      });
+
+      return {
+        ...state,
+        rosters: { ...state.rosters, [leagueMemberId]: updatedSlots },
+      };
+    }
+    case 'DEACTIVATE_IR': {
+      const { leagueMemberId: memberId, slotId: deactivateSlotId } = action.payload;
+      const slots = state.rosters[memberId];
+      if (!slots) return state;
+
+      const updatedIrSlots = slots.map((s) => {
+        if (s.id === deactivateSlotId) {
+          return { ...s, isActive: false, activatedFromIr: false };
+        }
+        return s;
+      });
+
+      return {
+        ...state,
+        rosters: { ...state.rosters, [memberId]: updatedIrSlots },
+      };
+    }
     default:
       return state;
   }
