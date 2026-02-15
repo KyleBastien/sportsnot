@@ -390,7 +390,7 @@
         "Playwright tests pass"
       ],
       "priority": 19,
-      "passes": false,
+      "passes": true,
       "notes": "RESET_ALL should already be implemented in the reducer skeleton (US-006). This story ensures the UI buttons work and localStorage cleanup is handled."
     },
     {
@@ -410,7 +410,7 @@
         "Playwright tests pass"
       ],
       "priority": 20,
-      "passes": false,
+      "passes": true,
       "notes": "This is a verification and hardening story. Run the production build and inspect the output. The Rspack DefinePlugin should replace VITE_MOCK_MODE with 'false', causing dead-code elimination of the entire mock branch."
     }
   ]

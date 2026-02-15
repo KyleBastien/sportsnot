@@ -16,6 +16,19 @@ module.exports = {
   output: {
     path: join(__dirname, 'dist'),
   },
+  resolve: {
+    alias: envVars.VITE_MOCK_MODE !== 'true' ? {
+      '@sportsnot/mock-data': false,
+    } : {},
+  },
+  module: {
+    rules: [
+      {
+        test: /[\\/]mock[\\/]/,
+        sideEffects: false,
+      },
+    ],
+  },
   devServer: {
     port: 4200,
     historyApiFallback: {

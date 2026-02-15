@@ -48,6 +48,9 @@ Started: 02/14/2026 21:14:25
 - Mock hook wiring pattern: `const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true'` at module level, then `if (IS_MOCK) return useMockXxx()` inside inline hooks; mutations use `if (IS_MOCK && mockMutation)` branch before Supabase calls
 - MockDataProvider exposes hooks registry via context (mockHooksRegistry.ts) — all mock hooks accessible through useMockData().hooks
 - Bracket derivation: pure function (baseBracket, simulationDate, currentRound) → NHLPlayoffSeries[] with win counts overlaid from game fixtures
+- Production bundle exclusion: `sideEffects: false` on mock-data package + module rule for mock/ files + `resolve.alias` mapping mock-data to false when VITE_MOCK_MODE !== 'true'
+- CI verification: `node scripts/verify-no-mock-in-bundle.mjs` after `nx build web` to check for mock identifiers in dist/
+- require() inside dead code blocks does NOT prevent bundling — rspack resolves require() at build time before dead code elimination
 
 ---
 
@@ -349,4 +352,39 @@ Started: 02/14/2026 21:14:25
   - For mutation handlers (handleConfirmPick, handleStartDraft, handleActivateIR, handleSubmit), add if (IS_MOCK && mockMutation) branch BEFORE the Supabase calls
   - DraftLobbyPage needed custom useLeagueForLobby and useActiveDraftCheck wrapper hooks to cleanly separate mock vs real queries
   - Mock hooks that use useMockData() must be called inside the React tree (not at module level) — they access context
+---
+
+## 2026-02-15T10:28:00Z - US-019
+- Implemented data reset and dump controls in SimulationControlPanel
+- Renamed 'Reset Season' button to 'Reset All Mock Data' per acceptance criteria
+- Added defensive localStorage cleanup on reset (iterates keys with 'mock-' prefix and removes them)
+- Verified: RESET_ALL dispatch clears all in-memory state (leagues, drafts, rosters, simulation progress) via getInitialState()
+- Verified: Dump State button logs full MockState as formatted JSON via console.log
+- Verified: State is session-only (useReducer in-memory, no localStorage/sessionStorage persistence) — closing tab/refreshing clears everything
+- Files changed: packages/web/src/mock/components/SimulationControlPanel.tsx
+- **Learnings for future iterations:**
+  - No localStorage or sessionStorage is used by mock mode — state is entirely in useReducer (session-only by design)
+  - localStorage cleanup is defensive/future-proof — iterates and removes keys with 'mock-' prefix
+  - RESET_ALL was already fully implemented in US-006; this story mainly ensured UI buttons match acceptance criteria naming
+  - Double-click confirmation pattern (setTimeout 3s fallback) works well for destructive reset actions
+---
+
+## 2026-02-15T10:31:00Z - US-020
+- Verified production bundle exclusion: zero mock mode code in production builds
+- Added sideEffects: false to packages/mock-data/package.json for tree-shaking
+- Added resolve.alias in rspack.config.js to map @sportsnot/mock-data to empty module when VITE_MOCK_MODE !== 'true'
+- Added module rule in rspack.config.js marking src/mock/ files as sideEffects: false
+- Created scripts/verify-no-mock-in-bundle.mjs — CI check scanning dist/ for 32 mock identifiers
+- Documented verification process in packages/mock-data/README.md
+- Bundle size reduced from 786 KiB to 778 KiB after tree-shaking improvements
+- Verified: MockDataProvider, MockModeBanner, SimulationControlPanel, all useMock* hooks, all fixture team/player names — none found in production bundle
+- Files changed: packages/mock-data/package.json, packages/mock-data/README.md, packages/web/rspack.config.js, scripts/verify-no-mock-in-bundle.mjs (new)
+- **Learnings for future iterations:**
+  - Static ES imports evaluate modules regardless of whether bindings are used — tree-shaking alone isn't enough
+  - sideEffects: false in package.json tells rspack a package can be safely tree-shaken when imports are unused
+  - Module rule { test: /[\\/]mock[\\/]/, sideEffects: false } marks local files as side-effect-free for tree-shaking
+  - esolve.alias: { '@sportsnot/mock-data': false } maps a package to empty module — guarantees zero fixture data in bundle
+  - DefinePlugin replaces import.meta.env.VITE_MOCK_MODE with 'false' at build time, enabling dead code elimination
+  - equire() inside if (false) blocks does NOT prevent bundling — rspack resolves require() before dead code elimination
+  - Verification script should use string matching (not regex) for fixture data names to avoid false positives
 ---
