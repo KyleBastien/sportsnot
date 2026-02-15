@@ -26,7 +26,7 @@ import {
   useRegularSeasonPlayers,
 } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
-import type { Position } from '@sportsnot/types';
+import { type Position, ROSTER_COMPOSITION } from '@sportsnot/types';
 import {
   useMockDraft,
   useMockLeagueMembers,
@@ -519,6 +519,24 @@ export function DraftPage() {
     [picks]
   );
 
+  // Count my filled roster slots by position for smart pre-selection
+  const mySlotCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      F: 0,
+      D: 0,
+      G: 0,
+      IR_F: 0,
+      IR_D: 0,
+    };
+    if (!myMember) return counts;
+    for (const pick of picks) {
+      if (pick.league_members?.user_id === myMember.user_id && pick.position) {
+        counts[pick.position] = (counts[pick.position] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [picks, myMember]);
+
   // Subscribe to real-time draft changes (no-op in mock mode)
   useEffect(() => {
     if (!leagueId || IS_MOCK) return;
@@ -792,13 +810,21 @@ export function DraftPage() {
               isMyTurn={isMyTurn}
               onSelectPlayer={(player) => {
                 setConfirmPlayer(player);
-                setConfirmPosition(
-                  player.position === 'G'
-                    ? 'G'
-                    : player.position === 'D'
-                      ? 'D'
-                      : 'F'
-                );
+                if (player.position === 'G') {
+                  setConfirmPosition('G');
+                } else if (player.position === 'D') {
+                  const dFull =
+                    mySlotCounts['D'] >= ROSTER_COMPOSITION.defensemen;
+                  const irDFull =
+                    mySlotCounts['IR_D'] >= ROSTER_COMPOSITION.irDefensemen;
+                  setConfirmPosition(dFull && !irDFull ? 'IR_D' : 'D');
+                } else {
+                  const fFull =
+                    mySlotCounts['F'] >= ROSTER_COMPOSITION.forwards;
+                  const irFFull =
+                    mySlotCounts['IR_F'] >= ROSTER_COMPOSITION.irForwards;
+                  setConfirmPosition(fFull && !irFFull ? 'IR_F' : 'F');
+                }
               }}
               comparePlayers={comparePlayers}
               onToggleCompare={handleToggleCompare}
@@ -894,12 +920,49 @@ export function DraftPage() {
                     ? [{ label: 'Goalie', value: 'G' }]
                     : confirmPlayer.position === 'D'
                       ? [
-                          { label: 'Defense', value: 'D' },
-                          { label: 'IR Defense', value: 'IR_D' },
+                          {
+                            label:
+                              mySlotCounts['D'] >= ROSTER_COMPOSITION.defensemen
+                                ? 'Defense (full)'
+                                : 'Defense',
+                            value: 'D',
+                            disabled:
+                              mySlotCounts['D'] >=
+                              ROSTER_COMPOSITION.defensemen,
+                          },
+                          {
+                            label:
+                              mySlotCounts['IR_D'] >=
+                              ROSTER_COMPOSITION.irDefensemen
+                                ? 'IR Defense (full)'
+                                : 'IR Defense',
+                            value: 'IR_D',
+                            disabled:
+                              mySlotCounts['IR_D'] >=
+                              ROSTER_COMPOSITION.irDefensemen,
+                          },
                         ]
                       : [
-                          { label: 'Forward', value: 'F' },
-                          { label: 'IR Forward', value: 'IR_F' },
+                          {
+                            label:
+                              mySlotCounts['F'] >= ROSTER_COMPOSITION.forwards
+                                ? 'Forward (full)'
+                                : 'Forward',
+                            value: 'F',
+                            disabled:
+                              mySlotCounts['F'] >= ROSTER_COMPOSITION.forwards,
+                          },
+                          {
+                            label:
+                              mySlotCounts['IR_F'] >=
+                              ROSTER_COMPOSITION.irForwards
+                                ? 'IR Forward (full)'
+                                : 'IR Forward',
+                            value: 'IR_F',
+                            disabled:
+                              mySlotCounts['IR_F'] >=
+                              ROSTER_COMPOSITION.irForwards,
+                          },
                         ]
                 }
               />
