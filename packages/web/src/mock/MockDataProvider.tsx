@@ -12,6 +12,7 @@ import type {
   DraftPick,
   RosterSlot,
 } from '@sportsnot/types';
+import { BotAutoPickRunner } from './bot/BotAutoPickRunner';
 
 // ── Mock user ──────────────────────────────────────────────────────────
 export interface MockUser {
@@ -182,6 +183,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
 
   return (
     <MockDataContext.Provider value={{ state, dispatch }}>
+      <BotAutoPickRunner />
       {children}
     </MockDataContext.Provider>
   );
