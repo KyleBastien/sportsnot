@@ -53,6 +53,15 @@ export function SimulationControlPanel() {
   const handleReset = () => {
     if (confirmReset) {
       dispatch({ type: 'RESET_ALL' });
+      // Clear any mock-mode localStorage entries (defensive cleanup)
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('mock-')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
       setConfirmReset(false);
     } else {
       setConfirmReset(true);
@@ -181,7 +190,9 @@ export function SimulationControlPanel() {
             color="red"
             onClick={handleReset}
           >
-            {confirmReset ? 'Click again to confirm reset' : 'Reset Season'}
+            {confirmReset
+              ? 'Click again to confirm reset'
+              : 'Reset All Mock Data'}
           </Button>
 
           {/* Dump State */}
