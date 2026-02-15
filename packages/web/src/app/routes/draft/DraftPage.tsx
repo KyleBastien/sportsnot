@@ -203,24 +203,28 @@ function AvailablePlayerBoard({
       shutouts: t.shutouts ?? 0,
     }));
 
-  const filteredSkaters = skaterRows.filter((p) => {
-    if (
-      positionFilter !== 'ALL' &&
-      positionFilter !== 'F' &&
-      positionFilter !== 'D'
-    )
-      return false;
-    if (positionFilter === 'F' && p.position !== 'F') return false;
-    if (positionFilter === 'D' && p.position !== 'D') return false;
-    if (query && !p.fullName.toLowerCase().includes(query)) return false;
-    return true;
-  });
+  const filteredSkaters = skaterRows
+    .filter((p) => {
+      if (
+        positionFilter !== 'ALL' &&
+        positionFilter !== 'F' &&
+        positionFilter !== 'D'
+      )
+        return false;
+      if (positionFilter === 'F' && p.position !== 'F') return false;
+      if (positionFilter === 'D' && p.position !== 'D') return false;
+      if (query && !p.fullName.toLowerCase().includes(query)) return false;
+      return true;
+    })
+    .sort((a, b) => b.points - a.points || b.goals - a.goals);
 
-  const filteredTeams = teamRows.filter((t) => {
-    if (positionFilter !== 'ALL' && positionFilter !== 'G') return false;
-    if (query && !t.fullName.toLowerCase().includes(query)) return false;
-    return true;
-  });
+  const filteredTeams = teamRows
+    .filter((t) => {
+      if (positionFilter !== 'ALL' && positionFilter !== 'G') return false;
+      if (query && !t.fullName.toLowerCase().includes(query)) return false;
+      return true;
+    })
+    .sort((a, b) => b.wins - a.wins);
 
   const showSkaters = positionFilter !== 'G';
   const showTeams = positionFilter === 'ALL' || positionFilter === 'G';
