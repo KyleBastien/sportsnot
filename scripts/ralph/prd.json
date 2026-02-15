@@ -268,7 +268,7 @@
         "Playwright tests pass"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "Use Mantine components (Drawer, ActionIcon, Button, Badge, Text). The FAB should be positioned bottom-right and clearly marked as a mock mode control."
     },
     {
@@ -288,7 +288,7 @@
         "Playwright tests pass"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": "Filter the round's game fixture files by gameDate === simulationDate. Series status requires counting wins per team from all games in the series up to the current date."
     },
     {
@@ -308,7 +308,7 @@
         "Playwright tests pass"
       ],
       "priority": 15,
-      "passes": false,
+      "passes": true,
       "notes": "Player stats on the roster come from the cumulative stats computed by the simulation state machine (US-012). The roster hooks read from MockState."
     },
     {
@@ -329,7 +329,7 @@
         "Playwright tests pass"
       ],
       "priority": 16,
-      "passes": false,
+      "passes": true,
       "notes": "Check how the real useStandings hook calculates points to match the same formula. Scoring events are derived from the per-game stat lines in the fixture data."
     },
     {
@@ -350,7 +350,7 @@
         "Playwright tests pass"
       ],
       "priority": 17,
-      "passes": false,
+      "passes": true,
       "notes": "Series wins are derived by counting game wins per team from fixture data through the current simulated date. The bracket rendering uses existing bracket UI components."
     },
     {
@@ -370,7 +370,7 @@
         "Playwright tests pass"
       ],
       "priority": 18,
-      "passes": false,
+      "passes": true,
       "notes": "This is the integration story that ties all mock hooks together. The key challenge is making the swap transparent. Consider a pattern where mock hooks have the same signature as real hooks and are provided via React context."
     },
     {

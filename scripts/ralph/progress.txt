@@ -36,6 +36,18 @@ Started: 02/14/2026 21:14:25
 - Browser globals (setTimeout/clearTimeout) need `/* eslint-disable no-undef */` in web package files too
 - Simulation state: accumulatePlayerStats and getRoundDateBounds are exported from MockDataProvider for reuse by standings/roster/scoring hooks
 - Round game fixtures mapped in ROUND_GAMES: { 1: gamesR1, 2: gamesR2, 3: gamesCf, 4: gamesScf }
+- SimulationControlPanel lives in packages/web/src/mock/components/ — must be inside MockDataProvider for context
+- Mantine Drawer with position="right" for collapsible side panels; ActionIcon for FAB buttons
+- Mock live games: useMockLiveGames returns MockLiveGame[] with game + seriesStatus; useMockLiveGamesTeamStats returns team_stats_cache shape; mockGetScoresNow returns NHLGame[]
+- Series status computation: group games by sorted team ID pair (seriesKey), count wins per team through simulationDate
+- Roster population on draft completion: MAKE_PICK reducer builds RosterSlot[] from picks + IR slots when isComplete; mock hooks read from state.rosters keyed by leagueMemberId
+- Points calculation in mock: calculatePlayerPoints(playerId, throughDate) using SCORING constants and playerGameLogs fixture data
+- Standings member shape from Supabase: { id, user_id, team_name, total_points, player_points, goalie_points, round_points, users: { display_name } }
+- ScoringEvent shape: { id, player_name, team_abbreviation, event_type, points, game_date, league_member_team }
+- Goalie win/shutout detection: match goalie teamAbbrev to game fixture scores; shutout (4pts) replaces win (2pts, not additive)
+- Mock hook wiring pattern: `const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true'` at module level, then `if (IS_MOCK) return useMockXxx()` inside inline hooks; mutations use `if (IS_MOCK && mockMutation)` branch before Supabase calls
+- MockDataProvider exposes hooks registry via context (mockHooksRegistry.ts) — all mock hooks accessible through useMockData().hooks
+- Bracket derivation: pure function (baseBracket, simulationDate, currentRound) → NHLPlayoffSeries[] with win counts overlaid from game fixtures
 
 ---
 
@@ -217,4 +229,124 @@ Started: 02/14/2026 21:14:25
   - ADVANCE_ROUND guards: no-op if !roundComplete or seasonComplete or currentRound >= 4
   - `as unknown as NHLGame[]` cast needed because fixture data uses `as const` (readonly arrays)
   - addOneDay uses noon UTC to avoid DST edge cases in date arithmetic
+---
+
+## 2026-02-15T08:29:00Z - US-013
+- Created SimulationControlPanel.tsx as a floating overlay with FAB (bottom-right) and Drawer panel
+- Panel displays: current simulated date, current round label, status badges (Round Complete, Season Complete)
+- Buttons: Next Day (ADVANCE_DAY), Advance Round (ADVANCE_ROUND), Reset Season (RESET_ALL with confirmation), Dump State to Console
+- Next Day disabled when roundComplete or seasonComplete; shows contextual text
+- Advance Round disabled until roundComplete; both disabled when seasonComplete with trophy indicator
+- Reset uses double-click confirmation pattern (3s timeout)
+- Wired into app.tsx via React.lazy + dynamic import inside MockWrapper (inside MockDataProvider for context access)
+- Files changed: packages/web/src/mock/components/SimulationControlPanel.tsx (new), packages/web/src/app/app.tsx
+- **Learnings for future iterations:**
+  - Mantine v8 Drawer works well for collapsible side panels - position right with size sm
+  - SimulationControlPanel must be inside MockDataProvider to access useMockData context
+  - FAB pattern: ActionIcon with fixed position, high z-index, and box-shadow for visibility
+  - console.log needs eslint-disable-next-line no-console comment (ESLint only allows warn/error)
+  - Double-click confirmation pattern with setTimeout fallback is simpler than Modal for destructive actions
+---
+
+## 2026-02-15T08:49:00Z - US-014
+- Created packages/web/src/mock/hooks/useMockLiveGames.ts with three mock implementations
+- useMockLiveGames(): Returns games for current simulationDate with series status (e.g., "FLA leads 2-1"), wrapped in MockLiveGamesResult with hasGames/message fields
+- useMockLiveGamesTeamStats(): Returns team_stats_cache shaped data (team_id, team_name, team_abbreviation, wins, shutouts, is_eliminated) — drop-in replacement for DashboardPage's inline useLiveGames()
+- mockGetScoresNow(): Standalone function returning NHLGame[] for a given date — replaces getScoresNow() from @sportsnot/nhl-api
+- Series status computed by grouping games by sorted team ID pair, counting wins through simulationDate
+- No network requests to NHL API or Supabase when mocks are active
+- Files changed: packages/web/src/mock/hooks/useMockLiveGames.ts (new)
+- **Learnings for future iterations:**
+  - Series key pattern: sort two team IDs and join with '-' for deterministic matchup identification
+  - bracket fixture may have undefined topSeedTeam/bottomSeedTeam — use optional chaining for safety
+  - ROUND_GAMES mapping already exists in MockDataProvider — duplicated locally for decoupling (avoids circular dependency)
+  - Three-level mock hierarchy: (1) raw function (mockGetScoresNow), (2) enriched hook with series status (useMockLiveGames), (3) Supabase-shaped hook (useMockLiveGamesTeamStats)
+  - Playwright smoke test requires serve-static running on localhost:4200
+---
+
+## 2026-02-15T09:08:00Z - US-015
+- Created packages/web/src/mock/hooks/useMockRoster.ts with mock roster management hooks
+- Hooks: useMockRoster, useMockLeagueRosters, useMockActivateIR, useMockDeactivateIR
+- useMockRoster returns roster for current user in Supabase snake_case shape (memberId, round, slots) with points_earned calculated from fixture data through simulationDate
+- useMockLeagueRosters returns all rosters for all members in a league with nested league_members data
+- ACTIVATE_IR reducer action: marks IR slot as active + activatedFromIr, deactivates matching position player
+- DEACTIVATE_IR reducer action: marks slot as inactive, clears activatedFromIr flag
+- MAKE_PICK reducer now populates rosters on draft completion: builds RosterSlot entries from picks + adds IR_F and IR_D empty slots per member
+- Added Position import to MockDataProvider.tsx for IR slot typing
+- Files changed: packages/web/src/mock/hooks/useMockRoster.ts (new), packages/web/src/mock/MockDataProvider.tsx
+- **Learnings for future iterations:**
+  - RosterPage uses inline useMyRoster hook (not @sportsnot/supabase export) that returns Supabase snake_case fields (is_active, points_earned, activated_from_ir, player_id, team_id)
+  - Roster population happens in MAKE_PICK reducer when draft completes (isComplete=true) - builds slots from all draft picks grouped by member
+  - Each member gets 10 drafted slots (5F+3D+2G) plus 2 IR slots (IR_F, IR_D) with isActive=false
+  - Points calculation uses SCORING constants (goal=1, assist=1) and playerGameLogs fixture data filtered by throughDate
+  - ACTIVATE_IR finds matching position (IR_F->F, IR_D->D) and deactivates the first active player at that position
+---
+
+## 2026-02-15T09:30:00Z - US-016
+- Created useMockStandings.ts with mock standings hook calculating total_points, player_points, goalie_points, and round_points per member
+- Created useMockScoringHistory.ts with mock scoring history hook generating individual scoring events (goals, assists, wins, shutouts) from fixture data
+- Goalie win/shutout detection: matches goalie teamAbbrev to game fixture scores; shutout (4pts) replaces win (2pts)
+- Standings update on each ADVANCE_DAY via recalculation from fixture data through simulationDate
+- Files changed: packages/web/src/mock/hooks/useMockStandings.ts (new), packages/web/src/mock/hooks/useMockScoringHistory.ts (new)
+- **Learnings for future iterations:**
+  - Standings member shape from Supabase: { id, user_id, team_name, total_points, player_points, goalie_points, round_points: Record<number, number>, users: { display_name } }
+  - ScoringEvent shape: { id, player_name, team_abbreviation, event_type: 'goal'|'assist'|'win'|'shutout', points, game_date, league_member_team }
+  - Goalie win/shutout detection: match goalie's teamAbbrev to game fixture homeTeam/awayTeam, compare scores; shutout replaces win (4pts, not 4+2=6)
+  - Round assignment for round_points: use getRoundDateBounds(r) to check if gameDate falls within round's date range
+  - Shared patterns across mock hooks: getPlayerInfo() lookup, GAME_MAP for game data, makeMockQuery helper
+---
+
+## 2026-02-15T09:52:00Z - US-017
+- Created packages/web/src/mock/hooks/useMockPlayoffBracket.ts with mock playoff bracket hook
+- useMockPlayoffBracket(): Returns bracket data derived from simulation progress, wrapped in TanStack Query shape with { bracket, champion } payload
+- deriveBracketState(): Pure function that overlays win counts from fixture game data through simulationDate onto the base bracket.ts fixture
+- Before simulation: all teams shown in correct seeding positions with 0-0 records
+- During simulation: series scores updated from game results through simulationDate
+- After a round: series winners shown (isComplete=true, seriesWinner set), losers eliminated
+- After round 4 (seasonComplete): Stanley Cup champion extracted from final series winner
+- mockGetPlayoffBracketForDate(): Async function replacement for getPlayoffBracket() returning NHLPlayoffSeries[]
+- Series win counting reuses same seriesKey pattern as useMockLiveGames (sorted team IDs)
+- Files changed: packages/web/src/mock/hooks/useMockPlayoffBracket.ts (new)
+- **Learnings for future iterations:**
+  - Bracket derivation is a pure function of (fixtureData, simulationDate, currentRound) — no side effects
+  - Win counts computed per-series by matching game fixture team IDs to bracket series topSeed/bottomSeed IDs
+  - Series completion: topSeedWins >= 4 || bottomSeedWins >= 4 triggers isComplete + seriesWinner
+  - For rounds beyond currentRound, return teams but with 0-0 records and isComplete=false
+  - Champion detection: find round 4 series where isComplete=true and seasonComplete flag is set
+  - seriesKey pattern (sorted team IDs joined with '-') is reused across multiple mock hooks — could be extracted to shared util
+---
+
+## 2026-02-15 02:27 - US-018
+- Implemented: Wire mock hooks into MockDataProvider
+- Created mockHooksRegistry.ts with typed registry of all mock hooks
+- Updated MockDataProvider to expose hooks registry through context
+- Created useMockMyLeagues adapter for DashboardPage shape compatibility
+- Wired 8 page components with build-time IS_MOCK guard pattern:
+  - DashboardPage (useMyLeagues, useLiveGames)
+  - DraftPage (useDraft, useLeagueMembers, usePlayoffPlayers, usePlayoffTeams, handleConfirmPick, realtime no-op)
+  - DraftLobbyPage (useLeagueForLobby, useActiveDraftCheck, handleStartDraft)
+  - RosterPage (useMyRoster, handleActivateIR)
+  - StandingsPage (useStandings)
+  - LeagueDashboardPage (useLeague)
+  - CreateLeaguePage (handleSubmit with useMockCreateLeague)
+  - ScoringHistoryPage (useScoringHistory)
+- Files changed:
+  - packages/web/src/mock/mockHooksRegistry.ts (new)
+  - packages/web/src/mock/MockDataProvider.tsx
+  - packages/web/src/mock/hooks/useMockLeagues.ts
+  - packages/web/src/app/routes/dashboard/DashboardPage.tsx
+  - packages/web/src/app/routes/draft/DraftPage.tsx
+  - packages/web/src/app/routes/draft/DraftLobbyPage.tsx
+  - packages/web/src/app/routes/roster/RosterPage.tsx
+  - packages/web/src/app/routes/standings/StandingsPage.tsx
+  - packages/web/src/app/routes/leagues/LeagueDashboardPage.tsx
+  - packages/web/src/app/routes/leagues/CreateLeaguePage.tsx
+  - packages/web/src/app/routes/scoring/ScoringHistoryPage.tsx
+- **Learnings for future iterations:**
+  - Build-time guard pattern: const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true' + if (IS_MOCK) return useMockXxx() inside inline hooks — Rspack eliminates dead branch at build time
+  - ESLint react-hooks/rules-of-hooks plugin is NOT installed — eslint-disable comments for it produce "Definition not found" warnings (harmless)
+  - DashboardPage expects league-centric shape (league as top-level with league_members array), while mock league data is stored in camelCase — useMockMyLeagues adapter bridges this gap
+  - For mutation handlers (handleConfirmPick, handleStartDraft, handleActivateIR, handleSubmit), add if (IS_MOCK && mockMutation) branch BEFORE the Supabase calls
+  - DraftLobbyPage needed custom useLeagueForLobby and useActiveDraftCheck wrapper hooks to cleanly separate mock vs real queries
+  - Mock hooks that use useMockData() must be called inside the React tree (not at module level) — they access context
 ---
