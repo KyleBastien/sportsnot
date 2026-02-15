@@ -99,10 +99,62 @@ function mockReducer(state: MockState, action: MockAction): MockState {
       );
       return { ...state, leagues: updated };
     }
-    case 'START_DRAFT':
-      return state;
-    case 'MAKE_PICK':
-      return state;
+    case 'START_DRAFT': {
+      // Also update the league status to 'drafting'
+      const leagueId = action.payload.draftState.draft.leagueId;
+      const updatedLeagues = state.leagues.map((l) =>
+        l.id === leagueId ? { ...l, status: 'drafting' as const } : l,
+      );
+      return {
+        ...state,
+        draftState: action.payload.draftState,
+        leagues: updatedLeagues,
+      };
+    }
+    case 'MAKE_PICK': {
+      if (!state.draftState) return state;
+
+      const { pick } = action.payload;
+      const ds = state.draftState;
+      const newPicks = [...ds.picks, pick];
+
+      // Remove picked player/team from available pool
+      const pickedId = pick.playerId ?? pick.teamId;
+      const newAvailable = pickedId
+        ? ds.availablePlayerIds.filter((id) => id !== pickedId)
+        : ds.availablePlayerIds;
+
+      const nextPick = ds.draft.currentPick + 1;
+      const totalPicks = ds.draft.draftOrder.length;
+      const isComplete = nextPick > totalPicks;
+
+      const newDraft = {
+        ...ds.draft,
+        currentPick: nextPick,
+        status: isComplete ? ('completed' as const) : ds.draft.status,
+        completedAt: isComplete ? new Date().toISOString() : ds.draft.completedAt,
+      };
+
+      // If draft is complete, update league status to 'active'
+      let leaguesAfterPick = state.leagues;
+      if (isComplete) {
+        leaguesAfterPick = state.leagues.map((l) =>
+          l.id === ds.draft.leagueId
+            ? { ...l, status: 'active' as const }
+            : l,
+        );
+      }
+
+      return {
+        ...state,
+        draftState: {
+          draft: newDraft,
+          picks: newPicks,
+          availablePlayerIds: newAvailable,
+        },
+        leagues: leaguesAfterPick,
+      };
+    }
     case 'ADVANCE_DAY':
       return state;
     case 'ADVANCE_ROUND':
