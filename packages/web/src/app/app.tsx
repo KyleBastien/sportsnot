@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { Route, Routes, Link, useNavigate } from 'react-router-dom';
 import {
   AppShell,
@@ -14,12 +14,21 @@ import { useAuthContext } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-// Mock mode banner — only loaded when VITE_MOCK_MODE is 'true'
+// Mock mode — only loaded when VITE_MOCK_MODE is 'true'
 const MockModeBanner =
   import.meta.env.VITE_MOCK_MODE === 'true'
     ? lazy(() =>
         import('../mock/MockModeBanner').then((m) => ({
           default: m.MockModeBanner,
+        }))
+      )
+    : null;
+
+const MockDataProvider =
+  import.meta.env.VITE_MOCK_MODE === 'true'
+    ? lazy(() =>
+        import('../mock/MockDataProvider').then((m) => ({
+          default: m.MockDataProvider,
         }))
       )
     : null;
@@ -90,6 +99,15 @@ function UserMenu() {
   );
 }
 
+function MockWrapper({ children }: { children: ReactNode }) {
+  if (!MockDataProvider) return <>{children}</>;
+  return (
+    <Suspense fallback={null}>
+      <MockDataProvider>{children}</MockDataProvider>
+    </Suspense>
+  );
+}
+
 export function App() {
   return (
     <ErrorBoundary>
@@ -98,130 +116,132 @@ export function App() {
           <MockModeBanner />
         </Suspense>
       )}
-      <AppShell header={{ height: 60 }} padding="md">
-        <AppShell.Header>
-          <Group h="100%" px="md" justify="space-between">
-            <UnstyledButton component={Link} to="/">
-              <Title order={3}>🏒 SportsNot</Title>
-            </UnstyledButton>
-            <UserMenu />
-          </Group>
-        </AppShell.Header>
+      <MockWrapper>
+        <AppShell header={{ height: 60 }} padding="md">
+          <AppShell.Header>
+            <Group h="100%" px="md" justify="space-between">
+              <UnstyledButton component={Link} to="/">
+                <Title order={3}>🏒 SportsNot</Title>
+              </UnstyledButton>
+              <UserMenu />
+            </Group>
+          </AppShell.Header>
 
-        <AppShell.Main>
-          <Routes>
-            {/* Auth routes */}
-            <Route path="/auth/login" element={<LoginPage />} />
-            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+          <AppShell.Main>
+            <Routes>
+              {/* Auth routes */}
+              <Route path="/auth/login" element={<LoginPage />} />
+              <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-            {/* Protected routes */}
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <DashboardPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/leagues/create"
-              element={
-                <ProtectedRoute>
-                  <CreateLeaguePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/leagues/join"
-              element={
-                <ProtectedRoute>
-                  <JoinLeaguePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/leagues/:leagueId"
-              element={
-                <ProtectedRoute>
-                  <LeagueDashboardPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/leagues/:leagueId/settings"
-              element={
-                <ProtectedRoute>
-                  <LeagueSettingsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/draft/:leagueId/lobby"
-              element={
-                <ProtectedRoute>
-                  <DraftLobbyPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/draft/:leagueId"
-              element={
-                <ProtectedRoute>
-                  <DraftPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/draft/:leagueId/transition"
-              element={
-                <ProtectedRoute>
-                  <RoundTransitionPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/roster/:leagueId"
-              element={
-                <ProtectedRoute>
-                  <RosterPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/roster/:leagueId/history"
-              element={
-                <ProtectedRoute>
-                  <RosterHistoryPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/standings/:leagueId"
-              element={
-                <ProtectedRoute>
-                  <StandingsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/scoring/:leagueId"
-              element={
-                <ProtectedRoute>
-                  <ScoringHistoryPage />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </AppShell.Main>
-      </AppShell>
+              {/* Protected routes */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <DashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/leagues/create"
+                element={
+                  <ProtectedRoute>
+                    <CreateLeaguePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/leagues/join"
+                element={
+                  <ProtectedRoute>
+                    <JoinLeaguePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/leagues/:leagueId"
+                element={
+                  <ProtectedRoute>
+                    <LeagueDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/leagues/:leagueId/settings"
+                element={
+                  <ProtectedRoute>
+                    <LeagueSettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/draft/:leagueId/lobby"
+                element={
+                  <ProtectedRoute>
+                    <DraftLobbyPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/draft/:leagueId"
+                element={
+                  <ProtectedRoute>
+                    <DraftPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/draft/:leagueId/transition"
+                element={
+                  <ProtectedRoute>
+                    <RoundTransitionPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/roster/:leagueId"
+                element={
+                  <ProtectedRoute>
+                    <RosterPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/roster/:leagueId/history"
+                element={
+                  <ProtectedRoute>
+                    <RosterHistoryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/standings/:leagueId"
+                element={
+                  <ProtectedRoute>
+                    <StandingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/scoring/:leagueId"
+                element={
+                  <ProtectedRoute>
+                    <ScoringHistoryPage />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </AppShell.Main>
+        </AppShell>
+      </MockWrapper>
     </ErrorBoundary>
   );
 }
