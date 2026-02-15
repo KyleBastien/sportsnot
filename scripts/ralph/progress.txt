@@ -1,0 +1,58 @@
+# Ralph Progress Log
+Started: 02/14/2026 21:14:25
+
+## Codebase Patterns
+- Package scaffolding: package.json with exports map, tsconfig.json extending root, tsconfig.lib.json with nodenext module resolution
+- Path aliases go in root tsconfig.base.json paths
+- Nx auto-infers typecheck target via @nx/js/typescript plugin — no need to add manually
+- Lint is not per-project in Nx; use root `npx eslint <path>` directly
+- Unit tests use rstest (yarn rstest --root packages/<name>)
+- E2e tests use Playwright against http://localhost:4200 (needs serve-static running)
+- Nx sync prompt appears on first typecheck — answer "yes" to sync TS references
+- tsconfig.json is auto-modified by Nx sync — commit changes after sync
+- Scripts that import cross-package need separate tsconfig with `bundler` moduleResolution (not `nodenext`) — use tsconfig.scripts.json pattern
+- Use `/* eslint-disable no-undef */` for Node.js scripts (process, setTimeout) since ESLint config doesn't set node env
+- tsx is installed as devDependency for running TypeScript scripts
+- nodenext moduleResolution requires `.js` extensions for relative imports — applies to barrel exports (index.ts) and any cross-file imports
+- Types package (packages/types/src/index.ts) needs `.js` extensions in re-exports for nodenext compatibility
+- Nx sync may revert manual tsconfig reference changes — let Nx manage project references
+
+---
+
+## 2026-02-15T05:15:00Z - US-001
+- Created packages/mock-data/ Nx package scaffolding
+- Files changed: packages/mock-data/package.json, project.json, tsconfig.json, tsconfig.lib.json, src/index.ts, root tsconfig.base.json, root tsconfig.json (Nx sync)
+- **Learnings for future iterations:**
+  - Follow existing package patterns: package.json with exports map, tsconfig.json + tsconfig.lib.json
+  - Nx auto-detects packages in packages/ directory — no need to register manually
+  - `nx show project @sportsnot/mock-data --json` verifies Nx recognition
+  - Nx sync may modify root tsconfig.json references — always commit those changes
+---
+
+## 2026-02-15T05:31:00Z - US-002
+- Created fixture data download script at packages/mock-data/src/scripts/download.ts
+- Pipeline: bracket → team rosters → games by round → player game logs
+- Includes rate limiting (10 concurrent, 100ms delay), error handling, idempotent file writes
+- Files changed: packages/mock-data/src/scripts/download.ts, project.json (download target), tsconfig.lib.json (exclude scripts), tsconfig.scripts.json (new), README.md, package.json (tsx), yarn.lock, src/data/.gitkeep
+- **Learnings for future iterations:**
+  - tsconfig.lib.json uses `nodenext` moduleResolution which breaks cross-package imports via path aliases — scripts need separate tsconfig with `bundler` resolution
+  - Don't include tsconfig.scripts.json in tsconfig.json references — it confuses Nx typecheck when `noEmit: true`
+  - Download script uses @sportsnot/nhl-api functions directly — no need to reimplement API logic
+  - NHL playoff game IDs encode round in position 8 (1-indexed) of the 10-digit ID
+  - Nx `command` target in project.json supports `{workspaceRoot}` for cwd option
+  - ESLint config has no node environment — use eslint-disable for `no-undef` in Node scripts
+---
+
+## 2026-02-15T05:44:00Z - US-003
+- Created stub fixture data files with correct TypeScript types conforming to @sportsnot/types
+- Files: teams.ts (4 teams: EDM, FLA, DAL, CAR), players.ts (3 players/team: F, D, G), bracket.ts (2 R1 series), games-r1.ts through games-scf.ts (2 games/round), player-game-logs.ts (2 entries/player)
+- Updated index.ts barrel exports with .js extensions for nodenext compatibility
+- Fixed packages/types/src/index.ts to use .js extensions in re-exports
+- Files changed: packages/mock-data/src/data/*.ts (8 new), packages/mock-data/src/index.ts, packages/types/src/index.ts, packages/mock-data/tsconfig.lib.json
+- **Learnings for future iterations:**
+  - nodenext moduleResolution requires .js extensions in all relative imports (even for .ts files)
+  - The types package index.ts had pre-existing nodenext incompatibility — needed .js extension fix
+  - Nx sync manages project references automatically — manual edits to tsconfig references may be reverted
+  - Playwright e2e tests fail when run via rstest (expected) — only unit tests (utils, nhl-api) run through rstest
+  - `as const` on exported data arrays/objects works well with type imports for fixture data
+---
