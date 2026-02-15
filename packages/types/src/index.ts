@@ -1,2 +1,2 @@
-export * from './lib/types';
-export * from './lib/nhl';
+export * from './lib/types.js';
+export * from './lib/nhl.js';

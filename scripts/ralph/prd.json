@@ -41,7 +41,7 @@
         "Playwright tests pass"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Use the existing @sportsnot/nhl-api package functions — do NOT duplicate API logic. The NHL API season format is '20242025'. Playoff gameType is 3. The script writes .ts files, not .json. Generated fixture files will be committed to the repo."
     },
     {
@@ -62,7 +62,7 @@
         "Playwright tests pass"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "These are small representative datasets for development. The download script (US-002) will overwrite them with full 2025 data later. Make sure the types import from @sportsnot/types."
     },
     {
