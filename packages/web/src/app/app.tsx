@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Route, Routes, Link, useNavigate } from 'react-router-dom';
 import {
   AppShell,
@@ -12,6 +13,16 @@ import {
 import { useAuthContext } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
+
+// Mock mode banner — only loaded when VITE_MOCK_MODE is 'true'
+const MockModeBanner =
+  import.meta.env.VITE_MOCK_MODE === 'true'
+    ? lazy(() =>
+        import('../mock/MockModeBanner').then((m) => ({
+          default: m.MockModeBanner,
+        }))
+      )
+    : null;
 
 // Route pages
 import { LoginPage } from './routes/auth/LoginPage';
@@ -82,6 +93,11 @@ function UserMenu() {
 export function App() {
   return (
     <ErrorBoundary>
+      {MockModeBanner && (
+        <Suspense fallback={null}>
+          <MockModeBanner />
+        </Suspense>
+      )}
       <AppShell header={{ height: 60 }} padding="md">
         <AppShell.Header>
           <Group h="100%" px="md" justify="space-between">
