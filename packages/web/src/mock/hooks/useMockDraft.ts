@@ -136,8 +136,8 @@ export function useMockStartDraft() {
 
       const memberUserIds = league.members.map((m) => m.userId);
 
-      // Default: 10 rounds of snake draft (5F + 3D + 2G = 10 roster slots)
-      const totalDraftRounds = 10;
+      // 11 rounds of snake draft (5F + 3D + 1G + 1IR_F + 1IR_D = 11 roster slots)
+      const totalDraftRounds = 11;
       const draftOrder =
         params.draftOrder ??
         generateSnakeDraftOrder(memberUserIds, totalDraftRounds);

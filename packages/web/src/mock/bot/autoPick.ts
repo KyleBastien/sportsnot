@@ -2,68 +2,81 @@ import type { NHLPlayer } from '@sportsnot/types';
 import { players } from '@sportsnot/mock-data';
 import type { MockDraftState, MockState } from '../MockDataProvider';
 
-// ── Roster composition targets (10 total: 5F + 3D + 2G) ───────────────
-const ROSTER_TARGETS: Record<string, number> = {
-  Forward: 5,
-  Defenseman: 3,
-  Goalie: 2,
+// ── Roster slot targets (11 total: 5F + 3D + 1G + 1IR_F + 1IR_D) ──────
+const SLOT_TARGETS: Record<string, number> = {
+  F: 5,
+  D: 3,
+  G: 1,
+  IR_F: 1,
+  IR_D: 1,
 };
-const TOTAL_ROSTER_SIZE = 10;
+const TOTAL_ROSTER_SIZE = 11;
 
 // ── Flat player lookup ─────────────────────────────────────────────────
 const ALL_PLAYERS: NHLPlayer[] = Object.values(
   players
 ).flat() as unknown as NHLPlayer[];
-const PLAYER_MAP = new Map<number, NHLPlayer>(
-  ALL_PLAYERS.map((p) => [p.id, p])
-);
 
 /** Returns position type string for a player */
 function positionType(player: NHLPlayer): string {
   return player.primaryPosition.type;
 }
 
-/** Count how many of each position type a member has already drafted */
-function countPositions(
+/** Count how many of each slot type a member has already drafted */
+function countSlots(
   draftState: MockDraftState,
   memberUserId: string
 ): Record<string, number> {
   const counts: Record<string, number> = {
-    Forward: 0,
-    Defenseman: 0,
-    Goalie: 0,
+    F: 0,
+    D: 0,
+    G: 0,
+    IR_F: 0,
+    IR_D: 0,
   };
   for (const pick of draftState.picks) {
-    // Find the userId for this pick's league member from the draft order
     const pickIndex = pick.pickNumber - 1;
     const pickerUserId = draftState.draft.draftOrder[pickIndex];
     if (pickerUserId !== memberUserId) continue;
-
-    const pid = pick.playerId ?? pick.teamId;
-    if (pid == null) continue;
-    const player = PLAYER_MAP.get(pid);
-    if (player) {
-      const pType = positionType(player);
-      counts[pType] = (counts[pType] ?? 0) + 1;
-    }
+    counts[pick.position] = (counts[pick.position] ?? 0) + 1;
   }
   return counts;
 }
 
-/** Determine the position with greatest remaining need */
-function greatestNeed(counts: Record<string, number>): string {
-  let maxNeed = -1;
-  let needPosition = 'Forward';
+/** Determine the slot with greatest remaining need, returning slot code and player type */
+function greatestNeed(counts: Record<string, number>): {
+  slot: string;
+  playerType: string;
+} {
+  // Fill regular slots first based on greatest remaining need
+  const regularSlots: [string, number, string][] = [
+    ['F', SLOT_TARGETS.F, 'Forward'],
+    ['D', SLOT_TARGETS.D, 'Defenseman'],
+    ['G', SLOT_TARGETS.G, 'Goalie'],
+  ];
 
-  for (const [pos, target] of Object.entries(ROSTER_TARGETS)) {
-    const have = counts[pos] ?? 0;
-    const remaining = target - have;
+  let maxNeed = 0;
+  let needSlot = 'F';
+  let needPlayerType = 'Forward';
+
+  for (const [slot, target, playerType] of regularSlots) {
+    const remaining = target - (counts[slot] ?? 0);
     if (remaining > maxNeed) {
       maxNeed = remaining;
-      needPosition = pos;
+      needSlot = slot;
+      needPlayerType = playerType;
     }
   }
-  return needPosition;
+
+  // If all regular slots are filled, fill IR slots
+  if (maxNeed <= 0) {
+    if ((counts['IR_F'] ?? 0) < SLOT_TARGETS.IR_F)
+      return { slot: 'IR_F', playerType: 'Forward' };
+    if ((counts['IR_D'] ?? 0) < SLOT_TARGETS.IR_D)
+      return { slot: 'IR_D', playerType: 'Defenseman' };
+  }
+
+  return { slot: needSlot, playerType: needPlayerType };
 }
 
 /**
@@ -75,13 +88,13 @@ export function selectBotPick(
   draftState: MockDraftState,
   botUserId: string
 ): { playerId: number; position: string } | null {
-  const counts = countPositions(draftState, botUserId);
-  const need = greatestNeed(counts);
+  const counts = countSlots(draftState, botUserId);
+  const { slot, playerType } = greatestNeed(counts);
   const available = new Set(draftState.availablePlayerIds);
 
-  // Filter to players matching the needed position type
+  // Filter to players matching the needed player type
   let candidates = ALL_PLAYERS.filter(
-    (p) => available.has(p.id) && positionType(p) === need
+    (p) => available.has(p.id) && positionType(p) === playerType
   );
 
   // Fallback: if no candidates for the needed position, pick any available player
@@ -95,15 +108,8 @@ export function selectBotPick(
   candidates.sort((a, b) => a.fullName.localeCompare(b.fullName));
 
   const picked = candidates[0];
-  // Map position type to draft position code
-  const posCode =
-    picked.primaryPosition.type === 'Goalie'
-      ? 'G'
-      : picked.primaryPosition.type === 'Defenseman'
-        ? 'D'
-        : 'F';
 
-  return { playerId: picked.id, position: posCode };
+  return { playerId: picked.id, position: slot };
 }
 
 /**

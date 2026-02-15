@@ -13,7 +13,6 @@ import type {
   RosterSlot,
   NHLPlayerStats,
   NHLGame,
-  Position,
 } from '@sportsnot/types';
 import {
   gamesR1,
@@ -236,29 +235,10 @@ function mockReducer(state: MockState, action: MockAction): MockState {
               playerId: p.playerId,
               teamId: p.teamId,
               position: p.position,
-              isActive: true,
+              isActive: !p.position.startsWith('IR'),
               pointsEarned: 0,
               activatedFromIr: false,
             }));
-            // Add IR slots (1 IR_F and 1 IR_D per member)
-            slots.push({
-              id: `mock-roster-${memberId}-ir-f`,
-              leagueMemberId: memberId,
-              round: ds.draft.round,
-              position: 'IR_F' as Position,
-              isActive: false,
-              pointsEarned: 0,
-              activatedFromIr: false,
-            });
-            slots.push({
-              id: `mock-roster-${memberId}-ir-d`,
-              leagueMemberId: memberId,
-              round: ds.draft.round,
-              position: 'IR_D' as Position,
-              isActive: false,
-              pointsEarned: 0,
-              activatedFromIr: false,
-            });
             rostersAfterPick[memberId] = slots;
           }
         }

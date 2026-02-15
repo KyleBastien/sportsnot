@@ -439,8 +439,15 @@ export function DraftPage() {
     [draft?.draft_picks]
   );
 
-  const currentPickIndex = draft ? draft.current_pick - 1 : 0;
-  const currentPickerUserId = draftOrder[currentPickIndex];
+  const isDraftComplete =
+    draft?.status === 'completed' ||
+    (draft ? draft.current_pick > draftOrder.length : false);
+  const currentPickIndex =
+    draft && draft.current_pick >= 1 && draft.current_pick <= draftOrder.length
+      ? draft.current_pick - 1
+      : -1;
+  const currentPickerUserId =
+    currentPickIndex >= 0 ? draftOrder[currentPickIndex] : undefined;
   const isMyTurn = currentPickerUserId === user?.id;
   const myMember = members?.find((m) => m.user_id === user?.id);
   const currentPicker = members?.find((m) => m.user_id === currentPickerUserId);
@@ -502,6 +509,50 @@ export function DraftPage() {
         <Alert color="blue" title="No Active Draft">
           No draft has been started for this league yet.
         </Alert>
+      </Container>
+    );
+  }
+
+  if (isDraftComplete) {
+    return (
+      <Container size="md" py="xl">
+        <Stack gap="lg" align="center">
+          <Title order={2}>Draft Complete</Title>
+          <Text c="dimmed">
+            All {draftOrder.length} picks have been made. The draft is complete!
+          </Text>
+          <Card padding="lg" radius="md" withBorder w="100%">
+            <Title order={4} mb="sm">
+              Draft History
+            </Title>
+            <ScrollArea h={400}>
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Pick</Table.Th>
+                    <Table.Th>Team</Table.Th>
+                    <Table.Th>Player</Table.Th>
+                    <Table.Th>Position</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {picks.map((pick) => (
+                    <Table.Tr key={pick.id}>
+                      <Table.Td>{pick.pick_number}</Table.Td>
+                      <Table.Td>
+                        {pick.league_members?.team_name ?? 'Unknown'}
+                      </Table.Td>
+                      <Table.Td>
+                        {pick.player_id ?? pick.team_id ?? '—'}
+                      </Table.Td>
+                      <Table.Td>{pick.position}</Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea>
+          </Card>
+        </Stack>
       </Container>
     );
   }
