@@ -9,6 +9,7 @@ const envVars = {
     process.env.VITE_SUPABASE_URL || 'http://localhost:54321',
   VITE_SUPABASE_ANON_KEY:
     process.env.VITE_SUPABASE_ANON_KEY || 'mock-anon-key-for-local-dev',
+  VITE_MOCK_MODE: process.env.VITE_MOCK_MODE || 'false',
 };
 
 module.exports = {
@@ -43,6 +44,7 @@ module.exports = {
     new DefinePlugin({
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(envVars.VITE_SUPABASE_URL),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(envVars.VITE_SUPABASE_ANON_KEY),
+      'import.meta.env.VITE_MOCK_MODE': JSON.stringify(envVars.VITE_MOCK_MODE),
     }),
   ],
 };
