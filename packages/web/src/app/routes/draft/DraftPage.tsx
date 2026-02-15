@@ -23,6 +23,7 @@ import {
   supabase,
   usePlayoffPlayers,
   usePlayoffTeams,
+  useRegularSeasonPlayers,
 } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import type { Position } from '@sportsnot/types';
@@ -34,6 +35,7 @@ import {
 import {
   useMockPlayoffPlayers,
   useMockPlayoffTeams,
+  useMockRegularSeasonPlayers,
 } from '../../../mock/hooks/useMockNhlApi';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
@@ -142,6 +144,11 @@ interface ComparePlayer {
 
 const MAX_COMPARE = 4;
 
+interface RegSeasonStatRow {
+  player_id: number;
+  points: number;
+}
+
 interface AvailablePlayerBoardProps {
   playerStats: PlayerStatRow[];
   teamStats: TeamStatRow[];
@@ -153,6 +160,8 @@ interface AvailablePlayerBoardProps {
   onSelectPlayer: (player: DraftablePlayer) => void;
   comparePlayers: ComparePlayer[];
   onToggleCompare: (player: ComparePlayer) => void;
+  isRound1: boolean;
+  regSeasonStats: RegSeasonStatRow[];
 }
 
 function AvailablePlayerBoard({
@@ -166,8 +175,15 @@ function AvailablePlayerBoard({
   onSelectPlayer,
   comparePlayers,
   onToggleCompare,
+  isRound1,
+  regSeasonStats,
 }: AvailablePlayerBoardProps) {
   const query = searchQuery.toLowerCase();
+
+  // Build a lookup for regular season points by player ID
+  const regSeasonMap = new Map(
+    regSeasonStats.map((r) => [r.player_id, r.points])
+  );
 
   // Build skater rows from player_stats_cache
   const skaterRows = playerStats
@@ -185,6 +201,7 @@ function AvailablePlayerBoard({
       assists: p.assists ?? 0,
       points: (p.goals ?? 0) + (p.assists ?? 0),
       gamesPlayed: p.games_played ?? 0,
+      regSeasonPts: regSeasonMap.get(p.player_id) ?? 0,
     }));
 
   // Build team/goalie rows from team_stats_cache
@@ -216,7 +233,11 @@ function AvailablePlayerBoard({
       if (query && !p.fullName.toLowerCase().includes(query)) return false;
       return true;
     })
-    .sort((a, b) => b.points - a.points || b.goals - a.goals);
+    .sort((a, b) =>
+      isRound1
+        ? b.regSeasonPts - a.regSeasonPts || b.points - a.points
+        : b.points - a.points || b.goals - a.goals
+    );
 
   const filteredTeams = teamRows
     .filter((t) => {
@@ -242,6 +263,11 @@ function AvailablePlayerBoard({
                 <Table.Tr>
                   <Table.Th>Player</Table.Th>
                   <Table.Th>Pos</Table.Th>
+                  {isRound1 && (
+                    <Table.Th style={{ textAlign: 'right' }}>
+                      Reg Season Pts
+                    </Table.Th>
+                  )}
                   <Table.Th style={{ textAlign: 'right' }}>G</Table.Th>
                   <Table.Th style={{ textAlign: 'right' }}>A</Table.Th>
                   <Table.Th style={{ textAlign: 'right' }}>Pts</Table.Th>
@@ -262,6 +288,13 @@ function AvailablePlayerBoard({
                           {p.position}
                         </Badge>
                       </Table.Td>
+                      {isRound1 && (
+                        <Table.Td
+                          style={{ textAlign: 'right', fontWeight: 600 }}
+                        >
+                          {p.regSeasonPts}
+                        </Table.Td>
+                      )}
                       <Table.Td style={{ textAlign: 'right' }}>
                         {p.goals}
                       </Table.Td>
@@ -321,7 +354,7 @@ function AvailablePlayerBoard({
                 })}
                 {filteredSkaters.length === 0 && (
                   <Table.Tr>
-                    <Table.Td colSpan={isMyTurn ? 8 : 7}>
+                    <Table.Td colSpan={(isRound1 ? 8 : 7) + (isMyTurn ? 1 : 0)}>
                       <Text c="dimmed" ta="center" size="sm">
                         No available skaters match your filters
                       </Text>
@@ -435,6 +468,20 @@ export function DraftPage() {
   const mockTeamResult = useMockPlayoffTeams(currentSeason, currentRound);
   const supabaseTeamResult = usePlayoffTeams(currentSeason, currentRound);
   const { data: teamStats } = IS_MOCK ? mockTeamResult : supabaseTeamResult;
+
+  // Fetch regular season stats (only in round 1)
+  const isRound1 = currentRound === 1;
+  const mockRegSeasonResult = useMockRegularSeasonPlayers(
+    currentSeason,
+    isRound1
+  );
+  const supabaseRegSeasonResult = useRegularSeasonPlayers(
+    currentSeason,
+    isRound1
+  );
+  const { data: regSeasonStats } = IS_MOCK
+    ? mockRegSeasonResult
+    : supabaseRegSeasonResult;
 
   // Derived state — compute before early returns to keep hook order stable
   const draftOrder: string[] = (draft?.draft_order as string[]) ?? [];
@@ -755,6 +802,11 @@ export function DraftPage() {
               }}
               comparePlayers={comparePlayers}
               onToggleCompare={handleToggleCompare}
+              isRound1={isRound1}
+              regSeasonStats={(regSeasonStats ?? []).map((r) => ({
+                player_id: r.player_id,
+                points: r.points,
+              }))}
             />
           )}
         </Card>
