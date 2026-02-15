@@ -1,743 +1,417 @@
 {
   "project": "SportsNot",
-  "branchName": "ralph/platform-features",
-  "description": "SportsNot Platform Features (P0-P2) — Player comparison, live scoring, mobile responsive design, live games widget, notifications, scoring history, reusable UI components, testing coverage, and P2 enhancements",
+  "branchName": "ralph/mock-mode",
+  "description": "Mock Mode — Developer/QA tool that replays 2025 NHL Playoff data offline via VITE_MOCK_MODE env var, enabling mock drafts with AI bots, day-by-day and round-by-round simulation, and full playoff season testing without Supabase or NHL API dependencies",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Create CompareContext for player comparison state",
-      "description": "As a developer, I need a React context to manage the player comparison tray state so that comparison selections persist across page navigation.",
+      "title": "Create packages/mock-data Nx package scaffolding",
+      "description": "As a developer, I need the mock-data package to exist as a proper Nx library so that fixture data and the download script have a home in the monorepo.",
       "acceptanceCriteria": [
-        "Create CompareContext in @sportsnot/web with provider wrapping the app",
-        "Context state holds an array of selected players (max 4), each with: playerId, name, teamAbbrev, position, headshot, stats",
-        "Context provides: addPlayer(player), removePlayer(playerId), clearAll(), players[], isFull (boolean when 4 selected)",
-        "Adding a player when 4 are already selected does nothing (isFull=true disables adds)",
-        "Context state resets on sign-out",
-        "Typecheck passes"
+        "Create packages/mock-data/ with package.json (name: @sportsnot/mock-data), tsconfig.json extending root tsconfig.base.json, and project.json with Nx targets",
+        "Create src/index.ts as the barrel export file (can be empty initially)",
+        "The package is recognized by Nx (nx show project mock-data works)",
+        "Add @sportsnot/mock-data path alias to root tsconfig.base.json paths",
+        "Typecheck passes",
+        "Lint passes",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 1,
       "passes": false,
-      "notes": ""
+      "notes": "This is pure scaffolding. Check existing packages like packages/utils or packages/types for the pattern to follow."
     },
     {
       "id": "US-002",
-      "title": "Build CompareTray floating UI component",
-      "description": "As a user, I want to see a floating compare tray at the bottom of the screen showing my selected players so that I can manage my comparison set.",
+      "title": "Write fixture data download script",
+      "description": "As a developer, I want an automated script that downloads 2025 NHL Playoff data from the NHL API and generates TypeScript fixture files, so the data is reproducible.",
       "acceptanceCriteria": [
-        "Create CompareTray component that reads from CompareContext",
-        "Tray is fixed to the bottom of the viewport, only visible when 1+ players are selected",
-        "Tray shows player avatars/names and a count badge (e.g. 'Compare (2)')",
-        "Each player in the tray has an × button to remove them",
-        "A 'Clear All' button empties the tray",
-        "A 'Compare' button is enabled when 2+ players are selected and opens the comparison modal (modal implemented in next story)",
-        "Tray does not obstruct bottom navigation on mobile (positioned above it)",
+        "Create packages/mock-data/src/scripts/download.ts that uses @sportsnot/nhl-api functions to fetch data",
+        "Script pipeline: 1) getPlayoffBracket('20242025') for teams+series, 2) getTeamRoster(abbr, '20242025') x16 teams, 3) getPlayoffSchedule('20242025') for all games, 4) getPlayerGameLog(id, '20242025', 3) for all players, 5) optionally getGameBoxscore(id) for goalie enrichment",
+        "Script includes rate limiting (max 10 concurrent requests, 100ms delay between batches)",
+        "Script writes TypeScript files with 'export const' and 'as const' into packages/mock-data/src/data/: teams.ts, players.ts, bracket.ts, games-r1.ts, games-r2.ts, games-cf.ts, games-scf.ts, player-game-logs.ts",
+        "Script logs progress (e.g., 'Fetching roster for TBL... done (23 players)')",
+        "Script handles API errors gracefully (retry transient failures, log and skip missing data)",
+        "Script is idempotent — running again overwrites existing fixture files",
+        "Register an Nx 'download' target in packages/mock-data/project.json that runs the script (e.g., via tsx)",
+        "Create packages/mock-data/README.md documenting how to run 'nx download mock-data' and what it produces",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 2,
       "passes": false,
-      "notes": ""
+      "notes": "Use the existing @sportsnot/nhl-api package functions — do NOT duplicate API logic. The NHL API season format is '20242025'. Playoff gameType is 3. The script writes .ts files, not .json. Generated fixture files will be committed to the repo."
     },
     {
       "id": "US-003",
-      "title": "Build ComparisonModal for side-by-side stat view",
-      "description": "As a user, I want to open a comparison modal from the tray so that I can see 2-4 players' stats side-by-side with differences highlighted.",
+      "title": "Create stub fixture data with correct types",
+      "description": "As a developer, I need stub fixture data files with the correct TypeScript types and structure so that subsequent mock mode stories can be developed and tested even if the download script hasn't been run yet.",
       "acceptanceCriteria": [
-        "Create ComparisonModal component that receives players from CompareContext",
-        "Modal displays players in columns (2-4 columns depending on selection count)",
-        "Skater stats shown: goals, assists, points, games played, +/-, points per game",
-        "Goalie stats shown: wins, shutouts, GAA, save percentage, games played",
-        "The highest value in each stat row is highlighted (bold + accent color)",
-        "Each player column shows: name, team, position, headshot",
-        "Fantasy points earned (from roster) are shown if the player is on a user's roster",
-        "Modal uses Mantine Modal with fullScreen on mobile, standard size on desktop",
-        "Modal can be closed via × button or Escape key",
+        "Create packages/mock-data/src/data/teams.ts exporting an array of at least 4 NHLTeam objects with realistic field values (e.g., EDM, FLA, DAL, CAR)",
+        "Create packages/mock-data/src/data/players.ts exporting a Record<string, NHLPlayer[]> keyed by team abbreviation, with at least 3 players per stub team (1 forward, 1 defenseman, 1 goalie)",
+        "Create packages/mock-data/src/data/bracket.ts exporting NHLPlayoffSeries[] with at least 2 stub R1 series",
+        "Create packages/mock-data/src/data/games-r1.ts, games-r2.ts, games-cf.ts, games-scf.ts each exporting NHLGame[] with at least 2 stub games per round, including gameDate field as ISO date string",
+        "Create packages/mock-data/src/data/player-game-logs.ts exporting a Record<number, NHLPlayerStats[]> keyed by player ID with at least 2 game log entries per stub player",
+        "All fixture files export typed data conforming to @sportsnot/types interfaces (NHLTeam, NHLPlayer, NHLGame, NHLPlayoffSeries, NHLPlayerStats)",
+        "Update packages/mock-data/src/index.ts to re-export all fixture data",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 3,
       "passes": false,
-      "notes": ""
+      "notes": "These are small representative datasets for development. The download script (US-002) will overwrite them with full 2025 data later. Make sure the types import from @sportsnot/types."
     },
     {
       "id": "US-004",
-      "title": "Add Compare action to PlayerCard component",
-      "description": "As a user, I want an 'Add to Compare' button on PlayerCard so that I can select players for comparison from any list.",
+      "title": "Add VITE_MOCK_MODE Rspack configuration",
+      "description": "As a developer, I want the VITE_MOCK_MODE environment variable to be available in the browser bundle so that mock mode can be toggled via .env files.",
       "acceptanceCriteria": [
-        "Add an 'Add to Compare' icon button to the existing PlayerCard component in @sportsnot/ui",
-        "Button uses CompareContext to add the player",
-        "Button is disabled when the compare tray is full (4 players)",
-        "Button shows a checkmark or 'Added' state when the player is already in the tray",
-        "Clicking when already added removes the player from the tray",
+        "Rspack config (packages/web rspack config or root) is updated so import.meta.env.VITE_MOCK_MODE is available at runtime in the browser",
+        "When VITE_MOCK_MODE is not set, it resolves to undefined or 'false' (never accidentally truthy)",
+        "Add VITE_MOCK_MODE=false to .env.example with a comment explaining its purpose",
+        "Create a utility function isMockMode() in packages/web/src/mock/utils.ts that returns import.meta.env.VITE_MOCK_MODE === 'true'",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 4,
       "passes": false,
-      "notes": ""
+      "notes": "Check the existing Rspack config to understand how env vars are currently handled. May need builtins.define or EnvironmentPlugin. The key requirement is that when VITE_MOCK_MODE is not 'true', Rspack can statically eliminate dead code branches."
     },
     {
       "id": "US-005",
-      "title": "Integrate compare tray into DraftPage",
-      "description": "As a user, I want to compare players while drafting so that I can make informed pick decisions.",
+      "title": "Mock mode conditional loading and banner",
+      "description": "As a developer, I want the app to conditionally load mock mode code only when VITE_MOCK_MODE is true, and show a visible banner so I know mock mode is active.",
       "acceptanceCriteria": [
-        "Each player row/card in the DraftPage player list has an 'Add to Compare' action",
-        "CompareTray is visible on the DraftPage without obstructing the draft board",
-        "Users can open the comparison modal, review stats, close it, and continue drafting",
-        "Already-drafted players are visually distinguished in the comparison modal",
+        "In packages/web/src/app/app.tsx (or the root layout), add a build-time guard: if (import.meta.env.VITE_MOCK_MODE === 'true') that dynamically imports mock mode code",
+        "All mock imports use dynamic import() inside the guard — no top-level imports of mock modules",
+        "Create packages/web/src/mock/MockModeBanner.tsx — a persistent, non-dismissible Mantine Alert or banner (bright yellow/orange) displaying '🧪 Mock Mode' at the top of the page",
+        "The banner is always visible when mock mode is active and does not overlap with existing header content",
+        "When VITE_MOCK_MODE is not 'true', the banner component is not loaded or rendered",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Verify in browser if browser testing tools are available",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 5,
       "passes": false,
-      "notes": ""
+      "notes": "The dynamic import pattern is critical for dead-code elimination. When VITE_MOCK_MODE is false, Rspack should tree-shake the entire mock branch including the banner."
     },
     {
       "id": "US-006",
-      "title": "Integrate compare tray into RosterPage",
-      "description": "As a user, I want to compare players from my roster page so that I can evaluate roster decisions.",
+      "title": "MockDataProvider context and state machine skeleton",
+      "description": "As a developer, I need a MockDataProvider React context with a useReducer state machine that will manage all mock mode state (leagues, drafts, rosters, simulation date, etc.).",
       "acceptanceCriteria": [
-        "Each player in the RosterPage roster slots has an 'Add to Compare' action",
-        "Users can compare their rostered players against each other",
-        "Points earned are shown in the comparison for rostered players",
+        "Create packages/web/src/mock/MockDataProvider.tsx with a React context and useReducer",
+        "Define the MockState type with fields: leagues (array), currentLeague, draftState, rosters (map), simulationDate (string ISO date), currentRound (1-4), playerStats (cumulative map), mockUser",
+        "Define action types: CREATE_LEAGUE, JOIN_LEAGUE, START_DRAFT, MAKE_PICK, ADVANCE_DAY, ADVANCE_ROUND, ACTIVATE_IR, DEACTIVATE_IR, RESET_ALL",
+        "The reducer handles RESET_ALL action (clears all state to initial values) — other actions can return state unchanged for now (stubs)",
+        "Create a useMockData() hook that returns state and dispatch from the context",
+        "The provider is dynamically imported and wrapped around children only when mock mode is active",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 6,
       "passes": false,
-      "notes": ""
+      "notes": "This is the skeleton only. Individual action handlers will be implemented in subsequent stories. The state shape should support day-by-day simulation with currentDate tracking."
     },
     {
       "id": "US-007",
-      "title": "Create Supabase Edge Functions for stat syncing",
-      "description": "As a developer, I need Supabase Edge Functions that fetch NHL stats and upsert them into the database so that stats stay current.",
+      "title": "Mock auth provider",
+      "description": "As a developer, I want mock mode to bypass Supabase auth with an automatic mock user login so I can use the app without authentication.",
       "acceptanceCriteria": [
-        "Create Edge Function sync-player-stats that accepts a list of player IDs, fetches stats from NHL API, and upserts into player_stats_cache",
-        "Create Edge Function sync-team-stats that accepts a list of team abbreviations, fetches stats from NHL API, and upserts into team_stats_cache",
-        "Stats include: goals, assists, games_played, is_injured (players); wins, shutouts, is_eliminated (teams)",
-        "Upsert logic: stale data is updated, new data is inserted, no duplicates",
-        "Functions are callable via supabase.functions.invoke()",
-        "Typecheck passes"
+        "Create packages/web/src/mock/hooks/useMockAuth.ts that returns a mock user session matching the shape of the real useAuth() hook",
+        "Mock user has deterministic ID ('mock-user-001'), display name ('Mock User'), and a placeholder avatar",
+        "When mock mode is active, the AuthProvider (or a MockAuthProvider wrapper) provides the mock user — all auth-gated routes (ProtectedRoute) work normally",
+        "Sign-out in mock mode shows a toast or message: 'Mock mode — auth disabled' and remains logged in as mock user",
+        "No Supabase auth network requests are made when mock mode is active",
+        "Typecheck passes",
+        "Lint passes",
+        "Verify in browser if browser testing tools are available",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 7,
       "passes": false,
-      "notes": "Edge Functions in packages/supabase-db/functions/"
+      "notes": "Check how AuthContext and ProtectedRoute work in the existing codebase to ensure the mock auth integrates seamlessly."
     },
     {
       "id": "US-008",
-      "title": "Create database triggers for auto-recalculating points",
-      "description": "As a system, I need PostgreSQL triggers that auto-recalculate roster and member points when stats change.",
+      "title": "Mock NHL API hooks — teams, players, bracket from fixtures",
+      "description": "As a developer, I want mock implementations of NHL API functions that return fixture data so components render correctly without hitting the real NHL API.",
       "acceptanceCriteria": [
-        "Create a PostgreSQL trigger on player_stats_cache that fires AFTER INSERT OR UPDATE",
-        "Create a PostgreSQL trigger on team_stats_cache that fires AFTER INSERT OR UPDATE",
-        "Triggers use scoring rules: goal=1, assist=1, win=2, shutout=4 (shutout replaces win points)",
-        "Updated points are written to rosters.points_earned for all active roster slots referencing the changed player/team",
-        "league_members.total_points is recalculated by summing active roster slot points",
-        "Trigger logic is idempotent (re-running produces the same result)",
-        "Use WHEN (OLD.* IS DISTINCT FROM NEW.*) to avoid unnecessary recalculations",
-        "Migration file is created in packages/supabase-db/migrations/",
-        "Typecheck passes"
+        "Create packages/web/src/mock/hooks/useMockNhlApi.ts with mock implementations for: getPlayoffBracket, getTeamRoster, getPlayer, getTeams, getPlayoffSchedule",
+        "Each mock function reads from the @sportsnot/mock-data fixture files and returns data matching the real function's return type",
+        "getPlayoffBracket returns bracket.ts data, getTeamRoster returns players.ts data for the given team, getPlayer returns the matching player from players.ts, getTeams returns teams.ts data",
+        "Mock implementations of usePlayoffPlayers and usePlayoffTeams hooks are provided, returning fixture data wrapped in the same shape as TanStack React Query responses (data, isLoading: false, error: null)",
+        "No network requests to api-web.nhle.com are made when these mocks are active",
+        "Typecheck passes",
+        "Lint passes",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 8,
       "passes": false,
-      "notes": ""
+      "notes": "Check how existing hooks like usePlayoffPlayers and usePlayoffTeams are consumed by components to match the return shape exactly."
     },
     {
       "id": "US-009",
-      "title": "Create useStatSync polling hook",
-      "description": "As a developer, I need a React hook that manages the polling lifecycle for stat syncs so that components can trigger and control live updates.",
+      "title": "Mock league creation with bot members",
+      "description": "As a developer, I want to create mock leagues with configurable bot counts so I can test league features solo.",
       "acceptanceCriteria": [
-        "Create useStatSync(leagueId) hook in @sportsnot/supabase",
-        "Hook calls the sync Edge Functions every 60 seconds when there are active NHL games",
-        "Hook stops polling when no games are active (checks via getScoresNow())",
-        "Hook exposes: lastSyncedAt, isSyncing, syncNow() (manual trigger), isLive",
-        "Hook uses React Query's refetchInterval for efficient polling",
-        "Polling pauses when the browser tab is not visible (document.hidden)",
-        "Typecheck passes"
+        "Create packages/web/src/mock/hooks/useMockLeagues.ts with mock implementations of useLeagues, useLeague, and league creation",
+        "When creating a league in mock mode, support a 'botCount' parameter (2-16 total members including mock user)",
+        "Bot members are generated with NHL player names (e.g., 'Connor McDavid', 'Auston Matthews') and deterministic IDs",
+        "The CREATE_LEAGUE reducer action stores the new league + bot members in MockState.leagues",
+        "useLeagues returns all mock leagues from state, useLeague returns a specific league by ID",
+        "Mock leagues include a 'isMock: true' flag that the UI can use to show a '🧪 Mock' badge",
+        "Typecheck passes",
+        "Lint passes",
+        "Verify in browser if browser testing tools are available",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 9,
       "passes": false,
-      "notes": ""
+      "notes": "League settings (roster size, scoring rules) should match the real league creation flow. Store leagues in the MockDataProvider state via dispatch."
     },
     {
       "id": "US-010",
-      "title": "Add live scoring indicators to UI",
-      "description": "As a user, I want to see visual indicators when scores update in real-time so that I know data is fresh.",
+      "title": "Mock draft state hooks",
+      "description": "As a developer, I want mock draft hooks that manage draft state in-memory so the draft UI works in mock mode.",
       "acceptanceCriteria": [
-        "A 'Last updated' timestamp is shown on StandingsPage and RosterPage",
-        "When a point total changes, the number briefly animates (200ms pulse/highlight effect)",
-        "A small 'live' indicator (green dot + 'LIVE') appears when active games are in progress",
-        "Point changes show a brief '+N' animation next to the updated total",
-        "Supabase Realtime subscription on rosters and league_members tables pushes updates to the client",
+        "Create packages/web/src/mock/hooks/useMockDraft.ts with mock implementations of useDraft, useMakePick, and useStartDraft",
+        "useStartDraft dispatches START_DRAFT which initializes a snake draft with the mock user and all bot members, setting draft order and current pick index",
+        "useMakePick dispatches MAKE_PICK which records a player selection, updates the draft board, and advances the current pick",
+        "useDraft returns current draft state: picks made, current turn, draft board, available players (filtered from fixture data), draft status (waiting/active/complete)",
+        "Draft state uses snake draft ordering (1-2-3...3-2-1 pattern)",
+        "The draft completes when all roster slots for all teams are filled",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 10,
       "passes": false,
-      "notes": ""
+      "notes": "This story handles draft state management only. Bot auto-pick AI is a separate story. The available player pool comes from the mock-data fixture players."
     },
     {
       "id": "US-011",
-      "title": "Create bottom navigation bar for mobile",
-      "description": "As a mobile user, I want a bottom navigation bar so that I can quickly switch between main sections with my thumb.",
+      "title": "Bot auto-pick AI for mock drafts",
+      "description": "As a developer, I want bots to automatically pick players during mock drafts using a sensible strategy so I can test the full draft flow solo.",
       "acceptanceCriteria": [
-        "Bottom nav bar appears on screens below sm breakpoint (Mantine: 768px) using AppShell.Footer",
-        "Tabs: Home (dashboard icon), Draft (list icon), Roster (users icon), Standings (trophy icon), Profile (user icon)",
-        "Active tab is highlighted with accent color based on current route",
-        "Bottom nav replaces the top header navigation links on mobile (use hiddenFrom/visibleFrom)",
-        "Top AppShell header remains but shows only logo and user avatar on mobile",
-        "Bottom nav is fixed to the viewport bottom and does not scroll with content",
-        "Page content has bottom padding to avoid being hidden behind the nav bar",
+        "Create packages/web/src/mock/bot/autoPick.ts with a 'best available by position need' draft strategy",
+        "Bot evaluates unfilled roster slots and picks the best available player for its greatest positional need (forwards first, then defensemen, then goalies proportional to roster requirements)",
+        "When it's a bot's turn during a mock draft, the bot auto-picks after a 1-2 second delay (setTimeout)",
+        "Bot picks trigger the same MAKE_PICK dispatch as manual picks, updating draft state normally",
+        "Draft UI shows bot picks appearing in real-time on the draft board (via state updates)",
+        "Bots do not pick players already drafted by other teams",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Verify in browser if browser testing tools are available",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 11,
       "passes": false,
-      "notes": ""
+      "notes": "The bot strategy doesn't need to be sophisticated — just avoid degenerate rosters (all goalies). Use a simple ranking: sort available players by position need, then by some stat or alphabetical as tiebreaker."
     },
     {
       "id": "US-012",
-      "title": "Create ResponsiveTable component",
-      "description": "As a mobile user, I want data tables to transform into card layouts on small screens so that I can read information without horizontal scrolling.",
+      "title": "Day-by-day simulation state machine",
+      "description": "As a developer, I want the ADVANCE_DAY and ADVANCE_ROUND reducer actions to work so that simulation state progresses through the 2025 playoff calendar.",
       "acceptanceCriteria": [
-        "Create a ResponsiveTable component in @sportsnot/ui",
-        "On desktop (md+): renders as a standard Mantine Table with columns and rows",
-        "On mobile (below md): renders as a vertical stack of cards, each card representing one row",
-        "Each card shows all column values as labeled key-value pairs",
-        "Column headers become labels in card view (e.g. 'Goals: 5', 'Assists: 3')",
-        "Component accepts props: columns (array of {key, label, sortable?}), data (array of row objects), onRowClick, sortable",
-        "Sorting works in both table and card views",
+        "ADVANCE_DAY action in the reducer increments simulationDate by one calendar day",
+        "After advancing a day, cumulative player stats are recalculated by summing all per-game stats from player-game-logs.ts where gameDate <= simulationDate",
+        "Stat accumulation is a pure function: (fixtures, currentDate) => cumulativeStats map keyed by player ID",
+        "Each round's games define a firstDate and lastDate boundary — when simulationDate >= lastDate for the current round, a 'roundComplete' flag is set to true in state",
+        "ADVANCE_ROUND action increments currentRound (1->2->3->4), sets simulationDate to the day before the next round's first game, and resets roundComplete to false",
+        "ADVANCE_ROUND is only valid when roundComplete is true (reducer ignores it otherwise)",
+        "When currentRound is 4 and roundComplete is true, a 'seasonComplete' flag is set",
+        "RESET_ALL resets simulationDate to the day before R1 game 1, currentRound to 1, and clears all cumulative stats",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 12,
       "passes": false,
-      "notes": ""
+      "notes": "The initial simulationDate after draft should be the day before the first R1 game in the fixture data. The stat accumulation function should handle both skater stats (NHLPlayerStats) and goalie stats."
     },
     {
       "id": "US-013",
-      "title": "Make DraftPage responsive with tabbed mobile layout",
-      "description": "As a mobile user, I want the draft interface to work on my phone so that I can participate in drafts from anywhere.",
+      "title": "Simulation control panel UI",
+      "description": "As a developer, I want a simulation control panel overlay with Next Day and Advance Round buttons so I can step through the playoff season.",
       "acceptanceCriteria": [
-        "DraftPage uses a tabbed layout on mobile (below sm): 'Players', 'Board', 'My Picks'",
-        "'Players' tab shows the available player list as cards (using ResponsiveTable)",
-        "'Board' tab shows the draft board (scrollable grid with pick cells)",
-        "'My Picks' tab shows the current user's picks so far",
-        "Only one tab is visible at a time on mobile; all three are visible side-by-side on desktop",
-        "The 'Make Pick' action is accessible regardless of which tab is active (sticky footer button)",
-        "Draft timer/turn indicator is always visible at the top on mobile",
+        "Create packages/web/src/mock/components/SimulationControlPanel.tsx as a floating overlay toggled via a FAB (Floating Action Button) visible on all pages in mock mode",
+        "Panel displays current simulated date (e.g., 'April 19, 2025') and current round label (e.g., 'Round 1 — First Round')",
+        "A 'Next Day →' button dispatches ADVANCE_DAY and is the primary action",
+        "When roundComplete is true, the 'Next Day →' button is disabled and shows text: 'Round complete — advance to next round'",
+        "An 'Advance Round →' button dispatches ADVANCE_ROUND and is disabled until roundComplete is true",
+        "When seasonComplete is true, both buttons are disabled and a '🏆 Season Complete' indicator is shown",
+        "A 'Reset Season' button dispatches RESET_ALL with a confirmation dialog",
+        "A 'Dump State' button logs the full MockState to console as JSON",
+        "Panel shows a day counter or mini progress indicator (e.g., 'Day 12 of 18')",
+        "Panel is collapsible/dismissible but can be re-opened via the FAB",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Verify in browser if browser testing tools are available",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 13,
       "passes": false,
-      "notes": ""
+      "notes": "Use Mantine components (Drawer, ActionIcon, Button, Badge, Text). The FAB should be positioned bottom-right and clearly marked as a mock mode control."
     },
     {
       "id": "US-014",
-      "title": "Make RosterPage and StandingsPage responsive",
-      "description": "As a mobile user, I want the roster and standings pages to be usable on my phone.",
+      "title": "Mock live games scoreboard for current simulated day",
+      "description": "As a developer, I want the Live Games widget on the dashboard to show that simulated day's games and scores from the 2025 fixture data.",
       "acceptanceCriteria": [
-        "RosterPage uses ResponsiveTable for roster slot display",
-        "Roster actions (activate IR, swap) work via tap interactions on mobile",
-        "StandingsPage uses ResponsiveTable for the standings table",
-        "Member names in standings truncate gracefully on small screens",
+        "Create packages/web/src/mock/hooks/useMockLiveGames.ts that returns games from fixture data matching the current simulationDate",
+        "The mock hook replaces getScoresNow() / useLiveGames() when mock mode is active",
+        "For the current simulated date, the dashboard Live Games section shows all games with final scores, team names, and abbreviations",
+        "On off-days (no games on that date), the widget shows 'No games scheduled today'",
+        "Series status is displayed on each matchup (e.g., 'TBL leads 2-1') calculated from games played up to current date",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Verify in browser if browser testing tools are available",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 14,
       "passes": false,
-      "notes": ""
+      "notes": "Filter the round's game fixture files by gameDate === simulationDate. Series status requires counting wins per team from all games in the series up to the current date."
     },
     {
       "id": "US-015",
-      "title": "Extract PositionBadge component to @sportsnot/ui",
-      "description": "As a developer, I want a reusable PositionBadge for displaying player positions with consistent colors.",
+      "title": "Mock roster management hooks",
+      "description": "As a developer, I want roster management to work in mock mode with daily stat accumulation so I can test the roster page.",
       "acceptanceCriteria": [
-        "Create PositionBadge component in @sportsnot/ui with props: position ('F'|'D'|'G'|'IR_F'|'IR_D'|'C'|'LW'|'RW'), size ('sm'|'md'), variant ('filled'|'outline')",
-        "Each position has a distinct color: F=blue, D=green, G=orange, IR_*=red, C/LW/RW=blue variants",
-        "Renders as a Mantine Badge with the position abbreviation",
-        "Export from @sportsnot/ui index",
+        "Create packages/web/src/mock/hooks/useMockRoster.ts with mock implementations of useRoster, useActivateIR, useDeactivateIR, and useLeagueRosters",
+        "After the draft, each team's roster is populated from draft picks and stored in MockState.rosters",
+        "useRoster returns the roster for a given league/team with player stats accumulated through the current simulationDate",
+        "IR activation/deactivation dispatches ACTIVATE_IR/DEACTIVATE_IR actions, stored in-memory in the roster state",
+        "useLeagueRosters returns all team rosters in the league",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Verify in browser if browser testing tools are available",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 15,
       "passes": false,
-      "notes": ""
+      "notes": "Player stats on the roster come from the cumulative stats computed by the simulation state machine (US-012). The roster hooks read from MockState."
     },
     {
       "id": "US-016",
-      "title": "Extract PointsBadge component to @sportsnot/ui",
-      "description": "As a developer, I want a reusable PointsBadge component for displaying point values consistently.",
+      "title": "Mock standings and scoring history hooks",
+      "description": "As a developer, I want standings and scoring history to work in mock mode so I can verify point calculations and ranking logic.",
       "acceptanceCriteria": [
-        "Create PointsBadge component in @sportsnot/ui with props: points (number), size ('sm'|'md'|'lg'), animate (boolean), delta (number for +N indicator), variant ('filled'|'outline'|'subtle')",
-        "Displays point value with consistent styling",
-        "When animate is true, pulses briefly on value change (200ms CSS animation)",
-        "When delta is provided, shows a small '+N' or '-N' indicator",
-        "Color scales with point value (gray=0, accent=positive)",
-        "Export from @sportsnot/ui index",
+        "Create packages/web/src/mock/hooks/useMockStandings.ts with a mock useStandings hook",
+        "Standings are calculated from drafted players' cumulative stats through the current simulationDate, applying the league's scoring rules",
+        "Standings update after each ADVANCE_DAY (not just per round)",
+        "Create packages/web/src/mock/hooks/useMockScoringHistory.ts with a mock scoring history hook",
+        "Scoring history shows a timeline of scoring events (goals, assists) derived from player-game-logs.ts for games through the current simulationDate",
+        "Point totals in standings match the scoring rules applied to historical stats",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Verify in browser if browser testing tools are available",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 16,
       "passes": false,
-      "notes": ""
+      "notes": "Check how the real useStandings hook calculates points to match the same formula. Scoring events are derived from the per-game stat lines in the fixture data."
     },
     {
       "id": "US-017",
-      "title": "Extract StatRow component to @sportsnot/ui",
-      "description": "As a developer, I want a reusable StatRow component for displaying labeled stat values.",
+      "title": "Mock playoff bracket state and rendering",
+      "description": "As a developer, I want the playoff bracket to render correctly in mock mode, updating as rounds are simulated.",
       "acceptanceCriteria": [
-        "Create StatRow component in @sportsnot/ui with props: label (string), value (string|number), highlight (boolean), trend ('up'|'down'|'neutral'), compact (boolean)",
-        "Renders a horizontal label-value pair with consistent alignment",
-        "highlight applies bold + accent color to the value",
-        "trend shows a small arrow icon (green up, red down, gray neutral)",
-        "compact reduces spacing for use in dense layouts",
-        "Export from @sportsnot/ui index",
+        "Create packages/web/src/mock/hooks/useMockPlayoffBracket.ts that derives bracket state from simulation progress",
+        "Before any simulation, bracket shows all 16 teams in correct 2025 seeding positions from bracket.ts fixture data",
+        "After a round's days are all simulated, the bracket shows series winners (from fixture data) advancing and losers eliminated",
+        "Series scores (e.g., '4-2') are calculated from game results up to the current simulationDate",
+        "After all 4 rounds are simulated, the Stanley Cup champion is displayed",
+        "The mock hook replaces the real getPlayoffBracket / usePlayoffBracket when mock mode is active",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Verify in browser if browser testing tools are available",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 17,
       "passes": false,
-      "notes": ""
+      "notes": "Series wins are derived by counting game wins per team from fixture data through the current simulated date. The bracket rendering uses existing bracket UI components."
     },
     {
       "id": "US-018",
-      "title": "Extract LiveIndicator component to @sportsnot/ui",
-      "description": "As a developer, I want a reusable LiveIndicator component for showing real-time status.",
+      "title": "Wire mock hooks into MockDataProvider",
+      "description": "As a developer, I want all mock hooks to be accessible through the MockDataProvider so that components transparently use mock data when mock mode is active.",
       "acceptanceCriteria": [
-        "Create LiveIndicator component in @sportsnot/ui with props: isLive (boolean), lastUpdated (Date), showTimestamp (boolean), size ('sm'|'md')",
-        "When isLive is true: shows a pulsing green dot with 'LIVE' text",
-        "When isLive is false: shows a gray dot with 'OFFLINE' or hidden entirely",
-        "When showTimestamp is true: shows 'Updated 2m ago' relative timestamp",
-        "Export from @sportsnot/ui index",
+        "MockDataProvider exposes all mock hooks (auth, leagues, draft, roster, standings, scoring, bracket, live games, NHL API) through context",
+        "Create a hook registry or conditional hook pattern so that when mock mode is active, components calling useLeagues/useDraft/useRoster/etc. receive mock implementations",
+        "Consuming components do NOT need any code changes — the swap is transparent at the provider level",
+        "Verify that the dashboard page renders with mock data (leagues list, live games) when VITE_MOCK_MODE=true",
+        "Verify that no network requests to Supabase or NHL API appear in the browser Network tab",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Verify in browser if browser testing tools are available",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 18,
       "passes": false,
-      "notes": ""
+      "notes": "This is the integration story that ties all mock hooks together. The key challenge is making the swap transparent. Consider a pattern where mock hooks have the same signature as real hooks and are provided via React context."
     },
     {
       "id": "US-019",
-      "title": "Extract TeamCard component to @sportsnot/ui",
-      "description": "As a developer, I want a reusable TeamCard component so that team information is displayed consistently.",
+      "title": "Data reset and dump controls",
+      "description": "As a developer, I want to reset all mock data and dump state to console for debugging.",
       "acceptanceCriteria": [
-        "Create TeamCard component in @sportsnot/ui with props: teamName (string), teamAbbrev (string), logoUrl (string?), record ({wins, losses}?), points (number?), isEliminated (boolean?), onClick (() => void?), size ('sm'|'md'|'lg')",
-        "Shows team logo/abbreviation, name, record, and points",
-        "Eliminated teams shown with reduced opacity and strikethrough",
-        "Size variants control overall card dimensions",
-        "Export from @sportsnot/ui index",
+        "The 'Reset All Mock Data' button in the SimulationControlPanel dispatches RESET_ALL, clearing all in-memory mock state (leagues, drafts, rosters, simulation progress)",
+        "After reset, the dashboard shows no leagues and no draft state — app returns to empty mock state",
+        "Any localStorage entries used by mock mode are also cleared on reset",
+        "The 'Dump State to Console' button logs the entire MockState tree to browser console as formatted JSON",
+        "Closing the browser tab or refreshing automatically clears mock state (session-only, no persistence across page loads)",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Verify in browser if browser testing tools are available",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 19,
       "passes": false,
-      "notes": ""
+      "notes": "RESET_ALL should already be implemented in the reducer skeleton (US-006). This story ensures the UI buttons work and localStorage cleanup is handled."
     },
     {
       "id": "US-020",
-      "title": "Extract RosterSlot component to @sportsnot/ui",
-      "description": "As a developer, I want a reusable RosterSlot component so that roster positions are displayed consistently across pages.",
+      "title": "Production bundle exclusion verification",
+      "description": "As a developer, I want to verify that zero mock mode code ships in production builds when VITE_MOCK_MODE is not enabled.",
       "acceptanceCriteria": [
-        "Create RosterSlot component in @sportsnot/ui with props: position ('F'|'D'|'G'|'IR_F'|'IR_D'), player ({name, teamAbbrev, headshot?, stats?}?), pointsEarned (number?), isActive (boolean?), isEmpty (boolean?), onAction ((action) => void?), actions (array of 'compare'|'activate'|'details')",
-        "Empty slots show a dashed border with position label and 'Empty' text",
-        "Filled slots show player info with PositionBadge and PointsBadge",
-        "IR slots are visually distinct (different background/border color)",
-        "Action buttons render based on actions prop",
-        "Export from @sportsnot/ui index",
+        "All mock mode imports in app.tsx and other entry points use dynamic import() inside if (import.meta.env.VITE_MOCK_MODE === 'true') guards",
+        "Run 'nx build web' with VITE_MOCK_MODE unset — the output bundle contains zero references to MockDataProvider, MockModeBanner, SimulationControlPanel, ADVANCE_DAY, or fixture team/player names",
+        "The packages/mock-data/ fixture files are not included in any production chunk",
+        "No mock-related React components appear in the production bundle",
+        "Add a script or CI check that greps dist/ output for known mock identifiers and fails if any are found",
+        "Document the verification process in packages/mock-data/README.md",
         "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "Lint passes",
+        "Unit tests pass",
+        "Playwright tests pass"
       ],
       "priority": 20,
       "passes": false,
-      "notes": "Depends on PositionBadge (US-015) and PointsBadge (US-016)"
-    },
-    {
-      "id": "US-021",
-      "title": "Extract GameCard component to @sportsnot/ui",
-      "description": "As a developer, I want a reusable GameCard component for displaying NHL game scores.",
-      "acceptanceCriteria": [
-        "Create GameCard component in @sportsnot/ui with props: homeTeam ({abbrev, score, logoUrl?}), awayTeam ({abbrev, score, logoUrl?}), status ('upcoming'|'live'|'final'), period (string?), timeRemaining (string?), startTime (Date?), highlight (boolean?), highlightReason (string?), onClick (() => void?)",
-        "Shows both teams with scores, game status, and period info",
-        "Live games show pulsing LiveIndicator and current period/time",
-        "Final games show 'FINAL' badge",
-        "Upcoming games show scheduled start time",
-        "highlight adds an accent border for games with rostered players",
-        "Export from @sportsnot/ui index",
-        "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
-      ],
-      "priority": 21,
-      "passes": false,
-      "notes": "Depends on LiveIndicator (US-018)"
-    },
-    {
-      "id": "US-022",
-      "title": "Build LiveGamesWidget with real-time NHL scores",
-      "description": "As a user, I want to see live NHL game scores so that I can follow the action without leaving the app.",
-      "acceptanceCriteria": [
-        "Create LiveGamesWidget component that displays current/recent NHL game scores using GameCard components",
-        "Widget uses getScoresNow() from @sportsnot/nhl-api with 30-second polling via React Query refetchInterval",
-        "Widget is displayed on the DashboardPage and LeagueDashboardPage",
-        "Widget is horizontally scrollable on mobile, grid layout on desktop",
-        "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
-      ],
-      "priority": 22,
-      "passes": false,
-      "notes": "Depends on GameCard (US-021)"
-    },
-    {
-      "id": "US-023",
-      "title": "Add rostered-player highlighting to LiveGamesWidget",
-      "description": "As a user, I want to see which of my rostered players are playing in live games so that I know which games matter to me.",
-      "acceptanceCriteria": [
-        "Games containing a user's rostered players are visually highlighted (accent border via GameCard highlight prop)",
-        "A small indicator shows how many of the user's rostered players are in each game",
-        "Clicking a highlighted game shows which specific rostered players are playing (tooltip or expandable section)",
-        "Highlighting is league-context-aware (uses active league's roster from useRoster hook)",
-        "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
-      ],
-      "priority": 23,
-      "passes": false,
-      "notes": "Depends on LiveGamesWidget (US-022)"
-    },
-    {
-      "id": "US-024",
-      "title": "Create NotificationContext and store",
-      "description": "As a developer, I need a client-side notification system so that components can push and consume notifications.",
-      "acceptanceCriteria": [
-        "Create NotificationContext in @sportsnot/web using React Context",
-        "Notification shape: { id, type, title, message, timestamp, read, leagueId? }",
-        "Types: 'draft', 'scoring', 'league', 'system'",
-        "Context provides: notifications[], unreadCount, markAsRead(id), markAllRead(), addNotification()",
-        "Notifications persist in localStorage (cleared on sign-out)",
-        "Maximum 50 notifications stored (oldest removed first when limit exceeded)",
-        "Typecheck passes"
-      ],
-      "priority": 24,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-025",
-      "title": "Add toast alerts for real-time events",
-      "description": "As a user, I want to see brief toast alerts when important events happen so that I'm informed without disrupting my workflow.",
-      "acceptanceCriteria": [
-        "Install @mantine/notifications and configure Notifications provider in the app",
-        "Toast notifications appear in the top-right corner of the screen",
-        "Draft events trigger toasts: 'It's your turn to pick!', 'Player X was drafted by Team Y'",
-        "Scoring events trigger toasts: 'Player X scored a goal! (+1 pt)', 'Team X recorded a shutout! (+4 pts)'",
-        "Toasts auto-dismiss after 5 seconds",
-        "Toasts are color-coded by type (draft=blue, scoring=green, league=yellow)",
-        "Clicking a toast marks it as read in NotificationContext and navigates to the relevant page",
-        "Maximum 3 toasts visible at once (oldest dismissed first)",
-        "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
-      ],
-      "priority": 25,
-      "passes": false,
-      "notes": "Depends on NotificationContext (US-024)"
-    },
-    {
-      "id": "US-026",
-      "title": "Build notification center bell icon in header",
-      "description": "As a user, I want to access a notification center from the header so that I can review past alerts.",
-      "acceptanceCriteria": [
-        "A bell icon in the AppShell header shows unread notification count as a badge (from NotificationContext.unreadCount)",
-        "Clicking the bell opens a dropdown/drawer listing all notifications",
-        "Each notification shows: icon (by type), title, message preview, relative timestamp ('2m ago')",
-        "Unread notifications are visually distinct (bold text, accent left-border)",
-        "'Mark all as read' button at the top of the list",
-        "Clicking a notification marks it as read and navigates to the relevant context",
-        "Empty state: 'No notifications yet' with icon",
-        "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
-      ],
-      "priority": 26,
-      "passes": false,
-      "notes": "Depends on NotificationContext (US-024)"
-    },
-    {
-      "id": "US-027",
-      "title": "Create scoring_events database table and migration",
-      "description": "As a developer, I need a scoring_events table so that individual scoring events are tracked and queryable.",
-      "acceptanceCriteria": [
-        "Create scoring_events table with columns: id (uuid), league_id, member_id, roster_id, player_id (nullable), team_id (nullable), event_type ('goal'|'assist'|'win'|'shutout'), points (integer), game_id, game_date, description (text), created_at",
-        "Add foreign keys to leagues, league_members, and rosters",
-        "Add index on (league_id, member_id, created_at) for efficient queries",
-        "Add unique constraint on (game_id, player_id, event_type) for idempotency",
-        "Add RLS policies: users can read scoring events for leagues they belong to",
-        "Enable Realtime on the table",
-        "Migration file created in packages/supabase-db/migrations/",
-        "Typecheck passes"
-      ],
-      "priority": 27,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-028",
-      "title": "Populate scoring events from stat sync triggers",
-      "description": "As a system, I need to create scoring event records when stats change so that users can see a history of how points were earned.",
-      "acceptanceCriteria": [
-        "Extend the player_stats_cache trigger: when goals/assists increase, create corresponding scoring_events records",
-        "Extend the team_stats_cache trigger: when wins/shutouts increase, create corresponding scoring_events records",
-        "Each event captures the delta (e.g. if goals went from 3 to 4, create one 'goal' event worth 1 point)",
-        "Events are linked to the correct roster slot and league member",
-        "Duplicate events are prevented via the (game_id, player_id, event_type) unique constraint",
-        "Migration file created in packages/supabase-db/migrations/",
-        "Typecheck passes"
-      ],
-      "priority": 28,
-      "passes": false,
-      "notes": "Depends on scoring_events table (US-027) and stat triggers (US-008)"
-    },
-    {
-      "id": "US-029",
-      "title": "Build scoring history page with data hook",
-      "description": "As a developer, I need a data hook and route for the scoring history page.",
-      "acceptanceCriteria": [
-        "Create useScoringEvents(leagueId, filters?) hook in @sportsnot/supabase that fetches from scoring_events table",
-        "Hook supports filters: memberId, eventType, dateRange, playerId/teamId",
-        "Hook supports pagination (20 events per page)",
-        "Add route /scoring/:leagueId to React Router config",
-        "Add link to scoring page in league navigation",
-        "Typecheck passes"
-      ],
-      "priority": 29,
-      "passes": false,
-      "notes": "Depends on scoring_events table (US-027)"
-    },
-    {
-      "id": "US-030",
-      "title": "Build scoring history page UI",
-      "description": "As a user, I want to view a timeline of scoring events so that I can see how points were earned over time.",
-      "acceptanceCriteria": [
-        "ScoringHistoryPage shows a chronological timeline of scoring events (newest first)",
-        "Each event shows: player/team name, event type icon, points earned, game info, timestamp",
-        "Filter by: player/team, event type (goal/assist/win/shutout), date range",
-        "Filter by league member ('Show only my events' toggle)",
-        "Events are grouped by game date with date headers",
-        "Pagination controls for 20 events per page",
-        "Uses ResponsiveTable for mobile compatibility",
-        "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
-      ],
-      "priority": 30,
-      "passes": false,
-      "notes": "Depends on useScoringEvents hook (US-029) and ResponsiveTable (US-012)"
-    },
-    {
-      "id": "US-031",
-      "title": "Component tests for @sportsnot/ui — PlayerCard, TeamCard, PositionBadge",
-      "description": "As a developer, I want component tests for PlayerCard, TeamCard, and PositionBadge so that I can refactor with confidence.",
-      "acceptanceCriteria": [
-        "Tests for PlayerCard: renders player info, handles missing data, shows points when provided",
-        "Tests for TeamCard: renders team info, shows eliminated state, handles click",
-        "Tests for PositionBadge: renders each position with correct color",
-        "All tests use React Testing Library (@testing-library/react)",
-        "Tests run via rstest framework",
-        "Typecheck passes"
-      ],
-      "priority": 31,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-032",
-      "title": "Component tests for @sportsnot/ui — RosterSlot, PointsBadge, StatRow",
-      "description": "As a developer, I want component tests for RosterSlot, PointsBadge, and StatRow.",
-      "acceptanceCriteria": [
-        "Tests for RosterSlot: renders empty state, filled state, IR state, action buttons",
-        "Tests for PointsBadge: renders points, shows delta, handles animation prop",
-        "Tests for StatRow: renders label/value, highlight state, trend icons",
-        "All tests use React Testing Library (@testing-library/react)",
-        "Tests run via rstest framework",
-        "Typecheck passes"
-      ],
-      "priority": 32,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-033",
-      "title": "Component tests for @sportsnot/ui — LiveIndicator, GameCard, ResponsiveTable",
-      "description": "As a developer, I want component tests for LiveIndicator, GameCard, and ResponsiveTable.",
-      "acceptanceCriteria": [
-        "Tests for LiveIndicator: live/offline states, timestamp display",
-        "Tests for GameCard: all game statuses (upcoming/live/final), highlight state",
-        "Tests for ResponsiveTable: table and card views (mock viewport)",
-        "All tests use React Testing Library (@testing-library/react)",
-        "Tests run via rstest framework",
-        "Typecheck passes"
-      ],
-      "priority": 33,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-034",
-      "title": "Page rendering tests for DashboardPage and DraftPage",
-      "description": "As a developer, I want rendering tests for DashboardPage and DraftPage so that regressions are caught early.",
-      "acceptanceCriteria": [
-        "Tests for DashboardPage: renders league grid, handles empty state, shows loading",
-        "Tests for DraftPage: renders player list, draft board, handles turn indicator",
-        "All page tests mock Supabase hooks and React Router",
-        "Tests use React Testing Library",
-        "Tests run via rstest framework",
-        "Typecheck passes"
-      ],
-      "priority": 34,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-035",
-      "title": "Page rendering tests for RosterPage, StandingsPage, LoginPage",
-      "description": "As a developer, I want rendering tests for RosterPage, StandingsPage, and LoginPage.",
-      "acceptanceCriteria": [
-        "Tests for RosterPage: renders roster slots, handles IR activation",
-        "Tests for StandingsPage: renders standings table, shows point totals",
-        "Tests for LoginPage: renders login form, handles magic link flow",
-        "All page tests mock Supabase hooks and React Router",
-        "Tests use React Testing Library",
-        "Tests run via rstest framework",
-        "Typecheck passes"
-      ],
-      "priority": 35,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-036",
-      "title": "Hook tests for @sportsnot/supabase — auth and league hooks",
-      "description": "As a developer, I want tests for auth and league data hooks.",
-      "acceptanceCriteria": [
-        "Tests for useAuth: sign-in, sign-out, session restoration",
-        "Tests for useLeagues, useLeague: data fetching, error handling, loading states",
-        "All hooks tested with @testing-library/react renderHook",
-        "Supabase client is mocked (no real API calls)",
-        "Typecheck passes"
-      ],
-      "priority": 36,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-037",
-      "title": "Hook tests for @sportsnot/supabase — draft, roster, and stat sync hooks",
-      "description": "As a developer, I want tests for draft, roster, and stat sync hooks.",
-      "acceptanceCriteria": [
-        "Tests for useDraft, useMakePick: draft flow, pick validation",
-        "Tests for useRoster: roster data, IR activation",
-        "Tests for useStatSync: polling lifecycle, pause on hidden tab, manual sync",
-        "All hooks tested with @testing-library/react renderHook",
-        "Supabase client is mocked (no real API calls)",
-        "Typecheck passes"
-      ],
-      "priority": 37,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-038",
-      "title": "Configure coverage targets and reporting",
-      "description": "As a developer, I want coverage targets defined and enforced so that test quality is maintained.",
-      "acceptanceCriteria": [
-        "Configure rstest to output coverage reports",
-        "Coverage targets: @sportsnot/utils=90%, @sportsnot/nhl-api=70%, @sportsnot/supabase=70%, @sportsnot/ui=80%, @sportsnot/web=60%",
-        "Coverage report is generated on 'yarn test'",
-        "CI fails if coverage drops below targets (when CI is set up)",
-        "Typecheck passes"
-      ],
-      "priority": 38,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-039",
-      "title": "Build PlayerDetailModal",
-      "description": "As a user, I want to click on a player to see their full stat sheet and game log in a modal.",
-      "acceptanceCriteria": [
-        "Clicking a player name/card anywhere in the app opens a PlayerDetailModal",
-        "Modal shows: headshot, name, team, position, full stat line, game-by-game log",
-        "Game log shows last 10 games with stats per game",
-        "Data fetched via getPlayerGameLog() from @sportsnot/nhl-api",
-        "'Add to Compare' button in the modal header (uses CompareContext)",
-        "Loading skeleton while data fetches",
-        "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
-      ],
-      "priority": 39,
-      "passes": false,
-      "notes": "P2 feature"
-    },
-    {
-      "id": "US-040",
-      "title": "Add CSV export for rosters and standings",
-      "description": "As a user, I want to export my roster and league standings as CSV so that I can analyze data in a spreadsheet.",
-      "acceptanceCriteria": [
-        "'Export CSV' button on RosterPage exports current roster with stats and points",
-        "'Export CSV' button on StandingsPage exports standings table",
-        "CSV includes all visible columns with headers",
-        "File is named sportsnot-{type}-{leagueName}-{date}.csv",
-        "Export works on mobile (triggers download via Blob URL)",
-        "Typecheck passes"
-      ],
-      "priority": 40,
-      "passes": false,
-      "notes": "P2 feature"
-    },
-    {
-      "id": "US-041",
-      "title": "Add service worker for offline caching",
-      "description": "As a user, I want the app to cache assets for offline use.",
-      "acceptanceCriteria": [
-        "Register a service worker on app load",
-        "Cache static assets (JS, CSS, images) with cache-first strategy",
-        "Cache API responses (rosters, standings) with stale-while-revalidate strategy",
-        "Offline fallback page when network is unavailable",
-        "Use Workbox for service worker generation with Rspack plugin",
-        "Typecheck passes"
-      ],
-      "priority": 41,
-      "passes": false,
-      "notes": "P2 feature"
-    },
-    {
-      "id": "US-042",
-      "title": "Add push notification support to service worker",
-      "description": "As a user, I want push notifications so that I stay informed even when the app isn't open.",
-      "acceptanceCriteria": [
-        "Push notification support: request permission prompt, subscribe to push endpoint",
-        "Push notifications for: draft turn, scoring milestones (configurable in profile settings)",
-        "Push payload includes: title, body, icon, click action URL",
-        "Unsubscribe option in profile settings",
-        "Typecheck passes"
-      ],
-      "priority": 42,
-      "passes": false,
-      "notes": "P2 feature. Depends on service worker (US-041)"
-    },
-    {
-      "id": "US-043",
-      "title": "Add virtualized lists for large data sets",
-      "description": "As a user, I want player lists and game logs to load efficiently so that the app stays fast.",
-      "acceptanceCriteria": [
-        "Install @tanstack/react-virtual",
-        "Player list in DraftPage uses virtualization for 500+ player lists",
-        "Game log in PlayerDetailModal uses virtualization if log exceeds 20 entries",
-        "Scroll position is preserved when switching tabs or returning to the list",
-        "Visible items render at 60fps (no jank during scroll)",
-        "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
-      ],
-      "priority": 43,
-      "passes": false,
-      "notes": "P2 feature. Depends on PlayerDetailModal (US-039)"
+      "notes": "This is a verification and hardening story. Run the production build and inspect the output. The Rspack DefinePlugin should replace VITE_MOCK_MODE with 'false', causing dead-code elimination of the entire mock branch."
     }
   ]
 }
