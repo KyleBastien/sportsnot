@@ -80,7 +80,7 @@
         "Playwright tests pass"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Check the existing Rspack config to understand how env vars are currently handled. May need builtins.define or EnvironmentPlugin. The key requirement is that when VITE_MOCK_MODE is not 'true', Rspack can statically eliminate dead code branches."
     },
     {
@@ -100,7 +100,7 @@
         "Playwright tests pass"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "The dynamic import pattern is critical for dead-code elimination. When VITE_MOCK_MODE is false, Rspack should tree-shake the entire mock branch including the banner."
     },
     {
@@ -120,7 +120,7 @@
         "Playwright tests pass"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "This is the skeleton only. Individual action handlers will be implemented in subsequent stories. The state shape should support day-by-day simulation with currentDate tracking."
     },
     {

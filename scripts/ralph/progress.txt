@@ -6,7 +6,7 @@ Started: 02/14/2026 21:14:25
 - Path aliases go in root tsconfig.base.json paths
 - Nx auto-infers typecheck target via @nx/js/typescript plugin — no need to add manually
 - Lint is not per-project in Nx; use root `npx eslint <path>` directly
-- Unit tests use rstest (yarn rstest --root packages/<name>)
+- Unit tests use rstest (yarn rstest <specific files>) — do NOT run bare `yarn rstest` as it picks up Playwright files
 - E2e tests use Playwright against http://localhost:4200 (needs serve-static running)
 - Nx sync prompt appears on first typecheck — answer "yes" to sync TS references
 - tsconfig.json is auto-modified by Nx sync — commit changes after sync
@@ -16,6 +16,13 @@ Started: 02/14/2026 21:14:25
 - nodenext moduleResolution requires `.js` extensions for relative imports — applies to barrel exports (index.ts) and any cross-file imports
 - Types package (packages/types/src/index.ts) needs `.js` extensions in re-exports for nodenext compatibility
 - Nx sync may revert manual tsconfig reference changes — let Nx manage project references
+- Rspack DefinePlugin: add env vars to envVars object with process.env fallback, then JSON.stringify in DefinePlugin
+- Nx typecheck for web fails (pre-existing) — use `tsc --noEmit -p packages/web/tsconfig.app.json` instead
+- Mock mode code lives in packages/web/src/mock/
+- Use React.lazy + dynamic import() inside build-time guard for mock-only components — enables Rspack dead-code elimination
+- Playwright tests need `--config packages/e2e/playwright.config.ts` flag (bare `npx playwright test` picks up rstest files)
+- MockWrapper pattern in app.tsx: conditionally wrap children with lazy-loaded provider using `if (!Comp) return <>{children}</>` guard
+- Playwright full suite (86 tests) is slow; use smoke test (`packages/e2e/tests/smoke.spec.ts`) for quick validation
 
 ---
 
@@ -55,4 +62,47 @@ Started: 02/14/2026 21:14:25
   - Nx sync manages project references automatically — manual edits to tsconfig references may be reverted
   - Playwright e2e tests fail when run via rstest (expected) — only unit tests (utils, nhl-api) run through rstest
   - `as const` on exported data arrays/objects works well with type imports for fixture data
+---
+
+## 2026-02-15T05:53:00Z - US-004
+- Added VITE_MOCK_MODE to Rspack DefinePlugin in packages/web/rspack.config.js with 'false' default
+- Added VITE_MOCK_MODE=false to .env.example with documentation comment
+- Created packages/web/src/mock/utils.ts with isMockMode() utility function
+- Created packages/web/src/env.d.ts with ImportMetaEnv type declarations for all VITE_ vars
+- Files changed: packages/web/rspack.config.js, .env.example, packages/web/src/env.d.ts (new), packages/web/src/mock/utils.ts (new)
+- **Learnings for future iterations:**
+  - Rspack DefinePlugin pattern: add env var to `envVars` object with `process.env` fallback, then add `JSON.stringify` entry in DefinePlugin
+  - Nx typecheck target (`tsc --build --emitDeclarationOnly`) fails for web package due to `composite: false` in tsconfig.app.json — this is pre-existing; use `tsc --noEmit -p tsconfig.app.json` to verify types
+  - rspack.config.js has pre-existing eslint no-undef errors (require, process, module, __dirname) — these are expected for Node CJS files
+  - The `packages/web/src/mock/` directory is the home for all mock mode code in the web package
+  - Unit tests run with `yarn rstest <file paths>` — running just `yarn rstest` picks up Playwright files and fails
+---
+
+## 2026-02-15T05:57:00Z - US-005
+- Created MockModeBanner.tsx with Mantine Alert (yellow, sticky, non-dismissible, z-index 1000)
+- Added build-time guard in app.tsx: `import.meta.env.VITE_MOCK_MODE === 'true'` with React.lazy + dynamic import
+- Banner renders above AppShell only when mock mode is active; null when inactive (tree-shaken)
+- Files changed: packages/web/src/mock/MockModeBanner.tsx (new), packages/web/src/app/app.tsx
+- **Learnings for future iterations:**
+  - React.lazy + ternary pattern: `const Comp = guard ? lazy(() => import(...)) : null` — clean conditional loading
+  - Wrap lazy component in `{Comp && <Suspense><Comp /></Suspense>}` for safe rendering
+  - Playwright tests need explicit config flag: `npx playwright test --config packages/e2e/playwright.config.ts`
+  - Banner placement: outside AppShell but inside ErrorBoundary for correct stacking
+---
+
+## 2026-02-15T06:00:00Z - US-006
+- Created MockDataProvider.tsx with React context, useReducer, full MockState type, and MockAction union type
+- MockState includes: leagues, currentLeague, draftState, rosters, simulationDate, currentRound, roundComplete, seasonComplete, playerStats, mockUser
+- Actions defined: CREATE_LEAGUE, JOIN_LEAGUE, START_DRAFT, MAKE_PICK, ADVANCE_DAY, ADVANCE_ROUND, ACTIVATE_IR, DEACTIVATE_IR, RESET_ALL
+- RESET_ALL handler clears all state to initial values; other actions are stubs returning state unchanged
+- useMockData() hook provides state + dispatch from context
+- MockDataProvider wired into app.tsx via React.lazy + dynamic import (same pattern as MockModeBanner)
+- Created MockWrapper component in app.tsx that wraps children with MockDataProvider when mock mode is active
+- Files changed: packages/web/src/mock/MockDataProvider.tsx (new), packages/web/src/app/app.tsx
+- **Learnings for future iterations:**
+  - MockDataProvider wraps inside ErrorBoundary but outside AppShell — same level as MockModeBanner
+  - MockWrapper pattern: `if (!LazyComponent) return <>{children}</>; else return <Suspense><LazyComponent>{children}</LazyComponent></Suspense>`
+  - Initial simulationDate is '2025-04-18' (day before first R1 game in fixture data)
+  - Playwright full suite (86 tests) takes very long to run; use smoke test for quick validation
+  - Navigation test failures are pre-existing (auth/profile route) — not caused by mock changes
 ---
