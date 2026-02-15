@@ -23,6 +23,9 @@
     },
     {
       "path": "./packages/e2e"
+    },
+    {
+      "path": "./packages/mock-data"
     }
   ]
 }

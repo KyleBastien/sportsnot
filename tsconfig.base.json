@@ -23,7 +23,8 @@
       "@sportsnot/utils": ["packages/utils/src/index.ts"],
       "@sportsnot/ui": ["packages/ui/src/index.ts"],
       "@sportsnot/nhl-api": ["packages/nhl-api/src/index.ts"],
-      "@sportsnot/supabase": ["packages/supabase/src/index.ts"]
+      "@sportsnot/supabase": ["packages/supabase/src/index.ts"],
+      "@sportsnot/mock-data": ["packages/mock-data/src/index.ts"]
     }
   }
 }
