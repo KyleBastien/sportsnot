@@ -162,6 +162,23 @@ async function main() {
   const allTeams: NHLTeam[] = [];
   const allPlayers: Record<string, NHLPlayer[]> = {};
 
+  // Build team info lookup from bracket data
+  const teamInfo = new Map<string, { id: number; name: string }>();
+  for (const series of bracket) {
+    if (series.topSeedTeam?.abbreviation) {
+      teamInfo.set(series.topSeedTeam.abbreviation, {
+        id: series.topSeedTeam.id,
+        name: series.topSeedTeam.name,
+      });
+    }
+    if (series.bottomSeedTeam?.abbreviation) {
+      teamInfo.set(series.bottomSeedTeam.abbreviation, {
+        id: series.bottomSeedTeam.id,
+        name: series.bottomSeedTeam.name,
+      });
+    }
+  }
+
   const rosterTasks = abbrs.map((abbr) => async () => {
     const players = await getTeamRoster(abbr, SEASON);
     log(`  Fetching roster for ${abbr}... done (${players.length} players)`);
@@ -174,26 +191,24 @@ async function main() {
     BATCH_DELAY_MS
   );
   for (const { abbr, players } of rosterResults) {
+    // Enrich players with team info from bracket
+    const info = teamInfo.get(abbr);
+    if (info) {
+      for (const p of players) {
+        p.currentTeam = { id: info.id, name: info.name, abbreviation: abbr };
+      }
+    }
     allPlayers[abbr] = players;
-    // Build a NHLTeam entry from the first player's currentTeam, or from bracket data
-    const bracketSeries = bracket.find(
-      (s) =>
-        s.topSeedTeam?.abbreviation === abbr ||
-        s.bottomSeedTeam?.abbreviation === abbr
-    );
-    const seedTeam =
-      bracketSeries?.topSeedTeam?.abbreviation === abbr
-        ? bracketSeries.topSeedTeam
-        : bracketSeries?.bottomSeedTeam;
-    if (seedTeam) {
+    if (info) {
       allTeams.push({
-        id: seedTeam.id,
-        name: seedTeam.name,
+        id: info.id,
+        name: info.name,
         abbreviation: abbr,
-        teamName: seedTeam.name,
+        teamName: info.name,
         locationName: '',
         division: { id: 0, name: '' },
         conference: { id: 0, name: '' },
+        logo: `https://assets.nhle.com/logos/nhl/svg/${abbr}_light.svg`,
       });
     }
   }
@@ -208,7 +223,7 @@ async function main() {
   log('Fetching playoff schedule...');
   let games: NHLGame[] = [];
   try {
-    games = await getPlayoffSchedule(SEASON);
+    games = await getPlayoffSchedule(SEASON, abbrs);
     log(`  ✓ Got ${games.length} total games`);
   } catch (err) {
     log(`  ⚠ Failed to fetch playoff schedule: ${String(err)}`);
@@ -253,16 +268,22 @@ async function main() {
   const playerGameLogs: Record<number, NHLPlayerStats[]> = {};
 
   const logTasks = allPlayerIds.map(({ id, name }) => async () => {
-    try {
-      const stats = await getPlayerGameLog(id, SEASON, 3);
-      return { id, name, stats };
-    } catch {
-      log(`  ⚠ No game log for ${name} (${id})`);
-      return { id, name, stats: [] as NHLPlayerStats[] };
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const stats = await getPlayerGameLog(id, SEASON, 3);
+        return { id, name, stats };
+      } catch {
+        if (attempt < maxRetries - 1) {
+          await delay(1000 * (attempt + 1));
+        }
+      }
     }
+    log(`  ⚠ No game log for ${name} (${id})`);
+    return { id, name, stats: [] as NHLPlayerStats[] };
   });
 
-  const logResults = await batchAll(logTasks, MAX_CONCURRENT, BATCH_DELAY_MS);
+  const logResults = await batchAll(logTasks, 3, 1000);
   let playersWithLogs = 0;
   for (const { id, stats } of logResults) {
     if (stats.length > 0) {

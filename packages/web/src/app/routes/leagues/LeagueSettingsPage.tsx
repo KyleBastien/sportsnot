@@ -23,6 +23,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { generateInviteCode } from '@sportsnot/utils';
+import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
+
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
 interface SettingsMemberRow {
   id: string;
@@ -38,14 +41,20 @@ export function LeagueSettingsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [leagueName, setLeagueName] = useState('');
-  const [maxParticipants, setMaxParticipants] = useState<number>(12);
+  const mockResult = useMockLeague(leagueId);
+
+  const [leagueName, setLeagueName] = useState(
+    IS_MOCK && mockResult.data ? mockResult.data.name : ''
+  );
+  const [maxParticipants, setMaxParticipants] = useState<number>(
+    IS_MOCK && mockResult.data ? mockResult.data.max_participants : 12
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [removeMemberId, setRemoveMemberId] = useState<string | null>(null);
 
-  const { data: league, isLoading } = useQuery({
+  const realResult = useQuery({
     queryKey: ['league-settings', leagueId],
     queryFn: async () => {
       const { data, error: fetchError } = await supabase
@@ -62,14 +71,21 @@ export function LeagueSettingsPage() {
       setMaxParticipants(data.max_participants);
       return data;
     },
-    enabled: !!leagueId,
+    enabled: !IS_MOCK && !!leagueId,
   });
+
+  const { data: league, isLoading } = IS_MOCK ? mockResult : realResult;
 
   const isCommissioner = league?.commissioner_id === user?.id;
   const canModify = isCommissioner && league?.status === 'setup';
 
   const handleSave = async () => {
     if (!leagueId || !leagueName.trim()) return;
+    if (IS_MOCK) {
+      setSuccess('Settings saved!');
+      setTimeout(() => setSuccess(''), 3000);
+      return;
+    }
     setSaving(true);
     setError('');
 
@@ -93,6 +109,11 @@ export function LeagueSettingsPage() {
 
   const handleRegenerateCode = async () => {
     if (!leagueId) return;
+    if (IS_MOCK) {
+      setSuccess('Invite code regenerated!');
+      setTimeout(() => setSuccess(''), 3000);
+      return;
+    }
     const newCode = generateInviteCode();
 
     const { error: updateError } = await supabase
@@ -113,6 +134,7 @@ export function LeagueSettingsPage() {
 
   const removeMember = useMutation({
     mutationFn: async (memberId: string) => {
+      if (IS_MOCK) return;
       const { error: removeError } = await supabase
         .from('league_members')
         .delete()
@@ -133,6 +155,10 @@ export function LeagueSettingsPage() {
 
   const handleStartDraft = async () => {
     if (!league) return;
+    if (IS_MOCK) {
+      navigate(`/draft/${leagueId}`);
+      return;
+    }
     const members = league.league_members ?? [];
     if (members.length < 2) {
       setError('Need at least 2 members to start a draft');

@@ -1,44 +1,130 @@
 import type { NHLGame } from '@sportsnot/types';
 
-export const gamesScf: NHLGame[] = [
+export const gamesScf = [
   {
-    id: 2024030411,
-    gameType: '3',
-    season: '20242025',
-    gameDate: '2025-05-31',
-    startTimeUTC: '2025-06-01T00:00:00Z',
-    homeTeam: {
-      id: 22,
-      name: 'Edmonton Oilers',
-      abbreviation: 'EDM',
-      score: 3,
+    "id": 2024030411,
+    "gameType": "3",
+    "season": "20242025",
+    "gameDate": "2025-06-04",
+    "startTimeUTC": "2025-06-05T00:00:00Z",
+    "homeTeam": {
+      "id": 22,
+      "name": "Oilers",
+      "abbreviation": "EDM",
+      "score": 4
     },
-    awayTeam: {
-      id: 13,
-      name: 'Florida Panthers',
-      abbreviation: 'FLA',
-      score: 2,
+    "awayTeam": {
+      "id": 13,
+      "name": "Panthers",
+      "abbreviation": "FLA",
+      "score": 3
     },
-    gameState: 'FINAL',
+    "gameState": "OFF",
+    "period": 4
   },
   {
-    id: 2024030412,
-    gameType: '3',
-    season: '20242025',
-    gameDate: '2025-06-02',
-    startTimeUTC: '2025-06-03T00:00:00Z',
-    homeTeam: {
-      id: 22,
-      name: 'Edmonton Oilers',
-      abbreviation: 'EDM',
-      score: 1,
+    "id": 2024030412,
+    "gameType": "3",
+    "season": "20242025",
+    "gameDate": "2025-06-06",
+    "startTimeUTC": "2025-06-07T00:00:00Z",
+    "homeTeam": {
+      "id": 22,
+      "name": "Oilers",
+      "abbreviation": "EDM",
+      "score": 4
     },
-    awayTeam: {
-      id: 13,
-      name: 'Florida Panthers',
-      abbreviation: 'FLA',
-      score: 4,
+    "awayTeam": {
+      "id": 13,
+      "name": "Panthers",
+      "abbreviation": "FLA",
+      "score": 5
     },
-    gameState: 'FINAL',
+    "gameState": "OFF",
+    "period": 5
   },
-] as const;
+  {
+    "id": 2024030413,
+    "gameType": "3",
+    "season": "20242025",
+    "gameDate": "2025-06-09",
+    "startTimeUTC": "2025-06-10T00:00:00Z",
+    "homeTeam": {
+      "id": 13,
+      "name": "Panthers",
+      "abbreviation": "FLA",
+      "score": 6
+    },
+    "awayTeam": {
+      "id": 22,
+      "name": "Oilers",
+      "abbreviation": "EDM",
+      "score": 1
+    },
+    "gameState": "OFF",
+    "period": 3
+  },
+  {
+    "id": 2024030414,
+    "gameType": "3",
+    "season": "20242025",
+    "gameDate": "2025-06-12",
+    "startTimeUTC": "2025-06-13T00:00:00Z",
+    "homeTeam": {
+      "id": 13,
+      "name": "Panthers",
+      "abbreviation": "FLA",
+      "score": 4
+    },
+    "awayTeam": {
+      "id": 22,
+      "name": "Oilers",
+      "abbreviation": "EDM",
+      "score": 5
+    },
+    "gameState": "OFF",
+    "period": 4
+  },
+  {
+    "id": 2024030415,
+    "gameType": "3",
+    "season": "20242025",
+    "gameDate": "2025-06-14",
+    "startTimeUTC": "2025-06-15T00:00:00Z",
+    "homeTeam": {
+      "id": 22,
+      "name": "Oilers",
+      "abbreviation": "EDM",
+      "score": 2
+    },
+    "awayTeam": {
+      "id": 13,
+      "name": "Panthers",
+      "abbreviation": "FLA",
+      "score": 5
+    },
+    "gameState": "OFF",
+    "period": 3
+  },
+  {
+    "id": 2024030416,
+    "gameType": "3",
+    "season": "20242025",
+    "gameDate": "2025-06-17",
+    "startTimeUTC": "2025-06-18T00:00:00Z",
+    "homeTeam": {
+      "id": 13,
+      "name": "Panthers",
+      "abbreviation": "FLA",
+      "score": 5
+    },
+    "awayTeam": {
+      "id": 22,
+      "name": "Oilers",
+      "abbreviation": "EDM",
+      "score": 1
+    },
+    "gameState": "OFF",
+    "period": 3
+  }
+] as const satisfies readonly NHLGame[];

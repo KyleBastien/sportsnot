@@ -9,6 +9,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '');
+const DUMMY_URL = 'http://localhost';
+const DUMMY_KEY = 'dummy-key';
+
+const isValidUrl = (s: string | undefined): boolean => {
+  try {
+    const url = new URL(s ?? '');
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+export const supabase = createClient(
+  isValidUrl(supabaseUrl) ? supabaseUrl : DUMMY_URL,
+  supabaseAnonKey || DUMMY_KEY
+);
 
 export { createClient };

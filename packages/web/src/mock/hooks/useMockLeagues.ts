@@ -239,7 +239,7 @@ export function useMockCreateLeague() {
         commissionerId: state.mockUser.id,
         inviteCode: generateInviteCode(),
         maxParticipants: params.maxParticipants,
-        currentRound: 1,
+        currentRound: 0,
         status: 'setup',
         createdAt: now,
         updatedAt: now,
