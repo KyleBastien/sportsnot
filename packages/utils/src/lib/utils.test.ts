@@ -287,3 +287,75 @@ describe('resolvePickName', () => {
     );
   });
 });
+
+describe('Draft Complete screen logic', () => {
+  const playerMap = new Map([
+    [8478402, 'Connor McDavid'],
+    [8477934, 'Leon Draisaitl'],
+    [8479318, 'Auston Matthews'],
+  ]);
+  const teamMap = new Map([
+    [22, 'Edmonton Oilers'],
+    [25, 'Dallas Stars'],
+    [10, 'Toronto Maple Leafs'],
+  ]);
+
+  it('should resolve all picks in a draft results list', () => {
+    const picks = [
+      { player_id: 8478402, team_id: null, position: 'C' },
+      { player_id: 8477934, team_id: null, position: 'LW' },
+      { player_id: null, team_id: 22, position: 'G' },
+      { player_id: 8479318, team_id: null, position: 'C' },
+      { player_id: null, team_id: 25, position: 'G' },
+    ];
+
+    const resolved = picks.map((p) =>
+      resolvePickName(p.player_id, p.team_id, playerMap, teamMap)
+    );
+
+    expect(resolved).toEqual([
+      'Connor McDavid',
+      'Leon Draisaitl',
+      'Edmonton Oilers',
+      'Auston Matthews',
+      'Dallas Stars',
+    ]);
+  });
+
+  it('should display team name for goalie picks (team_id only)', () => {
+    expect(resolvePickName(null, 22, playerMap, teamMap)).toBe(
+      'Edmonton Oilers'
+    );
+    expect(resolvePickName(null, 10, playerMap, teamMap)).toBe(
+      'Toronto Maple Leafs'
+    );
+  });
+
+  it('should construct correct Back to League URL from leagueId', () => {
+    const leagueId = 'abc-123-def';
+    const url = `/league/${leagueId}`;
+    expect(url).toBe('/league/abc-123-def');
+  });
+
+  it('should handle draft with only goalie/team picks', () => {
+    const picks = [
+      { player_id: null, team_id: 22, position: 'G' },
+      { player_id: null, team_id: 25, position: 'G' },
+    ];
+    const resolved = picks.map((p) =>
+      resolvePickName(p.player_id, p.team_id, playerMap, teamMap)
+    );
+    expect(resolved).toEqual(['Edmonton Oilers', 'Dallas Stars']);
+  });
+
+  it('should handle draft with unknown player and team IDs gracefully', () => {
+    const picks = [
+      { player_id: 999, team_id: null, position: 'C' },
+      { player_id: null, team_id: 999, position: 'G' },
+    ];
+    const resolved = picks.map((p) =>
+      resolvePickName(p.player_id, p.team_id, playerMap, teamMap)
+    );
+    expect(resolved).toEqual(['Unknown Player', 'Unknown Team']);
+  });
+});

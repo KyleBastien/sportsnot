@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -436,6 +436,7 @@ function AvailablePlayerBoard({
 
 export function DraftPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
+  const navigate = useNavigate();
   const { user } = useAuthContext();
   const { data: draft, isLoading: draftLoading } = useDraft(leagueId!);
   const { data: members } = useLeagueMembers(leagueId!);
@@ -641,6 +642,13 @@ export function DraftPage() {
               </Table>
             </ScrollArea>
           </Card>
+          <Button
+            variant="filled"
+            size="md"
+            onClick={() => navigate(`/league/${leagueId}`)}
+          >
+            Back to League
+          </Button>
         </Stack>
       </Container>
     );
