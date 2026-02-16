@@ -36,6 +36,7 @@ import {
   useMockPlayoffPlayers,
   useMockPlayoffTeams,
 } from '../../../mock/hooks/useMockNhlApi';
+import { groupHasActions } from './rosterUtils';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -241,106 +242,116 @@ export function RosterPage() {
           {SCORING.win}pts · Shutout = {SCORING.shutout}pts
         </Text>
 
-        {groupedSlots.map((group) => (
-          <Card
-            key={group.position}
-            shadow="sm"
-            padding="md"
-            radius="md"
-            withBorder
-          >
-            <Group justify="space-between" mb="sm">
-              <Title order={4}>{group.label}</Title>
-              <Badge variant="light">
-                {group.players.length} player
-                {group.players.length !== 1 ? 's' : ''}
-              </Badge>
-            </Group>
+        {groupedSlots.map((group) => {
+          const hasAnyActions = groupHasActions(
+            group.position,
+            group.players,
+            slots
+          );
 
-            {group.players.length === 0 ? (
-              <Text c="dimmed" size="sm">
-                No player drafted in this slot
-              </Text>
-            ) : (
-              <Table>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Player/Team</Table.Th>
-                    <Table.Th>Status</Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
-                    <Table.Th>Actions</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {group.players.map((slot: RosterSlotRow) => {
-                    const isIrSlot =
-                      slot.position === 'IR_F' || slot.position === 'IR_D';
-                    const matchingPosition =
-                      slot.position === 'IR_F' ? 'F' : 'D';
-                    // Find an active injured player at the matching position
-                    const injuredCandidates = slots.filter(
-                      (s: RosterSlotRow) =>
-                        s.position === matchingPosition &&
-                        s.is_active &&
-                        s.id !== slot.id
-                    );
+          return (
+            <Card
+              key={group.position}
+              shadow="sm"
+              padding="md"
+              radius="md"
+              withBorder
+            >
+              <Group justify="space-between" mb="sm">
+                <Title order={4}>{group.label}</Title>
+                <Badge variant="light">
+                  {group.players.length} player
+                  {group.players.length !== 1 ? 's' : ''}
+                </Badge>
+              </Group>
 
-                    return (
-                      <Table.Tr key={slot.id}>
-                        <Table.Td>
-                          {resolvePickName(
-                            slot.player_id,
-                            slot.team_id,
-                            playerNameMap,
-                            teamNameMap
-                          )}
-                        </Table.Td>
-                        <Table.Td>
-                          {slot.is_active ? (
-                            <Badge color="green" size="sm">
-                              Active
-                            </Badge>
-                          ) : (
-                            <Badge color="gray" size="sm">
-                              Inactive
-                            </Badge>
-                          )}
-                          {slot.activated_from_ir && (
-                            <Badge color="orange" size="sm" ml="xs">
-                              From IR
-                            </Badge>
-                          )}
-                        </Table.Td>
-                        <Table.Td style={{ textAlign: 'right' }}>
-                          {slot.points_earned ?? 0}
-                        </Table.Td>
-                        <Table.Td>
-                          {isIrSlot &&
-                            !slot.activated_from_ir &&
-                            injuredCandidates.length > 0 && (
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                color="orange"
-                                onClick={() =>
-                                  setIrModal({
-                                    injuredSlotId: injuredCandidates[0].id,
-                                    irSlotId: slot.id,
-                                  })
-                                }
-                              >
-                                Activate IR
-                              </Button>
+              {group.players.length === 0 ? (
+                <Text c="dimmed" size="sm">
+                  No player drafted in this slot
+                </Text>
+              ) : (
+                <Table>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Player/Team</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
+                      {hasAnyActions && <Table.Th>Actions</Table.Th>}
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {group.players.map((slot: RosterSlotRow) => {
+                      const isIrSlot =
+                        slot.position === 'IR_F' || slot.position === 'IR_D';
+                      const matchingPosition =
+                        slot.position === 'IR_F' ? 'F' : 'D';
+                      // Find an active injured player at the matching position
+                      const injuredCandidates = slots.filter(
+                        (s: RosterSlotRow) =>
+                          s.position === matchingPosition &&
+                          s.is_active &&
+                          s.id !== slot.id
+                      );
+
+                      return (
+                        <Table.Tr key={slot.id}>
+                          <Table.Td>
+                            {resolvePickName(
+                              slot.player_id,
+                              slot.team_id,
+                              playerNameMap,
+                              teamNameMap
                             )}
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
-                </Table.Tbody>
-              </Table>
-            )}
-          </Card>
-        ))}
+                          </Table.Td>
+                          <Table.Td>
+                            {slot.is_active ? (
+                              <Badge color="green" size="sm">
+                                Active
+                              </Badge>
+                            ) : (
+                              <Badge color="gray" size="sm">
+                                Inactive
+                              </Badge>
+                            )}
+                            {slot.activated_from_ir && (
+                              <Badge color="orange" size="sm" ml="xs">
+                                From IR
+                              </Badge>
+                            )}
+                          </Table.Td>
+                          <Table.Td style={{ textAlign: 'right' }}>
+                            {slot.points_earned ?? 0}
+                          </Table.Td>
+                          {hasAnyActions && (
+                            <Table.Td>
+                              {isIrSlot &&
+                                !slot.activated_from_ir &&
+                                injuredCandidates.length > 0 && (
+                                  <Button
+                                    size="xs"
+                                    variant="outline"
+                                    color="orange"
+                                    onClick={() =>
+                                      setIrModal({
+                                        injuredSlotId: injuredCandidates[0].id,
+                                        irSlotId: slot.id,
+                                      })
+                                    }
+                                  >
+                                    Activate IR
+                                  </Button>
+                                )}
+                            </Table.Td>
+                          )}
+                        </Table.Tr>
+                      );
+                    })}
+                  </Table.Tbody>
+                </Table>
+              )}
+            </Card>
+          );
+        })}
 
         {/* IR Activation Modal */}
         <Modal
