@@ -46,11 +46,20 @@ export interface MockDraftState {
   availablePlayerIds: number[];
 }
 
+// ── Completed draft record ─────────────────────────────────────────────
+export interface CompletedDraftRecord {
+  id: string;
+  round: number;
+  status: 'completed';
+  completed_at: string;
+}
+
 // ── State shape ────────────────────────────────────────────────────────
 export interface MockState {
   leagues: (League & { members: LeagueMember[]; isMock: boolean })[];
   currentLeague: string | null;
   draftState: MockDraftState | null;
+  completedDrafts: CompletedDraftRecord[]; // history of completed drafts
   rosters: Record<string, RosterSlot[]>; // keyed by leagueMemberId (current round)
   rosterHistory: Record<string, Record<number, RosterSlot[]>>; // memberId → round → slots
   simulationDate: string; // ISO date string
@@ -128,6 +137,7 @@ function getInitialState(): MockState {
     leagues: [],
     currentLeague: null,
     draftState: null,
+    completedDrafts: [],
     rosters: {},
     rosterHistory: {},
     simulationDate: INITIAL_SIMULATION_DATE,
@@ -151,6 +161,10 @@ export type MockAction =
   | {
       type: 'DEACTIVATE_IR';
       payload: { leagueMemberId: string; slotId: string };
+    }
+  | {
+      type: 'START_RE_DRAFT';
+      payload: { leagueId: string; draftState: MockDraftState };
     }
   | { type: 'RESET_ALL' };
 
@@ -246,6 +260,20 @@ function mockReducer(state: MockState, action: MockAction): MockState {
         }
       }
 
+      // Track completed draft
+      let newCompletedDrafts = state.completedDrafts;
+      if (isComplete) {
+        newCompletedDrafts = [
+          ...state.completedDrafts,
+          {
+            id: newDraft.id,
+            round: newDraft.round,
+            status: 'completed' as const,
+            completed_at: newDraft.completedAt!,
+          },
+        ];
+      }
+
       return {
         ...state,
         draftState: {
@@ -255,6 +283,7 @@ function mockReducer(state: MockState, action: MockAction): MockState {
         },
         rosters: rostersAfterPick,
         leagues: leaguesAfterPick,
+        completedDrafts: newCompletedDrafts,
       };
     }
     case 'ADVANCE_DAY': {
@@ -323,6 +352,24 @@ function mockReducer(state: MockState, action: MockAction): MockState {
         playerStats: newStats,
         rosterHistory: updatedHistory,
         rosters: {}, // Clear rosters for the new round
+      };
+    }
+    case 'START_RE_DRAFT': {
+      const { leagueId, draftState } = action.payload;
+      const updatedLeagues = state.leagues.map((l) =>
+        l.id === leagueId
+          ? {
+              ...l,
+              status: 'drafting' as const,
+              currentRound: draftState.draft.round,
+            }
+          : l
+      );
+      return {
+        ...state,
+        draftState,
+        leagues: updatedLeagues,
+        currentRound: draftState.draft.round,
       };
     }
     case 'ACTIVATE_IR': {
@@ -409,6 +456,7 @@ const EMPTY_MOCK_STATE: MockState = {
   leagues: [],
   currentLeague: null,
   draftState: null,
+  completedDrafts: [],
   rosters: {},
   rosterHistory: {},
   simulationDate: '',

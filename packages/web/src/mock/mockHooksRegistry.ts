@@ -14,6 +14,8 @@ import {
   useMockStartDraft,
   useMockMakePick,
   useMockLeagueMembers,
+  useMockCompletedDrafts,
+  useMockStartReDraft,
 } from './hooks/useMockDraft';
 import {
   useMockRoster,
@@ -49,6 +51,8 @@ export interface MockHooksRegistry {
   useMockStartDraft: typeof useMockStartDraft;
   useMockMakePick: typeof useMockMakePick;
   useMockLeagueMembers: typeof useMockLeagueMembers;
+  useMockCompletedDrafts: typeof useMockCompletedDrafts;
+  useMockStartReDraft: typeof useMockStartReDraft;
   // Roster
   useMockRoster: typeof useMockRoster;
   useMockLeagueRosters: typeof useMockLeagueRosters;
@@ -79,6 +83,8 @@ export const mockHooksRegistry: MockHooksRegistry = {
   useMockStartDraft,
   useMockMakePick,
   useMockLeagueMembers,
+  useMockCompletedDrafts,
+  useMockStartReDraft,
   useMockRoster,
   useMockLeagueRosters,
   useMockActivateIR,

@@ -220,3 +220,59 @@ export function useMockLeagueMembers(leagueId: string | undefined) {
 
   return makeMockQuery(data);
 }
+
+// ── useMockCompletedDrafts ─────────────────────────────────────────────
+// Returns completed drafts for a league (for RoundTransitionPage draft history)
+export function useMockCompletedDrafts(_leagueId: string | undefined) {
+  const { state } = useMockData();
+  return makeMockQuery(state.completedDrafts);
+}
+
+// ── useMockStartReDraft ────────────────────────────────────────────────
+// Starts a re-draft for the next round with draft order based on standings
+export function useMockStartReDraft() {
+  const { state, dispatch } = useMockData();
+
+  return makeMockMutation(
+    (params: { leagueId: string; nextRound: number; draftOrder: string[] }) => {
+      const league = state.leagues.find((l) => l.id === params.leagueId);
+      if (!league) throw new Error('League not found');
+
+      const totalDraftRounds = 11;
+      const draftOrder = generateSnakeDraftOrder(
+        params.draftOrder,
+        totalDraftRounds
+      );
+
+      const draftId = `mock-draft-${params.leagueId}-r${params.nextRound}-${crypto.randomUUID()}`;
+
+      const draftState: MockDraftState = {
+        draft: {
+          id: draftId,
+          leagueId: params.leagueId,
+          round: params.nextRound,
+          status: 'active',
+          currentPick: 1,
+          draftOrder,
+          startedAt: new Date().toISOString(),
+        },
+        picks: [],
+        availablePlayerIds: [...ALL_PLAYER_IDS],
+      };
+
+      dispatch({
+        type: 'START_RE_DRAFT',
+        payload: { leagueId: params.leagueId, draftState },
+      });
+
+      return {
+        id: draftId,
+        league_id: params.leagueId,
+        round: params.nextRound,
+        status: 'active' as const,
+        current_pick: 1,
+        draft_order: draftOrder,
+      };
+    }
+  );
+}

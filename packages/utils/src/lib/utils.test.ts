@@ -890,3 +890,74 @@ describe('getRosterForRound', () => {
     expect(result).toEqual([]);
   });
 });
+
+// ── Re-draft order and commissioner logic tests ─────────────────────
+
+describe('Re-draft order (generateReDraftOrder)', () => {
+  it('should order worst-to-best by points for first round of snake', () => {
+    const standings = [
+      { memberId: 'alpha', points: 25 },
+      { memberId: 'beta', points: 40 },
+      { memberId: 'gamma', points: 15 },
+      { memberId: 'delta', points: 32 },
+    ];
+    const order = generateReDraftOrder(standings, 1);
+    // Sorted worst first: gamma(15), alpha(25), delta(32), beta(40)
+    expect(order).toEqual(['gamma', 'alpha', 'delta', 'beta']);
+  });
+
+  it('should generate snake pattern with reversed second round', () => {
+    const standings = [
+      { memberId: 'a', points: 10 },
+      { memberId: 'b', points: 20 },
+      { memberId: 'c', points: 30 },
+    ];
+    const order = generateReDraftOrder(standings, 2);
+    // Round 1: a, b, c (worst to best)
+    // Round 2: c, b, a (reversed)
+    expect(order).toEqual(['a', 'b', 'c', 'c', 'b', 'a']);
+  });
+
+  it('should handle tied points (stable sort)', () => {
+    const standings = [
+      { memberId: 'x', points: 20 },
+      { memberId: 'y', points: 20 },
+    ];
+    const order = generateReDraftOrder(standings, 1);
+    expect(order).toHaveLength(2);
+    expect(order).toContain('x');
+    expect(order).toContain('y');
+  });
+
+  it('should handle single member', () => {
+    const standings = [{ memberId: 'solo', points: 100 }];
+    const order = generateReDraftOrder(standings, 3);
+    expect(order).toEqual(['solo', 'solo', 'solo']);
+  });
+
+  it('should generate full 11-round snake draft order', () => {
+    const standings = [
+      { memberId: 'a', points: 5 },
+      { memberId: 'b', points: 10 },
+    ];
+    const order = generateReDraftOrder(standings, 11);
+    // 11 rounds × 2 members = 22 total picks
+    expect(order).toHaveLength(22);
+    // Odd rounds (0,2,4,...): a,b — Even rounds (1,3,5,...): b,a
+    expect(order[0]).toBe('a'); // Round 1: worst first
+    expect(order[1]).toBe('b');
+    expect(order[2]).toBe('b'); // Round 2: reversed
+    expect(order[3]).toBe('a');
+  });
+
+  it('should give worst team first pick overall', () => {
+    const standings = [
+      { memberId: 'best', points: 100 },
+      { memberId: 'mid', points: 50 },
+      { memberId: 'worst', points: 0 },
+    ];
+    const order = generateReDraftOrder(standings, 1);
+    expect(order[0]).toBe('worst');
+    expect(order[2]).toBe('best');
+  });
+});

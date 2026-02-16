@@ -17,6 +17,13 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
+import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
+import {
+  useMockCompletedDrafts,
+  useMockStartReDraft,
+} from '../../../mock/hooks/useMockDraft';
+
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
 interface TransitionMemberRow {
   id: string;
@@ -33,13 +40,12 @@ interface CompletedDraftRow {
   completed_at: string | null;
 }
 
-export function RoundTransitionPage() {
-  const { leagueId } = useParams<{ leagueId: string }>();
-  const { user } = useAuthContext();
-  const navigate = useNavigate();
-  const [starting, setStarting] = useState(false);
+// ── Hook wrappers for mock/live mode ──────────────────────────────────
 
-  const { data: league, isLoading } = useQuery({
+function useTransitionLeague(leagueId: string | undefined) {
+  const mockResult = useMockLeague(leagueId);
+
+  const queryResult = useQuery({
     queryKey: ['round-transition', leagueId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -53,11 +59,16 @@ export function RoundTransitionPage() {
       if (error) throw error;
       return data;
     },
-    enabled: !!leagueId,
+    enabled: !IS_MOCK && !!leagueId,
   });
 
-  // Get completed drafts for this league
-  const { data: completedDrafts } = useQuery({
+  return IS_MOCK ? mockResult : queryResult;
+}
+
+function useCompletedDrafts(leagueId: string | undefined) {
+  const mockResult = useMockCompletedDrafts(leagueId);
+
+  const queryResult = useQuery({
     queryKey: ['completed-drafts', leagueId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -70,8 +81,21 @@ export function RoundTransitionPage() {
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!leagueId,
+    enabled: !IS_MOCK && !!leagueId,
   });
+
+  return IS_MOCK ? mockResult : queryResult;
+}
+
+export function RoundTransitionPage() {
+  const { leagueId } = useParams<{ leagueId: string }>();
+  const { user } = useAuthContext();
+  const navigate = useNavigate();
+  const [starting, setStarting] = useState(false);
+
+  const { data: league, isLoading } = useTransitionLeague(leagueId);
+  const { data: completedDrafts } = useCompletedDrafts(leagueId);
+  const mockStartReDraft = useMockStartReDraft();
 
   const isCommissioner = league?.commissioner_id === user?.id;
   const currentRound = league?.current_round ?? 0;
@@ -92,22 +116,31 @@ export function RoundTransitionPage() {
       (m: TransitionMemberRow) => m.user_id
     );
 
-    const { error } = await supabase.from('drafts').insert({
-      league_id: leagueId,
-      round: nextRound,
-      status: 'active',
-      current_pick: 1,
-      draft_order: reDraftOrder,
-      started_at: new Date().toISOString(),
-    });
-
-    if (!error) {
-      await supabase
-        .from('leagues')
-        .update({ status: 'drafting', current_round: nextRound })
-        .eq('id', leagueId!);
-
+    if (IS_MOCK) {
+      await mockStartReDraft.mutateAsync({
+        leagueId: leagueId!,
+        nextRound,
+        draftOrder: reDraftOrder,
+      });
       navigate(`/draft/${leagueId}`);
+    } else {
+      const { error } = await supabase.from('drafts').insert({
+        league_id: leagueId,
+        round: nextRound,
+        status: 'active',
+        current_pick: 1,
+        draft_order: reDraftOrder,
+        started_at: new Date().toISOString(),
+      });
+
+      if (!error) {
+        await supabase
+          .from('leagues')
+          .update({ status: 'drafting', current_round: nextRound })
+          .eq('id', leagueId!);
+
+        navigate(`/draft/${leagueId}`);
+      }
     }
     setStarting(false);
   };
