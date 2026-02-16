@@ -17,6 +17,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
+import { deriveCurrentRound, deriveNextRound } from '../../utils/roundUtils';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import {
   useMockCompletedDrafts,
@@ -98,8 +99,12 @@ export function RoundTransitionPage() {
   const mockStartReDraft = useMockStartReDraft();
 
   const isCommissioner = league?.commissioner_id === user?.id;
-  const currentRound = league?.current_round ?? 0;
-  const nextRound = currentRound + 1;
+  const completedCount = completedDrafts?.length ?? 0;
+  const currentRound = deriveCurrentRound(
+    league?.current_round,
+    completedCount
+  );
+  const nextRound = deriveNextRound(league?.current_round, completedCount);
 
   // Sort members by points (worst to best for re-draft order)
   const sortedMembers = [...(league?.league_members ?? [])].sort(
