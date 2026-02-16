@@ -167,6 +167,10 @@ export type MockAction =
       payload: { leagueId: string };
     }
   | {
+      type: 'SKIP_TO_ROUND4';
+      payload: { leagueId: string };
+    }
+  | {
       type: 'START_RE_DRAFT';
       payload: { leagueId: string; draftState: MockDraftState };
     }
@@ -348,6 +352,18 @@ export function mockReducer(state: MockState, action: MockAction): MockState {
         };
       }
 
+      // Round 3→4: auto-copy Round 3 rosters into Round 4 (no separate draft)
+      let newRosters: Record<string, RosterSlot[]> = {};
+      if (nextRound === 4) {
+        for (const [memberId, slots] of Object.entries(state.rosters)) {
+          newRosters[memberId] = slots.map((s) => ({
+            ...s,
+            round: 4,
+            pointsEarned: 0,
+          }));
+        }
+      }
+
       return {
         ...state,
         currentRound: nextRound,
@@ -355,13 +371,22 @@ export function mockReducer(state: MockState, action: MockAction): MockState {
         roundComplete: false,
         playerStats: newStats,
         rosterHistory: updatedHistory,
-        rosters: {}, // Clear rosters for the new round
+        rosters: newRosters,
       };
     }
     case 'START_NEXT_DRAFT': {
       const { leagueId } = action.payload;
       const updatedLeagues = state.leagues.map((l) =>
         l.id === leagueId ? { ...l, status: 'drafting' as const } : l
+      );
+      return { ...state, leagues: updatedLeagues };
+    }
+    case 'SKIP_TO_ROUND4': {
+      const { leagueId } = action.payload;
+      const updatedLeagues = state.leagues.map((l) =>
+        l.id === leagueId
+          ? { ...l, status: 'active' as const, currentRound: 4 }
+          : l
       );
       return { ...state, leagues: updatedLeagues };
     }

@@ -734,6 +734,11 @@ export function DraftPage() {
           <div>
             <Title order={2}>Draft Room</Title>
             <Text c="dimmed">Round {draft.round}</Text>
+            {draft.round === 3 && (
+              <Text size="sm" c="blue">
+                Conference Finals &amp; Stanley Cup Final
+              </Text>
+            )}
           </div>
           <Card padding="md" radius="md" withBorder>
             <Stack gap={4} align="center">

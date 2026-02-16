@@ -24,6 +24,7 @@ import {
   useMockStartReDraft,
 } from '../../../mock/hooks/useMockDraft';
 import { sortMembersForReDraft } from '../../../mock/utils';
+import { useMockData } from '../../../mock/MockDataProvider';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -98,6 +99,7 @@ export function RoundTransitionPage() {
   const { data: league, isLoading } = useTransitionLeague(leagueId);
   const { data: completedDrafts } = useCompletedDrafts(leagueId);
   const mockStartReDraft = useMockStartReDraft();
+  const { dispatch } = useMockData();
 
   const isCommissioner = league?.commissioner_id === user?.id;
   const completedCount = completedDrafts?.length ?? 0;
@@ -106,6 +108,7 @@ export function RoundTransitionPage() {
     completedCount
   );
   const nextRound = deriveNextRound(league?.current_round, completedCount);
+  const skipRound4Draft = nextRound === 4;
 
   // Sort members by points (worst to best for re-draft order), tiebreak by team name
   const sortedMembers = sortMembersForReDraft(
@@ -150,6 +153,51 @@ export function RoundTransitionPage() {
     setStarting(false);
   };
 
+  const handleSkipToRound4 = async () => {
+    if (!league) return;
+    setStarting(true);
+
+    if (IS_MOCK) {
+      // Set league to active for Round 4 (rosters were already copied by ADVANCE_ROUND)
+      dispatch({
+        type: 'SKIP_TO_ROUND4',
+        payload: { leagueId: leagueId! },
+      });
+      // Navigate to league dashboard — no draft needed
+      navigate(`/leagues/${leagueId}`);
+    } else {
+      // In live mode, copy Round 3 rosters to Round 4 and skip draft
+      const { data: round3Slots } = await supabase
+        .from('roster_slots')
+        .select('*')
+        .eq('round', 3)
+        .in(
+          'league_member_id',
+          (league.league_members ?? []).map((m: TransitionMemberRow) => m.id)
+        );
+
+      if (round3Slots && round3Slots.length > 0) {
+        const round4Slots = round3Slots.map(
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          ({ id, ...slot }: { id: string; [key: string]: unknown }) => ({
+            ...slot,
+            round: 4,
+            points_earned: 0,
+          })
+        );
+        await supabase.from('roster_slots').insert(round4Slots);
+      }
+
+      await supabase
+        .from('leagues')
+        .update({ status: 'active', current_round: 4 })
+        .eq('id', leagueId!);
+
+      navigate(`/leagues/${leagueId}`);
+    }
+    setStarting(false);
+  };
+
   if (isLoading) {
     return (
       <Center h="50vh">
@@ -174,11 +222,21 @@ export function RoundTransitionPage() {
           <Text c="dimmed">{league.name}</Text>
         </Stack>
 
-        <Alert color="blue" title="Full Re-Draft">
-          All players return to the pool. A new draft will be conducted for
-          Round {nextRound}. Draft order is based on current standings — worst
-          to best, snake pattern.
-        </Alert>
+        {skipRound4Draft ? (
+          <Alert color="green" title="No Draft Required">
+            Your Round 3 roster (Conference Finals) automatically carries into
+            Round 4 (Stanley Cup Final). No separate draft is needed.
+          </Alert>
+        ) : (
+          <Alert color="blue" title="Full Re-Draft">
+            All players return to the pool. A new draft will be conducted for
+            Round {nextRound}.
+            {nextRound === 3 &&
+              ' This draft covers both Conference Finals and Stanley Cup Final — your Round 3 picks carry into Round 4.'}{' '}
+            Draft order is based on current standings — worst to best, snake
+            pattern.
+          </Alert>
+        )}
 
         {/* Final Standings */}
         <Card shadow="sm" padding="lg" radius="md" withBorder>
@@ -191,7 +249,7 @@ export function RoundTransitionPage() {
                   <Table.Th>Team</Table.Th>
                   <Table.Th>Player</Table.Th>
                   <Table.Th>Points</Table.Th>
-                  <Table.Th>Re-Draft Pick</Table.Th>
+                  {!skipRound4Draft && <Table.Th>Re-Draft Pick</Table.Th>}
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -224,11 +282,13 @@ export function RoundTransitionPage() {
                         )}
                       </Table.Td>
                       <Table.Td fw={700}>{m.total_points ?? 0}</Table.Td>
-                      <Table.Td>
-                        <Badge variant="outline">
-                          #{sortedMembers.length - index}
-                        </Badge>
-                      </Table.Td>
+                      {!skipRound4Draft && (
+                        <Table.Td>
+                          <Badge variant="outline">
+                            #{sortedMembers.length - index}
+                          </Badge>
+                        </Table.Td>
+                      )}
                     </Table.Tr>
                   ))}
               </Table.Tbody>
@@ -253,8 +313,25 @@ export function RoundTransitionPage() {
           </Card>
         )}
 
-        {/* Re-Draft Action */}
-        {isCommissioner ? (
+        {/* Re-Draft Action or Round 4 Skip */}
+        {skipRound4Draft ? (
+          isCommissioner ? (
+            <Button
+              size="lg"
+              color="green"
+              onClick={handleSkipToRound4}
+              loading={starting}
+              fullWidth
+            >
+              Continue to Stanley Cup Final
+            </Button>
+          ) : (
+            <Alert color="blue" title="Waiting for Commissioner">
+              The commissioner will continue to Round 4 (Stanley Cup Final) when
+              ready. Your Round 3 roster carries over automatically.
+            </Alert>
+          )
+        ) : isCommissioner ? (
           <Button
             size="lg"
             color="green"
