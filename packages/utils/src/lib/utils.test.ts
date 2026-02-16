@@ -422,8 +422,8 @@ describe('Draft Complete screen logic', () => {
 
   it('should construct correct Back to League URL from leagueId', () => {
     const leagueId = 'abc-123-def';
-    const url = `/league/${leagueId}`;
-    expect(url).toBe('/league/abc-123-def');
+    const url = `/leagues/${leagueId}`;
+    expect(url).toBe('/leagues/abc-123-def');
   });
 
   it('should handle draft with only goalie/team picks', () => {

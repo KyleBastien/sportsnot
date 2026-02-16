@@ -32,6 +32,7 @@ import {
   buildTeamNameMap,
   resolvePickName,
 } from '@sportsnot/utils';
+import { routes } from '../../utils/routes';
 import {
   useMockDraft,
   useMockLeagueMembers,
@@ -645,7 +646,7 @@ export function DraftPage() {
           <Button
             variant="filled"
             size="md"
-            onClick={() => navigate(`/league/${leagueId}`)}
+            onClick={() => navigate(routes.leagues.dashboard(leagueId!))}
           >
             Back to League
           </Button>
