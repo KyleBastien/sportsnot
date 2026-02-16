@@ -25,9 +25,7 @@ function makeLeague(
   };
 }
 
-function makeState(
-  overrides: Partial<MockState> = {}
-): MockState {
+function makeState(overrides: Partial<MockState> = {}): MockState {
   return {
     ...getInitialState(),
     ...overrides,
@@ -51,6 +49,99 @@ function makeDraftState(round: number): MockDraftState {
     availablePlayerIds: [1, 2, 3],
   };
 }
+
+// ─── ADVANCE_ROUND ──────────────────────────────────────────────────────
+
+describe('ADVANCE_ROUND', () => {
+  it('increments currentRound when roundComplete is true', () => {
+    const state = makeState({ currentRound: 1, roundComplete: true });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    expect(next.currentRound).toBe(2);
+  });
+
+  it('does not advance when roundComplete is false', () => {
+    const state = makeState({ currentRound: 1, roundComplete: false });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    expect(next.currentRound).toBe(1);
+  });
+
+  it('does not advance when seasonComplete is true', () => {
+    const state = makeState({
+      currentRound: 4,
+      roundComplete: true,
+      seasonComplete: true,
+    });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    expect(next.currentRound).toBe(4);
+  });
+
+  it('does not advance beyond round 4', () => {
+    const state = makeState({ currentRound: 4, roundComplete: true });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    expect(next.currentRound).toBe(4);
+  });
+
+  it('resets roundComplete to false', () => {
+    const state = makeState({ currentRound: 1, roundComplete: true });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    expect(next.roundComplete).toBe(false);
+  });
+
+  it('does NOT change any league status', () => {
+    const state = makeState({
+      currentRound: 1,
+      roundComplete: true,
+      leagues: [
+        makeLeague({ id: 'lg-1', status: 'active' }),
+        makeLeague({ id: 'lg-2', status: 'drafting' }),
+      ],
+    });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    expect(next.leagues[0].status).toBe('active');
+    expect(next.leagues[1].status).toBe('drafting');
+  });
+
+  it('does NOT trigger any draft flow', () => {
+    const state = makeState({
+      currentRound: 1,
+      roundComplete: true,
+      draftState: null,
+    });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    expect(next.draftState).toBeNull();
+  });
+
+  it('archives current rosters to rosterHistory', () => {
+    const slots = [{ playerId: 1, position: 'F' as const, isFromIR: false }];
+    const state = makeState({
+      currentRound: 1,
+      roundComplete: true,
+      rosters: { 'member-1': slots },
+      rosterHistory: {},
+    });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    expect(next.rosterHistory['member-1']?.[1]).toEqual(slots);
+  });
+
+  it('clears rosters after advancing (leagues without draft earn 0)', () => {
+    const state = makeState({
+      currentRound: 1,
+      roundComplete: true,
+      rosters: {
+        'member-1': [{ playerId: 1, position: 'F' as const, isFromIR: false }],
+      },
+    });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    expect(next.rosters).toEqual({});
+  });
+
+  it('advances simulationDate to day before next round starts', () => {
+    const state = makeState({ currentRound: 1, roundComplete: true });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    // simulationDate should change (exact value depends on getRoundDateBounds)
+    expect(next.simulationDate).not.toBe(state.simulationDate);
+  });
+});
 
 // ─── START_NEXT_DRAFT ───────────────────────────────────────────────────
 

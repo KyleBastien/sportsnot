@@ -171,7 +171,9 @@ export function SimulationControlPanel() {
             onClick={handleAdvanceRound}
             disabled={!roundComplete || seasonComplete}
           >
-            Advance Round →
+            {currentRound < 4
+              ? `Advance to Round ${currentRound + 1} →`
+              : 'Season Complete'}
           </Button>
 
           <Divider />
