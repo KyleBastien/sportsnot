@@ -143,6 +143,61 @@ export function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
+// ── Standings aggregation utilities ──────────────────────────────────
+
+interface RosterPointsRow {
+  player_id?: number | null;
+  team_id?: number | null;
+  position: string;
+  is_active?: boolean;
+  points_earned: number;
+  round?: number;
+}
+
+/**
+ * Aggregate roster slot points into standings breakdown.
+ * Separates player points (skater slots with player_id) from goalie points
+ * (team slots with team_id only). Only counts active slots.
+ */
+export function aggregateStandingsPoints(roster: RosterPointsRow[]): {
+  total: number;
+  playerPts: number;
+  goaliePts: number;
+} {
+  let playerPts = 0;
+  let goaliePts = 0;
+
+  for (const slot of roster) {
+    if (slot.is_active === false) continue;
+
+    if (slot.team_id != null && slot.player_id == null) {
+      goaliePts += slot.points_earned;
+    } else {
+      playerPts += slot.points_earned;
+    }
+  }
+
+  return { total: playerPts + goaliePts, playerPts, goaliePts };
+}
+
+/**
+ * Aggregate roster slot points grouped by round number.
+ * Returns a map of round → total points for that round.
+ */
+export function aggregateRoundPoints(
+  roster: RosterPointsRow[]
+): Record<number, number> {
+  const roundPts: Record<number, number> = {};
+
+  for (const slot of roster) {
+    if (slot.is_active === false || slot.round == null) continue;
+
+    roundPts[slot.round] = (roundPts[slot.round] ?? 0) + slot.points_earned;
+  }
+
+  return roundPts;
+}
+
 /**
  * Generate random invite code
  */

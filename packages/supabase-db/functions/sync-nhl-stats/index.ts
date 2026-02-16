@@ -142,9 +142,91 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Update roster points_earned from stats cache ──────────────────
+    // Player roster slots: points = goals * 1 + assists * 1
+    const SCORING_GOAL = 1;
+    const SCORING_ASSIST = 1;
+    const SCORING_WIN = 2;
+    const SCORING_SHUTOUT = 4;
+
+    for (const playerId of playerIds) {
+      const { data: stats } = await supabase
+        .from('player_stats_cache')
+        .select('goals, assists')
+        .eq('player_id', playerId)
+        .eq('nhl_season', season)
+        .eq('playoff_round', playoffRound)
+        .single();
+
+      if (stats) {
+        const pts =
+          (stats.goals ?? 0) * SCORING_GOAL +
+          (stats.assists ?? 0) * SCORING_ASSIST;
+        await supabase
+          .from('rosters')
+          .update({ points_earned: pts })
+          .eq('player_id', playerId)
+          .eq('round', playoffRound)
+          .eq('is_active', true);
+      }
+    }
+
+    // Goalie roster slots: points from team wins/shutouts
+    for (const teamId of teamIds) {
+      const { data: stats } = await supabase
+        .from('team_stats_cache')
+        .select('wins, shutouts')
+        .eq('team_id', teamId)
+        .eq('nhl_season', season)
+        .eq('playoff_round', playoffRound)
+        .single();
+
+      if (stats) {
+        const regularWins = (stats.wins ?? 0) - (stats.shutouts ?? 0);
+        const pts =
+          regularWins * SCORING_WIN + (stats.shutouts ?? 0) * SCORING_SHUTOUT;
+        await supabase
+          .from('rosters')
+          .update({ points_earned: pts })
+          .eq('team_id', teamId)
+          .eq('round', playoffRound)
+          .eq('is_active', true);
+      }
+    }
+
+    // ── Aggregate roster points into league_members standings ────────
+    // Find all leagues that have active rosters for this round
+    const { data: affectedMembers } = await supabase
+      .from('rosters')
+      .select('league_member_id')
+      .eq('round', playoffRound)
+      .eq('is_active', true);
+
+    if (affectedMembers && affectedMembers.length > 0) {
+      const memberIds = [
+        ...new Set(affectedMembers.map((r) => r.league_member_id)),
+      ];
+
+      // Get the league IDs for affected members
+      const { data: members } = await supabase
+        .from('league_members')
+        .select('id, league_id')
+        .in('id', memberIds);
+
+      if (members) {
+        const leagueIds = [...new Set(members.map((m) => m.league_id))];
+        for (const leagueId of leagueIds) {
+          await supabase.rpc('refresh_league_standings', {
+            p_league_id: leagueId,
+            p_round: playoffRound,
+          });
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({
-        message: 'Stats synced successfully',
+        message: 'Stats synced and standings updated',
         playerUpdates,
         teamUpdates,
       }),

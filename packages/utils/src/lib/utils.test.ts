@@ -10,6 +10,8 @@ import {
   buildPlayerNameMap,
   buildTeamNameMap,
   resolvePickName,
+  aggregateStandingsPoints,
+  aggregateRoundPoints,
 } from './utils';
 import type { PlayerStats, TeamStats } from '@sportsnot/types';
 
@@ -336,16 +338,16 @@ describe('Roster page name resolution', () => {
 
   it('should show fallback for unknown player IDs on roster', () => {
     const slot = { player_id: 99999, team_id: null, position: 'F' };
-    expect(resolvePickName(slot.player_id, slot.team_id, playerMap, teamMap)).toBe(
-      'Unknown Player'
-    );
+    expect(
+      resolvePickName(slot.player_id, slot.team_id, playerMap, teamMap)
+    ).toBe('Unknown Player');
   });
 
   it('should show fallback for unknown team IDs on roster', () => {
     const slot = { player_id: null, team_id: 99999, position: 'G' };
-    expect(resolvePickName(slot.player_id, slot.team_id, playerMap, teamMap)).toBe(
-      'Unknown Team'
-    );
+    expect(
+      resolvePickName(slot.player_id, slot.team_id, playerMap, teamMap)
+    ).toBe('Unknown Team');
   });
 
   it('should resolve a full mixed roster with players and teams', () => {
@@ -500,5 +502,251 @@ describe('calculateGoalieGamePoints', () => {
       0
     );
     expect(totalPoints).toBe(8);
+  });
+});
+
+describe('aggregateStandingsPoints', () => {
+  it('should separate player and goalie points', () => {
+    const roster = [
+      {
+        player_id: 100,
+        team_id: null,
+        position: 'F',
+        is_active: true,
+        points_earned: 5,
+      },
+      {
+        player_id: 101,
+        team_id: null,
+        position: 'D',
+        is_active: true,
+        points_earned: 3,
+      },
+      {
+        player_id: null,
+        team_id: 22,
+        position: 'G',
+        is_active: true,
+        points_earned: 8,
+      },
+    ];
+    const result = aggregateStandingsPoints(roster);
+    expect(result.playerPts).toBe(8);
+    expect(result.goaliePts).toBe(8);
+    expect(result.total).toBe(16);
+  });
+
+  it('should exclude inactive slots', () => {
+    const roster = [
+      {
+        player_id: 100,
+        team_id: null,
+        position: 'F',
+        is_active: true,
+        points_earned: 5,
+      },
+      {
+        player_id: 101,
+        team_id: null,
+        position: 'D',
+        is_active: false,
+        points_earned: 10,
+      },
+      {
+        player_id: null,
+        team_id: 22,
+        position: 'G',
+        is_active: true,
+        points_earned: 4,
+      },
+    ];
+    const result = aggregateStandingsPoints(roster);
+    expect(result.playerPts).toBe(5);
+    expect(result.goaliePts).toBe(4);
+    expect(result.total).toBe(9);
+  });
+
+  it('should return zeros for empty roster', () => {
+    const result = aggregateStandingsPoints([]);
+    expect(result.total).toBe(0);
+    expect(result.playerPts).toBe(0);
+    expect(result.goaliePts).toBe(0);
+  });
+
+  it('should handle roster with only goalie slots', () => {
+    const roster = [
+      {
+        player_id: null,
+        team_id: 22,
+        position: 'G',
+        is_active: true,
+        points_earned: 6,
+      },
+    ];
+    const result = aggregateStandingsPoints(roster);
+    expect(result.playerPts).toBe(0);
+    expect(result.goaliePts).toBe(6);
+    expect(result.total).toBe(6);
+  });
+
+  it('should handle roster with only player slots', () => {
+    const roster = [
+      {
+        player_id: 100,
+        team_id: null,
+        position: 'F',
+        is_active: true,
+        points_earned: 12,
+      },
+      {
+        player_id: 101,
+        team_id: null,
+        position: 'D',
+        is_active: true,
+        points_earned: 4,
+      },
+    ];
+    const result = aggregateStandingsPoints(roster);
+    expect(result.playerPts).toBe(16);
+    expect(result.goaliePts).toBe(0);
+    expect(result.total).toBe(16);
+  });
+
+  it('total should always equal playerPts + goaliePts', () => {
+    const roster = [
+      {
+        player_id: 100,
+        team_id: null,
+        position: 'F',
+        is_active: true,
+        points_earned: 7,
+      },
+      {
+        player_id: 101,
+        team_id: null,
+        position: 'F',
+        is_active: true,
+        points_earned: 3,
+      },
+      {
+        player_id: 102,
+        team_id: null,
+        position: 'D',
+        is_active: true,
+        points_earned: 2,
+      },
+      {
+        player_id: null,
+        team_id: 22,
+        position: 'G',
+        is_active: true,
+        points_earned: 8,
+      },
+      {
+        player_id: 103,
+        team_id: null,
+        position: 'IR_F',
+        is_active: false,
+        points_earned: 0,
+      },
+    ];
+    const result = aggregateStandingsPoints(roster);
+    expect(result.total).toBe(result.playerPts + result.goaliePts);
+    expect(result.total).toBe(20);
+  });
+});
+
+describe('aggregateRoundPoints', () => {
+  it('should group points by round', () => {
+    const roster = [
+      {
+        player_id: 100,
+        position: 'F',
+        is_active: true,
+        points_earned: 5,
+        round: 1,
+      },
+      {
+        player_id: 101,
+        position: 'D',
+        is_active: true,
+        points_earned: 3,
+        round: 1,
+      },
+      {
+        player_id: 102,
+        position: 'F',
+        is_active: true,
+        points_earned: 7,
+        round: 2,
+      },
+    ];
+    const result = aggregateRoundPoints(roster);
+    expect(result[1]).toBe(8);
+    expect(result[2]).toBe(7);
+  });
+
+  it('should exclude inactive slots', () => {
+    const roster = [
+      {
+        player_id: 100,
+        position: 'F',
+        is_active: true,
+        points_earned: 5,
+        round: 1,
+      },
+      {
+        player_id: 101,
+        position: 'D',
+        is_active: false,
+        points_earned: 10,
+        round: 1,
+      },
+    ];
+    const result = aggregateRoundPoints(roster);
+    expect(result[1]).toBe(5);
+  });
+
+  it('should return empty object for empty roster', () => {
+    const result = aggregateRoundPoints([]);
+    expect(Object.keys(result).length).toBe(0);
+  });
+
+  it('should handle four rounds', () => {
+    const roster = [
+      {
+        player_id: 100,
+        position: 'F',
+        is_active: true,
+        points_earned: 5,
+        round: 1,
+      },
+      {
+        player_id: 100,
+        position: 'F',
+        is_active: true,
+        points_earned: 3,
+        round: 2,
+      },
+      {
+        player_id: 100,
+        position: 'F',
+        is_active: true,
+        points_earned: 8,
+        round: 3,
+      },
+      {
+        player_id: 100,
+        position: 'F',
+        is_active: true,
+        points_earned: 2,
+        round: 4,
+      },
+    ];
+    const result = aggregateRoundPoints(roster);
+    expect(result[1]).toBe(5);
+    expect(result[2]).toBe(3);
+    expect(result[3]).toBe(8);
+    expect(result[4]).toBe(2);
   });
 });
