@@ -180,6 +180,26 @@ const rosterSlots = [
 const TOTAL_ACTIVE_POINTS = 44;
 
 // ---------------------------------------------------------------------------
+// Mock data: player and team stats for name resolution
+// ---------------------------------------------------------------------------
+const playerStatsCache = [
+  { player_id: 8478402, player_name: 'Connor McDavid', position: 'F', team_abbreviation: 'EDM', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8479318, player_name: 'Auston Matthews', position: 'F', team_abbreviation: 'TOR', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8471675, player_name: 'Sidney Crosby', position: 'F', team_abbreviation: 'PIT', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8477934, player_name: 'Leon Draisaitl', position: 'F', team_abbreviation: 'EDM', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8479339, player_name: 'Jack Eichel', position: 'F', team_abbreviation: 'VGK', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8480069, player_name: 'Cale Makar', position: 'D', team_abbreviation: 'COL', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8479323, player_name: 'Miro Heiskanen', position: 'D', team_abbreviation: 'DAL', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8480145, player_name: 'Quinn Hughes', position: 'D', team_abbreviation: 'VAN', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8477492, player_name: 'Filip Forsberg', position: 'F', team_abbreviation: 'NSH', is_injured: true, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8477939, player_name: 'Morgan Rielly', position: 'D', team_abbreviation: 'TOR', is_injured: true, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+];
+
+const teamStatsCache = [
+  { team_id: 14, team_name: 'Tampa Bay Lightning', team_abbreviation: 'TBL', is_eliminated: false, wins: 0, shutouts: 0, nhl_season: '20242025', playoff_round: 1 },
+];
+
+// ---------------------------------------------------------------------------
 // Route handlers
 // ---------------------------------------------------------------------------
 
@@ -240,6 +260,8 @@ async function setupRosterMocks(
     leagues: leagueHandler(),
     league_members: leagueMembersHandler(),
     rosters: mockTableList(roster),
+    player_stats_cache: mockTableList(playerStatsCache),
+    team_stats_cache: mockTableList(teamStatsCache),
   });
 }
 
@@ -290,9 +312,9 @@ test.describe('Roster Management', () => {
       .locator('..');
     await expect(goalieCard.getByText('1 player')).toBeVisible();
 
-    // Player IDs are displayed as "Player #ID" or "Team #ID" in the UI
-    await expect(authenticatedPage.getByText('Player #8478402')).toBeVisible();
-    await expect(authenticatedPage.getByText('Team #14')).toBeVisible();
+    // Player names are resolved via player/team stats cache
+    await expect(authenticatedPage.getByText('Connor McDavid')).toBeVisible();
+    await expect(authenticatedPage.getByText('Tampa Bay Lightning')).toBeVisible();
   });
 
   test('IR slots IR_F and IR_D are displayed with correct state', async ({
@@ -359,7 +381,7 @@ test.describe('Roster Management', () => {
     // Points column shows values — e.g., first forward has 8 points
     const playerRow = authenticatedPage
       .getByRole('row')
-      .filter({ hasText: 'Player #8478402' });
+      .filter({ hasText: 'Connor McDavid' });
     await expect(playerRow.getByText('8', { exact: true })).toBeVisible();
   });
 

@@ -240,6 +240,26 @@ function leagueMembersHandler() {
 }
 
 // ---------------------------------------------------------------------------
+// Mock data: player and team stats for name resolution
+// ---------------------------------------------------------------------------
+const irPlayerStatsCache = [
+  { player_id: 8478402, player_name: 'Connor McDavid', position: 'F', team_abbreviation: 'EDM', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8479318, player_name: 'Auston Matthews', position: 'F', team_abbreviation: 'TOR', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8471675, player_name: 'Sidney Crosby', position: 'F', team_abbreviation: 'PIT', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8477934, player_name: 'Leon Draisaitl', position: 'F', team_abbreviation: 'EDM', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8479339, player_name: 'Jack Eichel', position: 'F', team_abbreviation: 'VGK', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8480069, player_name: 'Cale Makar', position: 'D', team_abbreviation: 'COL', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8479323, player_name: 'Miro Heiskanen', position: 'D', team_abbreviation: 'DAL', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8480145, player_name: 'Quinn Hughes', position: 'D', team_abbreviation: 'VAN', is_injured: false, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8477492, player_name: 'Filip Forsberg', position: 'F', team_abbreviation: 'NSH', is_injured: true, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+  { player_id: 8477939, player_name: 'Morgan Rielly', position: 'D', team_abbreviation: 'TOR', is_injured: true, goals: 0, assists: 0, games_played: 0, nhl_season: '20242025', playoff_round: 1 },
+];
+
+const irTeamStatsCache = [
+  { team_id: 14, team_name: 'Tampa Bay Lightning', team_abbreviation: 'TBL', is_eliminated: false, wins: 0, shutouts: 0, nhl_season: '20242025', playoff_round: 1 },
+];
+
+// ---------------------------------------------------------------------------
 // Setup helper
 // ---------------------------------------------------------------------------
 
@@ -253,6 +273,8 @@ async function setupIRMocks(
     leagues: leagueHandler(),
     league_members: leagueMembersHandler(),
     rosters: mockTableList(roster),
+    player_stats_cache: mockTableList(irPlayerStatsCache),
+    team_stats_cache: mockTableList(irTeamStatsCache),
   });
 }
 
@@ -334,7 +356,7 @@ test.describe('IR Activation Flow', () => {
     const irForwardSection = authenticatedPage
       .getByRole('heading', { name: 'IR Forward' })
       .locator('../..');
-    await expect(irForwardSection.getByText('Player #8477492')).toBeVisible();
+    await expect(irForwardSection.getByText('Filip Forsberg')).toBeVisible();
 
     // The Activate IR button is present for IR_F because there are active Forwards
     await expect(
@@ -345,7 +367,7 @@ test.describe('IR Activation Flow', () => {
     const irDefenseSection = authenticatedPage
       .getByRole('heading', { name: 'IR Defenseman' })
       .locator('../..');
-    await expect(irDefenseSection.getByText('Player #8477939')).toBeVisible();
+    await expect(irDefenseSection.getByText('Morgan Rielly')).toBeVisible();
     await expect(
       irDefenseSection.getByRole('button', { name: /Activate IR/i })
     ).toBeVisible();
@@ -475,7 +497,7 @@ test.describe('IR Activation Flow', () => {
       .locator('../..');
 
     // Verify the IR_F player is shown
-    await expect(irForwardSection.getByText('Player #8477492')).toBeVisible();
+    await expect(irForwardSection.getByText('Filip Forsberg')).toBeVisible();
 
     // No Activate IR button should be present in the IR Forward section
     await expect(

@@ -14,15 +14,28 @@ import {
   Alert,
   Modal,
 } from '@mantine/core';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@sportsnot/supabase';
+import {
+  supabase,
+  usePlayoffPlayers,
+  usePlayoffTeams,
+} from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { SCORING } from '@sportsnot/types';
+import {
+  buildPlayerNameMap,
+  buildTeamNameMap,
+  resolvePickName,
+} from '@sportsnot/utils';
 import {
   useMockRoster,
   useMockActivateIR,
 } from '../../../mock/hooks/useMockRoster';
+import {
+  useMockPlayoffPlayers,
+  useMockPlayoffTeams,
+} from '../../../mock/hooks/useMockNhlApi';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -105,6 +118,27 @@ export function RosterPage() {
   } | null>(null);
   const [activating, setActivating] = useState(false);
   const mockActivateIR = useMockActivateIR();
+
+  // Fetch player/team stats for name resolution
+  const currentSeason = '20242025';
+  const currentRound = data?.round ?? 1;
+  const mockPlayerResult = useMockPlayoffPlayers(currentSeason, currentRound);
+  const supabasePlayerResult = usePlayoffPlayers(currentSeason, currentRound);
+  const { data: playerStats } = IS_MOCK
+    ? mockPlayerResult
+    : supabasePlayerResult;
+  const mockTeamResult = useMockPlayoffTeams(currentSeason, currentRound);
+  const supabaseTeamResult = usePlayoffTeams(currentSeason, currentRound);
+  const { data: teamStats } = IS_MOCK ? mockTeamResult : supabaseTeamResult;
+
+  const playerNameMap = useMemo(
+    () => buildPlayerNameMap(playerStats ?? []),
+    [playerStats]
+  );
+  const teamNameMap = useMemo(
+    () => buildTeamNameMap(teamStats ?? []),
+    [teamStats]
+  );
 
   if (isLoading) {
     return (
@@ -238,9 +272,12 @@ export function RosterPage() {
                     return (
                       <Table.Tr key={slot.id}>
                         <Table.Td>
-                          {slot.player_id
-                            ? `Player #${slot.player_id}`
-                            : `Team #${slot.team_id}`}
+                          {resolvePickName(
+                            slot.player_id,
+                            slot.team_id,
+                            playerNameMap,
+                            teamNameMap
+                          )}
                         </Table.Td>
                         <Table.Td>
                           {slot.is_active ? (

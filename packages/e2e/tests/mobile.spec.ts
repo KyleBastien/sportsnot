@@ -548,6 +548,8 @@ test.describe('Mobile Viewport', () => {
       leagues: leagueHandler(),
       league_members: leagueMembersHandler(),
       rosters: mockTableList(rosterSlots),
+      player_stats_cache: mockTableList(allPlayers),
+      team_stats_cache: mockTableList(allTeams),
     });
 
     await authenticatedPage.goto(`/roster/${LEAGUE_ID}`);
@@ -574,8 +576,8 @@ test.describe('Mobile Viewport', () => {
     // Total Points card should be visible
     await expect(authenticatedPage.getByText('Total Points')).toBeVisible();
 
-    // Player entries should be visible after scrolling
-    await expect(authenticatedPage.getByText('Player #8478402')).toBeVisible();
+    // Player entries should be visible with resolved names
+    await expect(authenticatedPage.getByText('Connor McDavid')).toBeVisible();
 
     // Round info should be displayed
     await expect(authenticatedPage.getByText('Round 1')).toBeVisible();

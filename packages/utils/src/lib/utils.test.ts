@@ -288,6 +288,88 @@ describe('resolvePickName', () => {
   });
 });
 
+describe('Roster page name resolution', () => {
+  const playerMap = new Map([
+    [8478402, 'Connor McDavid'],
+    [8477934, 'Leon Draisaitl'],
+    [8476917, 'Zach Hyman'],
+  ]);
+  const teamMap = new Map([
+    [22, 'Edmonton Oilers'],
+    [25, 'Dallas Stars'],
+  ]);
+
+  it('should resolve Forward roster slots to player names', () => {
+    const forwardSlots = [
+      { player_id: 8478402, team_id: null, position: 'F' },
+      { player_id: 8477934, team_id: null, position: 'F' },
+      { player_id: 8476917, team_id: null, position: 'F' },
+    ];
+    const names = forwardSlots.map((s) =>
+      resolvePickName(s.player_id, s.team_id, playerMap, teamMap)
+    );
+    expect(names).toEqual(['Connor McDavid', 'Leon Draisaitl', 'Zach Hyman']);
+  });
+
+  it('should resolve Goalie roster slots to team names', () => {
+    const goalieSlots = [
+      { player_id: null, team_id: 22, position: 'G' },
+      { player_id: null, team_id: 25, position: 'G' },
+    ];
+    const names = goalieSlots.map((s) =>
+      resolvePickName(s.player_id, s.team_id, playerMap, teamMap)
+    );
+    expect(names).toEqual(['Edmonton Oilers', 'Dallas Stars']);
+  });
+
+  it('should resolve IR roster slots the same as active slots', () => {
+    const irSlots = [
+      { player_id: 8476917, team_id: null, position: 'IR_F' },
+      { player_id: 8477934, team_id: null, position: 'IR_D' },
+    ];
+    const names = irSlots.map((s) =>
+      resolvePickName(s.player_id, s.team_id, playerMap, teamMap)
+    );
+    expect(names).toEqual(['Zach Hyman', 'Leon Draisaitl']);
+  });
+
+  it('should show fallback for unknown player IDs on roster', () => {
+    const slot = { player_id: 99999, team_id: null, position: 'F' };
+    expect(resolvePickName(slot.player_id, slot.team_id, playerMap, teamMap)).toBe(
+      'Unknown Player'
+    );
+  });
+
+  it('should show fallback for unknown team IDs on roster', () => {
+    const slot = { player_id: null, team_id: 99999, position: 'G' };
+    expect(resolvePickName(slot.player_id, slot.team_id, playerMap, teamMap)).toBe(
+      'Unknown Team'
+    );
+  });
+
+  it('should resolve a full mixed roster with players and teams', () => {
+    const roster = [
+      { player_id: 8478402, team_id: null, position: 'F', points_earned: 12 },
+      { player_id: 8477934, team_id: null, position: 'F', points_earned: 8 },
+      { player_id: 8476917, team_id: null, position: 'D', points_earned: 3 },
+      { player_id: null, team_id: 22, position: 'G', points_earned: 6 },
+      { player_id: 8476917, team_id: null, position: 'IR_F', points_earned: 0 },
+    ];
+    const names = roster.map((s) =>
+      resolvePickName(s.player_id, s.team_id, playerMap, teamMap)
+    );
+    expect(names).toEqual([
+      'Connor McDavid',
+      'Leon Draisaitl',
+      'Zach Hyman',
+      'Edmonton Oilers',
+      'Zach Hyman',
+    ]);
+    // Points should still be accessible alongside resolved names
+    expect(roster.map((s) => s.points_earned)).toEqual([12, 8, 3, 6, 0]);
+  });
+});
+
 describe('Draft Complete screen logic', () => {
   const playerMap = new Map([
     [8478402, 'Connor McDavid'],
