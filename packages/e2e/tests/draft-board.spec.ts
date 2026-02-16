@@ -630,7 +630,7 @@ test.describe('Draft Board', () => {
       skatersTable.getByRole('columnheader', { name: 'A', exact: true })
     ).toBeVisible();
     await expect(
-      skatersTable.getByRole('columnheader', { name: 'Pts' })
+      skatersTable.getByRole('columnheader', { name: 'Pts', exact: true })
     ).toBeVisible();
 
     // Top scorer (McDavid with 8 goals) should appear in the list
@@ -811,7 +811,14 @@ test.describe('Draft Board', () => {
     // Draft with some picks already made
     const draft = buildDraft({
       current_pick: 3,
-      draft_order: [mockUser.id, OTHER_USER_ID],
+      draft_order: [
+        mockUser.id,
+        OTHER_USER_ID,
+        OTHER_USER_ID,
+        mockUser.id,
+        mockUser.id,
+        OTHER_USER_ID,
+      ],
       draft_picks: [
         {
           id: 'pick-0001',

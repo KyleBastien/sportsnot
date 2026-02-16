@@ -19,7 +19,10 @@ module.exports = {
     alias:
       envVars.VITE_MOCK_MODE !== 'true'
         ? {
-            '@sportsnot/mock-data': false,
+            '@sportsnot/mock-data': join(
+              __dirname,
+              'src/mock/mock-data-stub.ts'
+            ),
           }
         : {},
   },
