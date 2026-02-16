@@ -7,6 +7,14 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <!-- Mantine color scheme script — prevents flash of wrong theme -->
+    <script>
+      try {
+        var cs = window.localStorage.getItem('mantine-color-scheme-value');
+        var resolved = cs || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-mantine-color-scheme', resolved);
+      } catch (e) {}
+    </script>
     <!-- GitHub Pages SPA redirect handler -->
     <script>
       (function (l) {

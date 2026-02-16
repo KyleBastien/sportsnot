@@ -182,7 +182,7 @@ export function StandingsPage() {
                     style={{
                       fontWeight: isMe ? 700 : undefined,
                       backgroundColor: isMe
-                        ? 'var(--mantine-color-blue-0)'
+                        ? 'var(--mantine-color-blue-light)'
                         : undefined,
                     }}
                   >

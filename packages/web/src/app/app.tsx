@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { Route, Routes, Link, useNavigate } from 'react-router-dom';
 import {
+  ActionIcon,
   AppShell,
   Title,
   Group,
@@ -9,7 +10,10 @@ import {
   Avatar,
   Text,
   UnstyledButton,
+  useComputedColorScheme,
+  useMantineColorScheme,
 } from '@mantine/core';
+import { IconSun, IconMoon } from '@tabler/icons-react';
 import { useAuthContext } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -58,6 +62,28 @@ import { RosterHistoryPage } from './routes/roster/RosterHistoryPage';
 import { StandingsPage } from './routes/standings/StandingsPage';
 import { ScoringHistoryPage } from './routes/scoring/ScoringHistoryPage';
 import { ProfilePage } from './routes/profile/ProfilePage';
+
+function ColorSchemeToggle() {
+  const { setColorScheme } = useMantineColorScheme();
+  const computedColorScheme = useComputedColorScheme('light');
+
+  return (
+    <ActionIcon
+      variant="default"
+      size="lg"
+      aria-label="Toggle color scheme"
+      onClick={() =>
+        setColorScheme(computedColorScheme === 'dark' ? 'light' : 'dark')
+      }
+    >
+      {computedColorScheme === 'dark' ? (
+        <IconSun size={20} />
+      ) : (
+        <IconMoon size={20} />
+      )}
+    </ActionIcon>
+  );
+}
 
 function UserMenu() {
   const { user, signOut } = useAuthContext();
@@ -137,7 +163,10 @@ export function App() {
               <UnstyledButton component={Link} to="/">
                 <Title order={3}>🏒 SportsNot</Title>
               </UnstyledButton>
-              <UserMenu />
+              <Group gap="sm">
+                <ColorSchemeToggle />
+                <UserMenu />
+              </Group>
             </Group>
           </AppShell.Header>
 

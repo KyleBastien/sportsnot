@@ -209,3 +209,23 @@ export function generateInviteCode(): string {
   }
   return result;
 }
+
+// ── Color scheme / dark-mode utilities ───────────────────────────────
+
+export type ColorScheme = 'light' | 'dark';
+
+/**
+ * Toggle a color scheme value: light → dark, dark → light.
+ */
+export function toggleColorScheme(current: ColorScheme): ColorScheme {
+  return current === 'dark' ? 'light' : 'dark';
+}
+
+/**
+ * Resolve 'auto' default to an actual scheme using a media-query match result.
+ */
+export function resolveAutoColorScheme(
+  prefersDark: boolean
+): ColorScheme {
+  return prefersDark ? 'dark' : 'light';
+}

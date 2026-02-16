@@ -12,6 +12,8 @@ import {
   resolvePickName,
   aggregateStandingsPoints,
   aggregateRoundPoints,
+  toggleColorScheme,
+  resolveAutoColorScheme,
 } from './utils';
 import type { PlayerStats, TeamStats } from '@sportsnot/types';
 
@@ -748,5 +750,32 @@ describe('aggregateRoundPoints', () => {
     expect(result[2]).toBe(3);
     expect(result[3]).toBe(8);
     expect(result[4]).toBe(2);
+  });
+});
+
+// ── Dark-mode / color scheme utilities ──────────────────────────────
+
+describe('toggleColorScheme', () => {
+  it('returns dark when current is light', () => {
+    expect(toggleColorScheme('light')).toBe('dark');
+  });
+
+  it('returns light when current is dark', () => {
+    expect(toggleColorScheme('dark')).toBe('light');
+  });
+
+  it('is its own inverse', () => {
+    expect(toggleColorScheme(toggleColorScheme('light'))).toBe('light');
+    expect(toggleColorScheme(toggleColorScheme('dark'))).toBe('dark');
+  });
+});
+
+describe('resolveAutoColorScheme', () => {
+  it('returns dark when user prefers dark', () => {
+    expect(resolveAutoColorScheme(true)).toBe('dark');
+  });
+
+  it('returns light when user does not prefer dark', () => {
+    expect(resolveAutoColorScheme(false)).toBe('light');
   });
 });
