@@ -1,5 +1,67 @@
 import { SCORING, type PlayerStats, type TeamStats } from '@sportsnot/types';
 
+// ── Player / Team name lookup utilities ─────────────────────────────────
+
+interface PlayerLookupRow {
+  player_id: number;
+  player_name?: string | null;
+}
+
+interface TeamLookupRow {
+  team_id: number;
+  team_name?: string | null;
+}
+
+/**
+ * Build a Map<player_id, player_name> from player stat rows.
+ * Works with both mock and live data shapes.
+ */
+export function buildPlayerNameMap(
+  players: PlayerLookupRow[]
+): Map<number, string> {
+  const map = new Map<number, string>();
+  for (const p of players) {
+    if (p.player_name) {
+      map.set(p.player_id, p.player_name);
+    }
+  }
+  return map;
+}
+
+/**
+ * Build a Map<team_id, team_name> from team stat rows.
+ * Works with both mock and live data shapes.
+ */
+export function buildTeamNameMap(teams: TeamLookupRow[]): Map<number, string> {
+  const map = new Map<number, string>();
+  for (const t of teams) {
+    if (t.team_name) {
+      map.set(t.team_id, t.team_name);
+    }
+  }
+  return map;
+}
+
+/**
+ * Resolve a draft pick to a display name.
+ * Checks player_id first, then team_id, with fallback.
+ */
+export function resolvePickName(
+  playerId: number | null | undefined,
+  teamId: number | null | undefined,
+  playerMap: Map<number, string>,
+  teamMap: Map<number, string>,
+  fallback = 'Unknown Player'
+): string {
+  if (playerId != null) {
+    return playerMap.get(playerId) ?? fallback;
+  }
+  if (teamId != null) {
+    return teamMap.get(teamId) ?? 'Unknown Team';
+  }
+  return fallback;
+}
+
 /**
  * Calculate points for a player based on their stats
  */

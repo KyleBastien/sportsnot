@@ -28,6 +28,11 @@ import {
 import { useAuthContext } from '../../context/AuthContext';
 import { type Position, ROSTER_COMPOSITION } from '@sportsnot/types';
 import {
+  buildPlayerNameMap,
+  buildTeamNameMap,
+  resolvePickName,
+} from '@sportsnot/utils';
+import {
   useMockDraft,
   useMockLeagueMembers,
   useMockMakePick,
@@ -519,6 +524,16 @@ export function DraftPage() {
     [picks]
   );
 
+  // Name lookup maps for resolving player/team IDs to display names
+  const playerNameMap = useMemo(
+    () => buildPlayerNameMap(playerStats ?? []),
+    [playerStats]
+  );
+  const teamNameMap = useMemo(
+    () => buildTeamNameMap(teamStats ?? []),
+    [teamStats]
+  );
+
   // Count my filled roster slots by position for smart pre-selection
   const mySlotCounts = useMemo(() => {
     const counts: Record<string, number> = {
@@ -612,7 +627,12 @@ export function DraftPage() {
                         {pick.league_members?.team_name ?? 'Unknown'}
                       </Table.Td>
                       <Table.Td>
-                        {pick.player_id ?? pick.team_id ?? '—'}
+                        {resolvePickName(
+                          pick.player_id,
+                          pick.team_id,
+                          playerNameMap,
+                          teamNameMap
+                        )}
                       </Table.Td>
                       <Table.Td>{pick.position}</Table.Td>
                     </Table.Tr>
@@ -764,6 +784,13 @@ export function DraftPage() {
                     <Text size="sm">
                       #{pick.pick_number} -{' '}
                       {pick.league_members?.team_name ?? 'Unknown'}
+                      {' · '}
+                      {resolvePickName(
+                        pick.player_id,
+                        pick.team_id,
+                        playerNameMap,
+                        teamNameMap
+                      )}
                     </Text>
                     <Badge variant="light" size="sm">
                       {pick.position}

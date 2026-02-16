@@ -6,6 +6,9 @@ import {
   generateReDraftOrder,
   shuffleArray,
   generateInviteCode,
+  buildPlayerNameMap,
+  buildTeamNameMap,
+  resolvePickName,
 } from './utils';
 import type { PlayerStats, TeamStats } from '@sportsnot/types';
 
@@ -172,5 +175,115 @@ describe('generateInviteCode', () => {
     }
     // With 31^8 possible codes, 100 codes should all be unique
     expect(codes.size).toBe(100);
+  });
+});
+
+describe('buildPlayerNameMap', () => {
+  it('should build a map from player stat rows', () => {
+    const players = [
+      { player_id: 8478402, player_name: 'Connor McDavid' },
+      { player_id: 8477934, player_name: 'Leon Draisaitl' },
+    ];
+    const map = buildPlayerNameMap(players);
+    expect(map.get(8478402)).toBe('Connor McDavid');
+    expect(map.get(8477934)).toBe('Leon Draisaitl');
+    expect(map.size).toBe(2);
+  });
+
+  it('should skip entries with null or undefined player_name', () => {
+    const players = [
+      { player_id: 1, player_name: 'Valid Player' },
+      { player_id: 2, player_name: null },
+      { player_id: 3, player_name: undefined },
+    ];
+    const map = buildPlayerNameMap(players);
+    expect(map.size).toBe(1);
+    expect(map.get(1)).toBe('Valid Player');
+    expect(map.has(2)).toBe(false);
+  });
+
+  it('should handle empty array', () => {
+    const map = buildPlayerNameMap([]);
+    expect(map.size).toBe(0);
+  });
+});
+
+describe('buildTeamNameMap', () => {
+  it('should build a map from team stat rows', () => {
+    const teams = [
+      { team_id: 22, team_name: 'Edmonton Oilers' },
+      { team_id: 25, team_name: 'Dallas Stars' },
+    ];
+    const map = buildTeamNameMap(teams);
+    expect(map.get(22)).toBe('Edmonton Oilers');
+    expect(map.get(25)).toBe('Dallas Stars');
+    expect(map.size).toBe(2);
+  });
+
+  it('should skip entries with null or undefined team_name', () => {
+    const teams = [
+      { team_id: 1, team_name: 'Valid Team' },
+      { team_id: 2, team_name: null },
+      { team_id: 3, team_name: undefined },
+    ];
+    const map = buildTeamNameMap(teams);
+    expect(map.size).toBe(1);
+    expect(map.get(1)).toBe('Valid Team');
+  });
+
+  it('should handle empty array', () => {
+    const map = buildTeamNameMap([]);
+    expect(map.size).toBe(0);
+  });
+});
+
+describe('resolvePickName', () => {
+  const playerMap = new Map([
+    [8478402, 'Connor McDavid'],
+    [8477934, 'Leon Draisaitl'],
+  ]);
+  const teamMap = new Map([
+    [22, 'Edmonton Oilers'],
+    [25, 'Dallas Stars'],
+  ]);
+
+  it('should resolve player_id to player name', () => {
+    expect(resolvePickName(8478402, null, playerMap, teamMap)).toBe(
+      'Connor McDavid'
+    );
+  });
+
+  it('should resolve team_id when player_id is null', () => {
+    expect(resolvePickName(null, 22, playerMap, teamMap)).toBe(
+      'Edmonton Oilers'
+    );
+  });
+
+  it('should return fallback for unknown player_id', () => {
+    expect(resolvePickName(99999, null, playerMap, teamMap)).toBe(
+      'Unknown Player'
+    );
+  });
+
+  it('should return "Unknown Team" for unknown team_id', () => {
+    expect(resolvePickName(null, 99999, playerMap, teamMap)).toBe(
+      'Unknown Team'
+    );
+  });
+
+  it('should return fallback when both IDs are null', () => {
+    expect(resolvePickName(null, null, playerMap, teamMap)).toBe(
+      'Unknown Player'
+    );
+  });
+
+  it('should use custom fallback string', () => {
+    expect(resolvePickName(null, null, playerMap, teamMap, 'N/A')).toBe('N/A');
+  });
+
+  it('should prefer player_id over team_id when both are present', () => {
+    expect(resolvePickName(8478402, 22, playerMap, teamMap)).toBe(
+      'Connor McDavid'
+    );
   });
 });
