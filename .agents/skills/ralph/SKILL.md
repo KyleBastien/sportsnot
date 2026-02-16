@@ -31,7 +31,11 @@ Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph di
       "acceptanceCriteria": [
         "Criterion 1",
         "Criterion 2",
-        "Typecheck passes"
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 1,
       "passes": false,
@@ -88,8 +92,11 @@ Each criterion must be something Ralph can CHECK, not something vague.
 - "Add `status` column to tasks table with default 'pending'"
 - "Filter dropdown has options: All, Active, Completed"
 - "Clicking delete shows confirmation dialog"
-- "Typecheck passes"
-- "Tests pass"
+- All Typecheck passes (even if it's outside of your changes)
+- Lint passes (even if it's outside of your changes)
+- Unit tests have been added
+- All Unit tests pass (even if it's outside of your changes)
+- All Playwright tests pass (even if it's outside of your changes)
 
 ### Bad criteria (vague):
 - "Works correctly"
@@ -99,7 +106,11 @@ Each criterion must be something Ralph can CHECK, not something vague.
 
 ### Always include as final criterion:
 ```
-"Typecheck passes"
+"All Typecheck passes (even if it's outside of your changes)"
+"Lint passes (even if it's outside of your changes)"
+"Unit tests have been added"
+"All Unit tests pass (even if it's outside of your changes)"
+"All Playwright tests pass (even if it's outside of your changes)"
 ```
 
 For stories with testable logic, also include:
@@ -123,7 +134,7 @@ Frontend stories should be visually verified when possible. If browser testing t
 3. **Priority**: Based on dependency order, then document order
 4. **All stories**: `passes: false` and empty `notes`
 5. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
-6. **Always add**: "Typecheck passes" to every story's acceptance criteria
+6. **Always add**: "All Typecheck passes (even if it's outside of your changes)", "Lint passes (even if it's outside of your changes)", "Unit tests have been added", "All Unit tests pass (even if it's outside of your changes)", "All Playwright tests pass (even if it's outside of your changes)" to every story's acceptance criteria
 
 ---
 
@@ -175,7 +186,11 @@ Add ability to mark tasks with different statuses.
       "acceptanceCriteria": [
         "Add status column: 'pending' | 'in_progress' | 'done' (default 'pending')",
         "Generate and run migration successfully",
-        "Typecheck passes"
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 1,
       "passes": false,
@@ -188,8 +203,11 @@ Add ability to mark tasks with different statuses.
       "acceptanceCriteria": [
         "Each task card shows colored status badge",
         "Badge colors: gray=pending, blue=in_progress, green=done",
-        "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 2,
       "passes": false,
@@ -203,8 +221,11 @@ Add ability to mark tasks with different statuses.
         "Each row has status dropdown or toggle",
         "Changing status saves immediately",
         "UI updates without page refresh",
-        "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 3,
       "passes": false,
@@ -217,8 +238,11 @@ Add ability to mark tasks with different statuses.
       "acceptanceCriteria": [
         "Filter dropdown: All | Pending | In Progress | Done",
         "Filter persists in URL params",
-        "Typecheck passes",
-        "Verify in browser if browser testing tools are available"
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 4,
       "passes": false,
@@ -252,7 +276,7 @@ Before writing prd.json, verify:
 - [ ] **Previous run archived** (if prd.json exists with different branchName, archive it first)
 - [ ] Each story is completable in one iteration (small enough)
 - [ ] Stories are ordered by dependency (schema to backend to UI)
-- [ ] Every story has "Typecheck passes" as criterion
+- [ ] Every story has "All Typecheck passes (even if it's outside of your changes)", "Lint passes (even if it's outside of your changes)", "Unit tests have been added", "All Unit tests pass (even if it's outside of your changes)", "All Playwright tests pass (even if it's outside of your changes)" as criterion
 - [ ] UI stories have "Verify in browser if browser testing tools are available" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)
 - [ ] No story depends on a later story
