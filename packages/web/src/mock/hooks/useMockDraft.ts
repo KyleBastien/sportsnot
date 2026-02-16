@@ -1,6 +1,7 @@
 import { useMockData, type MockDraftState } from '../MockDataProvider';
 import type { DraftPick, Position } from '@sportsnot/types';
 import { players } from '@sportsnot/mock-data';
+import { getEliminatedAbbreviations } from './useMockNhlApi';
 
 // ── Mock TanStack helpers (same pattern as useMockLeagues) ──────────────
 interface MockQueryResult<T> {
@@ -246,6 +247,12 @@ export function useMockStartReDraft() {
 
       const draftId = `mock-draft-${params.leagueId}-r${params.nextRound}-${crypto.randomUUID()}`;
 
+      // Filter available players to only include those from teams still alive
+      const eliminatedAbbrs = getEliminatedAbbreviations(params.nextRound);
+      const alivePlayerIds = Object.entries(players)
+        .filter(([abbr]) => !eliminatedAbbrs.has(abbr))
+        .flatMap(([, roster]) => roster.map((p) => p.id));
+
       const draftState: MockDraftState = {
         draft: {
           id: draftId,
@@ -257,7 +264,7 @@ export function useMockStartReDraft() {
           startedAt: new Date().toISOString(),
         },
         picks: [],
-        availablePlayerIds: [...ALL_PLAYER_IDS],
+        availablePlayerIds: alivePlayerIds,
       };
 
       dispatch({

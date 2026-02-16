@@ -15,6 +15,27 @@ import {
   regularSeasonStats,
 } from '@sportsnot/mock-data';
 
+/**
+ * Returns abbreviations of teams eliminated in rounds before `beforeRound`.
+ * For round 1, returns empty set (all teams alive).
+ * For round 2, returns teams eliminated in round 1, etc.
+ */
+export function getEliminatedAbbreviations(beforeRound: number): Set<string> {
+  const eliminated = new Set<string>();
+  for (const series of bracket) {
+    if (series.round >= beforeRound) continue;
+    if (!series.topSeedTeam || !series.bottomSeedTeam) continue;
+    const topWins = series.topSeedWins ?? 0;
+    const bottomWins = series.bottomSeedWins ?? 0;
+    if (topWins === 4 && series.bottomSeedTeam.abbreviation) {
+      eliminated.add(series.bottomSeedTeam.abbreviation);
+    } else if (bottomWins === 4 && series.topSeedTeam.abbreviation) {
+      eliminated.add(series.topSeedTeam.abbreviation);
+    }
+  }
+  return eliminated;
+}
+
 // ── Mock NHL API functions ─────────────────────────────────────────────
 // These mirror the signatures in @sportsnot/nhl-api but return fixture data.
 
@@ -90,24 +111,28 @@ function makeMockQuery<T>(data: T): MockQueryResult<T> {
 /**
  * Mock replacement for usePlayoffPlayers from @sportsnot/supabase.
  * Returns player stats in the same shape as the player_stats_cache table.
+ * Filters out players from teams eliminated before the given round.
  */
-export function useMockPlayoffPlayers(_season: string, _round: number) {
-  const allPlayers = Object.entries(players).flatMap(([teamAbbr, roster]) =>
-    roster
-      .filter((p) => p.primaryPosition.type !== 'Goalie')
-      .map((p) => ({
-        player_id: p.id,
-        player_name: p.fullName,
-        position: p.primaryPosition.type === 'Forward' ? 'F' : 'D',
-        team_abbreviation: teamAbbr,
-        is_injured: false,
-        goals: 0,
-        assists: 0,
-        games_played: 0,
-        nhl_season: _season,
-        playoff_round: _round,
-      }))
-  );
+export function useMockPlayoffPlayers(_season: string, round: number) {
+  const eliminatedAbbrs = getEliminatedAbbreviations(round);
+  const allPlayers = Object.entries(players)
+    .filter(([teamAbbr]) => !eliminatedAbbrs.has(teamAbbr))
+    .flatMap(([teamAbbr, roster]) =>
+      roster
+        .filter((p) => p.primaryPosition.type !== 'Goalie')
+        .map((p) => ({
+          player_id: p.id,
+          player_name: p.fullName,
+          position: p.primaryPosition.type === 'Forward' ? 'F' : 'D',
+          team_abbreviation: teamAbbr,
+          is_injured: false,
+          goals: 0,
+          assists: 0,
+          games_played: 0,
+          nhl_season: _season,
+          playoff_round: round,
+        }))
+    );
 
   return makeMockQuery(allPlayers);
 }
@@ -115,18 +140,22 @@ export function useMockPlayoffPlayers(_season: string, _round: number) {
 /**
  * Mock replacement for usePlayoffTeams from @sportsnot/supabase.
  * Returns team stats in the same shape as the team_stats_cache table.
+ * Filters out teams eliminated before the given round.
  */
-export function useMockPlayoffTeams(_season: string, _round: number) {
-  const allTeams = teams.map((t) => ({
-    team_id: t.id,
-    team_name: t.name,
-    team_abbreviation: t.abbreviation,
-    is_eliminated: false,
-    wins: 0,
-    shutouts: 0,
-    nhl_season: _season,
-    playoff_round: _round,
-  }));
+export function useMockPlayoffTeams(_season: string, round: number) {
+  const eliminatedAbbrs = getEliminatedAbbreviations(round);
+  const allTeams = teams
+    .filter((t) => !eliminatedAbbrs.has(t.abbreviation))
+    .map((t) => ({
+      team_id: t.id,
+      team_name: t.name,
+      team_abbreviation: t.abbreviation,
+      is_eliminated: false,
+      wins: 0,
+      shutouts: 0,
+      nhl_season: _season,
+      playoff_round: round,
+    }));
 
   return makeMockQuery(allTeams);
 }
