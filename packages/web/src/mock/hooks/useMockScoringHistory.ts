@@ -14,6 +14,7 @@ import type {
   NHLGame,
   NHLPlayer,
   NHLTeam,
+  RosterSlot,
 } from '@sportsnot/types';
 
 // ── Mock TanStack query helper ─────────────────────────────────────────
@@ -104,95 +105,104 @@ export function useMockScoringHistory(leagueId: string) {
   const logs = playerGameLogs as unknown as Record<number, NHLPlayerStats[]>;
 
   for (const member of league.members) {
-    const roster = state.rosters[member.id] ?? [];
-
-    // Process skater slots (those with playerId)
-    const skaterSlots = roster.filter((s) => s.isActive && s.playerId);
-    for (const slot of skaterSlots) {
-      const playerId = slot.playerId!;
-      const info = getPlayerInfo(playerId);
-      if (!info) continue;
-
-      const entries = logs[playerId] ?? [];
-
-      for (const entry of entries) {
-        if (entry.gameDate > state.simulationDate) continue;
-
-        // Skater scoring events: individual goals and assists
-        for (let i = 0; i < entry.goals; i++) {
-          events.push({
-            id: `${entry.gameId}-${playerId}-goal-${i}`,
-            player_name: info.name,
-            team_abbreviation: info.teamAbbrev,
-            event_type: 'goal',
-            points: SCORING.goal,
-            game_date: entry.gameDate,
-            league_member_team: member.teamName,
-          });
-        }
-        for (let i = 0; i < entry.assists; i++) {
-          events.push({
-            id: `${entry.gameId}-${playerId}-assist-${i}`,
-            player_name: info.name,
-            team_abbreviation: info.teamAbbrev,
-            event_type: 'assist',
-            points: SCORING.assist,
-            game_date: entry.gameDate,
-            league_member_team: member.teamName,
-          });
-        }
-      }
+    // Collect rosters from all rounds (history + current)
+    const allRosters: { round: number; slots: RosterSlot[] }[] = [];
+    for (let r = 1; r < state.currentRound; r++) {
+      const histSlots = state.rosterHistory[member.id]?.[r];
+      if (histSlots) allRosters.push({ round: r, slots: histSlots });
     }
+    const currentSlots = state.rosters[member.id] ?? [];
+    allRosters.push({ round: state.currentRound, slots: currentSlots });
 
-    // Process goalie slots (those with teamId, representing team goaltending)
-    const goalieSlots = roster.filter(
-      (s) => s.isActive && s.teamId && !s.playerId
-    );
-    for (const slot of goalieSlots) {
-      const teamId = slot.teamId!;
-      const teamInfo = getTeamInfo(teamId);
-      const teamName = teamInfo?.name ?? `Team #${teamId}`;
-      const teamAbbrev = teamInfo?.abbreviation ?? '';
+    for (const { slots: roster } of allRosters) {
+      // Process skater slots (those with playerId)
+      const skaterSlots = roster.filter((s) => s.isActive && s.playerId);
+      for (const slot of skaterSlots) {
+        const playerId = slot.playerId!;
+        const info = getPlayerInfo(playerId);
+        if (!info) continue;
 
-      for (const game of ALL_GAMES) {
-        if (game.gameDate > state.simulationDate) continue;
+        const entries = logs[playerId] ?? [];
 
-        const isHome = game.homeTeam.id === teamId;
-        const isAway = game.awayTeam.id === teamId;
-        if (!isHome && !isAway) continue;
+        for (const entry of entries) {
+          if (entry.gameDate > state.simulationDate) continue;
 
-        const teamScore = isHome
-          ? (game.homeTeam.score ?? 0)
-          : (game.awayTeam.score ?? 0);
-        const oppScore = isHome
-          ? (game.awayTeam.score ?? 0)
-          : (game.homeTeam.score ?? 0);
-
-        if (teamScore > oppScore) {
-          if (oppScore === 0) {
+          // Skater scoring events: individual goals and assists
+          for (let i = 0; i < entry.goals; i++) {
             events.push({
-              id: `${game.id}-${teamId}-shutout`,
-              player_name: teamName,
-              team_abbreviation: teamAbbrev,
-              event_type: 'shutout',
-              points: SCORING.shutout,
-              game_date: game.gameDate,
+              id: `${entry.gameId}-${playerId}-goal-${i}`,
+              player_name: info.name,
+              team_abbreviation: info.teamAbbrev,
+              event_type: 'goal',
+              points: SCORING.goal,
+              game_date: entry.gameDate,
               league_member_team: member.teamName,
             });
-          } else {
+          }
+          for (let i = 0; i < entry.assists; i++) {
             events.push({
-              id: `${game.id}-${teamId}-win`,
-              player_name: teamName,
-              team_abbreviation: teamAbbrev,
-              event_type: 'win',
-              points: SCORING.win,
-              game_date: game.gameDate,
+              id: `${entry.gameId}-${playerId}-assist-${i}`,
+              player_name: info.name,
+              team_abbreviation: info.teamAbbrev,
+              event_type: 'assist',
+              points: SCORING.assist,
+              game_date: entry.gameDate,
               league_member_team: member.teamName,
             });
           }
         }
       }
-    }
+
+      // Process goalie slots (those with teamId, representing team goaltending)
+      const goalieSlots = roster.filter(
+        (s) => s.isActive && s.teamId && !s.playerId
+      );
+      for (const slot of goalieSlots) {
+        const teamId = slot.teamId!;
+        const teamInfo = getTeamInfo(teamId);
+        const teamName = teamInfo?.name ?? `Team #${teamId}`;
+        const teamAbbrev = teamInfo?.abbreviation ?? '';
+
+        for (const game of ALL_GAMES) {
+          if (game.gameDate > state.simulationDate) continue;
+
+          const isHome = game.homeTeam.id === teamId;
+          const isAway = game.awayTeam.id === teamId;
+          if (!isHome && !isAway) continue;
+
+          const teamScore = isHome
+            ? (game.homeTeam.score ?? 0)
+            : (game.awayTeam.score ?? 0);
+          const oppScore = isHome
+            ? (game.awayTeam.score ?? 0)
+            : (game.homeTeam.score ?? 0);
+
+          if (teamScore > oppScore) {
+            if (oppScore === 0) {
+              events.push({
+                id: `${game.id}-${teamId}-shutout`,
+                player_name: teamName,
+                team_abbreviation: teamAbbrev,
+                event_type: 'shutout',
+                points: SCORING.shutout,
+                game_date: game.gameDate,
+                league_member_team: member.teamName,
+              });
+            } else {
+              events.push({
+                id: `${game.id}-${teamId}-win`,
+                player_name: teamName,
+                team_abbreviation: teamAbbrev,
+                event_type: 'win',
+                points: SCORING.win,
+                game_date: game.gameDate,
+                league_member_team: member.teamName,
+              });
+            }
+          }
+        }
+      }
+    } // end allRosters loop
   }
 
   // Sort by game_date descending (most recent first)

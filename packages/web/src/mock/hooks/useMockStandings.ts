@@ -43,54 +43,29 @@ const ALL_GAMES: NHLGame[] = [
   ...(gamesScf as unknown as NHLGame[]),
 ];
 
-// ── Points calculation per member ──────────────────────────────────────
-function calculateMemberPoints(
+// ── Points calculation per member per round ────────────────────────────
+function calculateRoundMemberPoints(
   playerIds: number[],
   goalieTeamIds: number[],
+  fromDate: string,
   throughDate: string
-): {
-  total: number;
-  playerPts: number;
-  goaliePts: number;
-  roundPts: Record<number, number>;
-} {
+): { playerPts: number; goaliePts: number } {
   let playerPts = 0;
   let goaliePts = 0;
-  const roundPts: Record<number, number> = {};
 
   const logs = playerGameLogs as unknown as Record<number, NHLPlayerStats[]>;
 
-  // Skater points from player game logs
   for (const playerId of playerIds) {
     const entries = logs[playerId] ?? [];
-
     for (const entry of entries) {
-      if (entry.gameDate > throughDate) continue;
-
-      const entryPoints =
-        entry.goals * SCORING.goal + entry.assists * SCORING.assist;
-      playerPts += entryPoints;
-
-      if (entryPoints > 0) {
-        for (let r = 1; r <= 4; r++) {
-          const bounds = getRoundDateBounds(r);
-          if (
-            bounds &&
-            entry.gameDate >= bounds.firstDate &&
-            entry.gameDate <= bounds.lastDate
-          ) {
-            roundPts[r] = (roundPts[r] ?? 0) + entryPoints;
-            break;
-          }
-        }
-      }
+      if (entry.gameDate < fromDate || entry.gameDate > throughDate) continue;
+      playerPts += entry.goals * SCORING.goal + entry.assists * SCORING.assist;
     }
   }
 
-  // Goalie points from team game results
   for (const teamId of goalieTeamIds) {
     for (const game of ALL_GAMES) {
-      if (game.gameDate > throughDate) continue;
+      if (game.gameDate < fromDate || game.gameDate > throughDate) continue;
 
       const isHome = game.homeTeam.id === teamId;
       const isAway = game.awayTeam.id === teamId;
@@ -103,30 +78,13 @@ function calculateMemberPoints(
         ? (game.awayTeam.score ?? 0)
         : (game.homeTeam.score ?? 0);
 
-      let entryPoints = 0;
       if (teamScore > oppScore) {
-        entryPoints = oppScore === 0 ? SCORING.shutout : SCORING.win;
-      }
-
-      goaliePts += entryPoints;
-
-      if (entryPoints > 0) {
-        for (let r = 1; r <= 4; r++) {
-          const bounds = getRoundDateBounds(r);
-          if (
-            bounds &&
-            game.gameDate >= bounds.firstDate &&
-            game.gameDate <= bounds.lastDate
-          ) {
-            roundPts[r] = (roundPts[r] ?? 0) + entryPoints;
-            break;
-          }
-        }
+        goaliePts += oppScore === 0 ? SCORING.shutout : SCORING.win;
       }
     }
   }
 
-  return { total: playerPts + goaliePts, playerPts, goaliePts, roundPts };
+  return { playerPts, goaliePts };
 }
 
 // ── useMockStandings ───────────────────────────────────────────────────
@@ -141,28 +99,59 @@ export function useMockStandings(leagueId: string) {
   }
 
   const members = league.members.map((member) => {
-    const roster = state.rosters[member.id] ?? [];
-    const activePlayerIds = roster
-      .filter((s) => s.isActive && s.playerId)
-      .map((s) => s.playerId!);
-    const goalieTeamIds = roster
-      .filter((s) => s.isActive && s.teamId && !s.playerId)
-      .map((s) => s.teamId!);
+    let totalPlayerPts = 0;
+    let totalGoaliePts = 0;
+    const roundPts: Record<number, number> = {};
 
-    const pts = calculateMemberPoints(
-      activePlayerIds,
-      goalieTeamIds,
-      state.simulationDate
-    );
+    // Calculate points per round using each round's actual roster
+    for (let r = 1; r <= state.currentRound; r++) {
+      const bounds = getRoundDateBounds(r);
+      if (!bounds) continue;
+
+      // Use rosterHistory for past rounds, current rosters for current round
+      const roster =
+        r < state.currentRound
+          ? (state.rosterHistory[member.id]?.[r] ?? [])
+          : (state.rosters[member.id] ?? []);
+
+      const activePlayerIds = roster
+        .filter((s) => s.isActive && s.playerId)
+        .map((s) => s.playerId!);
+      const goalieTeamIds = roster
+        .filter((s) => s.isActive && s.teamId && !s.playerId)
+        .map((s) => s.teamId!);
+
+      // Cap through-date to the earlier of simulation date or round end
+      const throughDate =
+        state.simulationDate < bounds.lastDate
+          ? state.simulationDate
+          : bounds.lastDate;
+
+      if (state.simulationDate < bounds.firstDate) continue;
+
+      const pts = calculateRoundMemberPoints(
+        activePlayerIds,
+        goalieTeamIds,
+        bounds.firstDate,
+        throughDate
+      );
+
+      totalPlayerPts += pts.playerPts;
+      totalGoaliePts += pts.goaliePts;
+      const roundTotal = pts.playerPts + pts.goaliePts;
+      if (roundTotal > 0) {
+        roundPts[r] = roundTotal;
+      }
+    }
 
     return {
       id: member.id,
       user_id: member.userId,
       team_name: member.teamName,
-      total_points: pts.total,
-      player_points: pts.playerPts,
-      goalie_points: pts.goaliePts,
-      round_points: pts.roundPts,
+      total_points: totalPlayerPts + totalGoaliePts,
+      player_points: totalPlayerPts,
+      goalie_points: totalGoaliePts,
+      round_points: roundPts,
       users: { display_name: member.user?.displayName ?? 'Unknown' },
     };
   });

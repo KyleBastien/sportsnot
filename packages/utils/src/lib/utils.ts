@@ -224,8 +224,57 @@ export function toggleColorScheme(current: ColorScheme): ColorScheme {
 /**
  * Resolve 'auto' default to an actual scheme using a media-query match result.
  */
-export function resolveAutoColorScheme(
-  prefersDark: boolean
-): ColorScheme {
+export function resolveAutoColorScheme(prefersDark: boolean): ColorScheme {
   return prefersDark ? 'dark' : 'light';
+}
+
+// ── Roster round-transition utilities ────────────────────────────────
+
+interface RosterSlotLike {
+  id: string;
+  leagueMemberId: string;
+  round: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Archive current rosters into a history structure keyed by round,
+ * returning the updated history and an empty roster map for the new round.
+ */
+export function archiveRostersForRoundAdvance<T extends RosterSlotLike>(
+  currentRosters: Record<string, T[]>,
+  existingHistory: Record<string, Record<number, T[]>>,
+  completedRound: number
+): {
+  rosterHistory: Record<string, Record<number, T[]>>;
+  clearedRosters: Record<string, T[]>;
+} {
+  const updatedHistory = { ...existingHistory };
+  for (const [memberId, slots] of Object.entries(currentRosters)) {
+    if (!updatedHistory[memberId]) {
+      updatedHistory[memberId] = {};
+    }
+    updatedHistory[memberId] = {
+      ...updatedHistory[memberId],
+      [completedRound]: slots,
+    };
+  }
+  return { rosterHistory: updatedHistory, clearedRosters: {} };
+}
+
+/**
+ * Get the roster for a specific round, checking current rosters first
+ * then falling back to history.
+ */
+export function getRosterForRound<T>(
+  memberId: string,
+  round: number,
+  currentRound: number,
+  currentRosters: Record<string, T[]>,
+  rosterHistory: Record<string, Record<number, T[]>>
+): T[] {
+  if (round === currentRound) {
+    return currentRosters[memberId] ?? [];
+  }
+  return rosterHistory[memberId]?.[round] ?? [];
 }

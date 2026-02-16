@@ -14,6 +14,8 @@ import {
   aggregateRoundPoints,
   toggleColorScheme,
   resolveAutoColorScheme,
+  archiveRostersForRoundAdvance,
+  getRosterForRound,
 } from './utils';
 import type { PlayerStats, TeamStats } from '@sportsnot/types';
 
@@ -777,5 +779,114 @@ describe('resolveAutoColorScheme', () => {
 
   it('returns light when user does not prefer dark', () => {
     expect(resolveAutoColorScheme(false)).toBe('light');
+  });
+});
+
+// ── Roster round-transition utilities ──────────────────────────────
+
+describe('archiveRostersForRoundAdvance', () => {
+  const makeSlot = (memberId: string, round: number, id: string) => ({
+    id,
+    leagueMemberId: memberId,
+    round,
+    playerId: 100,
+    position: 'F' as const,
+    isActive: true,
+    pointsEarned: 5,
+    activatedFromIr: false,
+  });
+
+  it('should archive current rosters and return empty cleared rosters', () => {
+    const currentRosters = {
+      member1: [makeSlot('member1', 1, 'slot-1')],
+      member2: [makeSlot('member2', 1, 'slot-2')],
+    };
+    const result = archiveRostersForRoundAdvance(currentRosters, {}, 1);
+    expect(result.clearedRosters).toEqual({});
+    expect(result.rosterHistory['member1'][1]).toEqual(
+      currentRosters['member1']
+    );
+    expect(result.rosterHistory['member2'][1]).toEqual(
+      currentRosters['member2']
+    );
+  });
+
+  it('should preserve existing history when archiving new round', () => {
+    const r1Slots = [makeSlot('member1', 1, 'slot-r1')];
+    const r2Slots = [makeSlot('member1', 2, 'slot-r2')];
+    const existingHistory = { member1: { 1: r1Slots } };
+    const result = archiveRostersForRoundAdvance(
+      { member1: r2Slots },
+      existingHistory,
+      2
+    );
+    expect(result.rosterHistory['member1'][1]).toEqual(r1Slots);
+    expect(result.rosterHistory['member1'][2]).toEqual(r2Slots);
+  });
+
+  it('should handle empty current rosters', () => {
+    const result = archiveRostersForRoundAdvance({}, {}, 1);
+    expect(result.clearedRosters).toEqual({});
+    expect(result.rosterHistory).toEqual({});
+  });
+
+  it('should handle multiple members across rounds', () => {
+    const history = {
+      member1: { 1: [makeSlot('member1', 1, 's1')] },
+      member2: { 1: [makeSlot('member2', 1, 's2')] },
+    };
+    const current = {
+      member1: [makeSlot('member1', 2, 's3')],
+      member2: [makeSlot('member2', 2, 's4')],
+      member3: [makeSlot('member3', 2, 's5')],
+    };
+    const result = archiveRostersForRoundAdvance(current, history, 2);
+    expect(Object.keys(result.rosterHistory)).toEqual([
+      'member1',
+      'member2',
+      'member3',
+    ]);
+    expect(result.rosterHistory['member1'][1]).toBeDefined();
+    expect(result.rosterHistory['member1'][2]).toBeDefined();
+    expect(result.rosterHistory['member3'][2]).toBeDefined();
+  });
+});
+
+describe('getRosterForRound', () => {
+  const makeSlot = (round: number, id: string) => ({
+    id,
+    round,
+    playerId: 100,
+  });
+
+  it('should return current rosters for the current round', () => {
+    const current = { member1: [makeSlot(2, 'current-slot')] };
+    const history = { member1: { 1: [makeSlot(1, 'hist-slot')] } };
+    const result = getRosterForRound('member1', 2, 2, current, history);
+    expect(result).toEqual([makeSlot(2, 'current-slot')]);
+  });
+
+  it('should return historical rosters for past rounds', () => {
+    const current = { member1: [makeSlot(2, 'current-slot')] };
+    const history = { member1: { 1: [makeSlot(1, 'hist-slot')] } };
+    const result = getRosterForRound('member1', 1, 2, current, history);
+    expect(result).toEqual([makeSlot(1, 'hist-slot')]);
+  });
+
+  it('should return empty array when no roster exists for round', () => {
+    const result = getRosterForRound('member1', 3, 3, {}, {});
+    expect(result).toEqual([]);
+  });
+
+  it('should return empty array for unknown member', () => {
+    const current = { member1: [makeSlot(1, 's1')] };
+    const result = getRosterForRound('unknown', 1, 1, current, {});
+    expect(result).toEqual([]);
+  });
+
+  it('should return empty array for current round with cleared rosters', () => {
+    const history = { member1: { 1: [makeSlot(1, 'hist')] } };
+    const result = getRosterForRound('member1', 2, 2, {}, history);
+    expect(result).toEqual([]);
   });
 });

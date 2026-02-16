@@ -51,7 +51,8 @@ export interface MockState {
   leagues: (League & { members: LeagueMember[]; isMock: boolean })[];
   currentLeague: string | null;
   draftState: MockDraftState | null;
-  rosters: Record<string, RosterSlot[]>; // keyed by leagueMemberId
+  rosters: Record<string, RosterSlot[]>; // keyed by leagueMemberId (current round)
+  rosterHistory: Record<string, Record<number, RosterSlot[]>>; // memberId → round → slots
   simulationDate: string; // ISO date string
   currentRound: number; // 1-4
   roundComplete: boolean;
@@ -128,6 +129,7 @@ function getInitialState(): MockState {
     currentLeague: null,
     draftState: null,
     rosters: {},
+    rosterHistory: {},
     simulationDate: INITIAL_SIMULATION_DATE,
     currentRound: 1,
     roundComplete: false,
@@ -301,12 +303,26 @@ function mockReducer(state: MockState, action: MockAction): MockState {
         dayBeforeNext
       );
 
+      // Archive current rosters to rosterHistory keyed by round, then clear
+      const updatedHistory = { ...state.rosterHistory };
+      for (const [memberId, slots] of Object.entries(state.rosters)) {
+        if (!updatedHistory[memberId]) {
+          updatedHistory[memberId] = {};
+        }
+        updatedHistory[memberId] = {
+          ...updatedHistory[memberId],
+          [state.currentRound]: slots,
+        };
+      }
+
       return {
         ...state,
         currentRound: nextRound,
         simulationDate: dayBeforeNext,
         roundComplete: false,
         playerStats: newStats,
+        rosterHistory: updatedHistory,
+        rosters: {}, // Clear rosters for the new round
       };
     }
     case 'ACTIVATE_IR': {
@@ -394,6 +410,7 @@ const EMPTY_MOCK_STATE: MockState = {
   currentLeague: null,
   draftState: null,
   rosters: {},
+  rosterHistory: {},
   simulationDate: '',
   currentRound: 1,
   roundComplete: false,

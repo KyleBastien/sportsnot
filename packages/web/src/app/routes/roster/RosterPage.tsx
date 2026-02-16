@@ -160,6 +160,22 @@ export function RosterPage() {
 
   const { slots, round } = data;
 
+  // Show empty state when no roster exists for this round (e.g. before re-draft)
+  if (slots.length === 0) {
+    return (
+      <Container size="md" py="xl">
+        <Stack gap="lg" align="center">
+          <Title order={2}>My Roster</Title>
+          <Text c="dimmed">Round {round}</Text>
+          <Alert color="blue" title="No Roster Yet">
+            Your roster for Round {round} has not been set yet. Waiting for the
+            draft to begin.
+          </Alert>
+        </Stack>
+      </Container>
+    );
+  }
+
   // Group slots by position
   const groupedSlots = POSITION_ORDER.map((pos) => ({
     position: pos,
