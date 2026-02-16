@@ -1,5 +1,9 @@
 import { describe, it, expect } from '@rstest/core';
-import { calculateRoundMemberPoints, calculateMemberPoints } from './utils';
+import {
+  calculateRoundMemberPoints,
+  calculateMemberPoints,
+  sortMembersForReDraft,
+} from './utils';
 
 // We test calculateMemberPoints using the real fixture data loaded
 // by the shared utility. To keep tests deterministic, we construct
@@ -235,5 +239,92 @@ describe('calculateMemberPoints', () => {
       0
     );
     expect(result.totalPoints).toBe(roundPointsSum);
+  });
+});
+
+describe('sortMembersForReDraft', () => {
+  const makeMember = (team_name: string, total_points: number) => ({
+    id: `id-${team_name}`,
+    user_id: `user-${team_name}`,
+    team_name,
+    total_points,
+  });
+
+  it('should sort members by total_points ascending (worst first)', () => {
+    const members = [
+      makeMember('Alpha', 30),
+      makeMember('Bravo', 10),
+      makeMember('Charlie', 20),
+    ];
+    const sorted = sortMembersForReDraft(members);
+    expect(sorted.map((m) => m.team_name)).toEqual([
+      'Bravo',
+      'Charlie',
+      'Alpha',
+    ]);
+  });
+
+  it('should break ties by team_name alphabetically', () => {
+    const members = [
+      makeMember('Zebra', 10),
+      makeMember('Alpha', 10),
+      makeMember('Mango', 10),
+    ];
+    const sorted = sortMembersForReDraft(members);
+    expect(sorted.map((m) => m.team_name)).toEqual(['Alpha', 'Mango', 'Zebra']);
+  });
+
+  it('should handle mixed ties and different points', () => {
+    const members = [
+      makeMember('Delta', 20),
+      makeMember('Alpha', 20),
+      makeMember('Charlie', 10),
+      makeMember('Bravo', 30),
+    ];
+    const sorted = sortMembersForReDraft(members);
+    expect(sorted.map((m) => m.team_name)).toEqual([
+      'Charlie',
+      'Alpha',
+      'Delta',
+      'Bravo',
+    ]);
+  });
+
+  it('should treat null/undefined total_points as 0', () => {
+    const members = [
+      { id: '1', user_id: 'u1', team_name: 'A', total_points: 5 },
+      {
+        id: '2',
+        user_id: 'u2',
+        team_name: 'B',
+        total_points: null as unknown as number,
+      },
+      {
+        id: '3',
+        user_id: 'u3',
+        team_name: 'C',
+        total_points: undefined as unknown as number,
+      },
+    ];
+    const sorted = sortMembersForReDraft(members);
+    expect(sorted.map((m) => m.team_name)).toEqual(['B', 'C', 'A']);
+  });
+
+  it('should not mutate the original array', () => {
+    const members = [makeMember('B', 20), makeMember('A', 10)];
+    const original = [...members];
+    sortMembersForReDraft(members);
+    expect(members[0].team_name).toBe(original[0].team_name);
+    expect(members[1].team_name).toBe(original[1].team_name);
+  });
+
+  it('should return empty array for empty input', () => {
+    expect(sortMembersForReDraft([])).toEqual([]);
+  });
+
+  it('should handle single member', () => {
+    const members = [makeMember('Solo', 42)];
+    const sorted = sortMembersForReDraft(members);
+    expect(sorted).toEqual(members);
   });
 });

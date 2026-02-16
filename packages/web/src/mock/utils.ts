@@ -145,3 +145,17 @@ export function calculateMemberPoints(
     roundPoints: roundPts,
   };
 }
+
+/**
+ * Sort members for re-draft order: fewest cumulative points picks first.
+ * Ties broken by team_name alphabetically (A first).
+ */
+export function sortMembersForReDraft<
+  T extends { total_points?: number | null; team_name: string },
+>(members: T[]): T[] {
+  return [...members].sort((a, b) => {
+    const ptsDiff = (a.total_points ?? 0) - (b.total_points ?? 0);
+    if (ptsDiff !== 0) return ptsDiff;
+    return a.team_name.localeCompare(b.team_name);
+  });
+}

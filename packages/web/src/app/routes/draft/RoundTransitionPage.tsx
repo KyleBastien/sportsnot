@@ -23,6 +23,7 @@ import {
   useMockCompletedDrafts,
   useMockStartReDraft,
 } from '../../../mock/hooks/useMockDraft';
+import { sortMembersForReDraft } from '../../../mock/utils';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -106,10 +107,9 @@ export function RoundTransitionPage() {
   );
   const nextRound = deriveNextRound(league?.current_round, completedCount);
 
-  // Sort members by points (worst to best for re-draft order)
-  const sortedMembers = [...(league?.league_members ?? [])].sort(
-    (a: TransitionMemberRow, b: TransitionMemberRow) =>
-      (a.total_points ?? 0) - (b.total_points ?? 0)
+  // Sort members by points (worst to best for re-draft order), tiebreak by team name
+  const sortedMembers = sortMembersForReDraft(
+    (league?.league_members ?? []) as TransitionMemberRow[]
   );
 
   const handleStartReDraft = async () => {
@@ -195,11 +195,10 @@ export function RoundTransitionPage() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {[...(league.league_members ?? [])]
-                  .sort(
-                    (a: TransitionMemberRow, b: TransitionMemberRow) =>
-                      (b.total_points ?? 0) - (a.total_points ?? 0)
-                  )
+                {sortMembersForReDraft(
+                  (league.league_members ?? []) as TransitionMemberRow[]
+                )
+                  .reverse()
                   .map((m: TransitionMemberRow, index: number) => (
                     <Table.Tr key={m.id}>
                       <Table.Td>
