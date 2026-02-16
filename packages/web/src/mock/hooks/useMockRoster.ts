@@ -8,6 +8,8 @@ import {
   gamesScf,
 } from '@sportsnot/mock-data';
 import type { NHLPlayerStats, NHLGame } from '@sportsnot/types';
+import { getEliminatedAbbreviations } from './useMockNhlApi';
+import { isSlotEliminated } from '../utils';
 
 // ── Mock TanStack helpers (same pattern as useMockDraft) ────────────────
 interface MockQueryResult<T> {
@@ -136,22 +138,36 @@ export function useMockRoster(leagueId: string | undefined) {
 
   const memberSlots = state.rosters[member.id] ?? [];
 
+  // For Round 4, determine which slots are eliminated
+  const eliminatedAbbrs =
+    state.currentRound === 4
+      ? getEliminatedAbbreviations(4)
+      : new Set<string>();
+
   // Map to Supabase snake_case and compute points_earned through simulationDate
-  const slots = memberSlots.map((slot) => ({
-    id: slot.id,
-    league_member_id: slot.leagueMemberId,
-    round: slot.round,
-    player_id: slot.playerId ?? null,
-    team_id: slot.teamId ?? null,
-    position: slot.position,
-    is_active: slot.isActive,
-    points_earned: slot.playerId
-      ? calculatePlayerPoints(slot.playerId, state.simulationDate)
-      : slot.teamId
-        ? calculateGoaliePoints(slot.teamId, state.simulationDate)
-        : 0,
-    activated_from_ir: slot.activatedFromIr,
-  }));
+  const slots = memberSlots.map((slot) => {
+    const eliminated =
+      state.currentRound === 4 && isSlotEliminated(slot, eliminatedAbbrs);
+
+    return {
+      id: slot.id,
+      league_member_id: slot.leagueMemberId,
+      round: slot.round,
+      player_id: slot.playerId ?? null,
+      team_id: slot.teamId ?? null,
+      position: slot.position,
+      is_active: slot.isActive,
+      points_earned: eliminated
+        ? 0
+        : slot.playerId
+          ? calculatePlayerPoints(slot.playerId, state.simulationDate)
+          : slot.teamId
+            ? calculateGoaliePoints(slot.teamId, state.simulationDate)
+            : 0,
+      activated_from_ir: slot.activatedFromIr,
+      is_eliminated: eliminated,
+    };
+  });
 
   return makeMockQuery({
     memberId: member.id,
@@ -174,29 +190,42 @@ export function useMockLeagueRosters(leagueId: string | undefined) {
     return makeMockQuery([]);
   }
 
+  const eliminatedAbbrs =
+    state.currentRound === 4
+      ? getEliminatedAbbreviations(4)
+      : new Set<string>();
+
   const allRosters = league.members.flatMap((member) => {
     const memberSlots = state.rosters[member.id] ?? [];
-    return memberSlots.map((slot) => ({
-      id: slot.id,
-      league_member_id: slot.leagueMemberId,
-      round: slot.round,
-      player_id: slot.playerId ?? null,
-      team_id: slot.teamId ?? null,
-      position: slot.position,
-      is_active: slot.isActive,
-      points_earned: slot.playerId
-        ? calculatePlayerPoints(slot.playerId, state.simulationDate)
-        : slot.teamId
-          ? calculateGoaliePoints(slot.teamId, state.simulationDate)
-          : 0,
-      activated_from_ir: slot.activatedFromIr,
-      league_members: {
-        id: member.id,
-        user_id: member.userId,
-        team_name: member.teamName,
-        league_id: leagueId,
-      },
-    }));
+    return memberSlots.map((slot) => {
+      const eliminated =
+        state.currentRound === 4 && isSlotEliminated(slot, eliminatedAbbrs);
+
+      return {
+        id: slot.id,
+        league_member_id: slot.leagueMemberId,
+        round: slot.round,
+        player_id: slot.playerId ?? null,
+        team_id: slot.teamId ?? null,
+        position: slot.position,
+        is_active: slot.isActive,
+        points_earned: eliminated
+          ? 0
+          : slot.playerId
+            ? calculatePlayerPoints(slot.playerId, state.simulationDate)
+            : slot.teamId
+              ? calculateGoaliePoints(slot.teamId, state.simulationDate)
+              : 0,
+        activated_from_ir: slot.activatedFromIr,
+        is_eliminated: eliminated,
+        league_members: {
+          id: member.id,
+          user_id: member.userId,
+          team_name: member.teamName,
+          league_id: leagueId,
+        },
+      };
+    });
   });
 
   return makeMockQuery(allRosters);

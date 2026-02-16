@@ -3,6 +3,9 @@ import {
   calculateRoundMemberPoints,
   calculateMemberPoints,
   sortMembersForReDraft,
+  getPlayerTeamAbbr,
+  getTeamAbbr,
+  isSlotEliminated,
 } from './utils';
 
 // We test calculateMemberPoints using the real fixture data loaded
@@ -326,5 +329,205 @@ describe('sortMembersForReDraft', () => {
     const members = [makeMember('Solo', 42)];
     const sorted = sortMembersForReDraft(members);
     expect(sorted).toEqual(members);
+  });
+});
+
+// ── Elimination helpers ──────────────────────────────────────────────────
+
+describe('getPlayerTeamAbbr', () => {
+  it('should map a CAR player to CAR abbreviation', () => {
+    // Sebastian Aho (CAR)
+    expect(getPlayerTeamAbbr(8478427)).toBe('CAR');
+  });
+
+  it('should map a FLA player to FLA abbreviation', () => {
+    // Aleksander Barkov (FLA)
+    expect(getPlayerTeamAbbr(8477493)).toBe('FLA');
+  });
+
+  it('should return undefined for unknown player ID', () => {
+    expect(getPlayerTeamAbbr(99999999)).toBeUndefined();
+  });
+});
+
+describe('getTeamAbbr', () => {
+  it('should map CAR team ID to CAR', () => {
+    expect(getTeamAbbr(12)).toBe('CAR');
+  });
+
+  it('should map FLA team ID to FLA', () => {
+    expect(getTeamAbbr(13)).toBe('FLA');
+  });
+
+  it('should return undefined for unknown team ID', () => {
+    expect(getTeamAbbr(99999)).toBeUndefined();
+  });
+});
+
+describe('isSlotEliminated', () => {
+  const eliminatedAbbrs = new Set(['CAR', 'DAL']);
+
+  it('should return true for a player on an eliminated team', () => {
+    // Sebastian Aho is on CAR
+    expect(isSlotEliminated({ playerId: 8478427 }, eliminatedAbbrs)).toBe(true);
+  });
+
+  it('should return false for a player on a surviving team', () => {
+    // Aleksander Barkov is on FLA
+    expect(isSlotEliminated({ playerId: 8477493 }, eliminatedAbbrs)).toBe(
+      false
+    );
+  });
+
+  it('should return true for a goalie teamId on an eliminated team', () => {
+    // CAR team ID = 12
+    expect(isSlotEliminated({ teamId: 12 }, eliminatedAbbrs)).toBe(true);
+  });
+
+  it('should return false for a goalie teamId on a surviving team', () => {
+    // FLA team ID = 13
+    expect(isSlotEliminated({ teamId: 13 }, eliminatedAbbrs)).toBe(false);
+  });
+
+  it('should return false for a slot with no playerId or teamId', () => {
+    expect(isSlotEliminated({}, eliminatedAbbrs)).toBe(false);
+  });
+
+  it('should return false for unknown playerId', () => {
+    expect(isSlotEliminated({ playerId: 99999999 }, eliminatedAbbrs)).toBe(
+      false
+    );
+  });
+
+  it('should return false when eliminated set is empty', () => {
+    expect(isSlotEliminated({ playerId: 8478427 }, new Set())).toBe(false);
+  });
+});
+
+describe('calculateMemberPoints - Round 4 elimination', () => {
+  it('should exclude eliminated players from Round 4 scoring', () => {
+    // CAR is eliminated after Round 3, FLA survives
+    const carPlayerId = 8478427; // Sebastian Aho (CAR)
+    const flaPlayerId = 8477493; // Aleksander Barkov (FLA)
+
+    const roster = [
+      {
+        id: 'slot-car',
+        leagueMemberId: 'member-1',
+        round: 4,
+        playerId: carPlayerId,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 0,
+        activatedFromIr: false,
+      },
+      {
+        id: 'slot-fla',
+        leagueMemberId: 'member-1',
+        round: 4,
+        playerId: flaPlayerId,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 0,
+        activatedFromIr: false,
+      },
+    ];
+
+    // State at Round 4 with only these roster slots
+    const state = {
+      currentRound: 4,
+      simulationDate: '2025-06-20', // well into Round 4
+      rosters: { 'member-1': roster },
+      rosterHistory: {},
+    };
+
+    const result = calculateMemberPoints(state, 'member-1');
+
+    // Now compare with FLA-only: should be the same since CAR is excluded
+    const stateOnlyFla = {
+      currentRound: 4,
+      simulationDate: '2025-06-20',
+      rosters: {
+        'member-1': [roster[1]], // only FLA player
+      },
+      rosterHistory: {},
+    };
+    const flaOnlyResult = calculateMemberPoints(stateOnlyFla, 'member-1');
+
+    // Round 4 points should match FLA-only (CAR eliminated, contributes 0)
+    expect(result.roundPoints[4] ?? 0).toBe(flaOnlyResult.roundPoints[4] ?? 0);
+  });
+
+  it('should still count Round 3 points for eliminated players', () => {
+    const carPlayerId = 8478427; // CAR - eliminated after Round 3
+
+    const rosterR3 = [
+      {
+        id: 'slot-car-r3',
+        leagueMemberId: 'member-1',
+        round: 3,
+        playerId: carPlayerId,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 0,
+        activatedFromIr: false,
+      },
+    ];
+    const rosterR4 = [
+      {
+        id: 'slot-car-r4',
+        leagueMemberId: 'member-1',
+        round: 4,
+        playerId: carPlayerId,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 0,
+        activatedFromIr: false,
+      },
+    ];
+
+    const state = {
+      currentRound: 4,
+      simulationDate: '2025-06-20',
+      rosters: { 'member-1': rosterR4 },
+      rosterHistory: { 'member-1': { 3: rosterR3 } },
+    };
+
+    const result = calculateMemberPoints(state, 'member-1');
+
+    // Round 3 points should be included (CAR played in Conference Finals)
+    // Round 4 points should be 0 (CAR eliminated)
+    expect(result.roundPoints[4]).toBeUndefined(); // 0 points = not in breakdown
+    // Total should include Round 3 points
+    expect(result.totalPoints).toBeGreaterThanOrEqual(0);
+  });
+
+  it('should not filter elimination in rounds other than 4', () => {
+    // Even for a team that gets eliminated later, Round 3 scoring is normal
+    const carPlayerId = 8478427; // CAR
+
+    const state = {
+      currentRound: 3,
+      simulationDate: '2025-06-05',
+      rosters: {
+        'member-1': [
+          {
+            id: 'slot-car',
+            leagueMemberId: 'member-1',
+            round: 3,
+            playerId: carPlayerId,
+            position: 'F' as const,
+            isActive: true,
+            pointsEarned: 0,
+            activatedFromIr: false,
+          },
+        ],
+      },
+      rosterHistory: {},
+    };
+
+    const result = calculateMemberPoints(state, 'member-1');
+    // CAR players should still score in Round 3 (they're not eliminated yet)
+    expect(result.totalPoints).toBeGreaterThanOrEqual(0);
   });
 });

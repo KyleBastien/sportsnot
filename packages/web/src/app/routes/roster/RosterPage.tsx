@@ -50,6 +50,7 @@ interface RosterSlotRow {
   is_active: boolean;
   points_earned: number;
   activated_from_ir: boolean;
+  is_eliminated?: boolean;
 }
 
 function useMyRoster(leagueId: string) {
@@ -90,7 +91,11 @@ function useMyRoster(leagueId: string) {
       return {
         memberId: member.id,
         round: league.current_round,
-        slots: roster ?? [],
+        // Live mode: is_eliminated defaults to false (TODO: derive from team_stats_cache)
+        slots: (roster ?? []).map((s: RosterSlotRow) => ({
+          ...s,
+          is_eliminated: s.is_eliminated ?? false,
+        })),
       };
     },
     enabled: !IS_MOCK && !!user,
@@ -123,13 +128,27 @@ export function RosterPage() {
   // Fetch player/team stats for name resolution
   const currentSeason = '20242025';
   const currentRound = data?.round ?? 1;
-  const mockPlayerResult = useMockPlayoffPlayers(currentSeason, currentRound);
-  const supabasePlayerResult = usePlayoffPlayers(currentSeason, currentRound);
+  // For Round 4, use Round 3 stats so eliminated players' names are still resolved
+  const nameResolutionRound = currentRound >= 4 ? 3 : currentRound;
+  const mockPlayerResult = useMockPlayoffPlayers(
+    currentSeason,
+    nameResolutionRound
+  );
+  const supabasePlayerResult = usePlayoffPlayers(
+    currentSeason,
+    nameResolutionRound
+  );
   const { data: playerStats } = IS_MOCK
     ? mockPlayerResult
     : supabasePlayerResult;
-  const mockTeamResult = useMockPlayoffTeams(currentSeason, currentRound);
-  const supabaseTeamResult = usePlayoffTeams(currentSeason, currentRound);
+  const mockTeamResult = useMockPlayoffTeams(
+    currentSeason,
+    nameResolutionRound
+  );
+  const supabaseTeamResult = usePlayoffTeams(
+    currentSeason,
+    nameResolutionRound
+  );
   const { data: teamStats } = IS_MOCK ? mockTeamResult : supabaseTeamResult;
 
   const playerNameMap = useMemo(
@@ -296,15 +315,27 @@ export function RosterPage() {
                       return (
                         <Table.Tr key={slot.id}>
                           <Table.Td>
-                            {resolvePickName(
-                              slot.player_id,
-                              slot.team_id,
-                              playerNameMap,
-                              teamNameMap
-                            )}
+                            <span
+                              style={
+                                slot.is_eliminated
+                                  ? { textDecoration: 'line-through' }
+                                  : undefined
+                              }
+                            >
+                              {resolvePickName(
+                                slot.player_id,
+                                slot.team_id,
+                                playerNameMap,
+                                teamNameMap
+                              )}
+                            </span>
                           </Table.Td>
                           <Table.Td>
-                            {slot.is_active ? (
+                            {slot.is_eliminated ? (
+                              <Badge color="red" size="sm">
+                                Eliminated
+                              </Badge>
+                            ) : slot.is_active ? (
                               <Badge color="green" size="sm">
                                 Active
                               </Badge>
