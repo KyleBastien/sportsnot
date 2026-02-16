@@ -1,6 +1,6 @@
 import type { NHLPlayerStats } from '@sportsnot/types';
 
-export const playerGameLogs = {
+export const playerGameLogs: Record<string, readonly NHLPlayerStats[]> = {
   "8470594": [
     {
       "gameId": 2024030175,

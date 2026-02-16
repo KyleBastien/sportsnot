@@ -29,7 +29,10 @@ export async function mockGetTeamRoster(
 
   _season: string
 ): Promise<NHLPlayer[]> {
-  return [...(players[teamAbbreviation] ?? [])];
+  return [
+    ...((players as Record<string, readonly NHLPlayer[]>)[teamAbbreviation] ??
+      []),
+  ];
 }
 
 export async function mockGetPlayer(playerId: number): Promise<NHLPlayer> {
