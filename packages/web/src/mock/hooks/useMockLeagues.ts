@@ -1,4 +1,5 @@
 import { useMockData, type MockState } from '../MockDataProvider';
+import { calculateMemberPoints } from '../utils';
 import type { LeagueMember, User } from '@sportsnot/types';
 import { players } from '@sportsnot/mock-data';
 
@@ -117,7 +118,7 @@ export function useMockMyLeagues() {
     invite_code: league.inviteCode,
     league_members: league.members.map((m) => ({
       team_name: m.teamName,
-      total_points: m.totalPoints,
+      total_points: calculateMemberPoints(state, m.id).totalPoints,
       user_id: m.userId,
     })),
     memberCount: league.members.length,
@@ -135,10 +136,13 @@ export function useMockLeagues(_userId: string | undefined) {
 
   const data = state.leagues.map((league) => {
     const myMember = league.members.find((m) => m.userId === state.mockUser.id);
+    const pts = myMember
+      ? calculateMemberPoints(state, myMember.id).totalPoints
+      : 0;
     return {
       id: myMember?.id ?? league.id,
       team_name: myMember?.teamName ?? 'My Team',
-      total_points: myMember?.totalPoints ?? 0,
+      total_points: pts,
       leagues: {
         id: league.id,
         name: league.name,
@@ -180,7 +184,7 @@ export function useMockLeague(leagueId: string | undefined) {
           id: m.id,
           user_id: m.userId,
           team_name: m.teamName,
-          total_points: m.totalPoints,
+          total_points: calculateMemberPoints(state, m.id).totalPoints,
           users: m.user
             ? {
                 display_name: m.user.displayName,
