@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
+import { useRoundComplete } from '../../hooks/useRoundComplete';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -72,6 +73,14 @@ export function LeagueDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuthContext();
   const { data: league, isLoading, error } = useLeague(leagueId!);
+
+  // Must be called unconditionally (rules of hooks)
+  const currentRound = league?.current_round ?? 0;
+  const {
+    roundComplete,
+    seasonComplete,
+    isLoading: roundStatusLoading,
+  } = useRoundComplete(currentRound);
 
   if (isLoading) {
     return (
@@ -154,13 +163,20 @@ export function LeagueDashboardPage() {
                 >
                   Standings
                 </Button>
-                {isCommissioner && (
-                  <Button
-                    color="green"
-                    onClick={() => navigate(`/draft/${leagueId}/transition`)}
+                {isCommissioner && !seasonComplete && (
+                  <Tooltip
+                    label="All series in the current round must be complete"
+                    disabled={roundComplete}
                   >
-                    Next Round
-                  </Button>
+                    <Button
+                      color="green"
+                      onClick={() => navigate(`/draft/${leagueId}/transition`)}
+                      disabled={!roundComplete || roundStatusLoading}
+                      loading={roundStatusLoading}
+                    >
+                      Next Round
+                    </Button>
+                  </Tooltip>
                 )}
               </>
             )}

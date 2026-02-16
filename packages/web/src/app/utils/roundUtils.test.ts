@@ -1,5 +1,27 @@
 import { describe, it, expect } from '@rstest/core';
-import { deriveCurrentRound, deriveNextRound } from './roundUtils';
+import {
+  deriveCurrentRound,
+  deriveNextRound,
+  isAllSeriesComplete,
+} from './roundUtils';
+import type { NHLPlayoffSeries } from '@sportsnot/types';
+
+/** Helper to create a minimal series object for testing */
+function makeSeries(
+  round: number,
+  topWins: number,
+  bottomWins: number
+): NHLPlayoffSeries {
+  return {
+    seriesCode: `R${round}-${topWins}-${bottomWins}`,
+    round,
+    topSeedTeam: { id: 1, name: 'Team A' },
+    bottomSeedTeam: { id: 2, name: 'Team B' },
+    topSeedWins: topWins,
+    bottomSeedWins: bottomWins,
+    isComplete: topWins === 4 || bottomWins === 4,
+  };
+}
 
 describe('roundUtils', () => {
   describe('deriveCurrentRound', () => {
@@ -50,6 +72,56 @@ describe('roundUtils', () => {
 
     it('should return 1 when no drafts have been completed (initial state)', () => {
       expect(deriveNextRound(0, 0)).toBe(1);
+    });
+  });
+
+  describe('isAllSeriesComplete', () => {
+    it('should return false when there are no series for the round', () => {
+      expect(isAllSeriesComplete([], 1)).toBe(false);
+    });
+
+    it('should return false when no series match the given round', () => {
+      const series = [makeSeries(2, 4, 1)];
+      expect(isAllSeriesComplete(series, 1)).toBe(false);
+    });
+
+    it('should return true when all series in the round are complete', () => {
+      const series = [
+        makeSeries(1, 4, 2),
+        makeSeries(1, 1, 4),
+        makeSeries(1, 4, 3),
+        makeSeries(1, 4, 0),
+      ];
+      expect(isAllSeriesComplete(series, 1)).toBe(true);
+    });
+
+    it('should return false when some series in the round are still in progress', () => {
+      const series = [
+        makeSeries(1, 4, 2),
+        makeSeries(1, 3, 2), // not complete
+        makeSeries(1, 4, 3),
+      ];
+      expect(isAllSeriesComplete(series, 1)).toBe(false);
+    });
+
+    it('should only check series for the specified round', () => {
+      const series = [
+        makeSeries(1, 4, 2),
+        makeSeries(1, 4, 1),
+        makeSeries(2, 2, 1), // round 2, not complete — should not affect round 1 check
+      ];
+      expect(isAllSeriesComplete(series, 1)).toBe(true);
+      expect(isAllSeriesComplete(series, 2)).toBe(false);
+    });
+
+    it('should handle round 4 (Stanley Cup Final) with a single series', () => {
+      const series = [makeSeries(4, 4, 3)];
+      expect(isAllSeriesComplete(series, 4)).toBe(true);
+    });
+
+    it('should return false for round 4 when final is still in progress', () => {
+      const series = [makeSeries(4, 3, 3)];
+      expect(isAllSeriesComplete(series, 4)).toBe(false);
     });
   });
 });
