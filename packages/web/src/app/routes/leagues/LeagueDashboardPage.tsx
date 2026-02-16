@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
+import { useMockData } from '../../../mock/MockDataProvider';
 import { useRoundComplete } from '../../hooks/useRoundComplete';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
@@ -72,6 +73,7 @@ export function LeagueDashboardPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const navigate = useNavigate();
   const { user } = useAuthContext();
+  const { dispatch } = useMockData();
   const { data: league, isLoading, error } = useLeague(leagueId!);
 
   // Must be called unconditionally (rules of hooks)
@@ -106,6 +108,19 @@ export function LeagueDashboardPage() {
     (a: LeagueMemberRow, b: LeagueMemberRow) =>
       (b.total_points ?? 0) - (a.total_points ?? 0)
   );
+
+  const handleStartNextDraft = async () => {
+    if (!leagueId) return;
+    if (IS_MOCK) {
+      dispatch({ type: 'START_NEXT_DRAFT', payload: { leagueId } });
+    } else {
+      await supabase
+        .from('leagues')
+        .update({ status: 'drafting' })
+        .eq('id', leagueId);
+    }
+    navigate(`/draft/${leagueId}/transition`);
+  };
 
   return (
     <Container size="lg" py="xl">
@@ -170,11 +185,11 @@ export function LeagueDashboardPage() {
                   >
                     <Button
                       color="green"
-                      onClick={() => navigate(`/draft/${leagueId}/transition`)}
+                      onClick={handleStartNextDraft}
                       disabled={!roundComplete || roundStatusLoading}
                       loading={roundStatusLoading}
                     >
-                      Next Round
+                      Start Next Draft
                     </Button>
                   </Tooltip>
                 )}

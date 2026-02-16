@@ -132,7 +132,7 @@ function addOneDay(dateStr: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-function getInitialState(): MockState {
+export function getInitialState(): MockState {
   return {
     leagues: [],
     currentLeague: null,
@@ -163,13 +163,17 @@ export type MockAction =
       payload: { leagueMemberId: string; slotId: string };
     }
   | {
+      type: 'START_NEXT_DRAFT';
+      payload: { leagueId: string };
+    }
+  | {
       type: 'START_RE_DRAFT';
       payload: { leagueId: string; draftState: MockDraftState };
     }
   | { type: 'RESET_ALL' };
 
 // ── Reducer ────────────────────────────────────────────────────────────
-function mockReducer(state: MockState, action: MockAction): MockState {
+export function mockReducer(state: MockState, action: MockAction): MockState {
   switch (action.type) {
     case 'RESET_ALL':
       return getInitialState();
@@ -354,6 +358,13 @@ function mockReducer(state: MockState, action: MockAction): MockState {
         rosters: {}, // Clear rosters for the new round
       };
     }
+    case 'START_NEXT_DRAFT': {
+      const { leagueId } = action.payload;
+      const updatedLeagues = state.leagues.map((l) =>
+        l.id === leagueId ? { ...l, status: 'drafting' as const } : l
+      );
+      return { ...state, leagues: updatedLeagues };
+    }
     case 'START_RE_DRAFT': {
       const { leagueId, draftState } = action.payload;
       const updatedLeagues = state.leagues.map((l) =>
@@ -369,7 +380,6 @@ function mockReducer(state: MockState, action: MockAction): MockState {
         ...state,
         draftState,
         leagues: updatedLeagues,
-        currentRound: draftState.draft.round,
       };
     }
     case 'ACTIVATE_IR': {
