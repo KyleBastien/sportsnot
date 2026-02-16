@@ -87,7 +87,7 @@ function greatestNeed(counts: Record<string, number>): {
 export function selectBotPick(
   draftState: MockDraftState,
   botUserId: string
-): { playerId: number; position: string } | null {
+): { playerId: number; position: string; nhlTeamId?: number } | null {
   const counts = countSlots(draftState, botUserId);
   const { slot, playerType } = greatestNeed(counts);
   const available = new Set(draftState.availablePlayerIds);
@@ -108,8 +108,13 @@ export function selectBotPick(
   candidates.sort((a, b) => a.fullName.localeCompare(b.fullName));
 
   const picked = candidates[0];
+  const isGoalie = positionType(picked) === 'Goalie';
 
-  return { playerId: picked.id, position: slot };
+  return {
+    playerId: picked.id,
+    position: slot,
+    nhlTeamId: isGoalie ? picked.currentTeam?.id : undefined,
+  };
 }
 
 /**

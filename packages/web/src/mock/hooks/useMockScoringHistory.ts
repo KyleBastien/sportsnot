@@ -3,12 +3,18 @@ import { SCORING } from '@sportsnot/types';
 import {
   playerGameLogs,
   players,
+  teams,
   gamesR1,
   gamesR2,
   gamesCf,
   gamesScf,
 } from '@sportsnot/mock-data';
-import type { NHLPlayerStats, NHLGame, NHLPlayer } from '@sportsnot/types';
+import type {
+  NHLPlayerStats,
+  NHLGame,
+  NHLPlayer,
+  NHLTeam,
+} from '@sportsnot/types';
 
 // ── Mock TanStack query helper ─────────────────────────────────────────
 interface MockQueryResult<T> {
@@ -63,9 +69,14 @@ const ALL_GAMES: NHLGame[] = [
   ...(gamesScf as unknown as NHLGame[]),
 ];
 
-const GAME_MAP = new Map<number, NHLGame>();
-for (const g of ALL_GAMES) {
-  GAME_MAP.set(g.id, g);
+// ── Team info lookup ────────────────────────────────────────────────────
+const allTeams = teams as unknown as NHLTeam[];
+
+function getTeamInfo(
+  teamId: number
+): { name: string; abbreviation: string } | null {
+  const t = allTeams.find((team) => team.id === teamId);
+  return t ? { name: t.name, abbreviation: t.abbreviation } : null;
 }
 
 // ── ScoringEvent interface (matches ScoringHistoryPage.tsx) ────────────
@@ -94,9 +105,10 @@ export function useMockScoringHistory(leagueId: string) {
 
   for (const member of league.members) {
     const roster = state.rosters[member.id] ?? [];
-    const activePlayers = roster.filter((s) => s.isActive && s.playerId);
 
-    for (const slot of activePlayers) {
+    // Process skater slots (those with playerId)
+    const skaterSlots = roster.filter((s) => s.isActive && s.playerId);
+    for (const slot of skaterSlots) {
       const playerId = slot.playerId!;
       const info = getPlayerInfo(playerId);
       if (!info) continue;
@@ -106,62 +118,75 @@ export function useMockScoringHistory(leagueId: string) {
       for (const entry of entries) {
         if (entry.gameDate > state.simulationDate) continue;
 
-        if (info.isGoalie) {
-          // Goalie scoring events: win or shutout
-          const game = GAME_MAP.get(entry.gameId);
-          if (game) {
-            const isHome = game.homeTeam.abbreviation === entry.teamAbbrev;
-            const teamScore = isHome
-              ? (game.homeTeam.score ?? 0)
-              : (game.awayTeam.score ?? 0);
-            const oppScore = isHome
-              ? (game.awayTeam.score ?? 0)
-              : (game.homeTeam.score ?? 0);
-            if (teamScore > oppScore) {
-              if (oppScore === 0) {
-                events.push({
-                  id: `${entry.gameId}-${playerId}-shutout`,
-                  player_name: info.name,
-                  team_abbreviation: info.teamAbbrev,
-                  event_type: 'shutout',
-                  points: SCORING.shutout,
-                  game_date: entry.gameDate,
-                  league_member_team: member.teamName,
-                });
-              } else {
-                events.push({
-                  id: `${entry.gameId}-${playerId}-win`,
-                  player_name: info.name,
-                  team_abbreviation: info.teamAbbrev,
-                  event_type: 'win',
-                  points: SCORING.win,
-                  game_date: entry.gameDate,
-                  league_member_team: member.teamName,
-                });
-              }
-            }
-          }
-        } else {
-          // Skater scoring events: individual goals and assists
-          for (let i = 0; i < entry.goals; i++) {
+        // Skater scoring events: individual goals and assists
+        for (let i = 0; i < entry.goals; i++) {
+          events.push({
+            id: `${entry.gameId}-${playerId}-goal-${i}`,
+            player_name: info.name,
+            team_abbreviation: info.teamAbbrev,
+            event_type: 'goal',
+            points: SCORING.goal,
+            game_date: entry.gameDate,
+            league_member_team: member.teamName,
+          });
+        }
+        for (let i = 0; i < entry.assists; i++) {
+          events.push({
+            id: `${entry.gameId}-${playerId}-assist-${i}`,
+            player_name: info.name,
+            team_abbreviation: info.teamAbbrev,
+            event_type: 'assist',
+            points: SCORING.assist,
+            game_date: entry.gameDate,
+            league_member_team: member.teamName,
+          });
+        }
+      }
+    }
+
+    // Process goalie slots (those with teamId, representing team goaltending)
+    const goalieSlots = roster.filter(
+      (s) => s.isActive && s.teamId && !s.playerId
+    );
+    for (const slot of goalieSlots) {
+      const teamId = slot.teamId!;
+      const teamInfo = getTeamInfo(teamId);
+      const teamName = teamInfo?.name ?? `Team #${teamId}`;
+      const teamAbbrev = teamInfo?.abbreviation ?? '';
+
+      for (const game of ALL_GAMES) {
+        if (game.gameDate > state.simulationDate) continue;
+
+        const isHome = game.homeTeam.id === teamId;
+        const isAway = game.awayTeam.id === teamId;
+        if (!isHome && !isAway) continue;
+
+        const teamScore = isHome
+          ? (game.homeTeam.score ?? 0)
+          : (game.awayTeam.score ?? 0);
+        const oppScore = isHome
+          ? (game.awayTeam.score ?? 0)
+          : (game.homeTeam.score ?? 0);
+
+        if (teamScore > oppScore) {
+          if (oppScore === 0) {
             events.push({
-              id: `${entry.gameId}-${playerId}-goal-${i}`,
-              player_name: info.name,
-              team_abbreviation: info.teamAbbrev,
-              event_type: 'goal',
-              points: SCORING.goal,
-              game_date: entry.gameDate,
+              id: `${game.id}-${teamId}-shutout`,
+              player_name: teamName,
+              team_abbreviation: teamAbbrev,
+              event_type: 'shutout',
+              points: SCORING.shutout,
+              game_date: game.gameDate,
               league_member_team: member.teamName,
             });
-          }
-          for (let i = 0; i < entry.assists; i++) {
+          } else {
             events.push({
-              id: `${entry.gameId}-${playerId}-assist-${i}`,
-              player_name: info.name,
-              team_abbreviation: info.teamAbbrev,
-              event_type: 'assist',
-              points: SCORING.assist,
-              game_date: entry.gameDate,
+              id: `${game.id}-${teamId}-win`,
+              player_name: teamName,
+              team_abbreviation: teamAbbrev,
+              event_type: 'win',
+              points: SCORING.win,
+              game_date: game.gameDate,
               league_member_team: member.teamName,
             });
           }

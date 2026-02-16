@@ -79,6 +79,20 @@ export function calculateGoaliePoints(stats: TeamStats): number {
 }
 
 /**
+ * Determine goalie points for a single game based on scores.
+ * Returns SCORING.shutout if team won and opponent scored 0,
+ * SCORING.win if team won, or 0 otherwise.
+ * Shutout replaces win points (not additive).
+ */
+export function calculateGoalieGamePoints(
+  teamScore: number,
+  opponentScore: number
+): number {
+  if (teamScore <= opponentScore) return 0;
+  return opponentScore === 0 ? SCORING.shutout : SCORING.win;
+}
+
+/**
  * Generate snake draft order for a given number of participants
  * @param participantIds Array of participant IDs in initial order
  * @param totalPicks Total number of picks per participant

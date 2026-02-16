@@ -2,6 +2,7 @@ import { describe, it, expect } from '@rstest/core';
 import {
   calculatePlayerPoints,
   calculateGoaliePoints,
+  calculateGoalieGamePoints,
   generateSnakeDraftOrder,
   generateReDraftOrder,
   shuffleArray,
@@ -439,5 +440,65 @@ describe('Draft Complete screen logic', () => {
       resolvePickName(p.player_id, p.team_id, playerMap, teamMap)
     );
     expect(resolved).toEqual(['Unknown Player', 'Unknown Team']);
+  });
+});
+
+describe('calculateGoalieGamePoints', () => {
+  it('should return 2 points for a regular win', () => {
+    expect(calculateGoalieGamePoints(3, 1)).toBe(2);
+  });
+
+  it('should return 4 points for a shutout (opponent scores 0)', () => {
+    expect(calculateGoalieGamePoints(2, 0)).toBe(4);
+  });
+
+  it('should return 0 for a loss', () => {
+    expect(calculateGoalieGamePoints(1, 3)).toBe(0);
+  });
+
+  it('should return 0 for a tie', () => {
+    expect(calculateGoalieGamePoints(2, 2)).toBe(0);
+  });
+
+  it('should not be additive: shutout replaces win (4 not 6)', () => {
+    // A shutout is 4 points, not 4 + 2
+    expect(calculateGoalieGamePoints(3, 0)).toBe(4);
+  });
+
+  it('should award 2 points for a 1-goal win margin', () => {
+    expect(calculateGoalieGamePoints(2, 1)).toBe(2);
+  });
+
+  it('should correctly tally multiple games for a team', () => {
+    // Simulate a team with 4 wins (3 regular + 1 shutout) and 3 losses
+    const games = [
+      { teamScore: 3, oppScore: 1 }, // win: 2pts
+      { teamScore: 4, oppScore: 2 }, // win: 2pts
+      { teamScore: 1, oppScore: 3 }, // loss: 0pts
+      { teamScore: 2, oppScore: 0 }, // shutout: 4pts
+      { teamScore: 5, oppScore: 3 }, // win: 2pts
+      { teamScore: 0, oppScore: 2 }, // loss: 0pts
+      { teamScore: 1, oppScore: 4 }, // loss: 0pts
+    ];
+    const totalPoints = games.reduce(
+      (sum, g) => sum + calculateGoalieGamePoints(g.teamScore, g.oppScore),
+      0
+    );
+    // 3 regular wins * 2 + 1 shutout * 4 = 10
+    expect(totalPoints).toBe(10);
+  });
+
+  it('Oilers scenario: 4 wins with 0 shutouts = 8 goalie points', () => {
+    const games = [
+      { teamScore: 3, oppScore: 2 }, // win: 2pts
+      { teamScore: 4, oppScore: 1 }, // win: 2pts
+      { teamScore: 2, oppScore: 1 }, // win: 2pts
+      { teamScore: 5, oppScore: 3 }, // win: 2pts
+    ];
+    const totalPoints = games.reduce(
+      (sum, g) => sum + calculateGoalieGamePoints(g.teamScore, g.oppScore),
+      0
+    );
+    expect(totalPoints).toBe(8);
   });
 });

@@ -1,7 +1,13 @@
 import { useMockData } from '../MockDataProvider';
 import { SCORING } from '@sportsnot/types';
-import { playerGameLogs } from '@sportsnot/mock-data';
-import type { NHLPlayerStats } from '@sportsnot/types';
+import {
+  playerGameLogs,
+  gamesR1,
+  gamesR2,
+  gamesCf,
+  gamesScf,
+} from '@sportsnot/mock-data';
+import type { NHLPlayerStats, NHLGame } from '@sportsnot/types';
 
 // ── Mock TanStack helpers (same pattern as useMockDraft) ────────────────
 interface MockQueryResult<T> {
@@ -59,6 +65,14 @@ function makeMockMutation<TData, TVariables>(
   };
 }
 
+// ── Game data for goalie scoring ────────────────────────────────────────
+const ALL_GAMES: NHLGame[] = [
+  ...(gamesR1 as unknown as NHLGame[]),
+  ...(gamesR2 as unknown as NHLGame[]),
+  ...(gamesCf as unknown as NHLGame[]),
+  ...(gamesScf as unknown as NHLGame[]),
+];
+
 // ── Points calculation helper ──────────────────────────────────────────
 function calculatePlayerPoints(playerId: number, throughDate: string): number {
   const logs = (playerGameLogs as unknown as Record<number, NHLPlayerStats[]>)[
@@ -71,6 +85,29 @@ function calculatePlayerPoints(playerId: number, throughDate: string): number {
     if (entry.gameDate <= throughDate) {
       points += entry.goals * SCORING.goal;
       points += entry.assists * SCORING.assist;
+    }
+  }
+  return points;
+}
+
+function calculateGoaliePoints(teamId: number, throughDate: string): number {
+  let points = 0;
+  for (const game of ALL_GAMES) {
+    if (game.gameDate > throughDate) continue;
+
+    const isHome = game.homeTeam.id === teamId;
+    const isAway = game.awayTeam.id === teamId;
+    if (!isHome && !isAway) continue;
+
+    const teamScore = isHome
+      ? (game.homeTeam.score ?? 0)
+      : (game.awayTeam.score ?? 0);
+    const oppScore = isHome
+      ? (game.awayTeam.score ?? 0)
+      : (game.homeTeam.score ?? 0);
+
+    if (teamScore > oppScore) {
+      points += oppScore === 0 ? SCORING.shutout : SCORING.win;
     }
   }
   return points;
@@ -110,7 +147,9 @@ export function useMockRoster(leagueId: string | undefined) {
     is_active: slot.isActive,
     points_earned: slot.playerId
       ? calculatePlayerPoints(slot.playerId, state.simulationDate)
-      : 0,
+      : slot.teamId
+        ? calculateGoaliePoints(slot.teamId, state.simulationDate)
+        : 0,
     activated_from_ir: slot.activatedFromIr,
   }));
 
@@ -147,7 +186,9 @@ export function useMockLeagueRosters(leagueId: string | undefined) {
       is_active: slot.isActive,
       points_earned: slot.playerId
         ? calculatePlayerPoints(slot.playerId, state.simulationDate)
-        : 0,
+        : slot.teamId
+          ? calculateGoaliePoints(slot.teamId, state.simulationDate)
+          : 0,
       activated_from_ir: slot.activatedFromIr,
       league_members: {
         id: member.id,

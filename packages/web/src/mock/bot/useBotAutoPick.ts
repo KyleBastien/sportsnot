@@ -43,7 +43,10 @@ export function useBotAutoPick(): void {
         leagueMemberId: memberId,
         pickNumber: ds.draft.currentPick,
         playerId: result.position === 'G' ? undefined : result.playerId,
-        teamId: result.position === 'G' ? result.playerId : undefined,
+        teamId:
+          result.position === 'G'
+            ? (result.nhlTeamId ?? result.playerId)
+            : undefined,
         position: result.position as Position,
         pickedAt: new Date().toISOString(),
       };
