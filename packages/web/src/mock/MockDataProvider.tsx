@@ -388,7 +388,43 @@ export function mockReducer(state: MockState, action: MockAction): MockState {
           ? { ...l, status: 'active' as const, currentRound: 4 }
           : l
       );
-      return { ...state, leagues: updatedLeagues };
+
+      // Idempotent: check if R4 rosters already exist (ADVANCE_ROUND already ran)
+      const hasR4Rosters = Object.values(state.rosters).some((slots) =>
+        slots.some((s) => s.round === 4)
+      );
+      if (hasR4Rosters) {
+        return { ...state, leagues: updatedLeagues };
+      }
+
+      // Archive current R3 rosters to rosterHistory
+      const updatedHistory = { ...state.rosterHistory };
+      for (const [memberId, slots] of Object.entries(state.rosters)) {
+        if (!updatedHistory[memberId]) {
+          updatedHistory[memberId] = {};
+        }
+        updatedHistory[memberId] = {
+          ...updatedHistory[memberId],
+          [3]: slots,
+        };
+      }
+
+      // Copy R3 rosters into R4 with reset points
+      const newRosters: Record<string, RosterSlot[]> = {};
+      for (const [memberId, slots] of Object.entries(state.rosters)) {
+        newRosters[memberId] = slots.map((s) => ({
+          ...s,
+          round: 4,
+          pointsEarned: 0,
+        }));
+      }
+
+      return {
+        ...state,
+        leagues: updatedLeagues,
+        rosterHistory: updatedHistory,
+        rosters: newRosters,
+      };
     }
     case 'START_RE_DRAFT': {
       const { leagueId, draftState } = action.payload;

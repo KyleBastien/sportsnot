@@ -490,15 +490,148 @@ describe('SKIP_TO_ROUND4', () => {
     expect(next.leagues[1].currentRound).toBe(3);
   });
 
-  it('does not modify rosters', () => {
+  it('copies R3 rosters to R4 with round=4 and pointsEarned=0', () => {
+    const r3Slots = [
+      {
+        id: 'slot-1',
+        leagueMemberId: 'member-1',
+        round: 3,
+        playerId: 100,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 42,
+        activatedFromIr: false,
+      },
+      {
+        id: 'slot-2',
+        leagueMemberId: 'member-1',
+        round: 3,
+        playerId: 200,
+        position: 'D' as const,
+        isActive: true,
+        pointsEarned: 18,
+        activatedFromIr: false,
+      },
+    ];
     const state = makeState({
-      leagues: [makeLeague({ id: 'lg-1' })],
-      rosters: { 'member-1': [] },
+      leagues: [makeLeague({ id: 'lg-1', currentRound: 3 })],
+      rosters: { 'member-1': r3Slots },
     });
     const next = mockReducer(state, {
       type: 'SKIP_TO_ROUND4',
       payload: { leagueId: 'lg-1' },
     });
-    expect(next.rosters).toEqual({ 'member-1': [] });
+    expect(next.rosters['member-1']).toHaveLength(2);
+    expect(next.rosters['member-1'][0].round).toBe(4);
+    expect(next.rosters['member-1'][0].pointsEarned).toBe(0);
+    expect(next.rosters['member-1'][0].playerId).toBe(100);
+    expect(next.rosters['member-1'][1].round).toBe(4);
+    expect(next.rosters['member-1'][1].pointsEarned).toBe(0);
+  });
+
+  it('archives R3 rosters to rosterHistory', () => {
+    const r3Slots = [
+      {
+        id: 'slot-1',
+        leagueMemberId: 'member-1',
+        round: 3,
+        playerId: 100,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 42,
+        activatedFromIr: false,
+      },
+    ];
+    const state = makeState({
+      leagues: [makeLeague({ id: 'lg-1', currentRound: 3 })],
+      rosters: { 'member-1': r3Slots },
+      rosterHistory: {},
+    });
+    const next = mockReducer(state, {
+      type: 'SKIP_TO_ROUND4',
+      payload: { leagueId: 'lg-1' },
+    });
+    expect(next.rosterHistory['member-1']).toBeDefined();
+    expect(next.rosterHistory['member-1'][3]).toEqual(r3Slots);
+  });
+
+  it('is idempotent — does not duplicate R4 rosters if they already exist', () => {
+    const r4Slots = [
+      {
+        id: 'slot-1',
+        leagueMemberId: 'member-1',
+        round: 4,
+        playerId: 100,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 0,
+        activatedFromIr: false,
+      },
+    ];
+    const state = makeState({
+      leagues: [makeLeague({ id: 'lg-1', currentRound: 3 })],
+      rosters: { 'member-1': r4Slots },
+      rosterHistory: { 'member-1': { 3: r4Slots } },
+    });
+    const next = mockReducer(state, {
+      type: 'SKIP_TO_ROUND4',
+      payload: { leagueId: 'lg-1' },
+    });
+    // Rosters should be unchanged (already R4)
+    expect(next.rosters).toEqual(state.rosters);
+    expect(next.rosterHistory).toEqual(state.rosterHistory);
+  });
+
+  it('does not create rosters when state.rosters is empty', () => {
+    const state = makeState({
+      leagues: [makeLeague({ id: 'lg-1', currentRound: 3 })],
+      rosters: {},
+    });
+    const next = mockReducer(state, {
+      type: 'SKIP_TO_ROUND4',
+      payload: { leagueId: 'lg-1' },
+    });
+    expect(next.rosters).toEqual({});
+  });
+
+  it('copies rosters for multiple members', () => {
+    const m1Slots = [
+      {
+        id: 'slot-1',
+        leagueMemberId: 'member-1',
+        round: 3,
+        playerId: 100,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 10,
+        activatedFromIr: false,
+      },
+    ];
+    const m2Slots = [
+      {
+        id: 'slot-2',
+        leagueMemberId: 'member-2',
+        round: 3,
+        playerId: 200,
+        position: 'D' as const,
+        isActive: true,
+        pointsEarned: 20,
+        activatedFromIr: false,
+      },
+    ];
+    const state = makeState({
+      leagues: [makeLeague({ id: 'lg-1', currentRound: 3 })],
+      rosters: { 'member-1': m1Slots, 'member-2': m2Slots },
+    });
+    const next = mockReducer(state, {
+      type: 'SKIP_TO_ROUND4',
+      payload: { leagueId: 'lg-1' },
+    });
+    expect(next.rosters['member-1'][0].round).toBe(4);
+    expect(next.rosters['member-1'][0].pointsEarned).toBe(0);
+    expect(next.rosters['member-2'][0].round).toBe(4);
+    expect(next.rosters['member-2'][0].pointsEarned).toBe(0);
+    expect(next.rosterHistory['member-1'][3]).toEqual(m1Slots);
+    expect(next.rosterHistory['member-2'][3]).toEqual(m2Slots);
   });
 });
