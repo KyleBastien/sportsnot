@@ -9,6 +9,7 @@ const NHL_API_BASE = 'https://api-web.nhle.com/v1';
 
 interface PlayerGameLog {
   gameId: number;
+  gameDate: string;
   goals: number;
   assists: number;
 }
@@ -23,6 +24,9 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const season = body.season || '20252026';
     const playoffRound = body.playoff_round || 1;
+    // Optional round date boundaries for filtering game stats
+    const roundStartDate: string | undefined = body.round_start_date;
+    const roundEndDate: string | undefined = body.round_end_date;
 
     // Get all active rosters to know which players/teams to sync
     const { data: rosters } = await supabase
@@ -60,7 +64,15 @@ Deno.serve(async (req) => {
         if (!resp.ok) continue;
 
         const data = await resp.json();
-        const games: PlayerGameLog[] = data.gameLog ?? [];
+        const allGames: PlayerGameLog[] = data.gameLog ?? [];
+
+        // Filter to round-specific date range when provided
+        const games =
+          roundStartDate && roundEndDate
+            ? allGames.filter(
+                (g) => g.gameDate >= roundStartDate && g.gameDate <= roundEndDate
+              )
+            : allGames;
 
         const totalGoals = games.reduce(
           (sum: number, g: PlayerGameLog) => sum + (g.goals ?? 0),
@@ -105,6 +117,12 @@ Deno.serve(async (req) => {
 
         for (const game of games) {
           if (game.gameType !== 3 || game.gameState !== 'FINAL') continue;
+
+          // Filter by round date range when provided
+          if (roundStartDate && roundEndDate && game.gameDate) {
+            if (game.gameDate < roundStartDate || game.gameDate > roundEndDate)
+              continue;
+          }
 
           const isHome = game.homeTeam?.id === teamId;
           const isAway = game.awayTeam?.id === teamId;

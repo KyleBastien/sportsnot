@@ -63,7 +63,7 @@ function useMyRoster(leagueId: string) {
       // Get the member for this league
       const { data: member } = await supabase
         .from('league_members')
-        .select('id')
+        .select('id, total_points')
         .eq('league_id', leagueId)
         .eq('user_id', user!.id)
         .single();
@@ -96,6 +96,7 @@ function useMyRoster(leagueId: string) {
           ...s,
           is_eliminated: s.is_eliminated ?? false,
         })),
+        totalPoints: member.total_points ?? 0,
       };
     },
     enabled: !IS_MOCK && !!user,
