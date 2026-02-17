@@ -1,6 +1,10 @@
 import { useMockData, getRoundDateBounds } from '../MockDataProvider';
 import { getEliminatedAbbreviations } from './useMockNhlApi';
-import { isSlotEliminated, calculateRoundMemberPoints } from '../utils';
+import {
+  isSlotEliminated,
+  calculateRoundMemberPoints,
+  calculateMemberPoints,
+} from '../utils';
 
 // ── Mock TanStack helpers (same pattern as useMockDraft) ────────────────
 interface MockQueryResult<T> {
@@ -132,10 +136,13 @@ export function useMockRoster(leagueId: string | undefined) {
     };
   });
 
+  const pts = calculateMemberPoints(state, member.id);
+
   return makeMockQuery({
     memberId: member.id,
     round: state.currentRound,
     slots,
+    totalPoints: pts.totalPoints,
   });
 }
 

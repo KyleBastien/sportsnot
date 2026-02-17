@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@rstest/core';
 import { calculateSlotPoints } from './useMockRoster';
-import { calculateRoundMemberPoints } from '../utils';
+import { calculateRoundMemberPoints, calculateMemberPoints } from '../utils';
 import { getRoundDateBounds } from '../MockDataProvider';
 
 // Round date bounds (from fixture data):
@@ -141,5 +141,113 @@ describe('calculateSlotPoints', () => {
       '2025-05-20'
     );
     expect(pts).toBe(expectedPlayer.playerPts);
+  });
+});
+
+// ── totalPoints contract (US-002) ──────────────────────────────────────
+// These tests verify the calculateMemberPoints function returns the
+// correct totalPoints that useMockRoster now exposes.
+
+describe('totalPoints from calculateMemberPoints (useMockRoster contract)', () => {
+  const makeSlot = (
+    round: number,
+    playerId: number,
+    memberId = 'member-1'
+  ) => ({
+    id: `slot-r${round}-${playerId}`,
+    leagueMemberId: memberId,
+    round,
+    playerId,
+    position: 'F' as const,
+    isActive: true,
+    pointsEarned: 0,
+    activatedFromIr: false,
+  });
+
+  it('should equal sum of slot points in Round 1', () => {
+    const roster = [makeSlot(1, 8470594)];
+    const state = {
+      currentRound: 1,
+      simulationDate: '2025-05-04', // end of R1
+      rosters: { 'member-1': roster },
+      rosterHistory: {},
+    };
+
+    const result = calculateMemberPoints(state, 'member-1');
+    const slotPtsSum = roster.reduce(
+      (sum, s) => sum + calculateSlotPoints(s, state.simulationDate),
+      0
+    );
+
+    // In R1 totalPoints equals the sum of current round slot points
+    expect(result.totalPoints).toBe(slotPtsSum);
+  });
+
+  it('should include prior rounds in R2+', () => {
+    const rosterR1 = [makeSlot(1, 8470594)];
+    const rosterR2 = [makeSlot(2, 8470594)];
+
+    // R1-only totalPoints
+    const stateR1 = {
+      currentRound: 1,
+      simulationDate: '2025-05-04',
+      rosters: { 'member-1': rosterR1 },
+      rosterHistory: {},
+    };
+    const r1Total = calculateMemberPoints(stateR1, 'member-1').totalPoints;
+
+    // R2 totalPoints should include R1 contributions from rosterHistory
+    const stateR2 = {
+      currentRound: 2,
+      simulationDate: '2025-05-18', // end of R2
+      rosters: { 'member-1': rosterR2 },
+      rosterHistory: { 'member-1': { 1: rosterR1 } },
+    };
+    const r2Total = calculateMemberPoints(stateR2, 'member-1').totalPoints;
+
+    // Cumulative total should be >= R1 total
+    expect(r2Total).toBeGreaterThanOrEqual(r1Total);
+  });
+
+  it('should return totalPoints as playerPoints + goaliePoints', () => {
+    const roster = [
+      makeSlot(1, 8470594), // player
+      {
+        id: 'slot-g1',
+        leagueMemberId: 'member-1',
+        round: 1,
+        playerId: undefined as unknown as number,
+        teamId: 13, // FLA goalie
+        position: 'G' as const,
+        isActive: true,
+        pointsEarned: 0,
+        activatedFromIr: false,
+      },
+    ];
+    const state = {
+      currentRound: 1,
+      simulationDate: '2025-05-04',
+      rosters: { 'member-1': roster },
+      rosterHistory: {},
+    };
+    const result = calculateMemberPoints(state, 'member-1');
+    expect(result.totalPoints).toBe(result.playerPoints + result.goaliePoints);
+  });
+
+  it('should have roundPoints that sum to totalPoints', () => {
+    const rosterR1 = [makeSlot(1, 8470594)];
+    const rosterR2 = [makeSlot(2, 8470594)];
+    const state = {
+      currentRound: 2,
+      simulationDate: '2025-05-18',
+      rosters: { 'member-1': rosterR2 },
+      rosterHistory: { 'member-1': { 1: rosterR1 } },
+    };
+    const result = calculateMemberPoints(state, 'member-1');
+    const roundSum = Object.values(result.roundPoints).reduce(
+      (a, b) => a + b,
+      0
+    );
+    expect(result.totalPoints).toBe(roundSum);
   });
 });
