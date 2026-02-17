@@ -178,21 +178,34 @@ export function LeagueDashboardPage() {
                 >
                   Standings
                 </Button>
-                {isCommissioner && !seasonComplete && (
-                  <Tooltip
-                    label="All series in the current round must be complete"
-                    disabled={roundComplete}
-                  >
+                {isCommissioner &&
+                  !seasonComplete &&
+                  league.current_round < 3 && (
+                    <Tooltip
+                      label="All series in the current round must be complete"
+                      disabled={roundComplete}
+                    >
+                      <Button
+                        color="green"
+                        onClick={handleStartNextDraft}
+                        disabled={!roundComplete || roundStatusLoading}
+                        loading={roundStatusLoading}
+                      >
+                        Start Next Draft
+                      </Button>
+                    </Tooltip>
+                  )}
+                {isCommissioner &&
+                  league.current_round === 3 &&
+                  roundComplete &&
+                  !seasonComplete && (
                     <Button
                       color="green"
-                      onClick={handleStartNextDraft}
-                      disabled={!roundComplete || roundStatusLoading}
-                      loading={roundStatusLoading}
+                      onClick={() => navigate(`/draft/${leagueId}/transition`)}
                     >
-                      Start Next Draft
+                      Advance to Finals
                     </Button>
-                  </Tooltip>
-                )}
+                  )}
               </>
             )}
           </Group>
