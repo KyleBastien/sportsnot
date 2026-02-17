@@ -168,7 +168,7 @@ export function RoundTransitionPage() {
     } else {
       // In live mode, copy Round 3 rosters to Round 4 and skip draft
       const { data: round3Slots } = await supabase
-        .from('roster_slots')
+        .from('rosters')
         .select('*')
         .eq('round', 3)
         .in(
@@ -185,7 +185,7 @@ export function RoundTransitionPage() {
             points_earned: 0,
           })
         );
-        await supabase.from('roster_slots').insert(round4Slots);
+        await supabase.from('rosters').insert(round4Slots);
       }
 
       await supabase
