@@ -1,15 +1,6 @@
-import { useMockData } from '../MockDataProvider';
-import { SCORING } from '@sportsnot/types';
-import {
-  playerGameLogs,
-  gamesR1,
-  gamesR2,
-  gamesCf,
-  gamesScf,
-} from '@sportsnot/mock-data';
-import type { NHLPlayerStats, NHLGame } from '@sportsnot/types';
+import { useMockData, getRoundDateBounds } from '../MockDataProvider';
 import { getEliminatedAbbreviations } from './useMockNhlApi';
-import { isSlotEliminated } from '../utils';
+import { isSlotEliminated, calculateRoundMemberPoints } from '../utils';
 
 // ── Mock TanStack helpers (same pattern as useMockDraft) ────────────────
 interface MockQueryResult<T> {
@@ -67,52 +58,28 @@ function makeMockMutation<TData, TVariables>(
   };
 }
 
-// ── Game data for goalie scoring ────────────────────────────────────────
-const ALL_GAMES: NHLGame[] = [
-  ...(gamesR1 as unknown as NHLGame[]),
-  ...(gamesR2 as unknown as NHLGame[]),
-  ...(gamesCf as unknown as NHLGame[]),
-  ...(gamesScf as unknown as NHLGame[]),
-];
+// ── Per-slot points using round-specific date bounds ───────────────────
+export function calculateSlotPoints(
+  slot: { round: number; playerId?: number | null; teamId?: number | null },
+  simulationDate: string
+): number {
+  const bounds = getRoundDateBounds(slot.round);
+  if (!bounds) return 0;
+  if (simulationDate < bounds.firstDate) return 0;
 
-// ── Points calculation helper ──────────────────────────────────────────
-function calculatePlayerPoints(playerId: number, throughDate: string): number {
-  const logs = (playerGameLogs as unknown as Record<number, NHLPlayerStats[]>)[
-    playerId
-  ];
-  if (!logs) return 0;
+  const throughDate =
+    simulationDate < bounds.lastDate ? simulationDate : bounds.lastDate;
 
-  let points = 0;
-  for (const entry of logs) {
-    if (entry.gameDate <= throughDate) {
-      points += entry.goals * SCORING.goal;
-      points += entry.assists * SCORING.assist;
-    }
-  }
-  return points;
-}
+  const playerIds = slot.playerId ? [slot.playerId] : [];
+  const goalieTeamIds = !slot.playerId && slot.teamId ? [slot.teamId] : [];
 
-function calculateGoaliePoints(teamId: number, throughDate: string): number {
-  let points = 0;
-  for (const game of ALL_GAMES) {
-    if (game.gameDate > throughDate) continue;
-
-    const isHome = game.homeTeam.id === teamId;
-    const isAway = game.awayTeam.id === teamId;
-    if (!isHome && !isAway) continue;
-
-    const teamScore = isHome
-      ? (game.homeTeam.score ?? 0)
-      : (game.awayTeam.score ?? 0);
-    const oppScore = isHome
-      ? (game.awayTeam.score ?? 0)
-      : (game.homeTeam.score ?? 0);
-
-    if (teamScore > oppScore) {
-      points += oppScore === 0 ? SCORING.shutout : SCORING.win;
-    }
-  }
-  return points;
+  const pts = calculateRoundMemberPoints(
+    playerIds,
+    goalieTeamIds,
+    bounds.firstDate,
+    throughDate
+  );
+  return pts.playerPts + pts.goaliePts;
 }
 
 // ── useRoster (mock) ───────────────────────────────────────────────────
@@ -159,11 +126,7 @@ export function useMockRoster(leagueId: string | undefined) {
       is_active: slot.isActive,
       points_earned: eliminated
         ? 0
-        : slot.playerId
-          ? calculatePlayerPoints(slot.playerId, state.simulationDate)
-          : slot.teamId
-            ? calculateGoaliePoints(slot.teamId, state.simulationDate)
-            : 0,
+        : calculateSlotPoints(slot, state.simulationDate),
       activated_from_ir: slot.activatedFromIr,
       is_eliminated: eliminated,
     };
@@ -211,11 +174,7 @@ export function useMockLeagueRosters(leagueId: string | undefined) {
         is_active: slot.isActive,
         points_earned: eliminated
           ? 0
-          : slot.playerId
-            ? calculatePlayerPoints(slot.playerId, state.simulationDate)
-            : slot.teamId
-              ? calculateGoaliePoints(slot.teamId, state.simulationDate)
-              : 0,
+          : calculateSlotPoints(slot, state.simulationDate),
         activated_from_ir: slot.activatedFromIr,
         is_eliminated: eliminated,
         league_members: {
