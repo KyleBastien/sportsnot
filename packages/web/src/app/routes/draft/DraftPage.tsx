@@ -17,7 +17,10 @@ import {
   Modal,
   Table,
   ScrollArea,
+  Collapse,
+  UnstyledButton,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import {
   supabase,
@@ -449,6 +452,7 @@ export function DraftPage() {
   const [confirmPosition, setConfirmPosition] = useState<Position>('F');
   const [submitting, setSubmitting] = useState(false);
   const [comparePlayers, setComparePlayers] = useState<ComparePlayer[]>([]);
+  const [myTeamOpened, { toggle: toggleMyTeam }] = useDisclosure(false);
   const mockMakePick = useMockMakePick();
 
   const handleToggleCompare = (player: ComparePlayer) => {
@@ -552,6 +556,37 @@ export function DraftPage() {
       }
     }
     return counts;
+  }, [picks, myMember]);
+
+  // Build my roster slots grouped by position for the My Team section
+  const myRosterSlots = useMemo(() => {
+    const myPicks = myMember
+      ? picks.filter(
+          (p) => p.league_members?.user_id === myMember.user_id && p.position
+        )
+      : [];
+
+    const positionConfig: {
+      key: string;
+      label: string;
+      max: number;
+    }[] = [
+      { key: 'F', label: 'Forward', max: ROSTER_COMPOSITION.forwards },
+      { key: 'D', label: 'Defenseman', max: ROSTER_COMPOSITION.defensemen },
+      { key: 'G', label: 'Goalie', max: ROSTER_COMPOSITION.goalies },
+      { key: 'IR_F', label: 'IR Forward', max: ROSTER_COMPOSITION.irForwards },
+      {
+        key: 'IR_D',
+        label: 'IR Defenseman',
+        max: ROSTER_COMPOSITION.irDefensemen,
+      },
+    ];
+
+    return positionConfig.map(({ key, label, max }) => {
+      const filled = myPicks.filter((p) => p.position === key);
+      const emptyCount = Math.max(0, max - filled.length);
+      return { position: key, label, filled, emptyCount };
+    });
   }, [picks, myMember]);
 
   // Subscribe to real-time draft changes (no-op in mock mode)
@@ -814,6 +849,56 @@ export function DraftPage() {
               </Stack>
             </ScrollArea>
           )}
+        </Card>
+
+        {/* My Team */}
+        <Card shadow="sm" padding="md" radius="md" withBorder>
+          <UnstyledButton onClick={toggleMyTeam} w="100%">
+            <Group justify="space-between">
+              <Title order={4}>My Team</Title>
+              <Text size="sm" c="dimmed">
+                {myTeamOpened ? '▲ Collapse' : '▼ Expand'}
+              </Text>
+            </Group>
+          </UnstyledButton>
+          <Collapse in={myTeamOpened}>
+            <Stack gap="sm" mt="sm">
+              {myRosterSlots.map((group) => (
+                <div key={group.position}>
+                  <Text fw={600} size="sm" mb={4}>
+                    {group.label} ({group.filled.length}/
+                    {group.filled.length + group.emptyCount})
+                  </Text>
+                  <Stack gap={4}>
+                    {group.filled.map((pick) => (
+                      <Group key={pick.id} gap="xs">
+                        <Badge variant="light" size="sm">
+                          {pick.position}
+                        </Badge>
+                        <Text size="sm">
+                          {resolvePickName(
+                            pick.player_id,
+                            pick.team_id,
+                            playerNameMap,
+                            teamNameMap
+                          )}
+                        </Text>
+                      </Group>
+                    ))}
+                    {Array.from({ length: group.emptyCount }).map((_, i) => (
+                      <Text
+                        key={`empty-${group.position}-${i}`}
+                        size="sm"
+                        c="dimmed"
+                      >
+                        Empty {group.label} slot
+                      </Text>
+                    ))}
+                  </Stack>
+                </div>
+              ))}
+            </Stack>
+          </Collapse>
         </Card>
 
         {/* Available Players */}
