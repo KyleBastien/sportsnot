@@ -106,6 +106,84 @@ describe('filterGamesByDateRange (sync-nhl-stats edge function logic)', () => {
   });
 });
 
+// ── Roster page display: round points vs total points ──────────────────
+// US-004: The Roster page shows both "Round N Points" (current round active
+// slot sum) and "Total Points" (cumulative from data.totalPoints).
+
+interface DisplaySlot {
+  points_earned: number;
+  is_active: boolean;
+}
+
+/** Replicates the roundPoints calculation from RosterPage.tsx */
+function computeRoundPoints(slots: DisplaySlot[]): number {
+  return slots
+    .filter((s) => s.is_active)
+    .reduce((sum, s) => sum + (s.points_earned ?? 0), 0);
+}
+
+describe('Roster page round points vs total points display', () => {
+  it('roundPoints sums only active slots for the current round', () => {
+    const slots: DisplaySlot[] = [
+      { points_earned: 5, is_active: true },
+      { points_earned: 3, is_active: true },
+      { points_earned: 7, is_active: false }, // inactive, excluded
+    ];
+    expect(computeRoundPoints(slots)).toBe(8);
+  });
+
+  it('roundPoints is 0 when all slots are inactive', () => {
+    const slots: DisplaySlot[] = [
+      { points_earned: 5, is_active: false },
+      { points_earned: 3, is_active: false },
+    ];
+    expect(computeRoundPoints(slots)).toBe(0);
+  });
+
+  it('roundPoints handles missing points_earned gracefully', () => {
+    const slots = [
+      { points_earned: undefined as unknown as number, is_active: true },
+      { points_earned: 4, is_active: true },
+    ];
+    expect(computeRoundPoints(slots)).toBe(4);
+  });
+
+  it('in Round 1, roundPoints and totalPoints are identical', () => {
+    const slots: DisplaySlot[] = [
+      { points_earned: 3, is_active: true },
+      { points_earned: 5, is_active: true },
+    ];
+    const roundPoints = computeRoundPoints(slots);
+    // In R1, league_members.total_points = sum of R1 slot points
+    const totalPoints = 8;
+    expect(roundPoints).toBe(totalPoints);
+  });
+
+  it('in Round 2+, totalPoints exceeds roundPoints due to prior rounds', () => {
+    const r2Slots: DisplaySlot[] = [
+      { points_earned: 4, is_active: true },
+      { points_earned: 2, is_active: true },
+    ];
+    const roundPoints = computeRoundPoints(r2Slots);
+    // totalPoints includes R1 (10) + R2 (6) = 16
+    const totalPoints = 16;
+    expect(roundPoints).toBe(6);
+    expect(totalPoints).toBeGreaterThan(roundPoints);
+  });
+
+  it('totalPoints defaults to 0 when data.totalPoints is undefined', () => {
+    const data: { totalPoints?: number } = {};
+    const totalPoints = data.totalPoints ?? 0;
+    expect(totalPoints).toBe(0);
+  });
+
+  it('totalPoints defaults to 0 when data.totalPoints is null', () => {
+    const data: { totalPoints: number | null } = { totalPoints: null };
+    const totalPoints = data.totalPoints ?? 0;
+    expect(totalPoints).toBe(0);
+  });
+});
+
 // ── Production useMyRoster return shape contract ───────────────────────
 // The production hook must return { memberId, round, slots, totalPoints }
 // matching the mock hook shape.

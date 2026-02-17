@@ -204,9 +204,11 @@ export function RosterPage() {
     players: slots.filter((s: RosterSlotRow) => s.position === pos),
   }));
 
-  const totalPoints = slots
+  const roundPoints = slots
     .filter((s: RosterSlotRow) => s.is_active)
     .reduce((sum: number, s: RosterSlotRow) => sum + (s.points_earned ?? 0), 0);
+
+  const totalPoints = data.totalPoints ?? 0;
 
   const handleActivateIR = async () => {
     if (!irModal) return;
@@ -245,16 +247,28 @@ export function RosterPage() {
             <Title order={2}>My Roster</Title>
             <Text c="dimmed">Round {round}</Text>
           </div>
-          <Card padding="md" radius="md" withBorder>
-            <Stack gap={0} align="center">
-              <Text size="sm" c="dimmed">
-                Total Points
-              </Text>
-              <Text fw={700} size="xl">
-                {totalPoints}
-              </Text>
-            </Stack>
-          </Card>
+          <Group gap="md">
+            <Card padding="md" radius="md" withBorder>
+              <Stack gap={0} align="center">
+                <Text size="sm" c="dimmed">
+                  Round {round} Points
+                </Text>
+                <Text fw={700} size="xl">
+                  {roundPoints}
+                </Text>
+              </Stack>
+            </Card>
+            <Card padding="md" radius="md" withBorder>
+              <Stack gap={0} align="center">
+                <Text size="sm" c="dimmed">
+                  Total Points
+                </Text>
+                <Text fw={700} size="xl">
+                  {totalPoints}
+                </Text>
+              </Stack>
+            </Card>
+          </Group>
         </Group>
 
         <Text size="sm" c="dimmed">
