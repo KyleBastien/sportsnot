@@ -789,29 +789,30 @@ export function DraftPage() {
               No picks yet
             </Text>
           ) : (
-            <Stack gap="xs">
-              {[...picks]
-                .sort((a, b) => (b.pick_number ?? 0) - (a.pick_number ?? 0))
-                .slice(0, 10)
-                .map((pick) => (
-                  <Group key={pick.id} justify="space-between">
-                    <Text size="sm">
-                      #{pick.pick_number} -{' '}
-                      {pick.league_members?.team_name ?? 'Unknown'}
-                      {' · '}
-                      {resolvePickName(
-                        pick.player_id,
-                        pick.team_id,
-                        playerNameMap,
-                        teamNameMap
-                      )}
-                    </Text>
-                    <Badge variant="light" size="sm">
-                      {pick.position}
-                    </Badge>
-                  </Group>
-                ))}
-            </Stack>
+            <ScrollArea h={400}>
+              <Stack gap="xs">
+                {[...picks]
+                  .sort((a, b) => (b.pick_number ?? 0) - (a.pick_number ?? 0))
+                  .map((pick) => (
+                    <Group key={pick.id} justify="space-between">
+                      <Text size="sm">
+                        #{pick.pick_number} -{' '}
+                        {pick.league_members?.team_name ?? 'Unknown'}
+                        {' · '}
+                        {resolvePickName(
+                          pick.player_id,
+                          pick.team_id,
+                          playerNameMap,
+                          teamNameMap
+                        )}
+                      </Text>
+                      <Badge variant="light" size="sm">
+                        {pick.position}
+                      </Badge>
+                    </Group>
+                  ))}
+              </Stack>
+            </ScrollArea>
           )}
         </Card>
 
