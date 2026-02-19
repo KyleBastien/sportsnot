@@ -58,8 +58,9 @@ jobs:
       - name: Build
         run: npx nx build @sportsnot/web
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_MOCK_MODE: 'true'
+          VITE_SUPABASE_URL: 'http://localhost:54321'
+          VITE_SUPABASE_ANON_KEY: 'test-anon-key'
 
       - name: Copy 404.html for SPA routing
         run: cp packages/web/public/404.html packages/web/dist/404.html
