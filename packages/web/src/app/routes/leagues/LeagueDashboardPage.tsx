@@ -22,6 +22,7 @@ import { useAuthContext } from '../../context/AuthContext';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import { useMockData } from '../../../mock/MockDataProvider';
 import { useRoundComplete } from '../../hooks/useRoundComplete';
+import { useWinnerConfetti } from '../../hooks/useWinnerConfetti';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -83,6 +84,19 @@ export function LeagueDashboardPage() {
     seasonComplete,
     isLoading: roundStatusLoading,
   } = useRoundComplete(currentRound);
+
+  // Derive winner before early returns so the hook is called unconditionally
+  const sortedForWinner = [...(league?.league_members ?? [])].sort(
+    (a: LeagueMemberRow, b: LeagueMemberRow) =>
+      (b.total_points ?? 0) - (a.total_points ?? 0)
+  );
+  const winnerId = seasonComplete ? sortedForWinner[0]?.user_id : undefined;
+
+  useWinnerConfetti({
+    seasonComplete,
+    isWinner: !!winnerId && winnerId === user?.id,
+    leagueId,
+  });
 
   if (isLoading) {
     return (
@@ -195,17 +209,6 @@ export function LeagueDashboardPage() {
                       </Button>
                     </Tooltip>
                   )}
-                {isCommissioner &&
-                  league.current_round === 3 &&
-                  roundComplete &&
-                  !seasonComplete && (
-                    <Button
-                      color="green"
-                      onClick={() => navigate(`/draft/${leagueId}/transition`)}
-                    >
-                      Advance to Finals
-                    </Button>
-                  )}
               </>
             )}
           </Group>
@@ -266,7 +269,10 @@ export function LeagueDashboardPage() {
                   }}
                 >
                   <Table.Td>{index + 1}</Table.Td>
-                  <Table.Td>{member.team_name}</Table.Td>
+                  <Table.Td>
+                    {member.team_name}
+                    {seasonComplete && index === 0 && ' 🏆'}
+                  </Table.Td>
                   <Table.Td>{member.users?.display_name ?? 'Unknown'}</Table.Td>
                   <Table.Td style={{ textAlign: 'right' }}>
                     {member.total_points ?? 0}

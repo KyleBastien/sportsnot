@@ -748,6 +748,34 @@ export function DraftPage() {
           .from('leagues')
           .update({ status: 'active' })
           .eq('id', draft.league_id);
+
+        // R3 draft covers both Conference Finals and Stanley Cup Final:
+        // duplicate all R3 roster rows into R4 so scoring works immediately.
+        if (draft.round === 3) {
+          const memberIds = members?.map((m) => m.id) ?? [];
+          const { data: r3Slots } = await supabase
+            .from('rosters')
+            .select('*')
+            .eq('round', 3)
+            .in('league_member_id', memberIds);
+
+          if (r3Slots && r3Slots.length > 0) {
+            const r4Slots = r3Slots.map(
+              ({
+                id: _id,
+                ...slot
+              }: {
+                id: string;
+                [key: string]: unknown;
+              }) => ({
+                ...slot,
+                round: 4,
+                points_earned: 0,
+              })
+            );
+            await supabase.from('rosters').insert(r4Slots);
+          }
+        }
       } else {
         // Advance the pick
         await supabase

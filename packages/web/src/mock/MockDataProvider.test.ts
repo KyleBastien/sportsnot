@@ -141,6 +141,78 @@ describe('ADVANCE_ROUND', () => {
     // simulationDate should change (exact value depends on getRoundDateBounds)
     expect(next.simulationDate).not.toBe(state.simulationDate);
   });
+
+  it('does not overwrite rosterHistory if already archived by START_RE_DRAFT', () => {
+    const r1Slots = [
+      {
+        id: 'slot-1',
+        leagueMemberId: 'member-1',
+        round: 1,
+        playerId: 100,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 5,
+        activatedFromIr: false,
+      },
+    ];
+    const r2Slots = [
+      {
+        id: 'slot-2',
+        leagueMemberId: 'member-1',
+        round: 2,
+        playerId: 200,
+        position: 'D' as const,
+        isActive: true,
+        pointsEarned: 0,
+        activatedFromIr: false,
+      },
+    ];
+    const state = makeState({
+      currentRound: 1,
+      roundComplete: true,
+      rosters: { 'member-1': r2Slots },
+      rosterHistory: { 'member-1': { 1: r1Slots } },
+    });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    // Should preserve the original R1 archive, not overwrite with R2 data
+    expect(next.rosterHistory['member-1']?.[1]).toEqual(r1Slots);
+  });
+
+  it('preserves rosters if they belong to the next round (from re-draft)', () => {
+    const r2Slots = [
+      {
+        id: 'slot-1',
+        leagueMemberId: 'member-1',
+        round: 2,
+        playerId: 200,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 0,
+        activatedFromIr: false,
+      },
+    ];
+    const r1Slots = [
+      {
+        id: 'slot-2',
+        leagueMemberId: 'member-1',
+        round: 1,
+        playerId: 100,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 5,
+        activatedFromIr: false,
+      },
+    ];
+    const state = makeState({
+      currentRound: 1,
+      roundComplete: true,
+      rosters: { 'member-1': r2Slots },
+      rosterHistory: { 'member-1': { 1: r1Slots } },
+    });
+    const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
+    // Round 2 rosters should be preserved, not cleared
+    expect(next.rosters['member-1']).toEqual(r2Slots);
+  });
 });
 
 // ─── START_NEXT_DRAFT ───────────────────────────────────────────────────
@@ -270,6 +342,97 @@ describe('START_RE_DRAFT', () => {
       payload: { leagueId: 'league-1', draftState },
     });
     expect(next.draftState).toBe(draftState);
+  });
+
+  it('archives current rosters to rosterHistory for the current round', () => {
+    const r1Slots = [
+      {
+        id: 'slot-1',
+        leagueMemberId: 'member-1',
+        round: 1,
+        playerId: 100,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 5,
+        activatedFromIr: false,
+      },
+    ];
+    const state = makeState({
+      currentRound: 1,
+      leagues: [makeLeague({ id: 'league-1' })],
+      rosters: { 'member-1': r1Slots },
+      rosterHistory: {},
+    });
+    const next = mockReducer(state, {
+      type: 'START_RE_DRAFT',
+      payload: { leagueId: 'league-1', draftState: makeDraftState(2) },
+    });
+    expect(next.rosterHistory['member-1']?.[1]).toEqual(r1Slots);
+  });
+
+  it('does not archive if currentRound already matches draft round', () => {
+    const r2Slots = [
+      {
+        id: 'slot-1',
+        leagueMemberId: 'member-1',
+        round: 2,
+        playerId: 100,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 0,
+        activatedFromIr: false,
+      },
+    ];
+    const state = makeState({
+      currentRound: 2,
+      leagues: [makeLeague({ id: 'league-1' })],
+      rosters: { 'member-1': r2Slots },
+      rosterHistory: {},
+    });
+    const next = mockReducer(state, {
+      type: 'START_RE_DRAFT',
+      payload: { leagueId: 'league-1', draftState: makeDraftState(2) },
+    });
+    expect(next.rosterHistory['member-1']).toBeUndefined();
+  });
+
+  it('preserves existing rosterHistory entries when archiving', () => {
+    const r1Slots = [
+      {
+        id: 'slot-r1',
+        leagueMemberId: 'member-1',
+        round: 1,
+        playerId: 100,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 5,
+        activatedFromIr: false,
+      },
+    ];
+    const r2Slots = [
+      {
+        id: 'slot-r2',
+        leagueMemberId: 'member-1',
+        round: 2,
+        playerId: 200,
+        position: 'D' as const,
+        isActive: true,
+        pointsEarned: 3,
+        activatedFromIr: false,
+      },
+    ];
+    const state = makeState({
+      currentRound: 2,
+      leagues: [makeLeague({ id: 'league-1' })],
+      rosters: { 'member-1': r2Slots },
+      rosterHistory: { 'member-1': { 1: r1Slots } },
+    });
+    const next = mockReducer(state, {
+      type: 'START_RE_DRAFT',
+      payload: { leagueId: 'league-1', draftState: makeDraftState(3) },
+    });
+    expect(next.rosterHistory['member-1']?.[1]).toEqual(r1Slots);
+    expect(next.rosterHistory['member-1']?.[2]).toEqual(r2Slots);
   });
 });
 
@@ -426,10 +589,11 @@ describe('ADVANCE_ROUND: Round 3→4 roster auto-copy', () => {
   });
 
   it('does NOT copy rosters for round 2→3 advance', () => {
+    const round2Slots = round3Slots.map((s) => ({ ...s, round: 2 }));
     const state = makeState({
       currentRound: 2,
       roundComplete: true,
-      rosters: { 'member-1': round3Slots },
+      rosters: { 'member-1': round2Slots },
     });
     const next = mockReducer(state, { type: 'ADVANCE_ROUND' });
     expect(next.rosters).toEqual({});

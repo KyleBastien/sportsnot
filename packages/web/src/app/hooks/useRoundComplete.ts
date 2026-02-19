@@ -34,9 +34,18 @@ export function useRoundComplete(currentRound: number): RoundCompleteResult {
   });
 
   if (IS_MOCK) {
+    // Derive round/season completion by comparing simulation state to the
+    // league's current round:
+    // - sim ahead of league → league's round already completed
+    // - sim matches league  → use the live roundComplete flag
+    // - sim behind league   → league advanced via draft; round not yet complete
+    const roundDone =
+      state.currentRound > currentRound ||
+      (state.currentRound === currentRound && state.roundComplete);
     return {
-      roundComplete: state.roundComplete,
-      seasonComplete: state.seasonComplete,
+      roundComplete: roundDone,
+      seasonComplete:
+        state.currentRound >= currentRound && state.seasonComplete,
       isLoading: false,
     };
   }

@@ -197,10 +197,16 @@ export function mockReducer(state: MockState, action: MockAction): MockState {
       return { ...state, leagues: updated };
     }
     case 'START_DRAFT': {
-      // Also update the league status to 'drafting'
       const leagueId = action.payload.draftState.draft.leagueId;
+      const draftRound = action.payload.draftState.draft.round;
       const updatedLeagues = state.leagues.map((l) =>
-        l.id === leagueId ? { ...l, status: 'drafting' as const } : l
+        l.id === leagueId
+          ? {
+              ...l,
+              status: 'drafting' as const,
+              currentRound: draftRound,
+            }
+          : l
       );
       return {
         ...state,
@@ -237,6 +243,7 @@ export function mockReducer(state: MockState, action: MockAction): MockState {
       // If draft is complete, update league status to 'active' and populate rosters
       let leaguesAfterPick = state.leagues;
       let rostersAfterPick = state.rosters;
+      let historyAfterPick = state.rosterHistory;
       if (isComplete) {
         leaguesAfterPick = state.leagues.map((l) =>
           l.id === ds.draft.leagueId ? { ...l, status: 'active' as const } : l
@@ -265,6 +272,25 @@ export function mockReducer(state: MockState, action: MockAction): MockState {
             }));
             rostersAfterPick[memberId] = slots;
           }
+
+          // R3 draft covers both Conference Finals and Stanley Cup Final:
+          // pre-create R4 roster slots so scoring works immediately.
+          if (ds.draft.round === 3) {
+            historyAfterPick = { ...state.rosterHistory };
+            for (const memberId of memberIds) {
+              const r3Slots = rostersAfterPick[memberId] ?? [];
+              const r4Slots: RosterSlot[] = r3Slots.map((s, idx) => ({
+                ...s,
+                id: `mock-roster-r4-${memberId}-${idx}`,
+                round: 4,
+                pointsEarned: 0,
+              }));
+              historyAfterPick[memberId] = {
+                ...historyAfterPick[memberId],
+                [4]: r4Slots,
+              };
+            }
+          }
         }
       }
 
@@ -290,6 +316,7 @@ export function mockReducer(state: MockState, action: MockAction): MockState {
           availablePlayerIds: newAvailable,
         },
         rosters: rostersAfterPick,
+        rosterHistory: historyAfterPick,
         leagues: leaguesAfterPick,
         completedDrafts: newCompletedDrafts,
       };
@@ -340,27 +367,46 @@ export function mockReducer(state: MockState, action: MockAction): MockState {
         dayBeforeNext
       );
 
-      // Archive current rosters to rosterHistory keyed by round, then clear
+      // Archive current rosters to rosterHistory keyed by round
+      // Skip if already archived (e.g., by START_RE_DRAFT)
       const updatedHistory = { ...state.rosterHistory };
       for (const [memberId, slots] of Object.entries(state.rosters)) {
         if (!updatedHistory[memberId]) {
           updatedHistory[memberId] = {};
         }
-        updatedHistory[memberId] = {
-          ...updatedHistory[memberId],
-          [state.currentRound]: slots,
-        };
+        if (!updatedHistory[memberId][state.currentRound]) {
+          updatedHistory[memberId] = {
+            ...updatedHistory[memberId],
+            [state.currentRound]: slots,
+          };
+        }
       }
 
-      // Round 3→4: auto-copy Round 3 rosters into Round 4 (no separate draft)
-      let newRosters: Record<string, RosterSlot[]> = {};
-      if (nextRound === 4) {
-        for (const [memberId, slots] of Object.entries(state.rosters)) {
-          newRosters[memberId] = slots.map((s) => ({
-            ...s,
-            round: 4,
-            pointsEarned: 0,
-          }));
+      // Preserve rosters if a re-draft already populated them for the next round
+      const existingRosterRound = Object.values(state.rosters)[0]?.[0]?.round;
+      let newRosters: Record<string, RosterSlot[]> =
+        existingRosterRound === nextRound ? { ...state.rosters } : {};
+
+      // Round 3→4: use pre-created R4 rosters from history (created at R3 draft
+      // completion) or fall back to copying R3 rosters.
+      if (nextRound === 4 && existingRosterRound !== 4) {
+        const preCreatedR4 = Object.entries(updatedHistory).some(
+          ([, h]) => h[4]?.length > 0
+        );
+        if (preCreatedR4) {
+          for (const [memberId, history] of Object.entries(updatedHistory)) {
+            if (history[4]) {
+              newRosters[memberId] = history[4];
+            }
+          }
+        } else {
+          for (const [memberId, slots] of Object.entries(state.rosters)) {
+            newRosters[memberId] = slots.map((s) => ({
+              ...s,
+              round: 4,
+              pointsEarned: 0,
+            }));
+          }
         }
       }
 
@@ -437,10 +483,26 @@ export function mockReducer(state: MockState, action: MockAction): MockState {
             }
           : l
       );
+
+      // Archive current rosters before the re-draft can overwrite them
+      const updatedHistory = { ...state.rosterHistory };
+      if (state.currentRound < draftState.draft.round) {
+        for (const [memberId, slots] of Object.entries(state.rosters)) {
+          if (!updatedHistory[memberId]) {
+            updatedHistory[memberId] = {};
+          }
+          updatedHistory[memberId] = {
+            ...updatedHistory[memberId],
+            [state.currentRound]: slots,
+          };
+        }
+      }
+
       return {
         ...state,
         draftState,
         leagues: updatedLeagues,
+        rosterHistory: updatedHistory,
       };
     }
     case 'ACTIVATE_IR': {

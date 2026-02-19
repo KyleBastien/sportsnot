@@ -164,10 +164,13 @@ export function calculateMemberPoints(
     const bounds = getRoundDateBounds(r);
     if (!bounds) continue;
 
+    const currentSlots = state.rosters[memberId] ?? [];
+    const rosterMatchesRound =
+      currentSlots.length > 0 ? currentSlots[0].round === r : true;
     const roster =
-      r < state.currentRound
-        ? (state.rosterHistory[memberId]?.[r] ?? [])
-        : (state.rosters[memberId] ?? []);
+      r === state.currentRound && rosterMatchesRound
+        ? currentSlots
+        : (state.rosterHistory[memberId]?.[r] ?? []);
 
     // Round 4: exclude eliminated players (their Round 3 points still count)
     const filteredRoster =

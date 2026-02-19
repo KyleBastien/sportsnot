@@ -17,6 +17,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMockStandings } from '../../../mock/hooks/useMockStandings';
+import { useRoundComplete } from '../../hooks/useRoundComplete';
+import { useWinnerConfetti } from '../../hooks/useWinnerConfetti';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -87,6 +89,18 @@ export function StandingsPage() {
   const { user } = useAuthContext();
   const { data, isLoading, error } = useStandings(leagueId!);
 
+  const currentRound = data?.league?.current_round ?? 0;
+  const { seasonComplete } = useRoundComplete(currentRound);
+
+  const typedMembers = (data?.members ?? []) as StandingsMemberRow[];
+  const winnerId = seasonComplete ? typedMembers[0]?.user_id : undefined;
+
+  useWinnerConfetti({
+    seasonComplete,
+    isWinner: !!winnerId && winnerId === user?.id,
+    leagueId,
+  });
+
   if (isLoading) {
     return (
       <Center h="50vh">
@@ -105,9 +119,7 @@ export function StandingsPage() {
     );
   }
 
-  const { league, members } = data;
-  const typedMembers = members as StandingsMemberRow[];
-  const currentRound = league?.current_round ?? 0;
+  const { league } = data;
 
   // Check if breakdown data exists
   const hasBreakdown = typedMembers.some(
@@ -203,7 +215,10 @@ export function StandingsPage() {
                         index + 1
                       )}
                     </Table.Td>
-                    <Table.Td>{member.team_name}</Table.Td>
+                    <Table.Td>
+                      {member.team_name}
+                      {seasonComplete && index === 0 && ' 🏆'}
+                    </Table.Td>
                     <Table.Td>
                       {member.users?.display_name ?? 'Unknown'}
                       {isMe && (

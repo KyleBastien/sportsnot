@@ -243,6 +243,56 @@ describe('calculateMemberPoints', () => {
     );
     expect(result.totalPoints).toBe(roundPointsSum);
   });
+
+  it('should use rosterHistory when current roster round does not match currentRound', () => {
+    const roster1 = [
+      {
+        id: 'slot-r1',
+        leagueMemberId: 'member-1',
+        round: 1,
+        playerId: 8470594,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 0,
+        activatedFromIr: false,
+      },
+    ];
+    const roster2 = [
+      {
+        id: 'slot-r2',
+        leagueMemberId: 'member-1',
+        round: 2,
+        playerId: 8477493,
+        position: 'F' as const,
+        isActive: true,
+        pointsEarned: 0,
+        activatedFromIr: false,
+      },
+    ];
+
+    // After R2 draft completes, currentRound is still 1 but rosters have R2 data
+    const stateAfterReDraft = {
+      currentRound: 1,
+      simulationDate: '2025-05-04',
+      rosters: { 'member-1': roster2 },
+      rosterHistory: { 'member-1': { 1: roster1 } },
+    };
+    const resultAfterReDraft = calculateMemberPoints(
+      stateAfterReDraft,
+      'member-1'
+    );
+
+    // Should use R1 roster from history, not the R2 roster in state.rosters
+    const stateNormal = {
+      currentRound: 1,
+      simulationDate: '2025-05-04',
+      rosters: { 'member-1': roster1 },
+      rosterHistory: {},
+    };
+    const resultNormal = calculateMemberPoints(stateNormal, 'member-1');
+
+    expect(resultAfterReDraft.totalPoints).toBe(resultNormal.totalPoints);
+  });
 });
 
 describe('sortMembersForReDraft', () => {

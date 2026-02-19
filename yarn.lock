@@ -4249,6 +4249,7 @@ __metadata:
     "@testing-library/dom": "npm:^10.4.1"
     "@testing-library/jest-dom": "npm:^6.9.1"
     "@testing-library/react": "npm:^16.3.2"
+    "@types/canvas-confetti": "npm:^1.9.0"
     "@types/node": "npm:20.19.9"
     "@types/react": "npm:^19.2.14"
     "@types/react-dom": "npm:^19.2.3"
@@ -4258,6 +4259,7 @@ __metadata:
     "@vanilla-extract/sprinkles": "npm:^1.6.5"
     "@vanilla-extract/webpack-plugin": "npm:^2.3.25"
     babel-plugin-react-compiler: "npm:^1.0.0"
+    canvas-confetti: "npm:^1.9.4"
     eslint: "npm:9"
     eslint-config-prettier: "npm:^10.1.8"
     eslint-plugin-playwright: "npm:^2.5.1"
@@ -4843,6 +4845,13 @@ __metadata:
   dependencies:
     "@types/node": "npm:*"
   checksum: 10c0/eebedbca185ac3c39dd5992ef18d9e2a9f99e7f3c2f52f5561f90e9ed482c5d224c7962db95362712f580ed5713264e777a98d8f0bd8747f4eadf62937baed16
+  languageName: node
+  linkType: hard
+
+"@types/canvas-confetti@npm:^1.9.0":
+  version: 1.9.0
+  resolution: "@types/canvas-confetti@npm:1.9.0"
+  checksum: 10c0/ffe2c674d466b8e13472c81ab2a97056f3433fd40a3513dbc1bb76764e4e7c3ff0a2a58d37b16ea6a245c831077c553db321b069dda6572eab59f2be61137b2e
   languageName: node
   linkType: hard
 
@@ -6193,6 +6202,13 @@ __metadata:
   version: 1.0.30001769
   resolution: "caniuse-lite@npm:1.0.30001769"
   checksum: 10c0/161b8c30ab967371807d45d361f0d5bc06e38ef2dbf811493d70cd97c21e1522f5b91fd944c419a00047ee09c931ca64627f125a9ffa7a17a9fdff8dad9765b0
+  languageName: node
+  linkType: hard
+
+"canvas-confetti@npm:^1.9.4":
+  version: 1.9.4
+  resolution: "canvas-confetti@npm:1.9.4"
+  checksum: 10c0/08f11b5fa20b365922108828d7488f9b3eac2afdf39bc478339268c1250b5215df82682d7074520a3f0f72f4728f9703bbc937dcfe793f196b44e6e8ac0b1f7b
   languageName: node
   linkType: hard
 
