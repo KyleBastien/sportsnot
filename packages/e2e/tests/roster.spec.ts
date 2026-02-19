@@ -367,7 +367,9 @@ test.describe('Roster Management', () => {
     ).toBeVisible(NAV_TIMEOUT);
 
     // Round info displayed
-    await expect(authenticatedPage.getByText('Round 1')).toBeVisible();
+    await expect(
+      authenticatedPage.getByText('Round 1', { exact: true })
+    ).toBeVisible();
 
     // Scoring info displayed
     await expect(authenticatedPage.getByText(/Goal = 1pt/i)).toBeVisible();

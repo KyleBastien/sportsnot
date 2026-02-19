@@ -580,7 +580,9 @@ test.describe('Mobile Viewport', () => {
     await expect(authenticatedPage.getByText('Connor McDavid')).toBeVisible();
 
     // Round info should be displayed
-    await expect(authenticatedPage.getByText('Round 1')).toBeVisible();
+    await expect(
+      authenticatedPage.getByText('Round 1', { exact: true })
+    ).toBeVisible();
   });
 
   test('league dashboard is navigable on mobile', async ({
