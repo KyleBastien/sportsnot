@@ -12,7 +12,9 @@
       "!{projectRoot}/**/*.spec.ts",
       "!{projectRoot}/**/*.test.ts"
     ],
-    "sharedGlobals": []
+    "sharedGlobals": [
+      ".github/workflows/**/*"
+    ]
   },
   "targetDefaults": {
     "build": {
