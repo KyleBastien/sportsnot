@@ -57,11 +57,14 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
+      - name: Derive SHAs for affected commands
+        uses: nrwl/nx-set-shas@v4
+
       - name: Lint
-        run: npx nx affected -t lint --base=origin/main~1 --head=HEAD
+        run: npx nx affected -t lint --base=${{ env.NX_BASE }} --head=${{ env.NX_HEAD }}
 
       - name: Test
-        run: npx rstest
+        run: npx nx affected -t test --base=${{ env.NX_BASE }} --head=${{ env.NX_HEAD }}
 
       - name: Build
         run: npx nx build @sportsnot/web
