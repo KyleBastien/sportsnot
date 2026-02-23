@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* eslint-disable no-undef */
+
 /**
  * verify-no-mock-in-bundle.mjs
  *
@@ -92,18 +92,16 @@ if (violations.length > 0) {
   for (const { file, identifier } of violations) {
     console.error(`   ${file}: "${identifier}"`);
   }
-  console.error(
-    '\nMock mode code is leaking into the production bundle.'
-  );
+  console.error('\nMock mode code is leaking into the production bundle.');
   console.error(
     'Ensure all mock imports use dynamic import() inside build-time guards:'
   );
-  console.error(
-    "  if (import.meta.env.VITE_MOCK_MODE === 'true') { ... }\n"
-  );
+  console.error("  if (import.meta.env.VITE_MOCK_MODE === 'true') { ... }\n");
   process.exit(1);
 } else {
   console.log('✅ PASS: No mock identifiers found in production bundle.');
-  console.log(`   Checked ${MOCK_IDENTIFIERS.length} identifiers across ${jsFiles.length} file(s).`);
+  console.log(
+    `   Checked ${MOCK_IDENTIFIERS.length} identifiers across ${jsFiles.length} file(s).`
+  );
   process.exit(0);
 }
