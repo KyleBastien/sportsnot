@@ -66,19 +66,41 @@ jobs:
       - name: Test
         run: npx nx affected -t test --base=${{ env.NX_BASE }} --head=${{ env.NX_HEAD }}
 
-      - name: Build
+      - name: Build production
         run: npx nx build @sportsnot/web
         env:
+          VITE_MOCK_MODE: 'false'
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Verify no mock in production bundle
+        run: node scripts/verify-no-mock-in-bundle.mjs
+
+      - name: Stage production build
+        run: |
+          mkdir -p deploy
+          cp -r packages/web/dist/* deploy/
+          cp packages/web/public/404.html deploy/404.html
+
+      - name: Build demo
+        run: |
+          rm -rf packages/web/dist
+          npx nx build @sportsnot/web
+        env:
           VITE_MOCK_MODE: 'true'
+          BASE_HREF: '/demo/'
 
-      - name: Copy 404.html for SPA routing
-        run: cp packages/web/public/404.html packages/web/dist/404.html
+      - name: Stage demo build
+        run: |
+          mkdir -p deploy/demo
+          cp -r packages/web/dist/* deploy/demo/
+          cp packages/web/public/404-demo.html deploy/demo/404.html
 
-      - name: Upload build artifact
+      - name: Upload deploy artifact
         uses: actions/upload-artifact@v4
         with:
-          name: web-dist
-          path: packages/web/dist
+          name: web-deploy
+          path: deploy
           retention-days: 1
 
   e2e:
@@ -114,10 +136,10 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Download build artifact
+      - name: Download deploy artifact
         uses: actions/download-artifact@v4
         with:
-          name: web-dist
+          name: web-deploy
           path: packages/web/dist
 
       - name: Cache Playwright browsers
@@ -139,6 +161,8 @@ jobs:
 
       - name: Run Playwright tests
         run: npx nx e2e @sportsnot/e2e
+        env:
+          PLAYWRIGHT_BASE_URL: 'http://localhost:4200/demo'
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
@@ -164,11 +188,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ci, e2e]
     steps:
-      - name: Download build artifact
+      - name: Download deploy artifact
         uses: actions/download-artifact@v4
         with:
-          name: web-dist
-          path: packages/web/dist
+          name: web-deploy
+          path: deploy
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -176,7 +200,7 @@ jobs:
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: packages/web/dist
+          path: deploy
 
       - name: Deploy to GitHub Pages
         id: deployment
