@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@mantine/core/styles.css';
+import { theme } from './theme';
 
 import { AuthProvider } from './app/context/AuthContext';
 import App from './app/app';
@@ -42,7 +43,7 @@ const root = createRoot(document.getElementById('root') as HTMLElement);
 root.render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <MantineProvider defaultColorScheme="auto">
+      <MantineProvider theme={theme} defaultColorScheme="auto">
         <BrowserRouter>
           <AuthWrapper>
             <App />

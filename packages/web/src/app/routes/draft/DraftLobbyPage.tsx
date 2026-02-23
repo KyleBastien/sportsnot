@@ -252,7 +252,7 @@ export function DraftLobbyPage() {
             Start Round {nextRound} Draft
           </Button>
         ) : (
-          <Alert color="blue" title="Waiting for Commissioner">
+          <Alert color="navy" title="Waiting for Commissioner">
             The commissioner will start the draft when everyone is ready.
           </Alert>
         )}

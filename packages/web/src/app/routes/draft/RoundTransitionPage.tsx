@@ -174,7 +174,7 @@ export function RoundTransitionPage() {
           <Text c="dimmed">{league.name}</Text>
         </Stack>
 
-        <Alert color="blue" title="Full Re-Draft">
+        <Alert color="navy" title="Full Re-Draft">
           All players return to the pool. A new draft will be conducted for
           Round {nextRound}.
           {nextRound === 3 &&
@@ -268,7 +268,7 @@ export function RoundTransitionPage() {
             Start Round {nextRound} Re-Draft
           </Button>
         ) : (
-          <Alert color="blue" title="Waiting for Commissioner">
+          <Alert color="navy" title="Waiting for Commissioner">
             The commissioner will start the re-draft for Round {nextRound} when
             ready.
           </Alert>
