@@ -44,7 +44,9 @@ root.render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <MantineProvider theme={theme} defaultColorScheme="auto">
-        <BrowserRouter>
+        <BrowserRouter
+          basename={(import.meta.env.BASE_HREF || '/').replace(/\/+$/, '')}
+        >
           <AuthWrapper>
             <App />
           </AuthWrapper>
