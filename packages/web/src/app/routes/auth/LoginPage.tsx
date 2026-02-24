@@ -8,8 +8,10 @@ import {
   Stack,
   Paper,
   Alert,
+  Image,
 } from '@mantine/core';
 import { useAuthContext } from '../../context/AuthContext';
+import logoSrc from '../../../assets/sportsnot-logo.png';
 
 export function LoginPage() {
   const { signInWithMagicLink } = useAuthContext();
@@ -55,7 +57,14 @@ export function LoginPage() {
   return (
     <Container size="xs" py="xl">
       <Paper shadow="md" p="xl" radius="md" withBorder>
-        <Stack gap="md">
+        <Stack gap="md" align="center">
+          <Image
+            src={logoSrc}
+            alt="SportsNot Fantasy Hockey"
+            h={60}
+            w="auto"
+            fit="contain"
+          />
           <Title order={2} ta="center">
             Sign in to SportsNot
           </Title>

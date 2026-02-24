@@ -171,6 +171,7 @@ interface AvailablePlayerBoardProps {
   onToggleCompare: (player: ComparePlayer) => void;
   isRound1: boolean;
   regSeasonStats: RegSeasonStatRow[];
+  mySlotCounts: Record<string, number>;
 }
 
 function AvailablePlayerBoard({
@@ -186,8 +187,28 @@ function AvailablePlayerBoard({
   onToggleCompare,
   isRound1,
   regSeasonStats,
+  mySlotCounts,
 }: AvailablePlayerBoardProps) {
   const query = searchQuery.toLowerCase();
+
+  const isPositionFull = (pos: string): boolean => {
+    if (pos === 'F') {
+      return (
+        mySlotCounts['F'] >= ROSTER_COMPOSITION.forwards &&
+        mySlotCounts['IR_F'] >= ROSTER_COMPOSITION.irForwards
+      );
+    }
+    if (pos === 'D') {
+      return (
+        mySlotCounts['D'] >= ROSTER_COMPOSITION.defensemen &&
+        mySlotCounts['IR_D'] >= ROSTER_COMPOSITION.irDefensemen
+      );
+    }
+    if (pos === 'G') {
+      return mySlotCounts['G'] >= ROSTER_COMPOSITION.goalies;
+    }
+    return false;
+  };
 
   // Build a lookup for regular season points by player ID
   const regSeasonMap = new Map(
@@ -342,6 +363,7 @@ function AvailablePlayerBoard({
                           <Button
                             size="xs"
                             variant="light"
+                            disabled={isPositionFull(p.position)}
                             onClick={() =>
                               onSelectPlayer({
                                 id: p.id,
@@ -403,6 +425,7 @@ function AvailablePlayerBoard({
                       <Button
                         size="xs"
                         variant="light"
+                        disabled={isPositionFull('G')}
                         onClick={() =>
                           onSelectPlayer({
                             id: t.teamId,
@@ -627,7 +650,7 @@ export function DraftPage() {
   if (!draft) {
     return (
       <Container size="md" py="xl">
-        <Alert color="blue" title="No Active Draft">
+        <Alert color="navy" title="No Active Draft">
           No draft has been started for this league yet.
         </Alert>
       </Container>
@@ -945,7 +968,7 @@ export function DraftPage() {
                   Once player data is synced, you'll see a selectable list here.
                 </Alert>
               ) : (
-                <Alert color="blue">
+                <Alert color="navy">
                   Waiting for{' '}
                   {currentPicker
                     ? (currentPicker as DraftMemberRow).team_name
@@ -984,6 +1007,7 @@ export function DraftPage() {
               comparePlayers={comparePlayers}
               onToggleCompare={handleToggleCompare}
               isRound1={isRound1}
+              mySlotCounts={mySlotCounts}
               regSeasonStats={(regSeasonStats ?? []).map((r) => ({
                 player_id: r.player_id,
                 points: r.points,
@@ -1125,7 +1149,23 @@ export function DraftPage() {
                 <Button variant="subtle" onClick={() => setConfirmPlayer(null)}>
                   Cancel
                 </Button>
-                <Button onClick={handleConfirmPick} loading={submitting}>
+                <Button
+                  onClick={handleConfirmPick}
+                  loading={submitting}
+                  disabled={
+                    (confirmPosition === 'F' &&
+                      mySlotCounts['F'] >= ROSTER_COMPOSITION.forwards) ||
+                    (confirmPosition === 'IR_F' &&
+                      mySlotCounts['IR_F'] >= ROSTER_COMPOSITION.irForwards) ||
+                    (confirmPosition === 'D' &&
+                      mySlotCounts['D'] >= ROSTER_COMPOSITION.defensemen) ||
+                    (confirmPosition === 'IR_D' &&
+                      mySlotCounts['IR_D'] >=
+                        ROSTER_COMPOSITION.irDefensemen) ||
+                    (confirmPosition === 'G' &&
+                      mySlotCounts['G'] >= ROSTER_COMPOSITION.goalies)
+                  }
+                >
                   Confirm Pick
                 </Button>
               </Group>

@@ -23,9 +23,19 @@ import {
   useMockCompletedDrafts,
   useMockStartReDraft,
 } from '../../../mock/hooks/useMockDraft';
-import { sortMembersForReDraft } from '../../../mock/utils';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
+
+/** Sort league members worst-to-best by total_points (tiebreak: team name). */
+function sortMembersForReDraft<
+  T extends { total_points?: number | null; team_name: string },
+>(members: T[]): T[] {
+  return [...members].sort((a, b) => {
+    const ptsDiff = (a.total_points ?? 0) - (b.total_points ?? 0);
+    if (ptsDiff !== 0) return ptsDiff;
+    return a.team_name.localeCompare(b.team_name);
+  });
+}
 
 interface TransitionMemberRow {
   id: string;
@@ -174,7 +184,7 @@ export function RoundTransitionPage() {
           <Text c="dimmed">{league.name}</Text>
         </Stack>
 
-        <Alert color="blue" title="Full Re-Draft">
+        <Alert color="navy" title="Full Re-Draft">
           All players return to the pool. A new draft will be conducted for
           Round {nextRound}.
           {nextRound === 3 &&
@@ -268,7 +278,7 @@ export function RoundTransitionPage() {
             Start Round {nextRound} Re-Draft
           </Button>
         ) : (
-          <Alert color="blue" title="Waiting for Commissioner">
+          <Alert color="navy" title="Waiting for Commissioner">
             The commissioner will start the re-draft for Round {nextRound} when
             ready.
           </Alert>
