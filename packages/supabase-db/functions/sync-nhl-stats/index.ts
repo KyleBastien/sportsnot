@@ -70,7 +70,8 @@ Deno.serve(async (req) => {
         const games =
           roundStartDate && roundEndDate
             ? allGames.filter(
-                (g) => g.gameDate >= roundStartDate && g.gameDate <= roundEndDate
+                (g) =>
+                  g.gameDate >= roundStartDate && g.gameDate <= roundEndDate
               )
             : allGames;
 

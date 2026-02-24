@@ -3,7 +3,7 @@
  * Currently the only action is "Activate IR" which requires:
  * 1. The group is an IR position (IR_F or IR_D)
  * 2. At least one slot in the group has not been activated from IR
- * 3. There is at least one active player at the matching position to swap
+ * 3. There is at least one active, injured player at the matching position
  */
 
 export interface SlotLike {
@@ -11,12 +11,14 @@ export interface SlotLike {
   position: string;
   is_active: boolean;
   activated_from_ir: boolean;
+  player_id: number | null;
 }
 
 export function groupHasActions(
   groupPosition: string,
   groupPlayers: SlotLike[],
-  allSlots: SlotLike[]
+  allSlots: SlotLike[],
+  injuredPlayerIds: Set<number>
 ): boolean {
   const isIrGroup = groupPosition === 'IR_F' || groupPosition === 'IR_D';
   if (!isIrGroup) return false;
@@ -27,7 +29,12 @@ export function groupHasActions(
     (slot) =>
       !slot.activated_from_ir &&
       allSlots.some(
-        (s) => s.position === matchingPos && s.is_active && s.id !== slot.id
+        (s) =>
+          s.position === matchingPos &&
+          s.is_active &&
+          s.id !== slot.id &&
+          s.player_id !== null &&
+          injuredPlayerIds.has(s.player_id)
       )
   );
 }

@@ -1,8 +1,11 @@
 const { NxAppRspackPlugin } = require('@nx/rspack/app-plugin');
 const { NxReactRspackPlugin } = require('@nx/rspack/react-plugin');
 const { VanillaExtractPlugin } = require('@vanilla-extract/webpack-plugin');
-const { DefinePlugin } = require('@rspack/core');
+const { DefinePlugin, NormalModuleReplacementPlugin } = require('@rspack/core');
 const { join } = require('path');
+
+const baseHref = process.env.BASE_HREF || '/';
+const mockStub = join(__dirname, 'src/mock/stubs/mock-noop.ts');
 
 const envVars = {
   VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || 'http://localhost:54321',
@@ -14,6 +17,7 @@ const envVars = {
 module.exports = {
   output: {
     path: join(__dirname, 'dist'),
+    publicPath: baseHref,
   },
   resolve: {
     alias:
@@ -48,7 +52,7 @@ module.exports = {
       tsConfig: './tsconfig.app.json',
       main: './src/main.tsx',
       index: './src/index.html',
-      baseHref: '/',
+      baseHref: baseHref,
       assets: ['./src/favicon.ico', './src/assets'],
       styles: [],
       outputHashing: process.env['NODE_ENV'] === 'production' ? 'all' : 'none',
@@ -68,5 +72,18 @@ module.exports = {
       ),
       'import.meta.env.VITE_MOCK_MODE': JSON.stringify(envVars.VITE_MOCK_MODE),
     }),
+    ...(envVars.VITE_MOCK_MODE !== 'true'
+      ? [
+          new NormalModuleReplacementPlugin(
+            /[\\/]mock[\\/]hooks[\\/]/,
+            mockStub
+          ),
+          new NormalModuleReplacementPlugin(
+            /[\\/]mock[\\/]MockDataProvider/,
+            mockStub
+          ),
+          new NormalModuleReplacementPlugin(/[\\/]mock[\\/]utils/, mockStub),
+        ]
+      : []),
   ],
 };

@@ -83,9 +83,7 @@ test.describe('Navigation and Routing', () => {
     // Navigate via logo/home link
     await authenticatedPage.goto('/profile');
     await expect(authenticatedPage).toHaveURL(/\/profile/, NAV_TIMEOUT);
-    await authenticatedPage
-      .getByRole('heading', { name: /sportsnot/i })
-      .click();
+    await authenticatedPage.getByRole('link', { name: /sportsnot/i }).click();
     await expect(authenticatedPage).toHaveURL(
       /^http:\/\/localhost:\d+\/?$/,
       NAV_TIMEOUT
@@ -202,7 +200,7 @@ test.describe('Navigation and Routing', () => {
     // 2. Render blank (no matching route) with just the header
     // Verify that the app shell header is still rendered (app didn't crash)
     await expect(
-      authenticatedPage.getByRole('heading', { name: /sportsnot/i })
+      authenticatedPage.getByRole('link', { name: /sportsnot/i })
     ).toBeVisible(NAV_TIMEOUT);
 
     // The main content area should be empty (no route matched) or show error
@@ -215,7 +213,7 @@ test.describe('Navigation and Routing', () => {
     await authenticatedPage.goto('/leagues/unknown-id/nonexistent-page');
     await authenticatedPage.waitForLoadState('domcontentloaded');
     await expect(
-      authenticatedPage.getByRole('heading', { name: /sportsnot/i })
+      authenticatedPage.getByRole('link', { name: /sportsnot/i })
     ).toBeVisible(NAV_TIMEOUT);
   });
 });

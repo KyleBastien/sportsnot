@@ -72,7 +72,10 @@ interface RawGame {
   periodDescriptor?: { number: number; periodType: string };
 }
 
-const POSITION_MAP: Record<string, { code: string; name: string; type: string; abbreviation: string }> = {
+const POSITION_MAP: Record<
+  string,
+  { code: string; name: string; type: string; abbreviation: string }
+> = {
   C: { code: 'C', name: 'Center', type: 'Forward', abbreviation: 'C' },
   L: { code: 'L', name: 'Left Wing', type: 'Forward', abbreviation: 'LW' },
   R: { code: 'R', name: 'Right Wing', type: 'Forward', abbreviation: 'RW' },
@@ -124,18 +127,25 @@ function mapRawSeries(raw: RawBracketSeries): NHLPlayoffSeries {
     bottomSeedTeam: bottom,
     topSeedWins: raw.topSeedWins,
     bottomSeedWins: raw.bottomSeedWins,
-    matchupTeams: top && bottom
-      ? {
-          topSeed: {
-            team: { id: top.id, name: top.name },
-            seriesRecord: { wins: raw.topSeedWins, losses: raw.bottomSeedWins },
-          },
-          bottomSeed: {
-            team: { id: bottom.id, name: bottom.name },
-            seriesRecord: { wins: raw.bottomSeedWins, losses: raw.topSeedWins },
-          },
-        }
-      : undefined,
+    matchupTeams:
+      top && bottom
+        ? {
+            topSeed: {
+              team: { id: top.id, name: top.name },
+              seriesRecord: {
+                wins: raw.topSeedWins,
+                losses: raw.bottomSeedWins,
+              },
+            },
+            bottomSeed: {
+              team: { id: bottom.id, name: bottom.name },
+              seriesRecord: {
+                wins: raw.bottomSeedWins,
+                losses: raw.topSeedWins,
+              },
+            },
+          }
+        : undefined,
     isComplete,
     seriesWinner,
   };
@@ -146,14 +156,15 @@ function mapRawPlayer(
   teamAbbrev: string,
   teamId: number,
   teamName: string,
-  season: string
+  _season: string
 ): NHLPlayer {
   return {
     id: raw.id,
     fullName: `${raw.firstName.default} ${raw.lastName.default}`,
     firstName: raw.firstName.default,
     lastName: raw.lastName.default,
-    primaryNumber: raw.sweaterNumber != null ? String(raw.sweaterNumber) : undefined,
+    primaryNumber:
+      raw.sweaterNumber != null ? String(raw.sweaterNumber) : undefined,
     birthDate: raw.birthDate,
     currentAge: computeAge(raw.birthDate),
     nationality: raw.birthCountry ?? '',
@@ -167,8 +178,7 @@ function mapRawPlayer(
 }
 
 function mapRawGame(raw: RawGame): NHLGame {
-  const gameDate =
-    raw.gameDate ?? raw.startTimeUTC.split('T')[0];
+  const gameDate = raw.gameDate ?? raw.startTimeUTC.split('T')[0];
   return {
     id: raw.id,
     gameType: String(raw.gameType),
@@ -222,9 +232,7 @@ export async function getTeamRoster(
 
   // We need team info for the player mapping. Derive from bracket or use abbreviation.
   const allRaw = [...data.forwards, ...data.defensemen, ...data.goalies];
-  return allRaw.map((p) =>
-    mapRawPlayer(p, teamAbbreviation, 0, '', season)
-  );
+  return allRaw.map((p) => mapRawPlayer(p, teamAbbreviation, 0, '', season));
 }
 
 /**
@@ -282,7 +290,9 @@ export async function getRegularSeasonStats(
 
   return results
     .filter(
-      (r): r is PromiseFulfilledResult<{
+      (
+        r
+      ): r is PromiseFulfilledResult<{
         playerId: number;
         goals: number;
         assists: number;

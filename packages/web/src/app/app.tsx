@@ -3,18 +3,19 @@ import { Route, Routes, Link, useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
   AppShell,
-  Title,
   Group,
   Button,
   Menu,
   Avatar,
   Text,
   UnstyledButton,
+  Image,
   useComputedColorScheme,
   useMantineColorScheme,
 } from '@mantine/core';
 import { IconSun, IconMoon } from '@tabler/icons-react';
 import { useAuthContext } from './context/AuthContext';
+import logoSrc from '../assets/sportsnot-logo.png';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -161,7 +162,13 @@ export function App() {
           <AppShell.Header>
             <Group h="100%" px="md" justify="space-between">
               <UnstyledButton component={Link} to="/">
-                <Title order={3}>🏒 SportsNot</Title>
+                <Image
+                  src={logoSrc}
+                  alt="SportsNot Fantasy Hockey"
+                  h={40}
+                  w="auto"
+                  fit="contain"
+                />
               </UnstyledButton>
               <Group gap="sm">
                 <ColorSchemeToggle />

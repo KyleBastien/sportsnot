@@ -134,7 +134,7 @@ export function SimulationControlPanel() {
           {/* Status badges */}
           <Group gap="xs">
             {roundComplete && !seasonComplete && (
-              <Badge color="blue" variant="light">
+              <Badge color="navy" variant="light">
                 Round Complete
               </Badge>
             )}
@@ -151,7 +151,7 @@ export function SimulationControlPanel() {
           <Button
             fullWidth
             size="md"
-            color="blue"
+            color="navy"
             onClick={handleAdvanceDay}
             disabled={roundComplete || seasonComplete}
           >

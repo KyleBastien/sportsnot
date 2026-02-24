@@ -13,6 +13,7 @@ import {
   Center,
   Alert,
   Modal,
+  Radio,
 } from '@mantine/core';
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -120,9 +121,12 @@ export function RosterPage() {
   const { data, isLoading, error } = useMyRoster(leagueId!);
   const queryClient = useQueryClient();
   const [irModal, setIrModal] = useState<{
-    injuredSlotId: string;
     irSlotId: string;
+    candidates: RosterSlotRow[];
   } | null>(null);
+  const [selectedInjuredSlotId, setSelectedInjuredSlotId] = useState<
+    string | null
+  >(null);
   const [activating, setActivating] = useState(false);
   const mockActivateIR = useMockActivateIR();
 
@@ -161,6 +165,16 @@ export function RosterPage() {
     [teamStats]
   );
 
+  const injuredPlayerIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const p of playerStats ?? []) {
+      if (p.is_injured) {
+        ids.add(p.player_id);
+      }
+    }
+    return ids;
+  }, [playerStats]);
+
   if (isLoading) {
     return (
       <Center h="50vh">
@@ -188,7 +202,7 @@ export function RosterPage() {
         <Stack gap="lg" align="center">
           <Title order={2}>My Roster</Title>
           <Text c="dimmed">Round {round}</Text>
-          <Alert color="blue" title="No Roster Yet">
+          <Alert color="navy" title="No Roster Yet">
             Your roster for Round {round} has not been set yet. Waiting for the
             draft to begin.
           </Alert>
@@ -211,7 +225,7 @@ export function RosterPage() {
   const totalPoints = data.totalPoints ?? 0;
 
   const handleActivateIR = async () => {
-    if (!irModal) return;
+    if (!irModal || !selectedInjuredSlotId) return;
     setActivating(true);
 
     if (IS_MOCK && mockActivateIR) {
@@ -221,13 +235,14 @@ export function RosterPage() {
       });
       setActivating(false);
       setIrModal(null);
+      setSelectedInjuredSlotId(null);
       return;
     }
 
     const { error: activateError } = await supabase.rpc('activate_ir_player', {
       p_league_member_id: data.memberId,
       p_round: round,
-      p_injured_roster_id: irModal.injuredSlotId,
+      p_injured_roster_id: selectedInjuredSlotId,
       p_ir_roster_id: irModal.irSlotId,
     });
 
@@ -237,6 +252,7 @@ export function RosterPage() {
 
     setActivating(false);
     setIrModal(null);
+    setSelectedInjuredSlotId(null);
   };
 
   return (
@@ -280,7 +296,8 @@ export function RosterPage() {
           const hasAnyActions = groupHasActions(
             group.position,
             group.players,
-            slots
+            slots,
+            injuredPlayerIds
           );
 
           return (
@@ -319,12 +336,14 @@ export function RosterPage() {
                         slot.position === 'IR_F' || slot.position === 'IR_D';
                       const matchingPosition =
                         slot.position === 'IR_F' ? 'F' : 'D';
-                      // Find an active injured player at the matching position
+                      // Find active, injured players at the matching position
                       const injuredCandidates = slots.filter(
                         (s: RosterSlotRow) =>
                           s.position === matchingPosition &&
                           s.is_active &&
-                          s.id !== slot.id
+                          s.id !== slot.id &&
+                          s.player_id !== null &&
+                          injuredPlayerIds.has(s.player_id)
                       );
 
                       return (
@@ -377,12 +396,15 @@ export function RosterPage() {
                                     size="xs"
                                     variant="outline"
                                     color="orange"
-                                    onClick={() =>
+                                    onClick={() => {
                                       setIrModal({
-                                        injuredSlotId: injuredCandidates[0].id,
                                         irSlotId: slot.id,
-                                      })
-                                    }
+                                        candidates: injuredCandidates,
+                                      });
+                                      setSelectedInjuredSlotId(
+                                        injuredCandidates[0].id
+                                      );
+                                    }}
                                   >
                                     Activate IR
                                   </Button>
@@ -402,28 +424,62 @@ export function RosterPage() {
         {/* IR Activation Modal */}
         <Modal
           opened={!!irModal}
-          onClose={() => setIrModal(null)}
+          onClose={() => {
+            setIrModal(null);
+            setSelectedInjuredSlotId(null);
+          }}
           title="Activate IR Player"
         >
-          <Stack gap="md">
-            <Alert color="orange">
-              Activating an IR player will remove all points from the injured
-              player and retroactively grant the IR player's points for this
-              round.
-            </Alert>
-            <Group justify="flex-end">
-              <Button variant="subtle" onClick={() => setIrModal(null)}>
-                Cancel
-              </Button>
-              <Button
-                color="orange"
-                onClick={handleActivateIR}
-                loading={activating}
+          {irModal && (
+            <Stack gap="md">
+              <Alert color="orange">
+                Activating an IR player will remove all points from the injured
+                player and retroactively grant the IR player&apos;s points for
+                this round.
+              </Alert>
+              <Text fw={500} size="sm">
+                Select the injured player to replace:
+              </Text>
+              <Radio.Group
+                value={selectedInjuredSlotId ?? ''}
+                onChange={setSelectedInjuredSlotId}
               >
-                Activate IR Player
-              </Button>
-            </Group>
-          </Stack>
+                <Stack gap="xs">
+                  {irModal.candidates.map((candidate) => (
+                    <Radio
+                      key={candidate.id}
+                      value={candidate.id}
+                      label={resolvePickName(
+                        candidate.player_id,
+                        candidate.team_id,
+                        playerNameMap,
+                        teamNameMap
+                      )}
+                    />
+                  ))}
+                </Stack>
+              </Radio.Group>
+              <Group justify="flex-end">
+                <Button
+                  variant="subtle"
+                  onClick={() => {
+                    setIrModal(null);
+                    setSelectedInjuredSlotId(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  color="orange"
+                  onClick={handleActivateIR}
+                  loading={activating}
+                  disabled={!selectedInjuredSlotId}
+                >
+                  Activate IR Player
+                </Button>
+              </Group>
+            </Stack>
+          )}
         </Modal>
       </Stack>
     </Container>

@@ -10,7 +10,7 @@ export default defineConfig({
   workers: isCI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:4200',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:4200',
     trace: 'on-first-retry',
   },
   projects: [
