@@ -56,7 +56,11 @@ export const useMockScoringHistory = noopQuery;
 export { useMockLiveGamesTeamStats as useMockLiveGames };
 
 // mock/MockDataProvider
-export const useMockData = () => null;
+export const useMockData = () => ({
+  state: {},
+  dispatch: () => {},
+  hooks: {},
+});
 
 // mock/utils
 export const sortMembersForReDraft = () => [];

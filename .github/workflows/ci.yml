@@ -165,7 +165,7 @@ jobs:
       - name: Run Playwright tests
         run: npx nx e2e @sportsnot/e2e
         env:
-          VITE_MOCK_MODE: 'true'
+          VITE_MOCK_MODE: 'false'
 
       - name: Upload test report
         uses: actions/upload-artifact@v4

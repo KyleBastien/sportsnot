@@ -23,9 +23,19 @@ import {
   useMockCompletedDrafts,
   useMockStartReDraft,
 } from '../../../mock/hooks/useMockDraft';
-import { sortMembersForReDraft } from '../../../mock/utils';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
+
+/** Sort league members worst-to-best by total_points (tiebreak: team name). */
+function sortMembersForReDraft<
+  T extends { total_points?: number | null; team_name: string },
+>(members: T[]): T[] {
+  return [...members].sort((a, b) => {
+    const ptsDiff = (a.total_points ?? 0) - (b.total_points ?? 0);
+    if (ptsDiff !== 0) return ptsDiff;
+    return a.team_name.localeCompare(b.team_name);
+  });
+}
 
 interface TransitionMemberRow {
   id: string;

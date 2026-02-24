@@ -428,7 +428,7 @@ test.describe('Mobile Viewport', () => {
 
     // App header should still be visible
     await expect(
-      authenticatedPage.getByRole('heading', { name: /sportsnot/i })
+      authenticatedPage.getByRole('link', { name: /sportsnot/i })
     ).toBeVisible();
 
     // On mobile, user display name is hidden (visibleFrom="sm") — only avatar initial shows
@@ -616,7 +616,7 @@ test.describe('Mobile Viewport', () => {
 
     // App header should still show logo
     await expect(
-      authenticatedPage.getByRole('heading', { name: /sportsnot/i })
+      authenticatedPage.getByRole('link', { name: /sportsnot/i })
     ).toBeVisible();
   });
 
