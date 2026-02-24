@@ -71,6 +71,7 @@ module.exports = {
         envVars.VITE_SUPABASE_ANON_KEY
       ),
       'import.meta.env.VITE_MOCK_MODE': JSON.stringify(envVars.VITE_MOCK_MODE),
+      'import.meta.env.BASE_HREF': JSON.stringify(baseHref),
     }),
     ...(envVars.VITE_MOCK_MODE !== 'true'
       ? [
