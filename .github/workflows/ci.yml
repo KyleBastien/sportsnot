@@ -67,7 +67,7 @@ jobs:
         run: npx nx affected -t test --base=${{ env.NX_BASE }} --head=${{ env.NX_HEAD }}
 
       - name: Build production
-        run: npx nx build @sportsnot/web
+        run: npx nx build @sportsnot/web --skip-nx-cache
         env:
           VITE_MOCK_MODE: 'false'
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -82,10 +82,10 @@ jobs:
           cp -r packages/web/dist/* deploy/
           cp packages/web/public/404.html deploy/404.html
 
-      - name: Build demo
+      - name: Build demo for deployment
         run: |
           rm -rf packages/web/dist
-          npx nx build @sportsnot/web
+          npx nx build @sportsnot/web --skip-nx-cache
         env:
           VITE_MOCK_MODE: 'true'
           BASE_HREF: '/demo/'
@@ -101,6 +101,20 @@ jobs:
         with:
           name: web-deploy
           path: deploy
+          retention-days: 1
+
+      - name: Build demo for E2E
+        run: |
+          rm -rf packages/web/dist
+          npx nx build @sportsnot/web --skip-nx-cache
+        env:
+          VITE_MOCK_MODE: 'true'
+
+      - name: Upload E2E build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-e2e
+          path: packages/web/dist
           retention-days: 1
 
   e2e:
@@ -136,10 +150,10 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Download deploy artifact
+      - name: Download E2E build artifact
         uses: actions/download-artifact@v4
         with:
-          name: web-deploy
+          name: web-e2e
           path: packages/web/dist
 
       - name: Cache Playwright browsers
@@ -161,8 +175,6 @@ jobs:
 
       - name: Run Playwright tests
         run: npx nx e2e @sportsnot/e2e
-        env:
-          PLAYWRIGHT_BASE_URL: 'http://localhost:4200/demo'
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
