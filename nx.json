@@ -21,6 +21,14 @@
       "dependsOn": [
         "^build"
       ],
+      "inputs": [
+        "production",
+        "^production",
+        { "env": "VITE_MOCK_MODE" },
+        { "env": "BASE_HREF" },
+        { "env": "VITE_SUPABASE_URL" },
+        { "env": "VITE_SUPABASE_ANON_KEY" }
+      ],
       "cache": true
     },
     "test": {

@@ -67,7 +67,7 @@ jobs:
         run: npx nx affected -t test --base=${{ env.NX_BASE }} --head=${{ env.NX_HEAD }}
 
       - name: Build production
-        run: npx nx build @sportsnot/web --skip-nx-cache
+        run: npx nx build @sportsnot/web
         env:
           VITE_MOCK_MODE: 'false'
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -85,7 +85,7 @@ jobs:
       - name: Build demo for deployment
         run: |
           rm -rf packages/web/dist
-          npx nx build @sportsnot/web --skip-nx-cache
+          npx nx build @sportsnot/web
         env:
           VITE_MOCK_MODE: 'true'
           BASE_HREF: '/demo/'
@@ -106,7 +106,7 @@ jobs:
       - name: Build demo for E2E
         run: |
           rm -rf packages/web/dist
-          npx nx build @sportsnot/web --skip-nx-cache
+          npx nx build @sportsnot/web
         env:
           VITE_MOCK_MODE: 'true'
 
