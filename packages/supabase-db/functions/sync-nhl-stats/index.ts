@@ -55,10 +55,9 @@ async function pgSelect<T>(
   table: string,
   params: string
 ): Promise<T[]> {
-  const resp = await fetch(
-    `${baseUrl}/rest/v1/${table}?${params}`,
-    { headers: pgHeaders(apiKey) }
-  );
+  const resp = await fetch(`${baseUrl}/rest/v1/${table}?${params}`, {
+    headers: pgHeaders(apiKey),
+  });
   if (!resp.ok) return [];
   return (await resp.json()) as T[];
 }
@@ -93,14 +92,11 @@ async function pgUpdate(
   filters: string,
   body: unknown
 ): Promise<boolean> {
-  const resp = await fetch(
-    `${baseUrl}/rest/v1/${table}?${filters}`,
-    {
-      method: 'PATCH',
-      headers: pgHeaders(apiKey),
-      body: JSON.stringify(body),
-    }
-  );
+  const resp = await fetch(`${baseUrl}/rest/v1/${table}?${filters}`, {
+    method: 'PATCH',
+    headers: pgHeaders(apiKey),
+    body: JSON.stringify(body),
+  });
   return resp.ok;
 }
 
@@ -127,8 +123,7 @@ Deno.serve(async (req: Request) => {
     if (!supabaseUrl || !supabaseKey) {
       return new Response(
         JSON.stringify({
-          error:
-            'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY',
+          error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY',
         }),
         {
           status: 500,
@@ -140,8 +135,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const season: string = body.season || '20252026';
     const playoffRound: number = body.playoff_round || 1;
-    const roundStartDate: string | undefined =
-      body.round_start_date;
+    const roundStartDate: string | undefined = body.round_start_date;
     const roundEndDate: string | undefined = body.round_end_date;
 
     // ── Get active rosters ─────────────────────────────────────
@@ -168,9 +162,7 @@ Deno.serve(async (req: Request) => {
     ];
     const teamIds = [
       ...new Set(
-        rosters
-          .filter((r) => r.team_id != null)
-          .map((r) => r.team_id as number)
+        rosters.filter((r) => r.team_id != null).map((r) => r.team_id as number)
       ),
     ];
 
@@ -192,19 +184,16 @@ Deno.serve(async (req: Request) => {
           roundStartDate && roundEndDate
             ? allGames.filter(
                 (g) =>
-                  g.gameDate >= roundStartDate &&
-                  g.gameDate <= roundEndDate
+                  g.gameDate >= roundStartDate && g.gameDate <= roundEndDate
               )
             : allGames;
 
         const totalGoals = games.reduce(
-          (sum: number, g: PlayerGameLog) =>
-            sum + (g.goals ?? 0),
+          (sum: number, g: PlayerGameLog) => sum + (g.goals ?? 0),
           0
         );
         const totalAssists = games.reduce(
-          (sum: number, g: PlayerGameLog) =>
-            sum + (g.assists ?? 0),
+          (sum: number, g: PlayerGameLog) => sum + (g.assists ?? 0),
           0
         );
 
@@ -242,21 +231,10 @@ Deno.serve(async (req: Request) => {
         let shutouts = 0;
 
         for (const game of games) {
-          if (
-            game.gameType !== 3 ||
-            game.gameState !== 'FINAL'
-          )
-            continue;
+          if (game.gameType !== 3 || game.gameState !== 'FINAL') continue;
 
-          if (
-            roundStartDate &&
-            roundEndDate &&
-            game.gameDate
-          ) {
-            if (
-              game.gameDate < roundStartDate ||
-              game.gameDate > roundEndDate
-            )
+          if (roundStartDate && roundEndDate && game.gameDate) {
+            if (game.gameDate < roundStartDate || game.gameDate > roundEndDate)
               continue;
           }
 
@@ -334,11 +312,9 @@ Deno.serve(async (req: Request) => {
       );
       if (rows.length > 0) {
         const stats = rows[0];
-        const regularWins =
-          (stats.wins ?? 0) - (stats.shutouts ?? 0);
+        const regularWins = (stats.wins ?? 0) - (stats.shutouts ?? 0);
         const pts =
-          regularWins * SCORING_WIN +
-          (stats.shutouts ?? 0) * SCORING_SHUTOUT;
+          regularWins * SCORING_WIN + (stats.shutouts ?? 0) * SCORING_SHUTOUT;
         await pgUpdate(
           supabaseUrl,
           supabaseKey,
@@ -359,9 +335,7 @@ Deno.serve(async (req: Request) => {
 
     if (affectedMembers.length > 0) {
       const memberIds = [
-        ...new Set(
-          affectedMembers.map((r) => r.league_member_id)
-        ),
+        ...new Set(affectedMembers.map((r) => r.league_member_id)),
       ];
 
       const members = await pgSelect<LeagueMemberRow>(
@@ -372,19 +346,12 @@ Deno.serve(async (req: Request) => {
       );
 
       if (members.length > 0) {
-        const leagueIds = [
-          ...new Set(members.map((m) => m.league_id)),
-        ];
+        const leagueIds = [...new Set(members.map((m) => m.league_id))];
         for (const leagueId of leagueIds) {
-          await pgRpc(
-            supabaseUrl,
-            supabaseKey,
-            'refresh_league_standings',
-            {
-              p_league_id: leagueId,
-              p_round: playoffRound,
-            }
-          );
+          await pgRpc(supabaseUrl, supabaseKey, 'refresh_league_standings', {
+            p_league_id: leagueId,
+            p_round: playoffRound,
+          });
         }
       }
     }
@@ -398,8 +365,7 @@ Deno.serve(async (req: Request) => {
       { headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
