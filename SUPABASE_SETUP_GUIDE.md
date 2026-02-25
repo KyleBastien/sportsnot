@@ -51,10 +51,11 @@ Once the project is ready, go to **Settings → API** and note:
 
 ## 2. Run the Database Migrations
 
-SportsNot has two migration files that must be run **in order**:
+SportsNot has three migration files that must be run **in order**:
 
 1. `packages/supabase-db/migrations/001_initial_schema.sql` — Creates all tables, indexes, functions, triggers, and RLS policies.
 2. `packages/supabase-db/migrations/002_standings_columns.sql` — Adds standings breakdown columns and the `refresh_league_standings` function.
+3. `packages/supabase-db/migrations/003_regular_season_stats_cache.sql` — Creates the `regular_season_stats_cache` table for Round 1 draft player rankings.
 
 ### Option A: Supabase Dashboard SQL Editor (Recommended for first-time setup)
 
@@ -63,10 +64,9 @@ SportsNot has two migration files that must be run **in order**:
 3. Open `packages/supabase-db/migrations/001_initial_schema.sql` from your local repo, copy the **entire** contents, and paste it into the SQL Editor.
 4. Click **"Run"** (or press Ctrl+Enter / Cmd+Enter).
 5. You should see `Success. No rows returned.` This is correct — DDL statements don't return rows.
-6. Create another new query tab. Copy and paste the **entire** contents of `packages/supabase-db/migrations/002_standings_columns.sql`.
-7. Click **"Run"**.
+6. Repeat for `002_standings_columns.sql` and `003_regular_season_stats_cache.sql` — each in a new query tab, one at a time.
 
-> ⚠️ **DO NOT** run both files in a single query. Run them **one at a time, in order**. Migration 002 depends on tables created in 001.
+> ⚠️ **DO NOT** run all files in a single query. Run them **one at a time, in order**. Each migration depends on the previous ones.
 
 > ⚠️ **DO NOT** run a migration file more than once. If you accidentally re-run 001, you'll get errors like `relation "users" already exists`. If this happens, the tables are already there — just move on. The `CREATE OR REPLACE FUNCTION` statements are idempotent, but `CREATE TABLE` is not.
 
@@ -83,7 +83,7 @@ However, note that `supabase db push` expects migrations in the standard Supabas
 
 ### What the Migrations Create
 
-**Tables (8 total):**
+**Tables (9 total):**
 
 | Table | Purpose |
 |---|---|
@@ -95,6 +95,7 @@ However, note that `supabase db push` expects migrations in the standard Supabas
 | `rosters` | Active roster slots per member per round |
 | `player_stats_cache` | Cached NHL player stats (goals, assists, GP) |
 | `team_stats_cache` | Cached NHL team stats (wins, shutouts) |
+| `regular_season_stats_cache` | Cached regular season stats for Round 1 draft rankings |
 
 **Functions (5 total):**
 - `handle_updated_at()` — Auto-updates `updated_at` timestamps
@@ -113,11 +114,11 @@ However, note that `supabase db push` expects migrations in the standard Supabas
 
 ## 3. Verify Tables, Functions & Triggers
 
-After running both migrations, verify everything is in place.
+After running all three migrations, verify everything is in place.
 
 ### Check Tables
 
-Go to **Table Editor** (left sidebar). You should see all 8 tables listed:
+Go to **Table Editor** (left sidebar). You should see all 9 tables listed:
 - `users`
 - `leagues`
 - `league_members`
@@ -126,6 +127,7 @@ Go to **Table Editor** (left sidebar). You should see all 8 tables listed:
 - `rosters`
 - `player_stats_cache`
 - `team_stats_cache`
+- `regular_season_stats_cache`
 
 Click into `league_members` and verify it has columns `player_points`, `goalie_points`, and `round_points` (added by migration 002).
 
@@ -189,9 +191,9 @@ Go to **Authentication → Policies** (or **Table Editor → select a table → 
 
 The migration already adds tables to the `supabase_realtime` publication, but you need to **verify Realtime is enabled** in the dashboard.
 
-1. Go to **Database → Replication** (left sidebar).
-2. Under **Realtime**, ensure the `supabase_realtime` publication exists.
-3. Click on it and verify these tables are included:
+1. Go to **Database → Publications** (left sidebar, under the **Database** section).
+2. You should see a publication called **`supabase_realtime`**. Click on it.
+3. You'll see a list of your tables with toggles. Verify these tables are toggled **ON**:
    - `drafts`
    - `draft_picks`
    - `rosters`
@@ -224,11 +226,7 @@ SportsNot uses **Magic Link (email OTP)** authentication — no passwords. Users
 2. **Email** should already be enabled by default. Click on it to expand.
 3. Verify these settings:
    - **Enable Email provider:** ✅ ON
-   - **Confirm email:** ✅ ON (users must click the magic link to complete sign-in)
-   - **Enable email confirmations:** ✅ ON
-   - **Secure email change:** ✅ ON
-
-> ⚠️ **DO NOT** enable "Double confirm email changes." It adds friction for no security benefit in this app.
+   - **Confirm email:** ✅ ON (users must click the magic link to complete sign-in — this is the critical one)
 
 > ⚠️ **DO NOT** enable password-based sign-in alongside magic link unless you specifically want it. SportsNot's auth flow is built entirely around `signInWithOtp()` (magic link). Adding password auth creates a confusing UX with two sign-in paths.
 
@@ -290,12 +288,17 @@ Your SportsNot Login Link 🏒
 
 **Body (HTML):**
 ```html
-<h2>Welcome to SportsNot!</h2>
+<div style="text-align: center; margin-bottom: 24px;">
+  <img src="https://www.sportsnot.net/sportsnot-logo.f136dd23d873e889.png" alt="SportsNot" width="120" style="display: inline-block;" />
+</div>
+<h2 style="text-align: center;">Welcome to SportsNot!</h2>
 <p>Click the link below to sign in to your NHL Playoff Fantasy Hockey account:</p>
 <p><a href="{{ .ConfirmationURL }}">Sign In to SportsNot</a></p>
 <p>This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
 <p>Good luck in the 2026 Playoffs! 🏆</p>
 ```
+
+> **Logo URL:** The logo is hosted at `https://www.sportsnot.net/sportsnot-logo.f136dd23d873e889.png` and is already set in the template above.
 
 4. Click **"Save"**.
 
@@ -305,23 +308,75 @@ Your SportsNot Login Link 🏒
 
 ### Custom SMTP (Recommended for Production)
 
-Supabase's built-in email sending has strict rate limits (4 emails/hour on free, 30/hour on Pro) and emails may land in spam.
+Supabase's built-in email sending only delivers to **project team members' email addresses** and has a rate limit of **2 emails per hour**. For a real playoff season, you must set up custom SMTP. We recommend **Resend** — it's the easiest to integrate with Supabase.
 
-For a real playoff season with real users, set up custom SMTP:
+#### Step-by-Step: Setting Up Resend as Your SMTP Provider
 
-1. Go to **Settings → Authentication → SMTP Settings**.
-2. Toggle **"Enable Custom SMTP"** ON.
-3. Fill in your SMTP provider details. Good options:
-   - **Resend** (resend.com) — easiest setup, great deliverability, free tier: 100 emails/day
-   - **Postmark** — excellent deliverability, 100 free test emails
-   - **SendGrid** — free tier: 100 emails/day
-   - **AWS SES** — cheapest at scale, more setup effort
-4. Configure:
-   - **Sender email:** `noreply@sportsnot.app` (or your domain)
-   - **Sender name:** `SportsNot`
-   - **Host/Port/User/Password:** From your SMTP provider
+**1. Create a Resend account**
+   - Go to [https://resend.com](https://resend.com) and sign up.
+   - Free tier: 100 emails/day, 3,000 emails/month — more than enough for SportsNot.
 
-> ⚠️ **Without custom SMTP, you will hit rate limits during the playoffs.** If 10 people try to sign up in the same hour on the free plan, 6 of them won't get emails. This is the #1 issue people hit in production.
+**2. Verify your domain**
+   - Go to [https://resend.com/domains](https://resend.com/domains) and click **"Add Domain"**.
+   - Enter your domain (e.g., `sportsnot.net`).
+   - Resend will give you **DNS records** to add (MX, TXT for SPF, and CNAME for DKIM). Add these records at your domain registrar (e.g., Cloudflare, Namecheap, GoDaddy).
+   - Wait for verification (usually a few minutes, sometimes up to 24 hours).
+   - **Why this matters:** Without domain verification, emails may go to spam or not send at all. Supabase requires the sender email to match a verified domain.
+
+> ⚠️ **DO NOT** skip domain verification and use Resend's `onboarding@resend.dev` test address. It will not work with Supabase in production — your users' magic link emails will be rejected or filtered as spam.
+
+**3. Create an API key**
+   - Go to [https://resend.com/api-keys](https://resend.com/api-keys).
+   - Click **"Create API Key"**.
+   - Name it something like `supabase-sportsnot`.
+   - Permission: **Sending access** is sufficient.
+   - Copy the key immediately — you won't see it again.
+
+**4. Configure SMTP in Supabase**
+   - In your Supabase dashboard, go to **Authentication** (left sidebar).
+   - Click **Email** under the **Notifications** section.
+   - Click **SMTP Settings** and toggle it **ON**.
+   - Fill in the following values exactly:
+
+   | Setting | Value |
+   |---|---|
+   | **Sender email** | `noreply@sportsnot.net` (must match your verified Resend domain) |
+   | **Sender name** | `SportsNot` |
+   | **Host** | `smtp.resend.com` |
+   | **Port** | `465` |
+   | **Username** | `resend` (literally the word "resend" — not your email) |
+   | **Password** | Your Resend API key (the `re_` prefixed key you copied) |
+
+   - Click **Save**.
+
+> ⚠️ **Common mistakes with Resend setup:**
+> - **Wrong username:** The username is literally `resend`, not your Resend account email.
+> - **Wrong port:** Use `465` (SSL). Port `587` (STARTTLS) also works but `465` is what Resend recommends.
+> - **Sender email doesn't match verified domain:** If your domain is `sportsnot.net`, the sender must be `something@sportsnot.net`. Using `noreply@gmail.com` will fail.
+> - **API key copied wrong:** The key starts with `re_`. Make sure there are no extra spaces.
+
+**5. Test it**
+   - After saving, go to your app and try signing in with a real email address (not just project team members — that restriction is now lifted).
+   - Check that the email arrives from `noreply@sportsnot.net` (or whatever you set) and not from `noreply@mail.app.supabase.io`.
+   - Check spam/junk if it doesn't appear within a minute.
+   - You can also monitor delivery in the Resend dashboard at [https://resend.com/emails](https://resend.com/emails).
+
+**6. Adjust rate limits in Supabase**
+   - After configuring custom SMTP, Supabase defaults to 30 emails/hour.
+   - Go to **Authentication → Rate Limits** and increase if needed for your expected user count.
+   - Resend's free tier allows 100/day, so set your Supabase rate limit to stay within that.
+
+#### Alternative SMTP Providers
+
+If you prefer not to use Resend, these also work with the same Supabase SMTP settings page:
+
+| Provider | Host | Port | Username | Password | Free Tier |
+|---|---|---|---|---|---|
+| **Postmark** | `smtp.postmarkapp.com` | `587` | Your Postmark Server API Token | Same token | 100 test emails |
+| **SendGrid** | `smtp.sendgrid.net` | `587` | `apikey` (literal) | Your SendGrid API key | 100 emails/day |
+| **AWS SES** | `email-smtp.us-east-1.amazonaws.com` | `587` | SMTP credential username | SMTP credential password | 200 emails/day (in sandbox) |
+
+> ⚠️ **Without custom SMTP, Supabase will only send emails to project team members and caps at 2/hour.** This is the #1 issue people hit when going live. Set up SMTP before inviting any real users.
 
 ---
 
@@ -373,12 +428,16 @@ supabase functions deploy sync-nhl-stats --project-ref your-project-ref
 
 > ⚠️ **Important:** Supabase expects edge functions in a specific directory structure. The `supabase functions deploy` command looks for `supabase/functions/<function-name>/index.ts` by default. Since SportsNot keeps functions in `packages/supabase-db/functions/`, you may need to either:
 >
-> **Option A (recommended):** Copy/symlink the function to the expected location:
+> **Option A (recommended):** Create a symlink so Supabase CLI finds the function without duplicating files. Run these commands from the **repo root** (`sportsnot/`):
 > ```bash
-> mkdir -p supabase/functions/sync-nhl-stats
-> cp packages/supabase-db/functions/sync-nhl-stats/index.ts supabase/functions/sync-nhl-stats/index.ts
+> mkdir -p supabase/functions
+> # Windows PowerShell (from repo root — requires Administrator or Developer Mode)
+> New-Item -ItemType SymbolicLink -Path supabase\functions\sync-nhl-stats -Target (Resolve-Path packages\supabase-db\functions\sync-nhl-stats).Path
+> # macOS/Linux (from repo root)
+> ln -s ../../packages/supabase-db/functions/sync-nhl-stats supabase/functions/sync-nhl-stats
 > supabase functions deploy sync-nhl-stats
 > ```
+> The symlink keeps a single source of truth — edits to `packages/supabase-db/functions/sync-nhl-stats/index.ts` are automatically picked up by the CLI.
 >
 > **Option B:** Use the `--legacy-bundle` or specify the source directory if your Supabase CLI version supports it.
 
@@ -425,11 +484,12 @@ Supabase includes `pg_cron` for scheduling. Go to **SQL Editor** and run:
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Schedule sync every 15 minutes during playoff games
--- Adjust the schedule as needed. Games typically run 7 PM - midnight ET.
+-- Off-season: schedule a weekly health-check sync (every Sunday at midnight UTC)
+-- This keeps the function warm and verifies the pipeline works before playoffs start.
+-- When the playoffs begin, update to every 15 minutes (see below).
 SELECT cron.schedule(
   'sync-nhl-stats',
-  '*/15 * * * *',  -- Every 15 minutes
+  '0 0 * * 0',  -- Every Sunday at midnight UTC
   $$
   SELECT net.http_post(
     url := 'https://<your-project-ref>.supabase.co/functions/v1/sync-nhl-stats',
@@ -445,6 +505,28 @@ SELECT cron.schedule(
   $$
 );
 ```
+
+> **When the playoffs start,** switch to every 15 minutes:
+> ```sql
+> SELECT cron.unschedule('sync-nhl-stats');
+> SELECT cron.schedule(
+>   'sync-nhl-stats',
+>   '*/15 * * * *',  -- Every 15 minutes
+>   $$
+>   SELECT net.http_post(
+>     url := 'https://<your-project-ref>.supabase.co/functions/v1/sync-nhl-stats',
+>     headers := jsonb_build_object(
+>       'Content-Type', 'application/json',
+>       'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true)
+>     ),
+>     body := jsonb_build_object(
+>       'season', '20252026',
+>       'playoff_round', 1
+>     )
+>   );
+>   $$
+> );
+> ```
 
 > **Note:** You'll need to update the `playoff_round` value in the cron body as the playoffs progress (1 → 2 → 3 → 4). You can also pass `round_start_date` and `round_end_date` to filter stats to a specific round's date range.
 
@@ -498,11 +580,11 @@ curl -X POST https://<your-project-ref>.supabase.co/functions/v1/sync-nhl-stats 
 
 ---
 
-## 9. Connect the App (.env Configuration)
+## 9. Connect the App (.env & GitHub Actions Configuration)
 
-Now connect SportsNot to your Supabase project.
+Now connect SportsNot to your Supabase project — both for local development and for the deployed production site.
 
-### Edit `.env` in the Repo Root
+### 9a. Local Development — Edit `.env` in the Repo Root
 
 Open the `.env` file in the root of the repository and update:
 
@@ -515,6 +597,38 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...your-anon-key...
 VITE_MOCK_MODE=false
 ```
 
+### 9b. Production Deployment — Set GitHub Actions Secrets
+
+The CI workflow (`.github/workflows/ci.yml`) already reads Supabase credentials from **GitHub Actions secrets** during the production build. You need to add them to your repo:
+
+1. Make sure you have the [GitHub CLI](https://cli.github.com/) installed and authenticated (`gh auth login`).
+2. Run these commands from the repo root:
+
+   ```bash
+   gh secret set VITE_SUPABASE_URL --body "https://<your-project-ref>.supabase.co"
+   gh secret set VITE_SUPABASE_ANON_KEY --body "your-anon-key-here"
+   ```
+
+3. Verify the secrets were added:
+
+   ```bash
+   gh secret list
+   ```
+
+   You should see `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` listed.
+
+4. That's it. The next push to `main` (or manual workflow dispatch) will build and deploy with your real Supabase credentials.
+
+> **How it works:** The CI workflow builds the app twice:
+> - **Production build** — uses `VITE_MOCK_MODE: 'false'` and injects your Supabase secrets. This becomes the main site at `sportsnot.net`.
+> - **Demo build** — uses `VITE_MOCK_MODE: 'true'` and ignores Supabase entirely. This becomes the demo at `sportsnot.net/demo/`.
+>
+> You do NOT need to add `VITE_MOCK_MODE` as a secret — the workflow hardcodes it to `'false'` for production and `'true'` for demo.
+
+> ⚠️ **DO NOT** add secrets via a `.env` file committed to git. GitHub Actions secrets are the correct way — they're encrypted and never exposed in logs.
+
+> ⚠️ **DO NOT** put the `service_role` key in GitHub Actions secrets. The deployed app never needs it — only the edge function does (and Supabase injects it automatically at runtime).
+
 ### Where to Find the Values
 
 - **VITE_SUPABASE_URL:** Dashboard → Settings → API → Project URL
@@ -522,7 +636,7 @@ VITE_MOCK_MODE=false
 
 ### Important Notes
 
-- Set `VITE_MOCK_MODE=false` to use real Supabase instead of the in-memory mock data.
+- Set `VITE_MOCK_MODE=false` in your local `.env` to use real Supabase instead of the in-memory mock data.
 - The `VITE_` prefix is required — it's how Rspack (the bundler) exposes env vars to the browser. Without the prefix, the values won't be available at runtime.
 
 > ⚠️ **DO NOT** put the `service_role` key in `.env`. It's only needed by edge functions (which get it automatically) and the cron schedule (which is configured in the database, not the app).
@@ -651,36 +765,100 @@ Before the first puck drop, go through this checklist:
 | Not setting up custom SMTP | Magic link emails hit rate limits or go to spam | Use Resend, Postmark, SendGrid, or AWS SES |
 | Adding INSERT policies to stats cache tables | Users could write fake stats | Only the edge function (service_role) writes to these |
 | Enabling Realtime on stats cache tables | Wastes database connections for infrequently-updated data | Only enable Realtime for draft/roster tables |
-| Not creating `regular_season_stats_cache` table | `useRegularSeasonPlayers` hook queries this table (used for draft player rankings in Round 1) | See note below |
+| Not setting up `regular_season_stats_cache` | Round 1 draft can't show regular season stats for player rankings | Run migration 003 and deploy `sync-regular-season-stats` edge function |
 
-### Note: `regular_season_stats_cache` Table
+### Setting Up `regular_season_stats_cache` (Required for Round 1 Draft)
 
-The `useRegularSeasonPlayers` hook queries a `regular_season_stats_cache` table, but this table is **not included in the current migrations**. If you plan to show regular-season stats during the Round 1 draft (for player rankings/research), you'll need to create it manually:
+The `useRegularSeasonPlayers` hook queries a `regular_season_stats_cache` table to show regular season performance (goals, assists, points) next to each player during the Round 1 draft. This helps your league members make informed picks.
 
-```sql
-CREATE TABLE IF NOT EXISTS public.regular_season_stats_cache (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  player_id INTEGER NOT NULL,
-  nhl_season TEXT NOT NULL,
-  player_name TEXT,
-  team_abbreviation TEXT,
-  position TEXT CHECK (position IN ('F', 'D', 'G')),
-  goals INTEGER DEFAULT 0,
-  assists INTEGER DEFAULT 0,
-  points INTEGER DEFAULT 0,
-  games_played INTEGER DEFAULT 0,
-  last_updated TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(player_id, nhl_season)
-);
+#### Step 1: Run Migration 003
 
-ALTER TABLE public.regular_season_stats_cache ENABLE ROW LEVEL SECURITY;
+A new migration file exists at `packages/supabase-db/migrations/003_regular_season_stats_cache.sql`. Run it the same way you ran the others — paste the contents into the **SQL Editor** and click **Run**.
 
-CREATE POLICY "Authenticated users can read regular season stats"
-  ON public.regular_season_stats_cache FOR SELECT
-  USING (auth.role() = 'authenticated');
+This creates the table with:
+- `player_id`, `nhl_season` — unique key per player per season
+- `player_name`, `team_abbreviation`, `position` — display fields
+- `goals`, `assists`, `points`, `games_played` — aggregated regular season totals
+- RLS policy: authenticated users can read, only `service_role` (edge function) can write
+
+#### Step 2: Deploy the `sync-regular-season-stats` Edge Function
+
+A new edge function exists at `packages/supabase-db/functions/sync-regular-season-stats/index.ts`. Deploy it the same way you deployed `sync-nhl-stats`:
+
+```bash
+# Create symlink (from repo root)
+# Windows PowerShell
+New-Item -ItemType SymbolicLink -Path supabase\functions\sync-regular-season-stats -Target (Resolve-Path packages\supabase-db\functions\sync-regular-season-stats).Path
+# macOS/Linux
+ln -s ../../packages/supabase-db/functions/sync-regular-season-stats supabase/functions/sync-regular-season-stats
+
+# Deploy
+supabase functions deploy sync-regular-season-stats
 ```
 
-This table would need to be populated separately (either via a one-time script or an additional edge function) before the Round 1 draft. If you don't need regular season stats for the draft, the hook will simply return an empty array and the app will work fine without it.
+#### What the Function Does
+
+1. Determines which teams to sync — either from the `team_abbreviations` you provide, or by fetching the playoff bracket from the NHL API
+2. Fetches the full roster for each team
+3. For every player, fetches their **regular season** game log (game type `2`, not playoffs `3`)
+4. Aggregates goals, assists, points, and games played across the full regular season
+5. Upserts into `regular_season_stats_cache`
+
+It processes players in batches of 5 with a 500ms delay between batches to avoid NHL API rate limits. For 16 teams (~400 players), it takes approximately 1-2 minutes to complete.
+
+#### Step 3: Run the Sync
+
+This function only needs to be run **once before the Round 1 draft** (and optionally again if you want updated stats as the regular season wraps up). It's NOT scheduled on a cron — regular season stats are mostly static by playoff time.
+
+**Before the playoff bracket is published** (you must provide team abbreviations manually):
+
+```bash
+curl -X POST https://<your-project-ref>.supabase.co/functions/v1/sync-regular-season-stats \
+  -H "Authorization: Bearer <your-service-role-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "season": "20252026",
+    "team_abbreviations": ["TOR","FLA","TBL","BOS","OTT","MTL","BUF","DET","NYR","NJD","CAR","WSH","PIT","CBJ","NYI","PHI","WPG","DAL","COL","MIN","STL","NSH","CHI","UTA","VAN","EDM","CGY","LAK","VGK","SEA","SJS","ANA"]
+  }'
+```
+
+> **Tip:** You don't need to know the exact playoff teams yet. Sync all 32 teams — extra data doesn't hurt, and the draft board only shows players from teams in the bracket anyway.
+
+**After the playoff bracket is published** (function auto-discovers teams):
+
+```bash
+curl -X POST https://<your-project-ref>.supabase.co/functions/v1/sync-regular-season-stats \
+  -H "Authorization: Bearer <your-service-role-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"season": "20252026"}'
+```
+
+Expected response:
+```json
+{
+  "message": "Regular season stats synced",
+  "teams": 16,
+  "playersFound": 384,
+  "playersSynced": 380,
+  "playersFailed": 4
+}
+```
+
+A few failures (usually minor leaguers with no NHL game log) is normal.
+
+#### Step 4: Verify
+
+Go to **Table Editor → `regular_season_stats_cache`** and confirm rows exist with goals, assists, and points populated. You can also run:
+
+```sql
+SELECT player_name, team_abbreviation, goals, assists, points, games_played
+FROM regular_season_stats_cache
+WHERE nhl_season = '20252026'
+ORDER BY points DESC
+LIMIT 20;
+```
+
+> ⚠️ **DO NOT** skip this setup. Without it, the Round 1 draft board won't show the "Reg. Season Pts" column, making it harder for your league members to evaluate players.
 
 ---
 
@@ -693,7 +871,7 @@ This table would need to be populated separately (either via a one-time script o
 | **App Dev URL** | `http://localhost:4200` |
 | **Auth Callback Path** | `/auth/callback` |
 | **Auth Method** | Magic Link (email OTP) |
-| **Edge Function** | `sync-nhl-stats` |
+| **Edge Functions** | `sync-nhl-stats`, `sync-regular-season-stats` |
 | **NHL Season Code** | `20252026` |
 | **Playoff Rounds** | 1 (First Round), 2 (Second Round), 3 (Conference Finals), 4 (Stanley Cup Final) |
 | **Scoring: Goal** | 1 point |
