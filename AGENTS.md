@@ -79,6 +79,26 @@ The `packages/web/src/mock/` directory contains all mock infrastructure. The hoo
 - **E2E tests:** Use page object pattern (`packages/e2e/page-objects/`) with test fixtures (`packages/e2e/fixtures/`).
 - **Database:** Supabase with RLS policies. Schema in `packages/supabase-db/migrations/`. Edge functions in `packages/supabase-db/functions/`.
 
+## Edge Function Deployment
+
+Edge function source lives in `packages/supabase-db/functions/`. The Supabase CLI expects functions in `supabase/functions/`, so you must copy files before deploying (symlinks don't work on Windows).
+
+```bash
+# 1. Copy function source to the deploy directory
+Copy-Item packages\supabase-db\functions\<function-name> supabase\functions\<function-name> -Recurse -Force
+
+# 2. Deploy (supabase CLI installed via scoop)
+supabase functions deploy <function-name> --no-verify-jwt
+
+# Both functions at once
+Copy-Item packages\supabase-db\functions\sync-nhl-stats supabase\functions\sync-nhl-stats -Recurse -Force
+Copy-Item packages\supabase-db\functions\sync-regular-season-stats supabase\functions\sync-regular-season-stats -Recurse -Force
+supabase functions deploy sync-nhl-stats --no-verify-jwt
+supabase functions deploy sync-regular-season-stats --no-verify-jwt
+```
+
+**Important:** Edge functions use raw `fetch` to the PostgREST API — not the `@supabase/supabase-js` client library. The `esm.sh` CDN build of supabase-js is unreliable in the Deno edge runtime (`.upsert()` returns `undefined`). The `supabase/functions/` directory is gitignored.
+
 ## Ralph Agent System
 
 The repo includes a Ralph autonomous agent system (`scripts/ralph/`) for automated story implementation. Ralph agents read a `prd.json`, implement stories one at a time, and track progress in `progress.txt`. Agent instructions are in `scripts/ralph/CLAUDE.md`. Copilot Skills for PRD generation and Ralph conversion are in `.agents/skills/`.

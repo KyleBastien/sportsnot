@@ -5,6 +5,8 @@ Supabase database migrations and edge functions.
 ## Migrations
 
 - `001_initial_schema.sql` - Tables, indexes, functions, triggers, and RLS policies
+- `002_standings_columns.sql` - Standings breakdown columns and refresh function
+- `003_regular_season_stats_cache.sql` - Regular season stats table for Round 1 draft
 
 ## Setup
 
