@@ -14,6 +14,10 @@ import {
 } from '@mantine/core';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
+import {
+  DISPLAY_NAME_MAX_LENGTH,
+  validateDisplayName,
+} from './profileValidation';
 
 export function ProfilePage() {
   const { user, signOut } = useAuthContext();
@@ -26,8 +30,9 @@ export function ProfilePage() {
   const [success, setSuccess] = useState('');
 
   const handleSave = async () => {
-    if (!displayName.trim()) {
-      setError('Display name is required');
+    const validationError = validateDisplayName(displayName);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -91,6 +96,8 @@ export function ProfilePage() {
               value={displayName}
               onChange={(e) => setDisplayName(e.currentTarget.value)}
               placeholder="Your display name"
+              maxLength={DISPLAY_NAME_MAX_LENGTH}
+              description={`${displayName.length}/${DISPLAY_NAME_MAX_LENGTH}`}
             />
 
             <Button onClick={handleSave} loading={saving}>
