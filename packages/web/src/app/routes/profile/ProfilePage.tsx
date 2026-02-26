@@ -19,6 +19,9 @@ import {
   updateProfileDisplayName,
   type ProfileUpdateClient,
 } from './updateProfile';
+import { useMockUpdateProfile } from '../../../mock/hooks/useMockUpdateProfile';
+
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
 function createSupabaseProfileClient(): ProfileUpdateClient {
   return {
@@ -41,6 +44,7 @@ function createSupabaseProfileClient(): ProfileUpdateClient {
 export function ProfilePage() {
   const { user, signOut } = useAuthContext();
   const navigate = useNavigate();
+  const mockProfile = useMockUpdateProfile();
   const [displayName, setDisplayName] = useState(
     (user?.user_metadata?.['display_name'] as string) ?? ''
   );
@@ -52,7 +56,9 @@ export function ProfilePage() {
     setSaving(true);
     setError('');
 
-    const client = createSupabaseProfileClient();
+    const client = IS_MOCK
+      ? mockProfile.createMockProfileClient()
+      : createSupabaseProfileClient();
     const result = await updateProfileDisplayName(
       client,
       user!.id,

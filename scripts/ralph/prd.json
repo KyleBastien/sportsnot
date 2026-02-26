@@ -40,7 +40,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "After the Supabase users table update, call supabase.auth.updateUser({ data: { display_name: newName } }) to sync auth metadata, then refresh the AuthContext state. The nav bar reads from user.user_metadata?.['display_name']. React Query queries that join on users table will pick up the change on next fetch."
     },
     {
@@ -60,7 +60,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Follow the existing mockHooksRegistry pattern. The mock handler should update the in-memory user object held by useMockAuth. Check how other mock hooks (useMockLeagues, useMockDraft) handle mutations for the pattern to follow."
     },
     {
