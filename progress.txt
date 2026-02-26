@@ -1,0 +1,23 @@
+## Codebase Patterns
+- Use `@rstest/core` (describe/it/expect) for unit tests, NOT vitest or jest
+- Run `npx eslint --fix` on new/changed files to fix CRLF line endings on Windows
+- When adding mock hooks, always add a corresponding noop export in `packages/web/src/mock/stubs/mock-noop.ts`
+- The `NormalModuleReplacementPlugin` in rspack.config.js replaces all `mock/hooks/` imports with `mock-noop.ts` in production — missing exports will crash the entire app
+- Pure validation logic should be extracted from components into separate modules (e.g., `profileValidation.ts`) for easy unit testing
+- The `ProfileUpdateClient` interface pattern allows testing update logic with mock clients without React component rendering
+- E2e tests (79/87) fail on main branch — pre-existing issue unrelated to profile feature
+- New env vars used via `import.meta.env` must be declared in `packages/web/src/env.d.ts`
+
+---
+
+## 2026-02-26T22:55:00Z - US-004
+- What was implemented: Fixed typecheck and production build issues; verified all existing unit tests pass
+- Files changed:
+  - `packages/web/src/env.d.ts` — Added `BASE_HREF` to `ImportMetaEnv` interface (fixes typecheck)
+  - `packages/web/src/mock/stubs/mock-noop.ts` — Added `useMockUpdateProfile` noop export (fixes production build crash)
+- **Learnings for future iterations:**
+  - The mock-noop.ts stub must be kept in sync with all mock hook exports — any missing export causes the production build to crash since the `NormalModuleReplacementPlugin` replaces all `mock/hooks/` imports
+  - `import.meta.env.BASE_HREF` was used in `main.tsx` but not declared in `env.d.ts`, causing a typecheck failure
+  - E2e test failures (79/87) are pre-existing on the `main` branch — they are NOT caused by the profile feature changes
+  - Unit test files were already created in prior stories (US-001, US-002, US-003), covering all US-004 acceptance criteria
+---

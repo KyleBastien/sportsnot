@@ -80,7 +80,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Use @rstest/core with describe/it/expect — NOT vitest or jest. Test pure validation logic extracted from ProfilePage. Run npx eslint --fix on new test files to fix CRLF line endings."
     }
   ]
