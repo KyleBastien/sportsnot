@@ -1,17 +1,18 @@
 {
   "project": "SportsNot",
-  "branchName": "ralph/draft-ux-and-scoring-bugs",
-  "description": "Fix draft history scrolling, round-specific scoring bugs, add My Team view during draft, hide Start Next Draft after R3, and fix R4 roster carry-over",
+  "branchName": "ralph/update-manager-name",
+  "description": "Harden the ProfilePage manager name editing — add max character limit with counter, refresh display name across app after update, add mock mode support, and add unit tests",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Fix round-specific points in mock roster hooks",
-      "description": "As a league member, I want my roster page to show only the points earned during the current round so that R1 points don't contaminate R2 displays.",
+      "title": "Add max character limit and counter to manager name input",
+      "description": "As a user, I want the manager name field to enforce a 30-character limit with a visible counter so that names stay readable across the app.",
       "acceptanceCriteria": [
-        "useMockRoster and useMockLeagueRosters compute points_earned using getRoundDateBounds(slot.round) — only counting stats between firstDate and min(simulationDate, lastDate) for that round",
-        "Refactor to reuse calculateRoundMemberPoints from utils.ts instead of duplicating calculation logic — remove the standalone calculatePlayerPoints and calculateGoaliePoints helpers from useMockRoster.ts",
-        "R1 roster slots show only R1 game points; R2 slots show only R2 game points, etc.",
-        "Standings page (calculateMemberPoints in utils.ts) continues to show correct cumulative totals — verify no regression with existing unit tests",
+        "Manager name TextInput on ProfilePage enforces a 30-character maximum via maxLength prop",
+        "A character count indicator is displayed below the input (e.g., '12/30') using Mantine Text or Input.Description",
+        "Empty or whitespace-only names are still rejected with an error message (existing behavior preserved)",
+        "The save button remains disabled or shows validation error when input is empty",
+        "Verify in browser if browser testing tools are available",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -20,18 +21,18 @@
       ],
       "priority": 1,
       "passes": true,
-      "notes": "Root cause: calculatePlayerPoints and calculateGoaliePoints in useMockRoster.ts (lines 79-116) only filter by throughDate (upper bound) but have no fromDate. calculateRoundMemberPoints in utils.ts already does this correctly with both bounds. Import getRoundDateBounds from MockDataProvider.tsx and calculateRoundMemberPoints from utils.ts. For each slot, get bounds via getRoundDateBounds(slot.round), compute throughDate as min(simulationDate, bounds.lastDate), skip if simulationDate < bounds.firstDate."
+      "notes": "ProfilePage.tsx already has a TextInput for display_name. Add maxLength={30} prop and a character count helper text below the input showing `${displayName.length}/30`."
     },
     {
       "id": "US-002",
-      "title": "Return cumulative total points from mock roster hook",
-      "description": "As a league member, I want the mock roster hook to also return my cumulative total points across all rounds so the Roster page can display both round-specific and total points.",
+      "title": "Refresh display name across app after profile update",
+      "description": "As a user, I want my updated manager name to appear immediately in the nav bar and on other pages without refreshing my browser.",
       "acceptanceCriteria": [
-        "useMockRoster returns a totalPoints field alongside the existing slots data, computed via calculateMemberPoints from utils.ts",
-        "totalPoints reflects the cumulative sum across all completed rounds (R1 + R2 + ... + current round)",
-        "In Round 1, totalPoints equals the sum of current round slot points",
-        "In Round 2+, totalPoints includes prior rounds' contributions from rosterHistory",
-        "The return shape adds totalPoints to the existing { memberId, round, slots } object",
+        "After a successful profile save, the AuthContext or user state refreshes with the new display name",
+        "The nav bar header user menu reflects the updated name without a page reload",
+        "Standings and draft pages show the updated name on next navigation via fresh React Query fetch",
+        "If supabase.auth.updateUser or refreshSession is used, the user_metadata reflects the new display_name",
+        "Verify in browser if browser testing tools are available",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -39,19 +40,19 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "Depends on US-001 for correct per-round scoring. Call calculateMemberPoints(state, member.id) from utils.ts to get totalPoints. Add it to the makeMockQuery return: { memberId, round, slots, totalPoints: pts.totalPoints }."
+      "passes": false,
+      "notes": "After the Supabase users table update, call supabase.auth.updateUser({ data: { display_name: newName } }) to sync auth metadata, then refresh the AuthContext state. The nav bar reads from user.user_metadata?.['display_name']. React Query queries that join on users table will pick up the change on next fetch."
     },
     {
       "id": "US-003",
-      "title": "Audit and fix production (Supabase) roster points",
-      "description": "As a league member in production mode, I want my roster page to show correct round-specific points and cumulative totals.",
+      "title": "Add mock mode support for manager name update",
+      "description": "As a developer, I want profile name editing to work in mock mode so that I can develop and test the feature offline.",
       "acceptanceCriteria": [
-        "Audit the Supabase edge function or client-side logic that populates points_earned on roster_slots to verify it uses round-specific date filtering",
-        "If points_earned is calculated client-side (in useMyRoster query in RosterPage.tsx), apply round-date-bounds filtering",
-        "If points_earned is calculated server-side by an edge function, verify it filters game stats by the round's date range",
-        "R2 roster slots only reflect R2 game stats (not cumulative R1+R2)",
-        "The production useMyRoster hook also returns cumulative totalPoints (e.g., by querying/summing points_earned from roster_slots across all rounds, or using total_points on league_members)",
+        "A mock profile update handler exists in the mock hooks directory (packages/web/src/mock/hooks/)",
+        "The mock handler updates the in-memory user state with the new display name",
+        "The mock hooks registry (mockHooksRegistry.ts) includes the profile update mock",
+        "Updating the name in mock mode reflects immediately in the nav bar and across the app",
+        "The ProfilePage works identically in mock and live mode from the user's perspective",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -59,20 +60,19 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "Check packages/supabase-db/functions/ for edge functions that update points_earned. Check packages/supabase/src/lib/hooks/ for any client-side calculation. The production useMyRoster in RosterPage.tsx (lines 56-105) queries rosters table filtered by current round. Ensure the return shape matches mock: { memberId, round, slots, totalPoints }."
+      "passes": false,
+      "notes": "Follow the existing mockHooksRegistry pattern. The mock handler should update the in-memory user object held by useMockAuth. Check how other mock hooks (useMockLeagues, useMockDraft) handle mutations for the pattern to follow."
     },
     {
       "id": "US-004",
-      "title": "Update Roster page to show round points and total points",
-      "description": "As a league member, I want the Roster page to display both my current round's points and my cumulative total across all rounds.",
+      "title": "Add unit tests for profile update validation and flow",
+      "description": "As a developer, I want tests covering the manager name update logic so that regressions are caught.",
       "acceptanceCriteria": [
-        "The Roster page header displays two point values side-by-side: 'Round N Points' (sum of points_earned from current round active slots) and 'Total Points' (cumulative across all rounds from the totalPoints field returned by the roster hook)",
-        "Per-slot points_earned in the roster table continues to show the current round's points only (not cumulative)",
-        "When in Round 1, both values are identical",
-        "When in Round 2+, Total Points includes prior rounds and Round N Points shows only the current round",
-        "Layout uses two Mantine Card components side-by-side in the header Group",
-        "Verify in browser if browser testing tools are available",
+        "Test that empty or whitespace-only names are rejected",
+        "Test that names at exactly 30 characters are accepted",
+        "Test that a valid name trims whitespace before saving",
+        "Test that successful update triggers a state refresh (display name changes in returned user object)",
+        "Test that character count displays correctly for various input lengths",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -80,112 +80,8 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "Depends on US-002 and US-003 returning totalPoints from the roster hooks. In RosterPage.tsx, the existing totalPoints variable (line 206-208) becomes 'roundPoints'. Add a new totalPoints from data.totalPoints. Update the header (lines 247-256) to show two cards: one for 'Round {round} Points' with roundPoints, one for 'Total Points' with totalPoints."
-    },
-    {
-      "id": "US-005",
-      "title": "Make draft history scrollable during live draft",
-      "description": "As a drafter, I want to scroll through the full draft history while the draft is in progress so I can see all picks back to #1.",
-      "acceptanceCriteria": [
-        "During a live draft, the Draft History section displays ALL picks (remove the .slice(0, 10) limit)",
-        "The Draft History section is wrapped in a Mantine ScrollArea with max height h={400} so it scrolls when content overflows",
-        "The most recent pick is visible by default (scroll starts at the top since picks are sorted descending by pick number)",
-        "Import ScrollArea from @mantine/core",
-        "Verify in browser if browser testing tools are available",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 5,
-      "passes": true,
-      "notes": "In DraftPage.tsx lines 782-815: remove .slice(0, 10) from the picks chain, wrap the Stack in <ScrollArea h={400}>. ScrollArea is already imported and used in the post-draft-complete section of the same file."
-    },
-    {
-      "id": "US-006",
-      "title": "Add My Team collapsible section to draft page",
-      "description": "As a drafter, I want to see my in-progress roster during the draft so I can track which positions are filled and who I've already picked.",
-      "acceptanceCriteria": [
-        "A collapsible section labeled 'My Team' or 'My Roster' is added to the DraftPage below the draft board area",
-        "The section groups the current user's picks by position (F, D, G, IR_F, IR_D) matching the roster page layout",
-        "Each filled slot shows the player/team name resolved via playerNameMap/teamNameMap and a position Badge",
-        "Empty slots are shown as placeholders (e.g., 'Empty Forward slot') to indicate remaining picks needed",
-        "The section is collapsed by default and expandable on click using Mantine Collapse or Accordion",
-        "Updates in real-time as picks are made (derives from the existing picks array filtered by myMember.user_id)",
-        "Uses ROSTER_CONFIG from @sportsnot/types to determine expected slot counts per position",
-        "Verify in browser if browser testing tools are available",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 6,
-      "passes": true,
-      "notes": "DraftPage.tsx already has mySlotCounts (lines 540-555) counting filled positions. The picks array filtered by myMember.user_id gives the user's picks. Use ROSTER_CONFIG for expected counts. Place the collapsible section between the Draft History card and the Available Players card (around line 816). Use Mantine useDisclosure hook for collapse state."
-    },
-    {
-      "id": "US-007",
-      "title": "Fix SKIP_TO_ROUND4 mock reducer to copy rosters",
-      "description": "As a league member in Round 4, I want my Round 3 roster carried over so the My Roster page shows my actual team instead of 'Your roster has not been set yet.'",
-      "acceptanceCriteria": [
-        "The SKIP_TO_ROUND4 reducer action copies Round 3 rosters to Round 4 (with round: 4, pointsEarned: 0) if rosters for Round 4 don't already exist",
-        "If ADVANCE_ROUND already ran and copied rosters (R4 rosters exist), SKIP_TO_ROUND4 does NOT duplicate them (idempotent check)",
-        "The idempotent check looks at whether state.rosters already has entries for any member with round === 4",
-        "After the R3-to-R4 transition via either path (ADVANCE_ROUND or SKIP_TO_ROUND4), navigating to My Roster shows the carried-over roster with 0 points",
-        "The 'No Roster Yet' message does NOT appear in Round 4 when roster was carried over",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 7,
-      "passes": true,
-      "notes": "SKIP_TO_ROUND4 at line 384 in MockDataProvider.tsx only updates league status/round but does NOT copy rosters. It assumes ADVANCE_ROUND was already called. Fix: in the SKIP_TO_ROUND4 case, check if state.rosters has any entries. If empty (ADVANCE_ROUND wasn't called), copy from the current round 3 rosters. Also archive to rosterHistory if not already done. The ADVANCE_ROUND case at line 322 already handles this correctly — model the copy logic after it."
-    },
-    {
-      "id": "US-008",
-      "title": "Verify production handleSkipToRound4 roster copy",
-      "description": "As a league member in production mode, I want the R3-to-R4 transition to correctly copy my roster slots in Supabase.",
-      "acceptanceCriteria": [
-        "Verify handleSkipToRound4 in RoundTransitionPage.tsx correctly queries roster_slots (not rosters) for round 3 slots",
-        "Verify the insert uses the correct table name roster_slots with round: 4 and points_earned: 0",
-        "If the table name is wrong (rosters vs roster_slots), fix it to match the actual Supabase schema",
-        "Check the Supabase migration files in packages/supabase-db/migrations/ to confirm the correct table name",
-        "After the fix, the production My Roster page shows carried-over roster for Round 4",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 8,
-      "passes": true,
-      "notes": "handleSkipToRound4 at line 156 in RoundTransitionPage.tsx queries .from('roster_slots') for round 3 and inserts with round 4. Check if the Supabase schema actually uses 'roster_slots' or 'rosters' as the table name. The useMyRoster production query (RosterPage.tsx line 83) queries .from('rosters') — there may be a mismatch. Check packages/supabase-db/migrations/ for the actual table name."
-    },
-    {
-      "id": "US-009",
-      "title": "Hide Start Next Draft button after Round 3",
-      "description": "As a commissioner, I should not see a 'Start Next Draft' button at the end of Round 3 because Round 4 has no re-draft.",
-      "acceptanceCriteria": [
-        "The 'Start Next Draft' button is NOT rendered when league.current_round >= 3 on LeagueDashboardPage",
-        "The SimulationControlPanel 'Advance Round' button (mock mode) remains the mechanism for advancing from R3 to R4",
-        "In production mode, add an 'Advance to Finals' button on the dashboard that navigates to /draft/{leagueId}/transition when currentRound === 3 and roundComplete is true — this ensures the R3-to-R4 flow is still accessible",
-        "The 'Advance to Finals' button is only visible to commissioners when currentRound === 3 and roundComplete is true",
-        "The RoundTransitionPage correctly handles the R3-to-R4 case (already implemented — no changes needed there)",
-        "Verify in browser if browser testing tools are available",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 9,
-      "passes": true,
-      "notes": "In LeagueDashboardPage.tsx lines 181-195, the visibility condition is isCommissioner && !seasonComplete. Change to isCommissioner && !seasonComplete && league.current_round < 3. Then add a new button: when isCommissioner && league.current_round === 3 && roundComplete, show 'Advance to Finals' that navigates to /draft/{leagueId}/transition. This ensures the RoundTransitionPage (which already handles skipRound4Draft) is still reachable."
+      "passes": false,
+      "notes": "Use @rstest/core with describe/it/expect — NOT vitest or jest. Test pure validation logic extracted from ProfilePage. Run npx eslint --fix on new test files to fix CRLF line endings."
     }
   ]
 }
