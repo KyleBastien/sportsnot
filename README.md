@@ -1,4 +1,36 @@
-# SportsnotTemp
+# SportsNot
+
+NHL Playoff Fantasy Hockey App.
+
+## Deployment
+
+The app deploys two versions to GitHub Pages from a single CI pipeline:
+
+| URL | Version | Build Config |
+|-----|---------|-------------|
+| `sportsnot.net/` | Production | `VITE_MOCK_MODE=false` with real Supabase |
+| `sportsnot.net/demo/` | Demo | `VITE_MOCK_MODE=true` with offline mock data |
+
+### GitHub Actions Secrets
+
+The production build requires these secrets in the repository settings:
+
+- `VITE_SUPABASE_URL` — Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` — Supabase anonymous key
+
+The demo build uses built-in mock data and requires no secrets.
+
+### Local Build
+
+```bash
+# Production build
+VITE_MOCK_MODE=false yarn nx build @sportsnot/web
+
+# Demo build (with /demo/ base path)
+VITE_MOCK_MODE=true BASE_HREF=/demo/ yarn nx build @sportsnot/web
+```
+
+## Development
 
 <a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
 

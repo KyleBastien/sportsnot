@@ -65,3 +65,7 @@ scripts/ralph/prd.json
 scripts/ralph/progress.txt
 scripts/ralph/.last-branch
 scripts/ralph/archive/
+
+# Supabase CLI
+supabase/.temp/
+supabase/functions/
