@@ -5,7 +5,7 @@ import { resolve } from 'path';
 function getSupabaseUrl(): string {
   if (process.env.VITE_SUPABASE_URL) return process.env.VITE_SUPABASE_URL;
   try {
-    const content = readFileSync(resolve(__dirname, '../../.env'), 'utf-8');
+    const content = readFileSync(resolve(__dirname, '../../../.env'), 'utf-8');
     const match = content.match(/^VITE_SUPABASE_URL=(.+)$/m);
     if (match) return match[1].trim();
   } catch {
@@ -159,7 +159,7 @@ async function setupAuthMocks(page: Page, authenticated: boolean) {
   if (authenticated) {
     await page.addInitScript(
       ({ url, session }) => {
-        const storageKey = `sb-${new URL(url).hostname}-auth-token`;
+        const storageKey = `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
         window.localStorage.setItem(storageKey, JSON.stringify(session));
       },
       { url: SUPABASE_URL, session: mockSession }
