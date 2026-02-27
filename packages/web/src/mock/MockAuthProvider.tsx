@@ -53,6 +53,21 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
     signInWithMagicLink: async (_email: string) => ({
       error: null as Error | null,
     }),
+    signInWithOtp: async (_email: string) => ({
+      error: null as Error | null,
+    }),
+    verifyOtp: async (_email: string, token: string) => {
+      if (!/^\d{6}$/.test(token)) {
+        return {
+          data: null as unknown,
+          error: new Error('Invalid OTP code') as Error | null,
+        };
+      }
+      return {
+        data: { user: mockUser, session } as unknown,
+        error: null as Error | null,
+      };
+    },
     signOut: async () => ({ error: null as Error | null }),
   };
 
