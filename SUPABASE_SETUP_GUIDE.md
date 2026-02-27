@@ -51,11 +51,12 @@ Once the project is ready, go to **Settings → API** and note:
 
 ## 2. Run the Database Migrations
 
-SportsNot has three migration files that must be run **in order**:
+SportsNot has four migration files that must be run **in order**:
 
 1. `packages/supabase-db/migrations/001_initial_schema.sql` — Creates all tables, indexes, functions, triggers, and RLS policies.
 2. `packages/supabase-db/migrations/002_standings_columns.sql` — Adds standings breakdown columns and the `refresh_league_standings` function.
 3. `packages/supabase-db/migrations/003_regular_season_stats_cache.sql` — Creates the `regular_season_stats_cache` table for Round 1 draft player rankings.
+4. `packages/supabase-db/migrations/004_fix_league_members_rls_recursion.sql` — Fixes infinite recursion in `league_members` RLS policies by introducing a `SECURITY DEFINER` helper function.
 
 ### Option A: Supabase Dashboard SQL Editor (Recommended for first-time setup)
 
@@ -64,7 +65,7 @@ SportsNot has three migration files that must be run **in order**:
 3. Open `packages/supabase-db/migrations/001_initial_schema.sql` from your local repo, copy the **entire** contents, and paste it into the SQL Editor.
 4. Click **"Run"** (or press Ctrl+Enter / Cmd+Enter).
 5. You should see `Success. No rows returned.` This is correct — DDL statements don't return rows.
-6. Repeat for `002_standings_columns.sql` and `003_regular_season_stats_cache.sql` — each in a new query tab, one at a time.
+6. Repeat for `002_standings_columns.sql`, `003_regular_season_stats_cache.sql`, and `004_fix_league_members_rls_recursion.sql` — each in a new query tab, one at a time.
 
 > ⚠️ **DO NOT** run all files in a single query. Run them **one at a time, in order**. Each migration depends on the previous ones.
 
@@ -97,13 +98,14 @@ However, note that `supabase db push` expects migrations in the standard Supabas
 | `team_stats_cache` | Cached NHL team stats (wins, shutouts) |
 | `regular_season_stats_cache` | Cached regular season stats for Round 1 draft rankings |
 
-**Functions (5 total):**
+**Functions (7 total):**
 - `handle_updated_at()` — Auto-updates `updated_at` timestamps
 - `handle_new_user()` — Auto-creates a user profile row when someone signs up via Supabase Auth
 - `calculate_member_points()` — Sums points for a member's active roster
 - `validate_roster_composition()` — Ensures roster limits (5F, 3D, 1G)
 - `activate_ir_player()` — Handles IR activation with position validation
 - `refresh_league_standings()` — Aggregates roster points into league member standings (from migration 002)
+- `get_user_league_ids()` — `SECURITY DEFINER` helper that returns league IDs for the current user, used by RLS policies to avoid infinite recursion (from migration 004)
 
 **Triggers (3 total):**
 - `set_updated_at_users` — On `users` table updates
@@ -114,7 +116,7 @@ However, note that `supabase db push` expects migrations in the standard Supabas
 
 ## 3. Verify Tables, Functions & Triggers
 
-After running all three migrations, verify everything is in place.
+After running all four migrations, verify everything is in place.
 
 ### Check Tables
 
@@ -140,6 +142,7 @@ Go to **Database → Functions** (left sidebar). You should see:
 - `validate_roster_composition`
 - `activate_ir_player`
 - `refresh_league_standings`
+- `get_user_league_ids`
 
 ### Check Triggers
 
@@ -752,7 +755,7 @@ Before the first puck drop, go through this checklist:
 
 | Mistake | Why It's Bad | Fix |
 |---|---|---|
-| Running migrations out of order | 002 depends on tables from 001 | Always run 001 first, then 002 |
+| Running migrations out of order | 002 depends on tables from 001 | Always run 001 first, then 002, 003, 004 in order |
 | Running migrations twice | `CREATE TABLE` fails if table exists | If it errors, tables already exist — just move on |
 | Disabling RLS "to test" | Any user can read/modify all data | Never disable. Fix policies instead |
 | Putting `service_role` key in `.env` | Exposes it to the browser; bypasses all RLS | Only use in edge functions and server-side cron |
@@ -766,6 +769,7 @@ Before the first puck drop, go through this checklist:
 | Adding INSERT policies to stats cache tables | Users could write fake stats | Only the edge function (service_role) writes to these |
 | Enabling Realtime on stats cache tables | Wastes database connections for infrequently-updated data | Only enable Realtime for draft/roster tables |
 | Not setting up `regular_season_stats_cache` | Round 1 draft can't show regular season stats for player rankings | Run migration 003 and deploy `sync-regular-season-stats` edge function |
+| "Infinite recursion detected in policy for relation 'league_members'" | Self-referencing RLS policy causes Postgres to loop infinitely | Run migration 004 to fix the policy with a `SECURITY DEFINER` helper function |
 
 ### Setting Up `regular_season_stats_cache` (Required for Round 1 Draft)
 
