@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -24,7 +25,9 @@ import {
 } from './loginPageUtils';
 
 export function LoginPage() {
-  const { signInWithMagicLink, signInWithOtp, verifyOtp } = useAuthContext();
+  const { user, signInWithMagicLink, signInWithOtp, verifyOtp } =
+    useAuthContext();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -35,6 +38,10 @@ export function LoginPage() {
   const [otpError, setOtpError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (user) navigate('/', { replace: true });
+  }, [user, navigate]);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
