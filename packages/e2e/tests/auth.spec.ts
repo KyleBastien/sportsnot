@@ -125,6 +125,26 @@ test.describe('Authentication Flow', () => {
       .getByRole('menuitem', { name: /sign out/i })
       .click();
 
+    // After sign-out, override auth mocks to return unauthenticated responses
+    // so Supabase's auto-refresh cannot silently re-authenticate the user.
+    await authenticatedPage.route('**/auth/v1/token**', (route) =>
+      route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: 'invalid_grant',
+          error_description: 'Invalid Refresh Token',
+        }),
+      })
+    );
+    await authenticatedPage.route('**/auth/v1/user', (route) =>
+      route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Invalid token', status: 401 }),
+      })
+    );
+
     await expect(authenticatedPage).toHaveURL(/\/auth\/login/, NAV_TIMEOUT);
   });
 
