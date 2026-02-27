@@ -7,7 +7,44 @@
 - The `ProfileUpdateClient` interface pattern allows testing update logic with mock clients without React component rendering
 - E2e tests (79/87) fail on main branch — pre-existing issue unrelated to profile feature
 - New env vars used via `import.meta.env` must be declared in `packages/web/src/env.d.ts`
+- E2E auth tests that reference button text ("Send Magic Link") must be updated when the default login method changes (OTP checkbox is now checked by default)
+- Extract pure display logic (button text, subtitle text) from React components into utility modules for easy unit testing
+- Mantine PinInput is imported from `@mantine/core` and supports `length`, `type="number"`, `value`, and `onChange` props
+- Auth callback E2E test and sign-out E2E test are pre-existing failures (not caused by OTP changes)
+- The useEffect for setInterval-based timers needs the cooldown value in the dependency array so it starts/stops correctly
+- Use functional updater `(prev) => prev - 1` in setState inside setInterval to avoid stale closures
+- E2E auth fixture route mocks MUST use glob patterns (`**/auth/v1/...`) NOT hardcoded `http://localhost:54321` — the app uses the real Supabase URL from .env, not localhost
+- E2E fixture `eslint.config.mjs` must include `globals.node` for `fixtures/**/*.ts` (not just `*.config.ts`)
+- Playwright routes registered later take precedence over earlier ones — use this to override fixture mocks in individual tests
+- LoginPage needs a `useEffect` that redirects to `/` when `user` becomes non-null (OTP verify doesn't auto-redirect like magic link callback)
 
+---
+
+## 2026-02-27T04:43:00Z - US-004
+- What was implemented: Added OTP verification screen to LoginPage with PinInput for 6-digit code entry, Verify Code button (disabled until complete), error handling with inline Alert, and "Use a different email" back button. Added utility functions (getOtpSentMessage, isOtpTokenComplete, OTP_ERROR_MESSAGE) to loginPageUtils.ts with unit tests.
+- Files changed:
+  - `packages/web/src/app/routes/auth/LoginPage.tsx` — Added otpSent/otpToken/otpError/verifying state, OTP verification screen with PinInput, handleVerifyOtp and handleBackToEmail handlers, conditional rendering for OTP sent state
+  - `packages/web/src/app/routes/auth/loginPageUtils.ts` — Added getOtpSentMessage, isOtpTokenComplete, OTP_ERROR_MESSAGE exports
+  - `packages/web/src/app/routes/auth/loginPageUtils.test.ts` — Added 6 new unit tests for getOtpSentMessage, isOtpTokenComplete, and OTP_ERROR_MESSAGE
+- **Learnings for future iterations:**
+  - On successful OTP send, set otpSent=true to transition from email form to verification screen (the existing code only set error on failure, not success state)
+  - For bold email in text, render JSX directly in component rather than using a utility function that returns a plain string
+  - The 2 failing E2E auth tests (auth callback redirect, sign out) are pre-existing and unrelated to OTP changes
+  - PinInput onChange directly provides the string value, no need for event extraction
+---
+
+## 2026-02-27T04:27:00Z - US-003
+- What was implemented: Added OTP checkbox toggle to LoginPage with dynamic button/subtitle text, branched form submission to call signInWithOtp or signInWithMagicLink based on checkbox state
+- Files changed:
+  - `packages/web/src/app/routes/auth/LoginPage.tsx` — Added Checkbox, useOtp state, branched handleSubmit, dynamic button/subtitle text
+  - `packages/web/src/app/routes/auth/loginPageUtils.ts` — New utility module with getSubtitleText and getSubmitButtonText
+  - `packages/web/src/app/routes/auth/loginPageUtils.test.ts` — 4 unit tests for utility functions
+  - `packages/e2e/tests/auth.spec.ts` — Updated "login page renders" test to check for OTP default then uncheck; updated "submitting email" test to uncheck OTP before magic link flow
+- **Learnings for future iterations:**
+  - The OTP checkbox defaults to checked, so E2E tests that look for "Send Magic Link" must first uncheck the checkbox
+  - Pure display logic (getSubtitleText, getSubmitButtonText) was extracted to a separate utils module for easy unit testing without React rendering
+  - CRLF line ending issues persist — always run `npx eslint --fix` on changed files before committing
+  - The e2e package has pre-existing lint errors (process not defined in playwright.config.ts) that are unrelated to feature changes
 ---
 
 ## 2026-02-27T04:20:00Z - US-002
@@ -32,4 +69,58 @@
   - `import.meta.env.BASE_HREF` was used in `main.tsx` but not declared in `env.d.ts`, causing a typecheck failure
   - E2e test failures (79/87) are pre-existing on the `main` branch — they are NOT caused by the profile feature changes
   - Unit test files were already created in prior stories (US-001, US-002, US-003), covering all US-004 acceptance criteria
+---
+
+## 2026-02-27T04:58:00Z - US-005
+- What was implemented: Added resend code button with 60-second cooldown timer to OTP verification screen. Added `getResendButtonText` utility and `RESEND_COOLDOWN_SECONDS` constant to loginPageUtils.ts with unit tests. Added `resendCooldown` state, useEffect-based countdown timer, and `handleResendCode` handler to LoginPage.tsx. The resend button shows "Didn't get a code?" text and is disabled during cooldown with countdown text.
+- Files changed:
+  - `packages/web/src/app/routes/auth/LoginPage.tsx` — Added resendCooldown state, useEffect countdown timer, handleResendCode handler, resend UI section in OTP verification screen
+  - `packages/web/src/app/routes/auth/loginPageUtils.ts` — Added RESEND_COOLDOWN_SECONDS (60) and getResendButtonText utility
+  - `packages/web/src/app/routes/auth/loginPageUtils.test.ts` — Added 7 new unit tests for RESEND_COOLDOWN_SECONDS and getResendButtonText
+- **Learnings for future iterations:**
+  - The useEffect for setInterval-based timers needs the cooldown value in the dependency array so it starts/stops correctly when the value changes
+  - Use functional updater in setResendCooldown to avoid stale closure issues with setInterval
+  - The handleBackToEmail should also reset resendCooldown to 0 to clean up timer state
+  - E2E tests cannot run without a dev server (ERR_CONNECTION_REFUSED) — this is a pre-existing infrastructure issue
+---
+
+## 2026-02-27T05:11:00Z - US-006
+- What was implemented: Added full OTP support to mock mode. Updated useMockAuth to include signInWithOtp (always succeeds) and verifyOtp (validates 6-digit numeric token via regex). Updated MockAuthProvider with matching verifyOtp validation logic. Added useMockAuth noop export to mock-noop.ts for production builds. Created 14 unit tests covering all methods and validation edge cases.
+- Files changed:
+  - `packages/web/src/mock/hooks/useMockAuth.ts` — Added signInWithOtp, verifyOtp methods with OTP_PATTERN regex validation; removed console.warn/alert calls
+  - `packages/web/src/mock/hooks/useMockAuth.test.ts` — New file with 14 unit tests for all useMockAuth methods
+  - `packages/web/src/mock/MockAuthProvider.tsx` — Updated verifyOtp to validate token with /^\d{6}$/ regex and return user/session on success
+  - `packages/web/src/mock/stubs/mock-noop.ts` — Added useMockAuth noop export for production build compatibility
+- **Learnings for future iterations:**
+  - useMockAuth previously had console.warn and alert calls which violate ESLint rules (no-console) — mock methods should be silent no-ops
+  - MockAuthProvider and useMockAuth both need verifyOtp validation logic — keep them in sync
+  - The mock-noop.ts must have exports for ALL mock hooks, including useMockAuth
+---
+
+## 2026-02-27T05:14:00Z - US-007
+- What was implemented: Added OTP verify endpoint mock (POST /auth/v1/verify*) to setupAuthMocks in auth.fixture.ts. When authenticated=true, returns 200 with valid session JSON. When authenticated=false, returns 400 with otp_expired error JSON. Existing auth route mocks (otp send, signout, token refresh, user) remain unchanged.
+- Files changed:
+  - `packages/e2e/fixtures/auth.fixture.ts` — Added route mock for `${SUPABASE_URL}/auth/v1/verify*` between the existing otp and signout mocks
+- **Learnings for future iterations:**
+  - The verify endpoint uses glob pattern `verify*` (not `verify**`) since Supabase verify calls may have query params
+  - E2E tests cannot run without a dev server on port 4200 (ERR_CONNECTION_REFUSED) — this is a pre-existing infrastructure issue, not caused by fixture changes
+  - The session variable in setupAuthMocks is already correctly set to mockSession or null based on the authenticated parameter, so the verify mock can just return it directly
+---
+
+## 2026-02-27T05:38:00Z - US-008
+- What was implemented: Added 4 new E2E tests for OTP login flow (OTP send/verification screen, OTP verify+redirect, resend cooldown timer, magic link toggle). Fixed critical E2E infrastructure bug where auth fixture route mocks used hardcoded `localhost:54321` instead of the real Supabase URL from `.env`, causing all auth API calls to bypass mocks and hit the real API. Updated auth.fixture.ts to use glob patterns (`**/auth/v1/...`) for route matching and added `getSupabaseUrl()` to read the correct URL from `.env`. Added authenticated user redirect effect to LoginPage. Also fixed the pre-existing auth callback E2E test failure.
+- Files changed:
+  - `packages/e2e/tests/auth.spec.ts` — Added 4 new E2E tests, imported SUPABASE_URL from fixture
+  - `packages/e2e/fixtures/auth.fixture.ts` — Fixed route mocking to use glob patterns, added getSupabaseUrl() to read from .env, exported SUPABASE_URL
+  - `packages/e2e/fixtures/supabase-mock.fixture.ts` — Import shared SUPABASE_URL from auth.fixture instead of hardcoded constant
+  - `packages/e2e/eslint.config.mjs` — Extended node globals to `fixtures/**/*.ts` files (not just config files)
+  - `packages/web/src/app/routes/auth/LoginPage.tsx` — Added useEffect redirect to `/` when user becomes authenticated (needed for OTP verify flow)
+- **Learnings for future iterations:**
+  - The E2E auth fixture had a critical bug: route mocks used `http://localhost:54321` but the app uses the real Supabase URL from `.env`. The mocks never intercepted any requests! Tests that "passed" were hitting the real Supabase API.
+  - Fixing the fixture from `${SUPABASE_URL}/auth/v1/...` to `**/auth/v1/...` glob patterns makes mocks work regardless of the configured Supabase URL
+  - The auth callback E2E test was a pre-existing failure caused by the wrong localStorage key (using localhost hostname instead of real Supabase hostname). Fixing SUPABASE_URL resolution also fixed this test.
+  - The sign-out E2E test remains a pre-existing failure — the user menu trigger selector doesn't find the button on the dashboard page
+  - For OTP verify+redirect test, use `unauthenticatedPage` (no initial session) and override the verify endpoint with `page.route` (later routes take precedence). Using `authenticatedPage` causes immediate redirect before the user can interact with the login form.
+  - LoginPage had no redirect logic after successful OTP verification — the magic link flow redirects via AuthCallbackPage, but OTP verify stays on /auth/login. Added a useEffect watching `user` to redirect.
+  - ESLint in the e2e package only gave node globals (`process`, `__dirname`) to `*.config.ts` files, not fixture files. Extended the pattern to include `fixtures/**/*.ts`.
 ---

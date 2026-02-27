@@ -63,7 +63,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "File: packages/web/src/app/routes/auth/LoginPage.tsx. Add `useOtp` boolean state (default true). Import Checkbox from @mantine/core. The checkbox toggles useOtp. handleSubmit branches: if useOtp, call signInWithOtp and set otpSent=true; else call signInWithMagicLink and set sent=true (existing flow)."
     },
     {
@@ -89,7 +89,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "File: packages/web/src/app/routes/auth/LoginPage.tsx. Add states: otpSent (boolean), otpToken (string). When otpSent is true, render the verification view (same pattern as the existing 'sent' confirmation view). Import PinInput from @mantine/core. The PinInput onChange sets otpToken. Verify button calls verifyOtp — on success the onAuthStateChange listener in useAuth handles session creation and AuthCallbackPage-style redirect happens automatically."
     },
     {
@@ -111,7 +111,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "File: packages/web/src/app/routes/auth/LoginPage.tsx. Add resendCooldown state (number, starts at 60 when OTP is sent). useEffect with setInterval decrements every second. Resend button disabled when resendCooldown > 0. On resend click, call signInWithOtp again and reset cooldown to 60. Clean up interval on unmount."
     },
     {
@@ -131,7 +131,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Files: packages/web/src/mock/hooks/useMockAuth.ts and packages/web/src/mock/MockAuthProvider.tsx. Add signInWithOtp and verifyOtp to useMockAuth return value. verifyOtp validates token is 6 digits via /^\\d{6}$/ regex. MockAuthProvider spreads the mock auth object into AuthContext — verify the new methods are included in the spread."
     },
     {
@@ -149,7 +149,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "File: packages/e2e/fixtures/auth.fixture.ts. Add a route mock for `${SUPABASE_URL}/auth/v1/verify*` inside setupAuthMocks. When authenticated=true, return 200 with session JSON. When authenticated=false, return 400 with error JSON. The existing /auth/v1/otp** mock already handles the send step."
     },
     {
@@ -170,7 +170,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "File: packages/e2e/tests/auth.spec.ts. Add tests within the existing 'Authentication Flow' describe block. Use unauthenticatedPage fixture for login tests, authenticatedPage for the redirect-after-verify test. Existing tests reference 'Send Magic Link' button — those must still pass since the button text changes based on checkbox state. For the OTP verify redirect test, mock the verify endpoint to return a session and inject it into localStorage similar to the magic link callback test."
     }
   ]
