@@ -19,7 +19,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "File: packages/supabase/src/lib/hooks/useAuth.ts. Add two new useCallback methods alongside existing signInWithMagicLink and signOut. The key difference from magic link is NOT passing emailRedirectTo in signInWithOtp options — this tells Supabase to send a code instead of a link."
     },
     {
@@ -38,7 +38,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "File: packages/web/src/app/context/AuthContext.tsx. The useAuth hook already returns all methods as a spread object, so AuthProvider may already pass them through — but the AuthContextValue TypeScript interface must be explicitly updated with the new method signatures."
     },
     {

@@ -10,6 +10,18 @@
 
 ---
 
+## 2026-02-27T04:20:00Z - US-002
+- What was implemented: Extended AuthContextValue interface with signInWithOtp and verifyOtp methods; added stub OTP methods to MockAuthProvider for type compatibility; added unit tests for the interface contract
+- Files changed:
+  - `packages/web/src/app/context/AuthContext.tsx` — Added `signInWithOtp` and `verifyOtp` to `AuthContextValue` interface
+  - `packages/web/src/app/context/AuthContext.test.ts` — New unit tests (8 tests) verifying interface shape and method contracts
+  - `packages/web/src/mock/MockAuthProvider.tsx` — Added stub `signInWithOtp` and `verifyOtp` methods to satisfy AuthContextValue type
+- **Learnings for future iterations:**
+  - AuthProvider already spreads the full useAuth() return, so new methods are automatically passed through — only the TypeScript interface needs updating
+  - MockAuthProvider must also be updated when AuthContextValue changes, otherwise typecheck fails on the context provider value
+  - CRLF line ending issues are pervasive on Windows — always run `npx eslint --fix` on changed files before committing
+---
+
 ## 2026-02-26T22:55:00Z - US-004
 - What was implemented: Fixed typecheck and production build issues; verified all existing unit tests pass
 - Files changed:
