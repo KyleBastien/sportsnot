@@ -36,10 +36,12 @@ import {
   useMockRegularSeasonPlayers,
 } from './hooks/useMockNhlApi';
 import { useMockAuth } from './hooks/useMockAuth';
+import { useMockUpdateProfile } from './hooks/useMockUpdateProfile';
 
 export interface MockHooksRegistry {
   // Auth
   useMockAuth: typeof useMockAuth;
+  useMockUpdateProfile: typeof useMockUpdateProfile;
   // Leagues
   useMockMyLeagues: typeof useMockMyLeagues;
   useMockLeagues: typeof useMockLeagues;
@@ -74,6 +76,7 @@ export interface MockHooksRegistry {
 
 export const mockHooksRegistry: MockHooksRegistry = {
   useMockAuth,
+  useMockUpdateProfile,
   useMockMyLeagues,
   useMockLeagues,
   useMockLeague,

@@ -52,6 +52,14 @@ export const useMockStandings = noopQuery;
 // mock/hooks/useMockScoringHistory
 export const useMockScoringHistory = noopQuery;
 
+// mock/hooks/useMockUpdateProfile
+export const useMockUpdateProfile = () => ({
+  createMockProfileClient: () => ({
+    updateUsersTable: async () => ({ error: null }),
+    updateAuthMetadata: async () => ({ error: null }),
+  }),
+});
+
 // mock/hooks/useMockLiveGames (re-export for direct imports)
 export { useMockLiveGamesTeamStats as useMockLiveGames };
 
