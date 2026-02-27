@@ -120,13 +120,10 @@ test.describe('Authentication Flow', () => {
       );
     await menuTrigger.first().click();
 
-    // Click Sign Out in the dropdown menu
-    await authenticatedPage
-      .getByRole('menuitem', { name: /sign out/i })
-      .click();
-
-    // After sign-out, override auth mocks to return unauthenticated responses
-    // so Supabase's auto-refresh cannot silently re-authenticate the user.
+    // Override auth mocks BEFORE clicking sign-out so Supabase's
+    // auto-refresh cannot silently re-authenticate the user.
+    // Playwright evaluates routes in reverse registration order,
+    // so these take precedence over the mocks set up in the fixture.
     await authenticatedPage.route('**/auth/v1/token**', (route) =>
       route.fulfill({
         status: 400,
@@ -144,6 +141,11 @@ test.describe('Authentication Flow', () => {
         body: JSON.stringify({ message: 'Invalid token', status: 401 }),
       })
     );
+
+    // Click Sign Out in the dropdown menu
+    await authenticatedPage
+      .getByRole('menuitem', { name: /sign out/i })
+      .click();
 
     await expect(authenticatedPage).toHaveURL(/\/auth\/login/, NAV_TIMEOUT);
   });
