@@ -10,18 +10,28 @@ import {
   Alert,
   Image,
   Checkbox,
+  PinInput,
 } from '@mantine/core';
 import { useAuthContext } from '../../context/AuthContext';
 import logoSrc from '../../../assets/sportsnot-logo.png';
-import { getSubtitleText, getSubmitButtonText } from './loginPageUtils';
+import {
+  getSubtitleText,
+  getSubmitButtonText,
+  isOtpTokenComplete,
+  OTP_ERROR_MESSAGE,
+} from './loginPageUtils';
 
 export function LoginPage() {
-  const { signInWithMagicLink, signInWithOtp } = useAuthContext();
+  const { signInWithMagicLink, signInWithOtp, verifyOtp } = useAuthContext();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [useOtp, setUseOtp] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpToken, setOtpToken] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +42,8 @@ export function LoginPage() {
       const { error: authError } = await signInWithOtp(email);
       if (authError) {
         setError(authError.message);
+      } else {
+        setOtpSent(true);
       }
     } else {
       const { error: authError } = await signInWithMagicLink(email);
@@ -42,6 +54,24 @@ export function LoginPage() {
       }
     }
     setLoading(false);
+  };
+
+  const handleVerifyOtp = async () => {
+    setVerifying(true);
+    setOtpError(null);
+
+    const { error: authError } = await verifyOtp(email, otpToken);
+    if (authError) {
+      setOtpError(OTP_ERROR_MESSAGE);
+      setOtpToken('');
+    }
+    setVerifying(false);
+  };
+
+  const handleBackToEmail = () => {
+    setOtpSent(false);
+    setOtpToken('');
+    setOtpError(null);
   };
 
   if (sent) {
@@ -55,6 +85,48 @@ export function LoginPage() {
               in the email to sign in.
             </Text>
             <Button variant="subtle" onClick={() => setSent(false)}>
+              Use a different email
+            </Button>
+          </Stack>
+        </Paper>
+      </Container>
+    );
+  }
+
+  if (otpSent) {
+    return (
+      <Container size="xs" py="xl">
+        <Paper shadow="md" p="xl" radius="md" withBorder>
+          <Stack align="center" gap="md">
+            <Title order={2}>Enter your code</Title>
+            <Text ta="center" c="dimmed">
+              We sent a 6-digit code to <strong>{email}</strong>
+            </Text>
+
+            {otpError && (
+              <Alert color="red" title="Error">
+                {otpError}
+              </Alert>
+            )}
+
+            <PinInput
+              length={6}
+              type="number"
+              value={otpToken}
+              onChange={setOtpToken}
+            />
+
+            <Button
+              fullWidth
+              size="md"
+              loading={verifying}
+              disabled={!isOtpTokenComplete(otpToken)}
+              onClick={handleVerifyOtp}
+            >
+              Verify Code
+            </Button>
+
+            <Button variant="subtle" onClick={handleBackToEmail}>
               Use a different email
             </Button>
           </Stack>
