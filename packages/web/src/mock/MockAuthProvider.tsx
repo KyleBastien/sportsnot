@@ -53,6 +53,13 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
     signInWithMagicLink: async (_email: string) => ({
       error: null as Error | null,
     }),
+    signInWithOtp: async (_email: string) => ({
+      error: null as Error | null,
+    }),
+    verifyOtp: async (_email: string, _token: string) => ({
+      data: null as unknown,
+      error: null as Error | null,
+    }),
     signOut: async () => ({ error: null as Error | null }),
   };
 
