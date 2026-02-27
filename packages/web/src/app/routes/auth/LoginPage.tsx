@@ -9,15 +9,18 @@ import {
   Paper,
   Alert,
   Image,
+  Checkbox,
 } from '@mantine/core';
 import { useAuthContext } from '../../context/AuthContext';
 import logoSrc from '../../../assets/sportsnot-logo.png';
+import { getSubtitleText, getSubmitButtonText } from './loginPageUtils';
 
 export function LoginPage() {
-  const { signInWithMagicLink } = useAuthContext();
+  const { signInWithMagicLink, signInWithOtp } = useAuthContext();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [useOtp, setUseOtp] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,12 +28,18 @@ export function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const { error: authError } = await signInWithMagicLink(email);
-
-    if (authError) {
-      setError(authError.message);
+    if (useOtp) {
+      const { error: authError } = await signInWithOtp(email);
+      if (authError) {
+        setError(authError.message);
+      }
     } else {
-      setSent(true);
+      const { error: authError } = await signInWithMagicLink(email);
+      if (authError) {
+        setError(authError.message);
+      } else {
+        setSent(true);
+      }
     }
     setLoading(false);
   };
@@ -69,7 +78,7 @@ export function LoginPage() {
             Sign in to SportsNot
           </Title>
           <Text ta="center" c="dimmed" size="sm">
-            Enter your email to receive a magic link
+            {getSubtitleText(useOtp)}
           </Text>
 
           {error && (
@@ -89,8 +98,13 @@ export function LoginPage() {
                 onChange={(e) => setEmail(e.currentTarget.value)}
                 size="md"
               />
+              <Checkbox
+                label="Use OTP Code?"
+                checked={useOtp}
+                onChange={(e) => setUseOtp(e.currentTarget.checked)}
+              />
               <Button type="submit" loading={loading} fullWidth size="md">
-                Send Magic Link
+                {getSubmitButtonText(useOtp)}
               </Button>
             </Stack>
           </form>
