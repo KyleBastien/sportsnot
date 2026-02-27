@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -9,30 +10,98 @@ import {
   Paper,
   Alert,
   Image,
+  Checkbox,
+  PinInput,
 } from '@mantine/core';
 import { useAuthContext } from '../../context/AuthContext';
 import logoSrc from '../../../assets/sportsnot-logo.png';
+import {
+  getSubtitleText,
+  getSubmitButtonText,
+  isOtpTokenComplete,
+  OTP_ERROR_MESSAGE,
+  RESEND_COOLDOWN_SECONDS,
+  getResendButtonText,
+} from './loginPageUtils';
 
 export function LoginPage() {
-  const { signInWithMagicLink } = useAuthContext();
+  const { user, signInWithMagicLink, signInWithOtp, verifyOtp } =
+    useAuthContext();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [useOtp, setUseOtp] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpToken, setOtpToken] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (user) navigate('/', { replace: true });
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error: authError } = await signInWithMagicLink(email);
-
-    if (authError) {
-      setError(authError.message);
+    if (useOtp) {
+      const { error: authError } = await signInWithOtp(email);
+      if (authError) {
+        setError(authError.message);
+      } else {
+        setOtpSent(true);
+        setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      }
     } else {
-      setSent(true);
+      const { error: authError } = await signInWithMagicLink(email);
+      if (authError) {
+        setError(authError.message);
+      } else {
+        setSent(true);
+      }
     }
     setLoading(false);
+  };
+
+  const handleVerifyOtp = async () => {
+    setVerifying(true);
+    setOtpError(null);
+
+    const { error: authError } = await verifyOtp(email, otpToken);
+    if (authError) {
+      setOtpError(OTP_ERROR_MESSAGE);
+      setOtpToken('');
+    }
+    setVerifying(false);
+  };
+
+  const handleBackToEmail = () => {
+    setOtpSent(false);
+    setOtpToken('');
+    setOtpError(null);
+    setResendCooldown(0);
+  };
+
+  const handleResendCode = async () => {
+    setOtpError(null);
+    const { error: authError } = await signInWithOtp(email);
+    if (authError) {
+      setOtpError(authError.message);
+    } else {
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    }
   };
 
   if (sent) {
@@ -46,6 +115,62 @@ export function LoginPage() {
               in the email to sign in.
             </Text>
             <Button variant="subtle" onClick={() => setSent(false)}>
+              Use a different email
+            </Button>
+          </Stack>
+        </Paper>
+      </Container>
+    );
+  }
+
+  if (otpSent) {
+    return (
+      <Container size="xs" py="xl">
+        <Paper shadow="md" p="xl" radius="md" withBorder>
+          <Stack align="center" gap="md">
+            <Title order={2}>Enter your code</Title>
+            <Text ta="center" c="dimmed">
+              We sent a 6-digit code to <strong>{email}</strong>
+            </Text>
+
+            {otpError && (
+              <Alert color="red" title="Error">
+                {otpError}
+              </Alert>
+            )}
+
+            <PinInput
+              length={6}
+              type="number"
+              value={otpToken}
+              onChange={setOtpToken}
+            />
+
+            <Button
+              fullWidth
+              size="md"
+              loading={verifying}
+              disabled={!isOtpTokenComplete(otpToken)}
+              onClick={handleVerifyOtp}
+            >
+              Verify Code
+            </Button>
+
+            <Stack align="center" gap="xs">
+              <Text size="sm" c="dimmed">
+                {"Didn't get a code?"}
+              </Text>
+              <Button
+                variant="subtle"
+                size="sm"
+                disabled={resendCooldown > 0}
+                onClick={handleResendCode}
+              >
+                {getResendButtonText(resendCooldown)}
+              </Button>
+            </Stack>
+
+            <Button variant="subtle" onClick={handleBackToEmail}>
               Use a different email
             </Button>
           </Stack>
@@ -69,7 +194,7 @@ export function LoginPage() {
             Sign in to SportsNot
           </Title>
           <Text ta="center" c="dimmed" size="sm">
-            Enter your email to receive a magic link
+            {getSubtitleText(useOtp)}
           </Text>
 
           {error && (
@@ -89,8 +214,13 @@ export function LoginPage() {
                 onChange={(e) => setEmail(e.currentTarget.value)}
                 size="md"
               />
+              <Checkbox
+                label="Use OTP Code?"
+                checked={useOtp}
+                onChange={(e) => setUseOtp(e.currentTarget.checked)}
+              />
               <Button type="submit" loading={loading} fullWidth size="md">
-                Send Magic Link
+                {getSubmitButtonText(useOtp)}
               </Button>
             </Stack>
           </form>

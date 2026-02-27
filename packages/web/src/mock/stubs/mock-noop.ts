@@ -52,6 +52,17 @@ export const useMockStandings = noopQuery;
 // mock/hooks/useMockScoringHistory
 export const useMockScoringHistory = noopQuery;
 
+// mock/hooks/useMockAuth
+export const useMockAuth = () => ({
+  user: null,
+  session: null,
+  loading: false,
+  signInWithMagicLink: async () => ({ error: null }),
+  signInWithOtp: async () => ({ error: null }),
+  verifyOtp: async () => ({ data: null, error: null }),
+  signOut: async () => ({ error: null }),
+});
+
 // mock/hooks/useMockUpdateProfile
 export const useMockUpdateProfile = () => ({
   createMockProfileClient: () => ({

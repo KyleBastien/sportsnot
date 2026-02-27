@@ -1,63 +1,21 @@
 # Ralph Progress Log
-Started: 02/26/2026
+Started: 02/27/2026
 
 ## Codebase Patterns
-- Use `@rstest/core` with `describe/it/expect` for unit tests (NOT vitest or jest)
-- Extract validation logic into separate pure-function files for testability (e.g., profileValidation.ts)
-- Run `npx eslint --fix` on new files to fix CRLF line endings on Windows
-- Mantine `TextInput` supports `description` prop for helper text below input and `maxLength` for character limits
-- Pre-existing lint errors exist in rspack.config.js, RoundTransitionPage.tsx, main.tsx, mock-noop.ts (all CRLF issues)
-- Pre-existing typecheck error: `Property 'BASE_HREF' does not exist on type 'ImportMetaEnv'` in main.tsx
-- `supabase.auth.updateUser` triggers `onAuthStateChange` which auto-refreshes useAuth state — use it to sync auth metadata after profile changes
-- Use ProfileUpdateClient-style interface pattern to make Supabase mutation logic testable without React test renderers
-- MockAuthProvider is ABOVE MockDataProvider in the component tree — they cannot read each other's contexts directly
-- Extract shared contexts into separate files (e.g., MockAuthUpdateContext.ts) to avoid pulling heavy imports (supabase) into test bundles
-- Mock mode pages use `IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true'` and call both mock and real hooks unconditionally (React rules), then return mock result when IS_MOCK
-- Pre-existing e2e failures (79 tests) in standings, error-states, league-join, mobile, etc. — unrelated to profile changes
+- Use `@rstest/core` (describe/it/expect) for unit tests, NOT vitest or jest
+- Run `npx eslint --fix` on new/changed files to fix CRLF line endings on Windows
+- Extract testable logic into pure functions with client interfaces (e.g., `authOperations.ts`, `updateProfile.ts`)
+- The `OtpAuthClient` interface in `authOperations.ts` mirrors the Supabase auth API surface for testing
 ---
 
-## 2026-02-26T22:12:00Z - US-001
-- What was implemented: Added 30-character max limit with counter to Display Name TextInput on ProfilePage
+## 2026-02-27T04:09:00Z - US-001
+- What was implemented: Added `signInWithOtp` and `verifyOtp` methods to the `useAuth` hook, plus extracted `authOperations.ts` module with pure testable functions and 8 unit tests
 - Files changed:
-  - `packages/web/src/app/routes/profile/ProfilePage.tsx` - Added maxLength, description props, use extracted validation
-  - `packages/web/src/app/routes/profile/profileValidation.ts` - New file with DISPLAY_NAME_MAX_LENGTH constant and validateDisplayName function
-  - `packages/web/src/app/routes/profile/profileValidation.test.ts` - New file with 9 unit tests
+  - `packages/supabase/src/lib/hooks/useAuth.ts` — Added signInWithOtp and verifyOtp useCallback methods
+  - `packages/supabase/src/lib/hooks/authOperations.ts` — New file: extracted OtpAuthClient interface, sendOtpCode, and verifyOtpCode pure functions
+  - `packages/supabase/src/lib/hooks/authOperations.test.ts` — New file: 8 unit tests covering OTP send and verify operations
 - **Learnings for future iterations:**
-  - Mantine TextInput's `description` prop renders helper text below the input (ideal for character counters)
-  - Extracting validation to a pure function file makes it testable without DOM rendering
-  - The prd.json on the `users/kbastien/fixInfiniteBug` branch differs from main; must checkout correct files
-  - All 212 web tests + 7 package test suites pass
----
-
-## 2026-02-26T22:23:00Z - US-002
-- What was implemented: After profile save, auth metadata is now synced via supabase.auth.updateUser, which triggers onAuthStateChange in useAuth and propagates through AuthContext to update the nav bar and all consumers without page reload.
-- Files changed:
-  - `packages/web/src/app/routes/profile/ProfilePage.tsx` - Refactored to use updateProfileDisplayName with ProfileUpdateClient adapter pattern
-  - `packages/web/src/app/routes/profile/updateProfile.ts` - New file with pure updateProfileDisplayName function and ProfileUpdateClient interface
-  - `packages/web/src/app/routes/profile/updateProfile.test.ts` - New file with 8 unit tests for update flow
-- **Learnings for future iterations:**
-  - `supabase.auth.updateUser({ data: { display_name } })` triggers `onAuthStateChange` with USER_UPDATED event, which auto-refreshes useAuth state
-  - The ProfileUpdateClient interface pattern allows testing mutation logic with mock clients without needing React test renderers
-  - UserMenu in app.tsx reads from `user.user_metadata['display_name']` — updating auth metadata is what makes the nav bar refresh
-  - Pre-existing lint errors (CRLF) in rspack.config.js, RoundTransitionPage.tsx, main.tsx, mock-noop.ts are unchanged
-  - Pre-existing typecheck error `BASE_HREF` in main.tsx is unchanged
-  - All 220 web tests + 7 package test suites pass
----
-
-## 2026-02-26T22:31:00Z - US-003
-- What was implemented: Added mock mode support for manager name update so ProfilePage works offline with in-memory state.
-- Files changed:
-  - `packages/web/src/mock/MockAuthProvider.tsx` - Made stateful with useState for reactive mock user; exports MockAuthUpdateContext provider
-  - `packages/web/src/mock/MockAuthUpdateContext.ts` - New file with context and hook for updating mock auth display name (separated to avoid supabase import in test bundles)
-  - `packages/web/src/mock/MockDataProvider.tsx` - Added UPDATE_PROFILE action to reducer for updating mockUser.displayName
-  - `packages/web/src/mock/hooks/useMockUpdateProfile.ts` - New mock hook returning ProfileUpdateClient that dispatches to both MockDataProvider and MockAuthProvider
-  - `packages/web/src/mock/hooks/useMockUpdateProfile.test.ts` - New file with 7 unit tests
-  - `packages/web/src/mock/mockHooksRegistry.ts` - Registered useMockUpdateProfile
-  - `packages/web/src/app/routes/profile/ProfilePage.tsx` - Uses mock client when IS_MOCK is true
-- **Learnings for future iterations:**
-  - MockAuthProvider (main.tsx) is ABOVE MockDataProvider (app.tsx) in the tree — can't use useMockData inside MockAuthProvider
-  - Extract shared contexts into separate leaf files to avoid import chains that pull in supabase/heavy deps into test bundles
-  - Date.now() in React component render triggers `react-hooks/purity` lint error — move to module-level constant
-  - useMockAuth.ts is still used by mockHooksRegistry but MockAuthProvider now manages its own state — the two are decoupled
-  - All 227 web tests + 7 package test suites pass
+  - The supabase package had no existing tests — `rstest.config.ts` with `passWithNoTests: true` was already configured
+  - `useRegularSeasonStats.ts` also had CRLF issues — fixed by running eslint --fix
+  - E2E test results: 79 failed / 8 passed — same as pre-existing baseline on main branch
 ---
