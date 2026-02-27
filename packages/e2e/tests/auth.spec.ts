@@ -298,7 +298,7 @@ test.describe('Authentication Flow', () => {
     // resulting in a null session and redirect to login.
     await unauthenticatedPage.addInitScript(
       ({ url }) => {
-        const storageKey = `sb-${new URL(url).hostname}-auth-token`;
+        const storageKey = `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
         window.localStorage.setItem(
           storageKey,
           JSON.stringify({
