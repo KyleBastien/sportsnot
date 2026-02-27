@@ -174,6 +174,7 @@ export type MockAction =
       type: 'START_RE_DRAFT';
       payload: { leagueId: string; draftState: MockDraftState };
     }
+  | { type: 'UPDATE_PROFILE'; payload: { displayName: string } }
   | { type: 'RESET_ALL' };
 
 // ── Reducer ────────────────────────────────────────────────────────────
@@ -503,6 +504,15 @@ export function mockReducer(state: MockState, action: MockAction): MockState {
         draftState,
         leagues: updatedLeagues,
         rosterHistory: updatedHistory,
+      };
+    }
+    case 'UPDATE_PROFILE': {
+      return {
+        ...state,
+        mockUser: {
+          ...state.mockUser,
+          displayName: action.payload.displayName,
+        },
       };
     }
     case 'ACTIVATE_IR': {
