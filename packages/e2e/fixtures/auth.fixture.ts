@@ -112,6 +112,25 @@ async function setupAuthMocks(page: Page, authenticated: boolean) {
     });
   });
 
+  // POST /auth/v1/verify — OTP code verification
+  await page.route(`${SUPABASE_URL}/auth/v1/verify*`, (route) => {
+    if (!authenticated) {
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: 'otp_expired',
+          error_description: 'Token has expired or is invalid',
+        }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(session),
+    });
+  });
+
   // POST /auth/v1/signout — sign out
   await page.route(`${SUPABASE_URL}/auth/v1/signout**`, (route) => {
     return route.fulfill({
