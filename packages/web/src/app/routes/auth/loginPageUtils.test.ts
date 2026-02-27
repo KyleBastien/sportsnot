@@ -5,6 +5,8 @@ import {
   getOtpSentMessage,
   isOtpTokenComplete,
   OTP_ERROR_MESSAGE,
+  RESEND_COOLDOWN_SECONDS,
+  getResendButtonText,
 } from './loginPageUtils';
 
 describe('loginPageUtils', () => {
@@ -67,6 +69,34 @@ describe('loginPageUtils', () => {
       expect(OTP_ERROR_MESSAGE).toBe(
         'Invalid or expired code. Please try again.'
       );
+    });
+  });
+
+  describe('RESEND_COOLDOWN_SECONDS', () => {
+    it('should be 60 seconds', () => {
+      expect(RESEND_COOLDOWN_SECONDS).toBe(60);
+    });
+  });
+
+  describe('getResendButtonText', () => {
+    it('should return "Resend code" when cooldown is 0', () => {
+      expect(getResendButtonText(0)).toBe('Resend code');
+    });
+
+    it('should return countdown text when cooldown is greater than 0', () => {
+      expect(getResendButtonText(45)).toBe('Resend code (45s)');
+    });
+
+    it('should return countdown text with 1 second remaining', () => {
+      expect(getResendButtonText(1)).toBe('Resend code (1s)');
+    });
+
+    it('should return countdown text at full cooldown', () => {
+      expect(getResendButtonText(60)).toBe('Resend code (60s)');
+    });
+
+    it('should return "Resend code" for negative values', () => {
+      expect(getResendButtonText(-1)).toBe('Resend code');
     });
   });
 });

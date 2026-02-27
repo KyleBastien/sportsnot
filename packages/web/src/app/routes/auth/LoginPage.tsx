@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Container,
   Title,
@@ -19,6 +19,8 @@ import {
   getSubmitButtonText,
   isOtpTokenComplete,
   OTP_ERROR_MESSAGE,
+  RESEND_COOLDOWN_SECONDS,
+  getResendButtonText,
 } from './loginPageUtils';
 
 export function LoginPage() {
@@ -32,6 +34,15 @@ export function LoginPage() {
   const [otpToken, setOtpToken] = useState('');
   const [otpError, setOtpError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +55,7 @@ export function LoginPage() {
         setError(authError.message);
       } else {
         setOtpSent(true);
+        setResendCooldown(RESEND_COOLDOWN_SECONDS);
       }
     } else {
       const { error: authError } = await signInWithMagicLink(email);
@@ -72,6 +84,17 @@ export function LoginPage() {
     setOtpSent(false);
     setOtpToken('');
     setOtpError(null);
+    setResendCooldown(0);
+  };
+
+  const handleResendCode = async () => {
+    setOtpError(null);
+    const { error: authError } = await signInWithOtp(email);
+    if (authError) {
+      setOtpError(authError.message);
+    } else {
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    }
   };
 
   if (sent) {
@@ -125,6 +148,20 @@ export function LoginPage() {
             >
               Verify Code
             </Button>
+
+            <Stack align="center" gap="xs">
+              <Text size="sm" c="dimmed">
+                {"Didn't get a code?"}
+              </Text>
+              <Button
+                variant="subtle"
+                size="sm"
+                disabled={resendCooldown > 0}
+                onClick={handleResendCode}
+              >
+                {getResendButtonText(resendCooldown)}
+              </Button>
+            </Stack>
 
             <Button variant="subtle" onClick={handleBackToEmail}>
               Use a different email
