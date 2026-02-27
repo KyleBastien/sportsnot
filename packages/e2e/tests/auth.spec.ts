@@ -30,6 +30,16 @@ test.describe('Authentication Flow', () => {
       unauthenticatedPage.getByPlaceholder('you@example.com')
     ).toBeVisible();
 
+    // OTP checkbox is checked by default, so button reads "Send Code"
+    await expect(
+      unauthenticatedPage.getByRole('button', { name: /send code/i })
+    ).toBeVisible();
+
+    // Uncheck OTP to get magic link flow
+    await unauthenticatedPage
+      .getByRole('checkbox', { name: /use otp code/i })
+      .uncheck();
+
     await expect(
       unauthenticatedPage.getByRole('button', { name: /send magic link/i })
     ).toBeVisible();
@@ -45,6 +55,11 @@ test.describe('Authentication Flow', () => {
     await expect(
       unauthenticatedPage.getByPlaceholder('you@example.com')
     ).toBeVisible(NAV_TIMEOUT);
+
+    // Uncheck OTP to use magic link flow
+    await unauthenticatedPage
+      .getByRole('checkbox', { name: /use otp code/i })
+      .uncheck();
 
     await unauthenticatedPage
       .getByPlaceholder('you@example.com')
