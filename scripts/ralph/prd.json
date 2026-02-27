@@ -1,18 +1,17 @@
 {
   "project": "SportsNot",
-  "branchName": "ralph/update-manager-name",
-  "description": "Harden the ProfilePage manager name editing — add max character limit with counter, refresh display name across app after update, add mock mode support, and add unit tests",
+  "branchName": "ralph/otp-email-login",
+  "description": "Add OTP email code login alongside existing magic link — checkbox toggle, 6-digit PinInput verification screen, resend cooldown timer, mock mode support, and E2E tests",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add max character limit and counter to manager name input",
-      "description": "As a user, I want the manager name field to enforce a 30-character limit with a visible counter so that names stay readable across the app.",
+      "title": "Add signInWithOtp and verifyOtp methods to useAuth hook",
+      "description": "As a developer, I need the Supabase auth hook to support sending OTP codes and verifying them so the login page can use either flow.",
       "acceptanceCriteria": [
-        "Manager name TextInput on ProfilePage enforces a 30-character maximum via maxLength prop",
-        "A character count indicator is displayed below the input (e.g., '12/30') using Mantine Text or Input.Description",
-        "Empty or whitespace-only names are still rejected with an error message (existing behavior preserved)",
-        "The save button remains disabled or shows validation error when input is empty",
-        "Verify in browser if browser testing tools are available",
+        "useAuth returns a `signInWithOtp(email)` method that calls `supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })` without `emailRedirectTo`",
+        "useAuth returns a `verifyOtp(email, token)` method that calls `supabase.auth.verifyOtp({ email, token, type: 'email' })` and returns `{ data, error }`",
+        "Existing `signInWithMagicLink` method is unchanged and still works",
+        "Both new methods are wrapped in useCallback",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -20,19 +19,18 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "ProfilePage.tsx already has a TextInput for display_name. Add maxLength={30} prop and a character count helper text below the input showing `${displayName.length}/30`."
+      "passes": false,
+      "notes": "File: packages/supabase/src/lib/hooks/useAuth.ts. Add two new useCallback methods alongside existing signInWithMagicLink and signOut. The key difference from magic link is NOT passing emailRedirectTo in signInWithOtp options — this tells Supabase to send a code instead of a link."
     },
     {
       "id": "US-002",
-      "title": "Refresh display name across app after profile update",
-      "description": "As a user, I want my updated manager name to appear immediately in the nav bar and on other pages without refreshing my browser.",
+      "title": "Extend AuthContext with OTP methods",
+      "description": "As a developer, I need the AuthContext to expose the new OTP methods so components can access them.",
       "acceptanceCriteria": [
-        "After a successful profile save, the AuthContext or user state refreshes with the new display name",
-        "The nav bar header user menu reflects the updated name without a page reload",
-        "Standings and draft pages show the updated name on next navigation via fresh React Query fetch",
-        "If supabase.auth.updateUser or refreshSession is used, the user_metadata reflects the new display_name",
-        "Verify in browser if browser testing tools are available",
+        "AuthContextValue interface includes `signInWithOtp: (email: string) => Promise<{ error: Error | null }>`",
+        "AuthContextValue interface includes `verifyOtp: (email: string, token: string) => Promise<{ data: unknown; error: Error | null }>`",
+        "AuthProvider passes both new methods from useAuth to the context",
+        "useAuthContext returns both new methods",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -40,19 +38,24 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "After the Supabase users table update, call supabase.auth.updateUser({ data: { display_name: newName } }) to sync auth metadata, then refresh the AuthContext state. The nav bar reads from user.user_metadata?.['display_name']. React Query queries that join on users table will pick up the change on next fetch."
+      "passes": false,
+      "notes": "File: packages/web/src/app/context/AuthContext.tsx. The useAuth hook already returns all methods as a spread object, so AuthProvider may already pass them through — but the AuthContextValue TypeScript interface must be explicitly updated with the new method signatures."
     },
     {
       "id": "US-003",
-      "title": "Add mock mode support for manager name update",
-      "description": "As a developer, I want profile name editing to work in mock mode so that I can develop and test the feature offline.",
+      "title": "Add OTP checkbox and dynamic button to login form",
+      "description": "As a user, I want a checkbox on the login page to choose between OTP code and magic link so I can pick my preferred sign-in method.",
       "acceptanceCriteria": [
-        "A mock profile update handler exists in the mock hooks directory (packages/web/src/mock/hooks/)",
-        "The mock handler updates the in-memory user state with the new display name",
-        "The mock hooks registry (mockHooksRegistry.ts) includes the profile update mock",
-        "Updating the name in mock mode reflects immediately in the nav bar and across the app",
-        "The ProfilePage works identically in mock and live mode from the user's perspective",
+        "A Mantine Checkbox labeled 'Use OTP Code?' is rendered between the email input and submit button",
+        "The checkbox is checked by default (OTP is the default login method)",
+        "When checkbox is checked, submit button reads 'Send Code'",
+        "When checkbox is unchecked, submit button reads 'Send Magic Link'",
+        "Subtitle text reads 'Enter your email to receive a one-time code' when checked",
+        "Subtitle text reads 'Enter your email to receive a magic link' when unchecked",
+        "Submitting with checkbox checked calls signInWithOtp(email) from AuthContext",
+        "Submitting with checkbox unchecked calls signInWithMagicLink(email) (existing behavior)",
+        "Unchecked magic link flow still shows 'Check your email' confirmation (existing behavior preserved)",
+        "Verify in browser if browser testing tools are available",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -60,19 +63,25 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "Follow the existing mockHooksRegistry pattern. The mock handler should update the in-memory user object held by useMockAuth. Check how other mock hooks (useMockLeagues, useMockDraft) handle mutations for the pattern to follow."
+      "passes": false,
+      "notes": "File: packages/web/src/app/routes/auth/LoginPage.tsx. Add `useOtp` boolean state (default true). Import Checkbox from @mantine/core. The checkbox toggles useOtp. handleSubmit branches: if useOtp, call signInWithOtp and set otpSent=true; else call signInWithMagicLink and set sent=true (existing flow)."
     },
     {
       "id": "US-004",
-      "title": "Add unit tests for profile update validation and flow",
-      "description": "As a developer, I want tests covering the manager name update logic so that regressions are caught.",
+      "title": "Add OTP verification screen with PinInput",
+      "description": "As a user, I want to enter the 6-digit code I received via email on an in-app verification screen so I can sign in without leaving the browser.",
       "acceptanceCriteria": [
-        "Test that empty or whitespace-only names are rejected",
-        "Test that names at exactly 30 characters are accepted",
-        "Test that a valid name trims whitespace before saving",
-        "Test that successful update triggers a state refresh (display name changes in returned user object)",
-        "Test that character count displays correctly for various input lengths",
+        "After OTP is sent, the login form is replaced with an OTP verification screen (same page, conditional render)",
+        "Heading reads 'Enter your code'",
+        "Subtext reads 'We sent a 6-digit code to {email}' with the email bolded",
+        "A Mantine PinInput with length={6}, type='number' is rendered for code entry",
+        "A 'Verify Code' button is shown, disabled until all 6 digits are entered",
+        "Clicking 'Verify Code' calls verifyOtp(email, token) from AuthContext",
+        "On successful verification, Supabase fires SIGNED_IN event and user is redirected to / (no manual navigation needed)",
+        "On failed verification, an inline Alert shows 'Invalid or expired code. Please try again.' and the PinInput clears",
+        "A 'Use a different email' button returns to the email input form and resets OTP state",
+        "Error from signInWithOtp (sending step) is shown as an Alert on the email form",
+        "Verify in browser if browser testing tools are available",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -80,8 +89,89 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "Use @rstest/core with describe/it/expect — NOT vitest or jest. Test pure validation logic extracted from ProfilePage. Run npx eslint --fix on new test files to fix CRLF line endings."
+      "passes": false,
+      "notes": "File: packages/web/src/app/routes/auth/LoginPage.tsx. Add states: otpSent (boolean), otpToken (string). When otpSent is true, render the verification view (same pattern as the existing 'sent' confirmation view). Import PinInput from @mantine/core. The PinInput onChange sets otpToken. Verify button calls verifyOtp — on success the onAuthStateChange listener in useAuth handles session creation and AuthCallbackPage-style redirect happens automatically."
+    },
+    {
+      "id": "US-005",
+      "title": "Add resend code button with 60-second cooldown timer",
+      "description": "As a user, I want a resend button with a visible countdown so I know when I can request a new code.",
+      "acceptanceCriteria": [
+        "OTP verification screen shows 'Didn't get a code?' text with a 'Resend code' button",
+        "After sending (initial send or resend), the resend button is disabled for 60 seconds",
+        "While disabled, button text shows countdown: 'Resend code (Xs)' where X counts down from 60",
+        "After countdown reaches 0, button becomes enabled and text returns to 'Resend code'",
+        "Clicking resend calls signInWithOtp(email) again and resets the timer to 60",
+        "Timer is implemented with useEffect and setInterval, cleaning up on unmount",
+        "Verify in browser if browser testing tools are available",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "File: packages/web/src/app/routes/auth/LoginPage.tsx. Add resendCooldown state (number, starts at 60 when OTP is sent). useEffect with setInterval decrements every second. Resend button disabled when resendCooldown > 0. On resend click, call signInWithOtp again and reset cooldown to 60. Clean up interval on unmount."
+    },
+    {
+      "id": "US-006",
+      "title": "Add mock mode OTP support",
+      "description": "As a developer, I want the OTP flow to work in mock mode so I can develop and test offline, accepting any 6-digit code.",
+      "acceptanceCriteria": [
+        "useMockAuth returns a signInWithOtp method that always resolves with { error: null }",
+        "useMockAuth returns a verifyOtp method that accepts any 6-digit numeric string and returns { data: { user, session }, error: null }",
+        "verifyOtp in mock mode returns { data: null, error: Error('Invalid OTP code') } for non-6-digit or non-numeric input",
+        "MockAuthProvider passes signInWithOtp and verifyOtp to AuthContext",
+        "The full OTP flow (enter email → send code → enter code → signed in) works in mock mode",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Files: packages/web/src/mock/hooks/useMockAuth.ts and packages/web/src/mock/MockAuthProvider.tsx. Add signInWithOtp and verifyOtp to useMockAuth return value. verifyOtp validates token is 6 digits via /^\\d{6}$/ regex. MockAuthProvider spreads the mock auth object into AuthContext — verify the new methods are included in the spread."
+    },
+    {
+      "id": "US-007",
+      "title": "Add E2E test fixtures and route mocks for OTP verification",
+      "description": "As a developer, I need E2E test infrastructure to mock the OTP verify endpoint so Playwright tests can simulate the full flow.",
+      "acceptanceCriteria": [
+        "auth.fixture.ts mocks the Supabase OTP verify endpoint (POST /auth/v1/verify*) returning a valid session for authenticated pages",
+        "auth.fixture.ts mocks the verify endpoint returning an error for unauthenticated pages",
+        "Existing auth route mocks (otp send, signout, token refresh, user) are unchanged",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "File: packages/e2e/fixtures/auth.fixture.ts. Add a route mock for `${SUPABASE_URL}/auth/v1/verify*` inside setupAuthMocks. When authenticated=true, return 200 with session JSON. When authenticated=false, return 400 with error JSON. The existing /auth/v1/otp** mock already handles the send step."
+    },
+    {
+      "id": "US-008",
+      "title": "Add E2E tests for OTP login flow",
+      "description": "As a developer, I want E2E tests covering the OTP login flow to prevent regressions.",
+      "acceptanceCriteria": [
+        "Test: 'login page renders OTP checkbox checked by default' — checkbox is visible and checked",
+        "Test: 'submitting email with OTP sends code and shows verification screen' — fill email, submit, PinInput is visible, 'Enter your code' heading is visible",
+        "Test: 'entering valid OTP code signs in and redirects to dashboard' — fill 6-digit code, click verify, user is redirected to /",
+        "Test: 'resend code button has cooldown timer' — on verification screen, resend button shows countdown text and is disabled",
+        "Test: 'unchecking OTP checkbox shows magic link flow' — uncheck checkbox, submit, 'Check your email' confirmation appears",
+        "All existing auth E2E tests continue to pass without modification",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "File: packages/e2e/tests/auth.spec.ts. Add tests within the existing 'Authentication Flow' describe block. Use unauthenticatedPage fixture for login tests, authenticatedPage for the redirect-after-verify test. Existing tests reference 'Send Magic Link' button — those must still pass since the button text changes based on checkbox state. For the OTP verify redirect test, mock the verify endpoint to return a session and inject it into localStorage similar to the magic link callback test."
     }
   ]
 }
