@@ -1,6 +1,20 @@
 import { test as base, type Page } from '@playwright/test';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
-const SUPABASE_URL = 'http://localhost:54321';
+function getSupabaseUrl(): string {
+  if (process.env.VITE_SUPABASE_URL) return process.env.VITE_SUPABASE_URL;
+  try {
+    const content = readFileSync(resolve(__dirname, '../../.env'), 'utf-8');
+    const match = content.match(/^VITE_SUPABASE_URL=(.+)$/m);
+    if (match) return match[1].trim();
+  } catch {
+    /* ignore */
+  }
+  return 'http://localhost:54321';
+}
+
+export const SUPABASE_URL = getSupabaseUrl();
 
 /** Mock user data matching Supabase auth user shape */
 export const mockUser = {
@@ -41,7 +55,7 @@ async function setupAuthMocks(page: Page, authenticated: boolean) {
   const user = authenticated ? mockUser : null;
 
   // GET /auth/v1/user — Supabase calls this to verify the current user
-  await page.route(`${SUPABASE_URL}/auth/v1/user`, (route) => {
+  await page.route('**/auth/v1/user', (route) => {
     if (!authenticated) {
       return route.fulfill({
         status: 401,
@@ -60,51 +74,45 @@ async function setupAuthMocks(page: Page, authenticated: boolean) {
   });
 
   // POST /auth/v1/token?grant_type=refresh_token — token refresh
-  await page.route(
-    `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,
-    (route) => {
-      if (!authenticated) {
-        return route.fulfill({
-          status: 400,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            error: 'invalid_grant',
-            error_description: 'Invalid Refresh Token',
-          }),
-        });
-      }
+  await page.route('**/auth/v1/token?grant_type=refresh_token', (route) => {
+    if (!authenticated) {
       return route.fulfill({
-        status: 200,
+        status: 400,
         contentType: 'application/json',
-        body: JSON.stringify(session),
+        body: JSON.stringify({
+          error: 'invalid_grant',
+          error_description: 'Invalid Refresh Token',
+        }),
       });
     }
-  );
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(session),
+    });
+  });
 
   // POST /auth/v1/token?grant_type=password — password-based sign-in
-  await page.route(
-    `${SUPABASE_URL}/auth/v1/token?grant_type=password`,
-    (route) => {
-      if (!authenticated) {
-        return route.fulfill({
-          status: 400,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            error: 'invalid_grant',
-            error_description: 'Invalid credentials',
-          }),
-        });
-      }
+  await page.route('**/auth/v1/token?grant_type=password', (route) => {
+    if (!authenticated) {
       return route.fulfill({
-        status: 200,
+        status: 400,
         contentType: 'application/json',
-        body: JSON.stringify(session),
+        body: JSON.stringify({
+          error: 'invalid_grant',
+          error_description: 'Invalid credentials',
+        }),
       });
     }
-  );
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(session),
+    });
+  });
 
   // POST /auth/v1/otp — magic link request (glob to match query params like ?redirect_to=...)
-  await page.route(`${SUPABASE_URL}/auth/v1/otp**`, (route) => {
+  await page.route('**/auth/v1/otp**', (route) => {
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -113,7 +121,7 @@ async function setupAuthMocks(page: Page, authenticated: boolean) {
   });
 
   // POST /auth/v1/verify — OTP code verification
-  await page.route(`${SUPABASE_URL}/auth/v1/verify*`, (route) => {
+  await page.route('**/auth/v1/verify*', (route) => {
     if (!authenticated) {
       return route.fulfill({
         status: 400,
@@ -132,7 +140,7 @@ async function setupAuthMocks(page: Page, authenticated: boolean) {
   });
 
   // POST /auth/v1/signout — sign out
-  await page.route(`${SUPABASE_URL}/auth/v1/signout**`, (route) => {
+  await page.route('**/auth/v1/signout**', (route) => {
     return route.fulfill({
       status: 204,
       body: '',
@@ -140,7 +148,7 @@ async function setupAuthMocks(page: Page, authenticated: boolean) {
   });
 
   // POST /auth/v1/logout — alternative logout endpoint
-  await page.route(`${SUPABASE_URL}/auth/v1/logout`, (route) => {
+  await page.route('**/auth/v1/logout', (route) => {
     return route.fulfill({
       status: 204,
       body: '',

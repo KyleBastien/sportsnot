@@ -1,7 +1,5 @@
-import { test as authTest } from './auth.fixture';
+import { test as authTest, SUPABASE_URL } from './auth.fixture';
 import type { Page } from '@playwright/test';
-
-const SUPABASE_URL = 'http://localhost:54321';
 
 /** Tables that will be mocked by default */
 const TABLES = [

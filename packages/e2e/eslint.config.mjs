@@ -6,7 +6,7 @@ export default [
   ...baseConfig,
   playwright.configs['flat/recommended'],
   {
-    files: ['*.config.ts'],
+    files: ['*.config.ts', 'fixtures/**/*.ts'],
     languageOptions: { globals: { ...globals.node } },
   },
 ];

@@ -1,8 +1,7 @@
-import { test, expect } from '../fixtures/auth.fixture';
+import { test, expect, SUPABASE_URL } from '../fixtures/auth.fixture';
 import { mockUser } from '../fixtures/auth.fixture';
 import { setupSupabaseMocks } from '../fixtures/supabase-mock.fixture';
 
-const SUPABASE_URL = 'http://localhost:54321';
 const NAV_TIMEOUT = { timeout: 15000 };
 
 test.describe('Authentication Flow', () => {
@@ -127,6 +126,166 @@ test.describe('Authentication Flow', () => {
       .click();
 
     await expect(authenticatedPage).toHaveURL(/\/auth\/login/, NAV_TIMEOUT);
+  });
+
+  test('submitting email with OTP sends code and shows verification screen', async ({
+    unauthenticatedPage,
+  }) => {
+    await setupSupabaseMocks(unauthenticatedPage);
+    await unauthenticatedPage.goto('/auth/login');
+
+    await expect(
+      unauthenticatedPage.getByPlaceholder('you@example.com')
+    ).toBeVisible(NAV_TIMEOUT);
+
+    // OTP checkbox is checked by default — fill email and submit
+    await unauthenticatedPage
+      .getByPlaceholder('you@example.com')
+      .fill('user@test.com');
+    await unauthenticatedPage
+      .getByRole('button', { name: /send code/i })
+      .click();
+
+    // Verification screen should appear
+    await expect(
+      unauthenticatedPage.getByRole('heading', { name: /enter your code/i })
+    ).toBeVisible(NAV_TIMEOUT);
+    await expect(unauthenticatedPage.getByText(/user@test\.com/)).toBeVisible();
+
+    // PinInput renders 6 individual input fields
+    const pinInputs = unauthenticatedPage.locator('input[type="tel"]');
+    await expect(pinInputs.first()).toBeVisible();
+
+    // Verify Code button should be visible but disabled (no digits entered)
+    const verifyButton = unauthenticatedPage.getByRole('button', {
+      name: /verify code/i,
+    });
+    await expect(verifyButton).toBeVisible();
+    await expect(verifyButton).toBeDisabled();
+  });
+
+  test('entering valid OTP code signs in and redirects to dashboard', async ({
+    unauthenticatedPage,
+  }) => {
+    // Override verify endpoint to return a valid session
+    // (registered after fixture mocks, so takes precedence)
+    await unauthenticatedPage.route('**/auth/v1/verify*', (route) => {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          access_token: 'mock-access-token-for-testing',
+          token_type: 'bearer',
+          expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          refresh_token: 'mock-refresh-token-for-testing',
+          user: mockUser,
+        }),
+      });
+    });
+
+    await setupSupabaseMocks(unauthenticatedPage);
+    await unauthenticatedPage.goto('/auth/login');
+
+    await expect(
+      unauthenticatedPage.getByPlaceholder('you@example.com')
+    ).toBeVisible(NAV_TIMEOUT);
+
+    // Fill email and submit OTP
+    await unauthenticatedPage
+      .getByPlaceholder('you@example.com')
+      .fill('user@test.com');
+    await unauthenticatedPage
+      .getByRole('button', { name: /send code/i })
+      .click();
+
+    // Wait for verification screen
+    await expect(
+      unauthenticatedPage.getByRole('heading', { name: /enter your code/i })
+    ).toBeVisible(NAV_TIMEOUT);
+
+    // Fill in 6-digit OTP code via the pin input fields
+    const pinInputs = unauthenticatedPage.locator('input[type="tel"]');
+    for (let i = 0; i < 6; i++) {
+      await pinInputs.nth(i).fill(String(i + 1));
+    }
+
+    // Click Verify Code
+    await unauthenticatedPage
+      .getByRole('button', { name: /verify code/i })
+      .click();
+
+    // Should redirect to dashboard (root) after successful verification
+    await expect(unauthenticatedPage).toHaveURL(
+      /^http:\/\/localhost:\d+\/?$/,
+      NAV_TIMEOUT
+    );
+  });
+
+  test('resend code button has cooldown timer', async ({
+    unauthenticatedPage,
+  }) => {
+    await setupSupabaseMocks(unauthenticatedPage);
+    await unauthenticatedPage.goto('/auth/login');
+
+    await expect(
+      unauthenticatedPage.getByPlaceholder('you@example.com')
+    ).toBeVisible(NAV_TIMEOUT);
+
+    // Submit email with OTP
+    await unauthenticatedPage
+      .getByPlaceholder('you@example.com')
+      .fill('user@test.com');
+    await unauthenticatedPage
+      .getByRole('button', { name: /send code/i })
+      .click();
+
+    // Wait for verification screen
+    await expect(
+      unauthenticatedPage.getByRole('heading', { name: /enter your code/i })
+    ).toBeVisible(NAV_TIMEOUT);
+
+    // Resend button should be disabled with countdown text
+    const resendButton = unauthenticatedPage.getByRole('button', {
+      name: /resend code/i,
+    });
+    await expect(resendButton).toBeVisible();
+    await expect(resendButton).toBeDisabled();
+    await expect(resendButton).toHaveText(/resend code \(\d+s\)/i);
+
+    // "Didn't get a code?" text should be visible
+    await expect(
+      unauthenticatedPage.getByText(/didn.t get a code/i)
+    ).toBeVisible();
+  });
+
+  test('unchecking OTP checkbox shows magic link flow', async ({
+    unauthenticatedPage,
+  }) => {
+    await setupSupabaseMocks(unauthenticatedPage);
+    await unauthenticatedPage.goto('/auth/login');
+
+    await expect(
+      unauthenticatedPage.getByPlaceholder('you@example.com')
+    ).toBeVisible(NAV_TIMEOUT);
+
+    // Uncheck OTP checkbox
+    await unauthenticatedPage
+      .getByRole('checkbox', { name: /use otp code/i })
+      .uncheck();
+
+    // Fill email and submit magic link
+    await unauthenticatedPage
+      .getByPlaceholder('you@example.com')
+      .fill('user@test.com');
+    await unauthenticatedPage
+      .getByRole('button', { name: /send magic link/i })
+      .click();
+
+    // Should show check your email confirmation
+    await expect(
+      unauthenticatedPage.getByText(/check your email/i)
+    ).toBeVisible(NAV_TIMEOUT);
   });
 
   test('expired/invalid session redirects to login page', async ({
