@@ -17,3 +17,9 @@ export function isOtpTokenComplete(token: string): boolean {
 }
 
 export const OTP_ERROR_MESSAGE = 'Invalid or expired code. Please try again.';
+
+export const RESEND_COOLDOWN_SECONDS = 60;
+
+export function getResendButtonText(cooldown: number): string {
+  return cooldown > 0 ? `Resend code (${cooldown}s)` : 'Resend code';
+}
