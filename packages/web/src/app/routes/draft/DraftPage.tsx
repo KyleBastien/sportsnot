@@ -29,7 +29,7 @@ import {
   useRegularSeasonPlayers,
 } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
-import { type Position, ROSTER_COMPOSITION } from '@sportsnot/types';
+import { type Position, getRosterComposition } from '@sportsnot/types';
 import {
   buildPlayerNameMap,
   buildTeamNameMap,
@@ -41,6 +41,7 @@ import {
   useMockLeagueMembers,
   useMockMakePick,
 } from '../../../mock/hooks/useMockDraft';
+import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import {
   useMockPlayoffPlayers,
   useMockPlayoffTeams,
@@ -147,12 +148,15 @@ function useLeagueCommissioner(leagueId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('leagues')
-        .select('commissioner_id')
+        .select('commissioner_id, allow_ir_slots')
         .eq('id', leagueId)
         .single();
 
       if (error) throw error;
-      return data?.commissioner_id as string | null;
+      return {
+        commissionerId: data?.commissioner_id as string | null,
+        allowIrSlots: (data?.allow_ir_slots ?? true) as boolean,
+      };
     },
     enabled: !IS_MOCK,
   });
@@ -195,6 +199,7 @@ interface AvailablePlayerBoardProps {
   isRound1: boolean;
   regSeasonStats: RegSeasonStatRow[];
   mySlotCounts: Record<string, number>;
+  allowIrSlots: boolean;
 }
 
 function AvailablePlayerBoard({
@@ -211,24 +216,26 @@ function AvailablePlayerBoard({
   isRound1,
   regSeasonStats,
   mySlotCounts,
+  allowIrSlots,
 }: AvailablePlayerBoardProps) {
   const query = searchQuery.toLowerCase();
+  const roster = getRosterComposition(allowIrSlots);
 
   const isPositionFull = (pos: string): boolean => {
     if (pos === 'F') {
       return (
-        mySlotCounts['F'] >= ROSTER_COMPOSITION.forwards &&
-        mySlotCounts['IR_F'] >= ROSTER_COMPOSITION.irForwards
+        mySlotCounts['F'] >= roster.forwards &&
+        mySlotCounts['IR_F'] >= roster.irForwards
       );
     }
     if (pos === 'D') {
       return (
-        mySlotCounts['D'] >= ROSTER_COMPOSITION.defensemen &&
-        mySlotCounts['IR_D'] >= ROSTER_COMPOSITION.irDefensemen
+        mySlotCounts['D'] >= roster.defensemen &&
+        mySlotCounts['IR_D'] >= roster.irDefensemen
       );
     }
     if (pos === 'G') {
-      return mySlotCounts['G'] >= ROSTER_COMPOSITION.goalies;
+      return mySlotCounts['G'] >= roster.goalies;
     }
     return false;
   };
@@ -511,7 +518,15 @@ export function DraftPage() {
   const { user } = useAuthContext();
   const { data: draft, isLoading: draftLoading } = useDraft(leagueId!);
   const { data: members } = useLeagueMembers(leagueId!);
-  const { data: commissionerId } = useLeagueCommissioner(leagueId!);
+  const { data: leagueInfo } = useLeagueCommissioner(leagueId!);
+  const mockLeagueResult = useMockLeague(leagueId);
+  const commissionerId = IS_MOCK
+    ? (mockLeagueResult.data?.commissioner_id ?? null)
+    : (leagueInfo?.commissionerId ?? null);
+  const allowIrSlots = IS_MOCK
+    ? (mockLeagueResult.data?.allow_ir_slots ?? true)
+    : (leagueInfo?.allowIrSlots ?? true);
+  const roster = getRosterComposition(allowIrSlots);
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmPlayer, setConfirmPlayer] = useState<DraftablePlayer | null>(
@@ -649,23 +664,25 @@ export function DraftPage() {
       label: string;
       max: number;
     }[] = [
-      { key: 'F', label: 'Forward', max: ROSTER_COMPOSITION.forwards },
-      { key: 'D', label: 'Defenseman', max: ROSTER_COMPOSITION.defensemen },
-      { key: 'G', label: 'Goalie', max: ROSTER_COMPOSITION.goalies },
-      { key: 'IR_F', label: 'IR Forward', max: ROSTER_COMPOSITION.irForwards },
+      { key: 'F', label: 'Forward', max: roster.forwards },
+      { key: 'D', label: 'Defenseman', max: roster.defensemen },
+      { key: 'G', label: 'Goalie', max: roster.goalies },
+      { key: 'IR_F', label: 'IR Forward', max: roster.irForwards },
       {
         key: 'IR_D',
         label: 'IR Defenseman',
-        max: ROSTER_COMPOSITION.irDefensemen,
+        max: roster.irDefensemen,
       },
     ];
 
-    return positionConfig.map(({ key, label, max }) => {
-      const filled = myPicks.filter((p) => p.position === key);
-      const emptyCount = Math.max(0, max - filled.length);
-      return { position: key, label, filled, emptyCount };
-    });
-  }, [picks, myMember]);
+    return positionConfig
+      .filter(({ max }) => max > 0)
+      .map(({ key, label, max }) => {
+        const filled = myPicks.filter((p) => p.position === key);
+        const emptyCount = Math.max(0, max - filled.length);
+        return { position: key, label, filled, emptyCount };
+      });
+  }, [picks, myMember, roster]);
 
   // Subscribe to real-time draft changes (no-op in mock mode)
   useEffect(() => {
@@ -1056,16 +1073,20 @@ export function DraftPage() {
                   setConfirmPosition('G');
                 } else if (player.position === 'D') {
                   const dFull =
-                    mySlotCounts['D'] >= ROSTER_COMPOSITION.defensemen;
+                    mySlotCounts['D'] >= roster.defensemen;
                   const irDFull =
-                    mySlotCounts['IR_D'] >= ROSTER_COMPOSITION.irDefensemen;
-                  setConfirmPosition(dFull && !irDFull ? 'IR_D' : 'D');
+                    mySlotCounts['IR_D'] >= roster.irDefensemen;
+                  setConfirmPosition(
+                    dFull && !irDFull ? 'IR_D' : 'D'
+                  );
                 } else {
                   const fFull =
-                    mySlotCounts['F'] >= ROSTER_COMPOSITION.forwards;
+                    mySlotCounts['F'] >= roster.forwards;
                   const irFFull =
-                    mySlotCounts['IR_F'] >= ROSTER_COMPOSITION.irForwards;
-                  setConfirmPosition(fFull && !irFFull ? 'IR_F' : 'F');
+                    mySlotCounts['IR_F'] >= roster.irForwards;
+                  setConfirmPosition(
+                    fFull && !irFFull ? 'IR_F' : 'F'
+                  );
                 }
               }}
               comparePlayers={comparePlayers}
@@ -1073,6 +1094,7 @@ export function DraftPage() {
               isRound1={isRound1}
               mySlotCounts={mySlotCounts}
               regSeasonStats={regSeasonStats ?? []}
+              allowIrSlots={allowIrSlots}
             />
           )}
         </Card>
@@ -1170,47 +1192,55 @@ export function DraftPage() {
                       ? [
                           {
                             label:
-                              mySlotCounts['D'] >= ROSTER_COMPOSITION.defensemen
+                              mySlotCounts['D'] >= roster.defensemen
                                 ? 'Defense (full)'
                                 : 'Defense',
                             value: 'D',
                             disabled:
                               mySlotCounts['D'] >=
-                              ROSTER_COMPOSITION.defensemen,
+                              roster.defensemen,
                           },
-                          {
-                            label:
-                              mySlotCounts['IR_D'] >=
-                              ROSTER_COMPOSITION.irDefensemen
-                                ? 'IR Defense (full)'
-                                : 'IR Defense',
-                            value: 'IR_D',
-                            disabled:
-                              mySlotCounts['IR_D'] >=
-                              ROSTER_COMPOSITION.irDefensemen,
-                          },
+                          ...(allowIrSlots
+                            ? [
+                                {
+                                  label:
+                                    mySlotCounts['IR_D'] >=
+                                    roster.irDefensemen
+                                      ? 'IR Defense (full)'
+                                      : 'IR Defense',
+                                  value: 'IR_D',
+                                  disabled:
+                                    mySlotCounts['IR_D'] >=
+                                    roster.irDefensemen,
+                                },
+                              ]
+                            : []),
                         ]
                       : [
                           {
                             label:
-                              mySlotCounts['F'] >= ROSTER_COMPOSITION.forwards
+                              mySlotCounts['F'] >= roster.forwards
                                 ? 'Forward (full)'
                                 : 'Forward',
                             value: 'F',
                             disabled:
-                              mySlotCounts['F'] >= ROSTER_COMPOSITION.forwards,
+                              mySlotCounts['F'] >= roster.forwards,
                           },
-                          {
-                            label:
-                              mySlotCounts['IR_F'] >=
-                              ROSTER_COMPOSITION.irForwards
-                                ? 'IR Forward (full)'
-                                : 'IR Forward',
-                            value: 'IR_F',
-                            disabled:
-                              mySlotCounts['IR_F'] >=
-                              ROSTER_COMPOSITION.irForwards,
-                          },
+                          ...(allowIrSlots
+                            ? [
+                                {
+                                  label:
+                                    mySlotCounts['IR_F'] >=
+                                    roster.irForwards
+                                      ? 'IR Forward (full)'
+                                      : 'IR Forward',
+                                  value: 'IR_F',
+                                  disabled:
+                                    mySlotCounts['IR_F'] >=
+                                    roster.irForwards,
+                                },
+                              ]
+                            : []),
                         ]
                 }
               />
@@ -1223,16 +1253,16 @@ export function DraftPage() {
                   loading={submitting}
                   disabled={
                     (confirmPosition === 'F' &&
-                      mySlotCounts['F'] >= ROSTER_COMPOSITION.forwards) ||
+                      mySlotCounts['F'] >= roster.forwards) ||
                     (confirmPosition === 'IR_F' &&
-                      mySlotCounts['IR_F'] >= ROSTER_COMPOSITION.irForwards) ||
+                      mySlotCounts['IR_F'] >= roster.irForwards) ||
                     (confirmPosition === 'D' &&
-                      mySlotCounts['D'] >= ROSTER_COMPOSITION.defensemen) ||
+                      mySlotCounts['D'] >= roster.defensemen) ||
                     (confirmPosition === 'IR_D' &&
                       mySlotCounts['IR_D'] >=
-                        ROSTER_COMPOSITION.irDefensemen) ||
+                        roster.irDefensemen) ||
                     (confirmPosition === 'G' &&
-                      mySlotCounts['G'] >= ROSTER_COMPOSITION.goalies)
+                      mySlotCounts['G'] >= roster.goalies)
                   }
                 >
                   Confirm Pick
