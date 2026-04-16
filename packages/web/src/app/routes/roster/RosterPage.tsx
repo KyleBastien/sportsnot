@@ -33,6 +33,7 @@ import {
   useMockRoster,
   useMockActivateIR,
 } from '../../../mock/hooks/useMockRoster';
+import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import {
   useMockPlayoffPlayers,
   useMockPlayoffTeams,
@@ -120,6 +121,29 @@ export function RosterPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { data, isLoading, error } = useMyRoster(leagueId!);
   const queryClient = useQueryClient();
+
+  // Fetch league's allow_ir_slots setting
+  const mockLeagueResult = useMockLeague(leagueId);
+  const realLeagueIrResult = useQuery({
+    queryKey: ['league-ir-setting', leagueId],
+    queryFn: async () => {
+      const { data: league } = await supabase
+        .from('leagues')
+        .select('allow_ir_slots')
+        .eq('id', leagueId!)
+        .single();
+      return (league?.allow_ir_slots ?? true) as boolean;
+    },
+    enabled: !IS_MOCK && !!leagueId,
+  });
+  const allowIrSlots = IS_MOCK
+    ? (mockLeagueResult.data?.allow_ir_slots ?? true)
+    : (realLeagueIrResult.data ?? true);
+
+  const positionOrder = allowIrSlots
+    ? POSITION_ORDER
+    : POSITION_ORDER.filter((p) => p !== 'IR_F' && p !== 'IR_D');
+
   const [irModal, setIrModal] = useState<{
     irSlotId: string;
     candidates: RosterSlotRow[];
@@ -212,7 +236,7 @@ export function RosterPage() {
   }
 
   // Group slots by position
-  const groupedSlots = POSITION_ORDER.map((pos) => ({
+  const groupedSlots = positionOrder.map((pos) => ({
     position: pos,
     label: POSITION_LABELS[pos],
     players: slots.filter((s: RosterSlotRow) => s.position === pos),
