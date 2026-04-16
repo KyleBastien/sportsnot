@@ -28,23 +28,33 @@ const mockSession = {
   user: mockUser,
 } as unknown as Session;
 
+const OTP_PATTERN = /^\d{6}$/;
+
 export function useMockAuth() {
   return {
     user: mockUser,
     session: mockSession,
     loading: false,
-    signInWithMagicLink: async (_email: string) => {
-      console.warn(
-        '[Mock Mode] Auth disabled — already signed in as Mock User'
-      );
-      return { error: null as Error | null };
+    signInWithMagicLink: async (_email: string) => ({
+      error: null as Error | null,
+    }),
+    signInWithOtp: async (_email: string) => ({
+      error: null as Error | null,
+    }),
+    verifyOtp: async (_email: string, token: string) => {
+      if (!OTP_PATTERN.test(token)) {
+        return {
+          data: null as unknown,
+          error: new Error('Invalid OTP code') as Error | null,
+        };
+      }
+      return {
+        data: { user: mockUser, session: mockSession } as unknown,
+        error: null as Error | null,
+      };
     },
-    signOut: async () => {
-      console.warn(
-        '[Mock Mode] Auth disabled — sign-out is a no-op in mock mode'
-      );
-      alert('🧪 Mock mode — auth disabled');
-      return { error: null as Error | null };
-    },
+    signOut: async () => ({
+      error: null as Error | null,
+    }),
   };
 }

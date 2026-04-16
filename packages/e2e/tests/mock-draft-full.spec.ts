@@ -3,7 +3,7 @@ import {
   setupSupabaseMocks,
   mockTableList,
 } from '../fixtures/supabase-mock.fixture';
-import { mockUser } from '../fixtures/auth.fixture';
+import { mockUser, SUPABASE_URL } from '../fixtures/auth.fixture';
 
 /**
  * Full draft end-to-end test using HTTP-level Supabase mocks.
@@ -20,7 +20,6 @@ import { mockUser } from '../fixtures/auth.fixture';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const SUPABASE_URL = 'http://localhost:54321';
 const LEAGUE_ID = 'full-draft-league-aaaa-bbbb-cccccccccccc';
 const DRAFT_ID = 'full-draft-0001-aaaa-bbbb-cccccccccccc';
 const HUMAN_MEMBER_ID = 'member-human-0001';

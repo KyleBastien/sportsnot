@@ -49,6 +49,23 @@ export function useAuth() {
     return { error };
   }, []);
 
+  const signInWithOtp = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
+    });
+    return { error };
+  }, []);
+
+  const verifyOtp = useCallback(async (email: string, token: string) => {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
+    });
+    return { data, error };
+  }, []);
+
   const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
     return { error };
@@ -57,6 +74,8 @@ export function useAuth() {
   return {
     ...state,
     signInWithMagicLink,
+    signInWithOtp,
+    verifyOtp,
     signOut,
   };
 }
