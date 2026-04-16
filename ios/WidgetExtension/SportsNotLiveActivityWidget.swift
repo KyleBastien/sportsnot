@@ -44,7 +44,7 @@ struct SportsNotLiveActivityWidget: Widget {
         guard let top = state.players.max(by: { $0.fantasyPoints < $1.fantasyPoints }) else {
             return "—"
         }
-        return String(format: "%.1f", top.fantasyPoints)
+        return String(format: "%.0f", top.fantasyPoints)
     }
 }
 
@@ -95,7 +95,7 @@ struct LiveActivityLockScreenView: View {
                         .font(.footnote)
                         .lineLimit(1)
                     Spacer()
-                    Text(String(format: "%.1f", p.fantasyPoints))
+                    Text(String(format: "%.0f", p.fantasyPoints))
                         .font(.footnote.monospacedDigit())
                         .foregroundStyle(.white)
                 }
@@ -122,7 +122,7 @@ struct DynamicIslandTrailing: View {
     let state: SportsNotGameAttributes.ContentState
     var body: some View {
         let total = state.players.reduce(0) { $0 + $1.fantasyPoints }
-        Text(String(format: "%.1f", total))
+        Text(String(format: "%.0f", total))
             .font(.headline.monospacedDigit())
     }
 }
@@ -145,7 +145,7 @@ struct DynamicIslandBottom: View {
             ForEach(top3, id: \.playerId) { p in
                 VStack {
                     Text(p.teamAbbrev).font(.caption2.bold())
-                    Text(String(format: "%.1f", p.fantasyPoints))
+                    Text(String(format: "%.0f", p.fantasyPoints))
                         .font(.caption.monospacedDigit())
                 }
             }

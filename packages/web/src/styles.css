@@ -1,0 +1,15 @@
+/* Global overrides for the SportsNot web app.
+ * Prevents content wider than the viewport from causing horizontal
+ * scroll inside the Capacitor iOS WebView (e.g. wide Mantine Tables
+ * that don't wrap). Individual wide components should still opt-in to
+ * their own horizontal scroll via Mantine's <Table.ScrollContainer> or
+ * <ScrollArea>, which keeps their overflow contained locally.
+ */
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}

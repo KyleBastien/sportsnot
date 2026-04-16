@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@mantine/core/styles.css';
+import './styles.css';
 import { theme } from './theme';
 
 import { AuthProvider } from './app/context/AuthContext';

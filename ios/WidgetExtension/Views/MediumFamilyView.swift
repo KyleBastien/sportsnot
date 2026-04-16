@@ -26,7 +26,7 @@ struct MediumFamilyView: View {
                                     .frame(width: 34, alignment: .leading)
                                 Text(p.name).font(.caption).lineLimit(1)
                                 Spacer()
-                                Text(String(format: "%.1f", p.fantasyPoints))
+                                Text(String(format: "%.0f", p.fantasyPoints))
                                     .font(.caption.monospacedDigit())
                                     .foregroundStyle(.primary)
                             }

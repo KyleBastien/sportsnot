@@ -333,41 +333,43 @@ export function LeagueSettingsPage() {
         <Card shadow="sm" padding="lg" radius="md" withBorder>
           <Stack gap="md">
             <Title order={4}>Members ({members.length})</Title>
-            <Table>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Player</Table.Th>
-                  <Table.Th>Team Name</Table.Th>
-                  <Table.Th>Points</Table.Th>
-                  {canModify && <Table.Th>Actions</Table.Th>}
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {members.map((m: SettingsMemberRow) => (
-                  <Table.Tr key={m.id}>
-                    <Table.Td>
-                      {m.users?.display_name ?? 'Unknown'}
-                      {m.user_id === league.commissioner_id && ' 👑'}
-                    </Table.Td>
-                    <Table.Td>{m.team_name}</Table.Td>
-                    <Table.Td>{m.total_points ?? 0}</Table.Td>
-                    {canModify && (
-                      <Table.Td>
-                        {m.user_id !== league.commissioner_id && (
-                          <ActionIcon
-                            color="red"
-                            variant="subtle"
-                            onClick={() => setRemoveMemberId(m.id)}
-                          >
-                            ✕
-                          </ActionIcon>
-                        )}
-                      </Table.Td>
-                    )}
+            <Table.ScrollContainer minWidth={600}>
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Player</Table.Th>
+                    <Table.Th>Team Name</Table.Th>
+                    <Table.Th>Points</Table.Th>
+                    {canModify && <Table.Th>Actions</Table.Th>}
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
+                </Table.Thead>
+                <Table.Tbody>
+                  {members.map((m: SettingsMemberRow) => (
+                    <Table.Tr key={m.id}>
+                      <Table.Td>
+                        {m.users?.display_name ?? 'Unknown'}
+                        {m.user_id === league.commissioner_id && ' 👑'}
+                      </Table.Td>
+                      <Table.Td>{m.team_name}</Table.Td>
+                      <Table.Td>{m.total_points ?? 0}</Table.Td>
+                      {canModify && (
+                        <Table.Td>
+                          {m.user_id !== league.commissioner_id && (
+                            <ActionIcon
+                              color="red"
+                              variant="subtle"
+                              onClick={() => setRemoveMemberId(m.id)}
+                            >
+                              ✕
+                            </ActionIcon>
+                          )}
+                        </Table.Td>
+                      )}
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
           </Stack>
         </Card>
 

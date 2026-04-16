@@ -11,7 +11,7 @@ struct AccessoryRectangularView: View {
                 .font(.caption2.bold())
                 .lineLimit(1)
             if let total = entry.snapshot.map({ $0.players.reduce(0) { $0 + $1.fantasyPoints } }) {
-                Text(String(format: "%.1f pts", total))
+                Text(String(format: "%.0f pts", total))
                     .font(.headline.monospacedDigit())
             }
             if let top = entry.snapshot?.players.max(by: { $0.fantasyPoints < $1.fantasyPoints }) {
@@ -48,6 +48,6 @@ struct AccessoryInlineView: View {
     var body: some View {
         let total = entry.snapshot.map { $0.players.reduce(0) { $0 + $1.fantasyPoints } } ?? 0
         let liveCount = entry.snapshot.map { $0.games.filter { $0.state == "LIVE" }.count } ?? 0
-        Text("🏒 \(String(format: "%.1f", total)) pts · \(liveCount) live")
+        Text("🏒 \(String(format: "%.0f", total)) pts · \(liveCount) live")
     }
 }

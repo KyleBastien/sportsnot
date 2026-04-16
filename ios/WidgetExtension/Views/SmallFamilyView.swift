@@ -14,7 +14,7 @@ struct SmallFamilyView: View {
                     .font(.caption.bold())
                     .lineLimit(1)
                 let total = snapshot.players.reduce(0) { $0 + $1.fantasyPoints }
-                Text(String(format: "%.1f pts", total))
+                Text(String(format: "%.0f pts", total))
                     .font(.title3.bold().monospacedDigit())
                 if let top = snapshot.players.max(by: { $0.fantasyPoints < $1.fantasyPoints }) {
                     Text("Top: \(top.name)")

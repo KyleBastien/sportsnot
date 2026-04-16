@@ -11,7 +11,7 @@ struct LargeFamilyView: View {
                 Text(entry.snapshot?.league.name ?? "SportsNot").font(.headline).lineLimit(1)
                 Spacer()
                 if let total = entry.snapshot.map({ $0.players.reduce(0) { $0 + $1.fantasyPoints } }) {
-                    Text(String(format: "%.1f pts", total))
+                    Text(String(format: "%.0f pts", total))
                         .font(.subheadline.monospacedDigit().bold())
                 }
             }
@@ -49,7 +49,7 @@ struct LargeFamilyView: View {
                             Text(p.name).font(.caption).lineLimit(1)
                             Spacer()
                             Text(p.ownedByTeamName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                            Text(String(format: "%.1f", p.fantasyPoints))
+                            Text(String(format: "%.0f", p.fantasyPoints))
                                 .font(.caption.monospacedDigit())
                                 .frame(width: 44, alignment: .trailing)
                         }
