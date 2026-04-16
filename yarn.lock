@@ -4314,6 +4314,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@sportsnot/widget-api@workspace:packages/widget-api":
+  version: 0.0.0-use.local
+  resolution: "@sportsnot/widget-api@workspace:packages/widget-api"
+  languageName: unknown
+  linkType: soft
+
 "@supabase/auth-js@npm:2.95.3":
   version: 2.95.3
   resolution: "@supabase/auth-js@npm:2.95.3"

@@ -26,6 +26,9 @@
     },
     {
       "path": "./packages/mock-data"
+    },
+    {
+      "path": "./packages/widget-api"
     }
   ]
 }
