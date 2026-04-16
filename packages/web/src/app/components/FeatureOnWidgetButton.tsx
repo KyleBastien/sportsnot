@@ -5,6 +5,7 @@ import {
   WidgetBridge,
   isWidgetBridgeAvailable,
 } from '@sportsnot/widget-bridge';
+import { WidgetApiClient } from '@sportsnot/widget-api';
 
 interface FeatureOnWidgetButtonProps {
   leagueId: string;
@@ -38,11 +39,18 @@ export function FeatureOnWidgetButton({
       if (native) {
         const supported = await WidgetBridge.isLiveActivitySupported();
         if (supported.supported) {
-          await WidgetBridge.startLiveActivity({
-            shareCode,
-            leagueId,
-            leagueName,
-          });
+          const hasGamesToday = await leagueHasGamesToday(shareCode);
+          if (hasGamesToday) {
+            await WidgetBridge.startLiveActivity({
+              shareCode,
+              leagueId,
+              leagueName,
+            });
+          } else {
+            // No games today: don't clutter the Live Activity tray.
+            // End any previously-started activity for this league.
+            await WidgetBridge.endLiveActivity();
+          }
         }
       }
       setSaved(true);
@@ -62,7 +70,7 @@ export function FeatureOnWidgetButton({
     <Tooltip
       label={
         native
-          ? 'Sets this league as the featured one in your Home Screen widget and starts a Live Activity.'
+          ? 'Sets this league as the featured one in your Home Screen widget. If a game is on today, starts a Live Activity too.'
           : 'iOS Home Screen widget feature — tap to preview (actual widget only appears in the iOS app).'
       }
       multiline
@@ -79,4 +87,17 @@ export function FeatureOnWidgetButton({
       </Button>
     </Tooltip>
   );
+}
+
+async function leagueHasGamesToday(shareCode: string): Promise<boolean> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  if (!supabaseUrl || !anonKey) return false;
+  try {
+    const client = new WidgetApiClient({ supabaseUrl, anonKey });
+    const snapshot = await client.getSnapshot(shareCode);
+    return snapshot.games.length > 0;
+  } catch {
+    return false;
+  }
 }

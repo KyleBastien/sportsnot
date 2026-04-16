@@ -169,6 +169,26 @@ Deno.serve(async (req: Request) => {
           );
     const playerStatsById = new Map(playerStats.map((p) => [p.player_id, p]));
 
+    // Fallback: for players not yet in the playoff-round cache (e.g.
+    // before the round's first stat sync), look them up in the
+    // regular-season cache so the widget can still show a name.
+    const missingNameIds = playerIds.filter((pid) => !playerStatsById.has(pid));
+    const regularSeasonStats =
+      missingNameIds.length === 0
+        ? []
+        : await pgSelect<{
+            player_id: number;
+            player_name: string | null;
+            team_abbreviation: string | null;
+          }>(
+            cfg,
+            'regular_season_stats_cache',
+            `select=player_id,player_name,team_abbreviation&player_id=in.(${missingNameIds.join(',')})`
+          );
+    const regularSeasonStatsById = new Map(
+      regularSeasonStats.map((p) => [p.player_id, p])
+    );
+
     const teamStats =
       teamIds.length === 0
         ? []
@@ -202,19 +222,25 @@ Deno.serve(async (req: Request) => {
       const teamName = memberById.get(r.league_member_id)?.team_name ?? '';
       if (r.player_id != null) {
         const stats = playerStatsById.get(r.player_id);
+        const regStats = regularSeasonStatsById.get(r.player_id);
         const fantasyPoints = stats
           ? calculatePlayerPoints({
               goals: stats.goals ?? 0,
               assists: stats.assists ?? 0,
             })
           : (r.points_earned ?? 0);
+        const teamAbbrev =
+          stats?.team_abbreviation ?? regStats?.team_abbreviation ?? '';
         playersPayload.push({
           playerId: r.player_id,
           teamId: null,
-          name: stats?.player_name ?? `Player ${r.player_id}`,
-          teamAbbrev: stats?.team_abbreviation ?? '',
+          name:
+            stats?.player_name ??
+            regStats?.player_name ??
+            `Player ${r.player_id}`,
+          teamAbbrev,
           position: r.position,
-          gameId: correlatePlayerGame(stats?.team_abbreviation, games),
+          gameId: correlatePlayerGame(teamAbbrev, games),
           fantasyPoints,
           ownedByTeamName: teamName,
         });

@@ -16,7 +16,7 @@ struct LargeFamilyView: View {
                 }
             }
             Text("Today's games").font(.caption).foregroundStyle(.secondary)
-            if let games = entry.snapshot?.games {
+            if let games = entry.snapshot?.games, !games.isEmpty {
                 ForEach(games.prefix(6)) { g in
                     HStack(spacing: 6) {
                         Text("\(g.awayTeamAbbrev) \(g.awayScore)")
@@ -28,22 +28,31 @@ struct LargeFamilyView: View {
                         statusLabel(for: g)
                     }
                 }
+            } else {
+                Text("No games today").font(.caption).foregroundStyle(.secondary)
             }
 
             Divider()
 
             Text("Drafted players").font(.caption).foregroundStyle(.secondary)
-            if let players = entry.snapshot?.players {
-                ForEach(players.sorted(by: { $0.fantasyPoints > $1.fantasyPoints }).prefix(6), id: \.id) { p in
-                    HStack {
-                        Text(p.teamAbbrev).font(.caption2.bold()).foregroundStyle(Color.accentColor)
-                            .frame(width: 36, alignment: .leading)
-                        Text(p.name).font(.caption).lineLimit(1)
-                        Spacer()
-                        Text(p.ownedByTeamName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                        Text(String(format: "%.1f", p.fantasyPoints))
-                            .font(.caption.monospacedDigit())
-                            .frame(width: 44, alignment: .trailing)
+            if let snapshot = entry.snapshot {
+                let playingToday = snapshot.players
+                    .filter { $0.gameId != nil }
+                    .sorted(by: { $0.fantasyPoints > $1.fantasyPoints })
+                if playingToday.isEmpty {
+                    Text("No players playing today").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ForEach(playingToday, id: \.id) { p in
+                        HStack {
+                            Text(p.teamAbbrev).font(.caption2.bold()).foregroundStyle(Color.accentColor)
+                                .frame(width: 36, alignment: .leading)
+                            Text(p.name).font(.caption).lineLimit(1)
+                            Spacer()
+                            Text(p.ownedByTeamName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            Text(String(format: "%.1f", p.fantasyPoints))
+                                .font(.caption.monospacedDigit())
+                                .frame(width: 44, alignment: .trailing)
+                        }
                     }
                 }
             }

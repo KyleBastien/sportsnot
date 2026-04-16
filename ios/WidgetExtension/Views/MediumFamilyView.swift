@@ -12,16 +12,24 @@ struct MediumFamilyView: View {
                     .font(.caption.bold())
                     .lineLimit(1)
                 if let snapshot = entry.snapshot {
-                    let top = Array(snapshot.players.sorted(by: { $0.fantasyPoints > $1.fantasyPoints }).prefix(3))
-                    ForEach(top, id: \.id) { p in
-                        HStack {
-                            Text(p.teamAbbrev).font(.caption2.bold()).foregroundStyle(Color.accentColor)
-                                .frame(width: 34, alignment: .leading)
-                            Text(p.name).font(.caption).lineLimit(1)
-                            Spacer()
-                            Text(String(format: "%.1f", p.fantasyPoints))
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.primary)
+                    let playingToday = snapshot.players
+                        .filter { $0.gameId != nil }
+                        .sorted(by: { $0.fantasyPoints > $1.fantasyPoints })
+                    if playingToday.isEmpty {
+                        Text("No players playing today")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(Array(playingToday.prefix(3)), id: \.id) { p in
+                            HStack {
+                                Text(p.teamAbbrev).font(.caption2.bold()).foregroundStyle(Color.accentColor)
+                                    .frame(width: 34, alignment: .leading)
+                                Text(p.name).font(.caption).lineLimit(1)
+                                Spacer()
+                                Text(String(format: "%.1f", p.fantasyPoints))
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.primary)
+                            }
                         }
                     }
                 } else {
@@ -46,7 +54,7 @@ struct MediumFamilyView: View {
                         }
                     }
                 } else {
-                    Text("No games").font(.caption2).foregroundStyle(.secondary)
+                    Text("No games today").font(.caption2).foregroundStyle(.secondary)
                 }
             }
         }
