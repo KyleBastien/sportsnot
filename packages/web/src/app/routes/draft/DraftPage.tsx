@@ -155,7 +155,13 @@ const MAX_COMPARE = 4;
 
 interface RegSeasonStatRow {
   player_id: number;
+  player_name: string;
+  team_abbreviation: string;
+  position: string;
+  goals: number;
+  assists: number;
   points: number;
+  games_played: number;
 }
 
 interface AvailablePlayerBoardProps {
@@ -215,24 +221,45 @@ function AvailablePlayerBoard({
     regSeasonStats.map((r) => [r.player_id, r.points])
   );
 
-  // Build skater rows from player_stats_cache
-  const skaterRows = playerStats
-    .filter((p) => !draftedPlayerIds.has(p.player_id))
-    .filter((p) => !p.is_injured)
-    .map((p) => ({
-      id: p.player_id,
-      fullName: p.player_name ?? `Player #${p.player_id}`,
-      firstName: '',
-      lastName: '',
-      position: p.position ?? 'F',
-      team: p.team_abbreviation ?? 'NHL',
-      teamId: 0,
-      goals: p.goals ?? 0,
-      assists: p.assists ?? 0,
-      points: (p.goals ?? 0) + (p.assists ?? 0),
-      gamesPlayed: p.games_played ?? 0,
-      regSeasonPts: regSeasonMap.get(p.player_id) ?? 0,
-    }));
+  // Round 1 fallback: use regular season data when playoff stats aren't available yet
+  const useRegSeasonFallback = isRound1 && playerStats.length === 0;
+
+  // Build skater rows — prefer playoff stats, fall back to regular season in Round 1
+  const skaterRows = useRegSeasonFallback
+    ? regSeasonStats
+        .filter((p) => p.position === 'F' || p.position === 'D')
+        .filter((p) => !draftedPlayerIds.has(p.player_id))
+        .map((p) => ({
+          id: p.player_id,
+          fullName: p.player_name ?? `Player #${p.player_id}`,
+          firstName: '',
+          lastName: '',
+          position: p.position ?? 'F',
+          team: p.team_abbreviation ?? 'NHL',
+          teamId: 0,
+          goals: p.goals ?? 0,
+          assists: p.assists ?? 0,
+          points: p.points ?? 0,
+          gamesPlayed: p.games_played ?? 0,
+          regSeasonPts: p.points ?? 0,
+        }))
+    : playerStats
+        .filter((p) => !draftedPlayerIds.has(p.player_id))
+        .filter((p) => !p.is_injured)
+        .map((p) => ({
+          id: p.player_id,
+          fullName: p.player_name ?? `Player #${p.player_id}`,
+          firstName: '',
+          lastName: '',
+          position: p.position ?? 'F',
+          team: p.team_abbreviation ?? 'NHL',
+          teamId: 0,
+          goals: p.goals ?? 0,
+          assists: p.assists ?? 0,
+          points: (p.goals ?? 0) + (p.assists ?? 0),
+          gamesPlayed: p.games_played ?? 0,
+          regSeasonPts: regSeasonMap.get(p.player_id) ?? 0,
+        }));
 
   // Build team/goalie rows from team_stats_cache
   const teamRows = teamStats
@@ -493,7 +520,7 @@ export function DraftPage() {
   };
 
   // Fetch cached NHL data
-  const currentSeason = '20242025'; // TODO: derive from NHL API
+  const currentSeason = '20252026';
   const currentRound = draft?.round ?? 1;
   const mockPlayerResult = useMockPlayoffPlayers(currentSeason, currentRound);
   const supabasePlayerResult = usePlayoffPlayers(currentSeason, currentRound);
