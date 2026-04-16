@@ -609,16 +609,13 @@ export function DraftPage() {
 
   // Name lookup maps for resolving player/team IDs to display names
   // Merge regular season names so Draft History resolves picks even before playoff data exists
-  const playerNameMap = useMemo(
-    () => {
-      const map = buildPlayerNameMap(regSeasonStats ?? []);
-      for (const [id, name] of buildPlayerNameMap(playerStats ?? [])) {
-        map.set(id, name);
-      }
-      return map;
-    },
-    [playerStats, regSeasonStats]
-  );
+  const playerNameMap = useMemo(() => {
+    const map = buildPlayerNameMap(regSeasonStats ?? []);
+    for (const [id, name] of buildPlayerNameMap(playerStats ?? [])) {
+      map.set(id, name);
+    }
+    return map;
+  }, [playerStats, regSeasonStats]);
   const teamNameMap = useMemo(
     () => buildTeamNameMap(teamStats ?? []),
     [teamStats]
