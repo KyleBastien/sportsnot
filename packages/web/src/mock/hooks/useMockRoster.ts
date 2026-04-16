@@ -88,8 +88,13 @@ export function calculateSlotPoints(
 
 // ── useRoster (mock) ───────────────────────────────────────────────────
 // Returns roster for a specific league member in Supabase snake_case shape
-// matching the inline useMyRoster in RosterPage.tsx
-export function useMockRoster(leagueId: string | undefined) {
+// matching the inline useMemberRoster in RosterPage.tsx.
+// When leagueMemberId is provided, returns that member's roster;
+// otherwise falls back to the mock user's roster.
+export function useMockRoster(
+  leagueId: string | undefined,
+  leagueMemberId?: string
+) {
   const { state } = useMockData();
 
   if (!leagueId) {
@@ -101,8 +106,9 @@ export function useMockRoster(leagueId: string | undefined) {
     return makeMockQuery(null);
   }
 
-  // Find the mock user's member entry
-  const member = league.members.find((m) => m.userId === state.mockUser.id);
+  const member = leagueMemberId
+    ? league.members.find((m) => m.id === leagueMemberId)
+    : league.members.find((m) => m.userId === state.mockUser.id);
   if (!member) {
     return makeMockQuery(null);
   }

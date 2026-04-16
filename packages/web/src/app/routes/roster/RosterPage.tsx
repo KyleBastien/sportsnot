@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -14,6 +14,7 @@ import {
   Alert,
   Modal,
   Radio,
+  Select,
 } from '@mantine/core';
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -58,24 +59,38 @@ interface RosterSlotRow {
   is_eliminated?: boolean;
 }
 
-function useMyRoster(leagueId: string) {
-  const mockResult = useMockRoster(leagueId);
+function useMemberRoster(leagueId: string, leagueMemberId?: string) {
+  const mockResult = useMockRoster(leagueId, leagueMemberId);
   const { user } = useAuthContext();
 
   const queryResult = useQuery({
-    queryKey: ['roster', leagueId, user?.id],
+    queryKey: ['roster', leagueId, leagueMemberId ?? user?.id],
     queryFn: async () => {
-      // Get the member for this league
-      const { data: member } = await supabase
-        .from('league_members')
-        .select('id, total_points')
-        .eq('league_id', leagueId)
-        .eq('user_id', user!.id)
-        .single();
+      let memberId = leagueMemberId;
+      let memberTotalPoints = 0;
 
-      if (!member) throw new Error('Not a member of this league');
+      if (memberId) {
+        const { data: member } = await supabase
+          .from('league_members')
+          .select('id, total_points')
+          .eq('id', memberId)
+          .single();
 
-      // Get the league to know current round
+        if (!member) throw new Error('Member not found');
+        memberTotalPoints = member.total_points ?? 0;
+      } else {
+        const { data: member } = await supabase
+          .from('league_members')
+          .select('id, total_points')
+          .eq('league_id', leagueId)
+          .eq('user_id', user!.id)
+          .single();
+
+        if (!member) throw new Error('Not a member of this league');
+        memberId = member.id;
+        memberTotalPoints = member.total_points ?? 0;
+      }
+
       const { data: league } = await supabase
         .from('leagues')
         .select('current_round')
@@ -84,24 +99,22 @@ function useMyRoster(leagueId: string) {
 
       if (!league) throw new Error('League not found');
 
-      // Get roster for current round
       const { data: roster, error } = await supabase
         .from('rosters')
         .select('*')
-        .eq('league_member_id', member.id)
+        .eq('league_member_id', memberId)
         .eq('round', league.current_round);
 
       if (error) throw error;
 
       return {
-        memberId: member.id,
+        memberId,
         round: league.current_round,
-        // Live mode: is_eliminated defaults to false (TODO: derive from team_stats_cache)
         slots: (roster ?? []).map((s: RosterSlotRow) => ({
           ...s,
           is_eliminated: s.is_eliminated ?? false,
         })),
-        totalPoints: member.total_points ?? 0,
+        totalPoints: memberTotalPoints,
       };
     },
     enabled: !IS_MOCK && !!user,
@@ -121,15 +134,42 @@ const POSITION_LABELS: Record<string, string> = {
 const POSITION_ORDER = ['F', 'D', 'G', 'IR_F', 'IR_D'];
 
 export function RosterPage() {
-  const { leagueId } = useParams<{ leagueId: string }>();
-  const { data, isLoading, error } = useMyRoster(leagueId!);
+  const { leagueId, leagueMemberId } = useParams<{
+    leagueId: string;
+    leagueMemberId?: string;
+  }>();
+  const navigate = useNavigate();
+  const { user } = useAuthContext();
+  const { data, isLoading, error } = useMemberRoster(leagueId!, leagueMemberId);
   const queryClient = useQueryClient();
 
-  // Fetch league's allow_ir_slots setting
+  // Fetch league data (members list + settings)
   const mockLeagueResult = useMockLeague(leagueId);
   const realLeagueResult = useLeague(leagueId);
   const leagueData = IS_MOCK ? mockLeagueResult.data : realLeagueResult.data;
   const allowIrSlots = (leagueData?.allow_ir_slots ?? true) as boolean;
+
+  interface LeagueMemberRow {
+    id: string;
+    user_id: string;
+    team_name: string;
+    users?: { display_name?: string } | null;
+  }
+
+  const leagueMembers = (leagueData?.league_members ?? []) as LeagueMemberRow[];
+
+  // Determine the current user's member ID in this league
+  const myMemberId = leagueMembers.find((m) => m.user_id === user?.id)?.id;
+
+  const isOwnRoster = !leagueMemberId || leagueMemberId === myMemberId;
+
+  // Resolve the viewed member's team name for the title
+  const viewedMember = leagueMemberId
+    ? leagueMembers.find((m) => m.id === leagueMemberId)
+    : undefined;
+  const rosterTitle = isOwnRoster
+    ? 'My Roster'
+    : `${viewedMember?.team_name ?? 'Roster'}`;
 
   const positionOrder = allowIrSlots
     ? POSITION_ORDER
@@ -220,7 +260,7 @@ export function RosterPage() {
     return (
       <Container size="md" py="xl">
         <Alert color="red" title="Error">
-          Could not load your roster.
+          Could not load roster.
         </Alert>
       </Container>
     );
@@ -228,16 +268,43 @@ export function RosterPage() {
 
   const { slots, round } = data;
 
+  // Build member selector options
+  const memberOptions = leagueMembers.map((m) => ({
+    value: m.id,
+    label:
+      m.user_id === user?.id
+        ? `${m.team_name} (You)`
+        : `${m.team_name} — ${m.users?.display_name ?? 'Unknown'}`,
+  }));
+
+  const selectedMemberId = leagueMemberId ?? myMemberId ?? '';
+
   // Show empty state when no roster exists for this round (e.g. before re-draft)
   if (slots.length === 0) {
     return (
       <Container size="md" py="xl">
         <Stack gap="lg" align="center">
-          <Title order={2}>My Roster</Title>
+          <Title order={2}>{rosterTitle}</Title>
           <Text c="dimmed">Round {round}</Text>
+          {memberOptions.length > 1 && (
+            <Select
+              data={memberOptions}
+              value={selectedMemberId}
+              onChange={(value) => {
+                if (!value || value === myMemberId) {
+                  navigate(`/roster/${leagueId}`);
+                } else {
+                  navigate(`/roster/${leagueId}/${value}`);
+                }
+              }}
+              w={300}
+              allowDeselect={false}
+            />
+          )}
           <Alert color="navy" title="No Roster Yet">
-            Your roster for Round {round} has not been set yet. Waiting for the
-            draft to begin.
+            {isOwnRoster
+              ? `Your roster for Round ${round} has not been set yet. Waiting for the draft to begin.`
+              : `This team's roster for Round ${round} has not been set yet.`}
           </Alert>
         </Stack>
       </Container>
@@ -291,9 +358,25 @@ export function RosterPage() {
   return (
     <Container size="lg" py="xl">
       <Stack gap="xl">
+        {memberOptions.length > 1 && (
+          <Select
+            label="View roster"
+            data={memberOptions}
+            value={selectedMemberId}
+            onChange={(value) => {
+              if (!value || value === myMemberId) {
+                navigate(`/roster/${leagueId}`);
+              } else {
+                navigate(`/roster/${leagueId}/${value}`);
+              }
+            }}
+            w={300}
+            allowDeselect={false}
+          />
+        )}
         <Group justify="space-between">
           <div>
-            <Title order={2}>My Roster</Title>
+            <Title order={2}>{rosterTitle}</Title>
             <Text c="dimmed">Round {round}</Text>
           </div>
           <Group gap="md">
@@ -326,12 +409,14 @@ export function RosterPage() {
         </Text>
 
         {groupedSlots.map((group) => {
-          const hasAnyActions = groupHasActions(
-            group.position,
-            group.players,
-            slots,
-            injuredPlayerIds
-          );
+          const hasAnyActions =
+            isOwnRoster &&
+            groupHasActions(
+              group.position,
+              group.players,
+              slots,
+              injuredPlayerIds
+            );
 
           return (
             <Card
