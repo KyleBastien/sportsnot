@@ -745,9 +745,7 @@ export function DraftPage() {
     });
 
     if (error) {
-      setPickError(
-        'Failed to submit pick. Please try again.'
-      );
+      setPickError('Failed to submit pick. Please try again.');
       setSubmitting(false);
       return;
     }
@@ -794,13 +792,7 @@ export function DraftPage() {
 
         if (r3Slots && r3Slots.length > 0) {
           const r4Slots = r3Slots.map(
-            ({
-              id: _id,
-              ...slot
-            }: {
-              id: string;
-              [key: string]: unknown;
-            }) => ({
+            ({ id: _id, ...slot }: { id: string; [key: string]: unknown }) => ({
               ...slot,
               round: 4,
               points_earned: 0,
