@@ -29,7 +29,11 @@ import {
   useRegularSeasonPlayers,
 } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
-import { type Position, getRosterComposition, CURRENT_SEASON } from '@sportsnot/types';
+import {
+  type Position,
+  getRosterComposition,
+  CURRENT_SEASON,
+} from '@sportsnot/types';
 import {
   buildPlayerNameMap,
   buildTeamNameMap,
