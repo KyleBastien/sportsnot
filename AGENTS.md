@@ -70,6 +70,7 @@ The `packages/web/src/mock/` directory contains all mock infrastructure. The hoo
 
 - **Never commit or push directly to `main`.** Always create a feature branch and open a pull request.
 - Branch naming: `feat/`, `fix/`, `chore/` prefixes (e.g., `fix/draft-night-blockers`, `feat/commissioner-picks`).
+- **All lint, build, and tests must pass before pushing.** Run `yarn nx affected -t lint`, `yarn nx build @sportsnot/web`, and `yarn nx run-many -t test --all` to verify before every push.
 
 ## Key Conventions
 

@@ -29,7 +29,11 @@ import {
   useRegularSeasonPlayers,
 } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
-import { type Position, getRosterComposition } from '@sportsnot/types';
+import {
+  type Position,
+  getRosterComposition,
+  CURRENT_SEASON,
+} from '@sportsnot/types';
 import {
   buildPlayerNameMap,
   buildTeamNameMap,
@@ -553,7 +557,7 @@ export function DraftPage() {
   };
 
   // Fetch cached NHL data
-  const currentSeason = '20252026';
+  const currentSeason = CURRENT_SEASON;
   const currentRound = draft?.round ?? 1;
   const mockPlayerResult = useMockPlayoffPlayers(currentSeason, currentRound);
   const supabasePlayerResult = usePlayoffPlayers(currentSeason, currentRound);

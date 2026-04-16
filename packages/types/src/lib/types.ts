@@ -130,3 +130,6 @@ export const SCORING = {
   win: 2,
   shutout: 4, // replaces win points
 } as const;
+
+// Current NHL season code used across the app
+export const CURRENT_SEASON = '20252026';
