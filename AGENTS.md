@@ -66,6 +66,11 @@ Set `VITE_MOCK_MODE=true` in `.env` to run the entire app offline with in-memory
 
 The `packages/web/src/mock/` directory contains all mock infrastructure. The hook registry pattern (`mockHooksRegistry.ts`) maps each real Supabase hook to a mock implementation.
 
+## Git Workflow
+
+- **Never commit or push directly to `main`.** Always create a feature branch and open a pull request.
+- Branch naming: `feat/`, `fix/`, `chore/` prefixes (e.g., `fix/draft-night-blockers`, `feat/commissioner-picks`).
+
 ## Key Conventions
 
 - **Styling:** Mantine v8 components for UI. Shared design tokens via vanilla-extract in `packages/ui/src/lib/styles/` (theme, sprinkles). The web app itself has no `.css.ts` files — it relies on Mantine + the ui package.
