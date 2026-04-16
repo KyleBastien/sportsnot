@@ -108,6 +108,14 @@ export function DraftLobbyPage() {
   const isCommissioner = league?.commissioner_id === user?.id;
   const members = league?.league_members ?? [];
   const nextRound = (league?.current_round ?? 0) + 1;
+  const allowIrSlots = (league?.allow_ir_slots ?? true) as boolean;
+  const rosterComp = getRosterComposition(allowIrSlots);
+  const picksPerMember =
+    rosterComp.forwards +
+    rosterComp.defensemen +
+    rosterComp.goalies +
+    rosterComp.irForwards +
+    rosterComp.irDefensemen;
 
   const handleStartDraft = async () => {
     if (!league || members.length < 2) return;
@@ -125,16 +133,7 @@ export function DraftLobbyPage() {
 
     const memberUserIds = members.map((m: LobbyMember) => m.user_id);
     const shuffled = [...memberUserIds].sort(() => Math.random() - 0.5);
-
-    const allowIrSlots = (league?.allow_ir_slots ?? true) as boolean;
-    const comp = getRosterComposition(allowIrSlots);
-    const totalDraftRounds =
-      comp.forwards +
-      comp.defensemen +
-      comp.goalies +
-      comp.irForwards +
-      comp.irDefensemen;
-    const draftOrder = generateSnakeDraftOrder(shuffled, totalDraftRounds);
+    const draftOrder = generateSnakeDraftOrder(shuffled, picksPerMember);
 
     const { error } = await supabase.from('drafts').insert({
       league_id: leagueId,
@@ -172,14 +171,6 @@ export function DraftLobbyPage() {
     );
   }
 
-  const lobbyAllowIrSlots = (league?.allow_ir_slots ?? true) as boolean;
-  const lobbyComp = getRosterComposition(lobbyAllowIrSlots);
-  const picksPerMember =
-    lobbyComp.forwards +
-    lobbyComp.defensemen +
-    lobbyComp.goalies +
-    lobbyComp.irForwards +
-    lobbyComp.irDefensemen;
   const totalPicks = members.length * picksPerMember;
 
   return (
@@ -219,10 +210,10 @@ export function DraftLobbyPage() {
                   Roster
                 </Text>
                 <Text fw={500}>
-                  {lobbyComp.forwards}F, {lobbyComp.defensemen}D,{' '}
-                  {lobbyComp.goalies}G
-                  {lobbyAllowIrSlots
-                    ? `, ${lobbyComp.irForwards}IR_F, ${lobbyComp.irDefensemen}IR_D`
+                  {rosterComp.forwards}F, {rosterComp.defensemen}D,{' '}
+                  {rosterComp.goalies}G
+                  {allowIrSlots
+                    ? `, ${rosterComp.irForwards}IR_F, ${rosterComp.irDefensemen}IR_D`
                     : ''}
                 </Text>
               </div>
