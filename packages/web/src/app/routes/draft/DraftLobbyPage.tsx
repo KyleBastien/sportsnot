@@ -16,6 +16,8 @@ import {
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
+import { getRosterComposition } from '@sportsnot/types';
+import { generateSnakeDraftOrder } from '@sportsnot/utils';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import {
@@ -106,6 +108,14 @@ export function DraftLobbyPage() {
   const isCommissioner = league?.commissioner_id === user?.id;
   const members = league?.league_members ?? [];
   const nextRound = (league?.current_round ?? 0) + 1;
+  const allowIrSlots = (league?.allow_ir_slots ?? true) as boolean;
+  const rosterComp = getRosterComposition(allowIrSlots);
+  const picksPerMember =
+    rosterComp.forwards +
+    rosterComp.defensemen +
+    rosterComp.goalies +
+    rosterComp.irForwards +
+    rosterComp.irDefensemen;
 
   const handleStartDraft = async () => {
     if (!league || members.length < 2) return;
@@ -123,13 +133,14 @@ export function DraftLobbyPage() {
 
     const memberUserIds = members.map((m: LobbyMember) => m.user_id);
     const shuffled = [...memberUserIds].sort(() => Math.random() - 0.5);
+    const draftOrder = generateSnakeDraftOrder(shuffled, picksPerMember);
 
     const { error } = await supabase.from('drafts').insert({
       league_id: leagueId,
       round: nextRound,
       status: 'active',
       current_pick: 1,
-      draft_order: shuffled,
+      draft_order: draftOrder,
       started_at: new Date().toISOString(),
     });
 
@@ -160,8 +171,7 @@ export function DraftLobbyPage() {
     );
   }
 
-  // Calculate total picks per member: 5F + 3D + 1G + 1IR_F + 1IR_D = 11
-  const totalPicks = members.length * 11;
+  const totalPicks = members.length * picksPerMember;
 
   return (
     <Container size="md" py="xl">
@@ -199,7 +209,13 @@ export function DraftLobbyPage() {
                 <Text size="sm" c="dimmed">
                   Roster
                 </Text>
-                <Text fw={500}>5F, 3D, 1G, 1IR_F, 1IR_D</Text>
+                <Text fw={500}>
+                  {rosterComp.forwards}F, {rosterComp.defensemen}D,{' '}
+                  {rosterComp.goalies}G
+                  {allowIrSlots
+                    ? `, ${rosterComp.irForwards}IR_F, ${rosterComp.irDefensemen}IR_D`
+                    : ''}
+                </Text>
               </div>
             </Group>
           </Stack>
