@@ -142,9 +142,9 @@ function useLeagueMembers(leagueId: string) {
   return IS_MOCK ? mockResult : queryResult;
 }
 
-function useLeagueCommissioner(leagueId: string) {
+function useLeagueInfo(leagueId: string) {
   return useQuery({
-    queryKey: ['league-commissioner', leagueId],
+    queryKey: ['league-info', leagueId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('leagues')
@@ -518,7 +518,7 @@ export function DraftPage() {
   const { user } = useAuthContext();
   const { data: draft, isLoading: draftLoading } = useDraft(leagueId!);
   const { data: members } = useLeagueMembers(leagueId!);
-  const { data: leagueInfo } = useLeagueCommissioner(leagueId!);
+  const { data: leagueInfo } = useLeagueInfo(leagueId!);
   const mockLeagueResult = useMockLeague(leagueId);
   const commissionerId = IS_MOCK
     ? (mockLeagueResult.data?.commissioner_id ?? null)

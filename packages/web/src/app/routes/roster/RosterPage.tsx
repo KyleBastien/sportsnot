@@ -19,6 +19,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   supabase,
+  useLeague,
   usePlayoffPlayers,
   usePlayoffTeams,
 } from '@sportsnot/supabase';
@@ -124,21 +125,9 @@ export function RosterPage() {
 
   // Fetch league's allow_ir_slots setting
   const mockLeagueResult = useMockLeague(leagueId);
-  const realLeagueIrResult = useQuery({
-    queryKey: ['league-ir-setting', leagueId],
-    queryFn: async () => {
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('allow_ir_slots')
-        .eq('id', leagueId!)
-        .single();
-      return (league?.allow_ir_slots ?? true) as boolean;
-    },
-    enabled: !IS_MOCK && !!leagueId,
-  });
-  const allowIrSlots = IS_MOCK
-    ? (mockLeagueResult.data?.allow_ir_slots ?? true)
-    : (realLeagueIrResult.data ?? true);
+  const realLeagueResult = useLeague(leagueId);
+  const leagueData = IS_MOCK ? mockLeagueResult.data : realLeagueResult.data;
+  const allowIrSlots = (leagueData?.allow_ir_slots ?? true) as boolean;
 
   const positionOrder = allowIrSlots
     ? POSITION_ORDER
