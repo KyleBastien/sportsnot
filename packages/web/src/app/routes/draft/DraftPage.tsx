@@ -1072,21 +1072,13 @@ export function DraftPage() {
                 if (player.position === 'G') {
                   setConfirmPosition('G');
                 } else if (player.position === 'D') {
-                  const dFull =
-                    mySlotCounts['D'] >= roster.defensemen;
-                  const irDFull =
-                    mySlotCounts['IR_D'] >= roster.irDefensemen;
-                  setConfirmPosition(
-                    dFull && !irDFull ? 'IR_D' : 'D'
-                  );
+                  const dFull = mySlotCounts['D'] >= roster.defensemen;
+                  const irDFull = mySlotCounts['IR_D'] >= roster.irDefensemen;
+                  setConfirmPosition(dFull && !irDFull ? 'IR_D' : 'D');
                 } else {
-                  const fFull =
-                    mySlotCounts['F'] >= roster.forwards;
-                  const irFFull =
-                    mySlotCounts['IR_F'] >= roster.irForwards;
-                  setConfirmPosition(
-                    fFull && !irFFull ? 'IR_F' : 'F'
-                  );
+                  const fFull = mySlotCounts['F'] >= roster.forwards;
+                  const irFFull = mySlotCounts['IR_F'] >= roster.irForwards;
+                  setConfirmPosition(fFull && !irFFull ? 'IR_F' : 'F');
                 }
               }}
               comparePlayers={comparePlayers}
@@ -1196,22 +1188,18 @@ export function DraftPage() {
                                 ? 'Defense (full)'
                                 : 'Defense',
                             value: 'D',
-                            disabled:
-                              mySlotCounts['D'] >=
-                              roster.defensemen,
+                            disabled: mySlotCounts['D'] >= roster.defensemen,
                           },
                           ...(allowIrSlots
                             ? [
                                 {
                                   label:
-                                    mySlotCounts['IR_D'] >=
-                                    roster.irDefensemen
+                                    mySlotCounts['IR_D'] >= roster.irDefensemen
                                       ? 'IR Defense (full)'
                                       : 'IR Defense',
                                   value: 'IR_D',
                                   disabled:
-                                    mySlotCounts['IR_D'] >=
-                                    roster.irDefensemen,
+                                    mySlotCounts['IR_D'] >= roster.irDefensemen,
                                 },
                               ]
                             : []),
@@ -1223,21 +1211,18 @@ export function DraftPage() {
                                 ? 'Forward (full)'
                                 : 'Forward',
                             value: 'F',
-                            disabled:
-                              mySlotCounts['F'] >= roster.forwards,
+                            disabled: mySlotCounts['F'] >= roster.forwards,
                           },
                           ...(allowIrSlots
                             ? [
                                 {
                                   label:
-                                    mySlotCounts['IR_F'] >=
-                                    roster.irForwards
+                                    mySlotCounts['IR_F'] >= roster.irForwards
                                       ? 'IR Forward (full)'
                                       : 'IR Forward',
                                   value: 'IR_F',
                                   disabled:
-                                    mySlotCounts['IR_F'] >=
-                                    roster.irForwards,
+                                    mySlotCounts['IR_F'] >= roster.irForwards,
                                 },
                               ]
                             : []),
@@ -1259,8 +1244,7 @@ export function DraftPage() {
                     (confirmPosition === 'D' &&
                       mySlotCounts['D'] >= roster.defensemen) ||
                     (confirmPosition === 'IR_D' &&
-                      mySlotCounts['IR_D'] >=
-                        roster.irDefensemen) ||
+                      mySlotCounts['IR_D'] >= roster.irDefensemen) ||
                     (confirmPosition === 'G' &&
                       mySlotCounts['G'] >= roster.goalies)
                   }

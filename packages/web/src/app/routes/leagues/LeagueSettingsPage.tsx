@@ -53,9 +53,7 @@ export function LeagueSettingsPage() {
     IS_MOCK && mockResult.data ? mockResult.data.max_participants : 12
   );
   const [allowIrSlots, setAllowIrSlots] = useState<boolean>(
-    IS_MOCK && mockResult.data
-      ? (mockResult.data.allow_ir_slots ?? true)
-      : true
+    IS_MOCK && mockResult.data ? (mockResult.data.allow_ir_slots ?? true) : true
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -289,9 +287,7 @@ export function LeagueSettingsPage() {
               label="Allow IR (Injured Reserve) Slots"
               description="When disabled, IR Forward and IR Defenseman roster slots are removed from drafts and rosters."
               checked={allowIrSlots}
-              onChange={(event) =>
-                setAllowIrSlots(event.currentTarget.checked)
-              }
+              onChange={(event) => setAllowIrSlots(event.currentTarget.checked)}
               disabled={!canModifyIr}
             />
             {(canModify || canModifyIr) && (
