@@ -22,9 +22,10 @@ import {
   useLeague,
   usePlayoffPlayers,
   usePlayoffTeams,
+  useRegularSeasonPlayers,
 } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
-import { SCORING } from '@sportsnot/types';
+import { SCORING, CURRENT_SEASON } from '@sportsnot/types';
 import {
   buildPlayerNameMap,
   buildTeamNameMap,
@@ -38,6 +39,7 @@ import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import {
   useMockPlayoffPlayers,
   useMockPlayoffTeams,
+  useMockRegularSeasonPlayers,
 } from '../../../mock/hooks/useMockNhlApi';
 import { groupHasActions } from './rosterUtils';
 
@@ -144,7 +146,7 @@ export function RosterPage() {
   const mockActivateIR = useMockActivateIR();
 
   // Fetch player/team stats for name resolution
-  const currentSeason = '20242025';
+  const currentSeason = CURRENT_SEASON;
   const currentRound = data?.round ?? 1;
   // For Round 4, use Round 3 stats so eliminated players' names are still resolved
   const nameResolutionRound = currentRound >= 4 ? 3 : currentRound;
@@ -169,10 +171,28 @@ export function RosterPage() {
   );
   const { data: teamStats } = IS_MOCK ? mockTeamResult : supabaseTeamResult;
 
-  const playerNameMap = useMemo(
-    () => buildPlayerNameMap(playerStats ?? []),
-    [playerStats]
+  // Fetch regular season stats for name resolution fallback in Round 1
+  const isRound1 = currentRound === 1;
+  const mockRegSeasonResult = useMockRegularSeasonPlayers(
+    currentSeason,
+    isRound1
   );
+  const supabaseRegSeasonResult = useRegularSeasonPlayers(
+    currentSeason,
+    isRound1
+  );
+  const { data: regSeasonStats } = IS_MOCK
+    ? mockRegSeasonResult
+    : supabaseRegSeasonResult;
+
+  // Merge regular season names so roster resolves picks even before playoff data exists
+  const playerNameMap = useMemo(() => {
+    const map = buildPlayerNameMap(regSeasonStats ?? []);
+    for (const [id, name] of buildPlayerNameMap(playerStats ?? [])) {
+      map.set(id, name);
+    }
+    return map;
+  }, [playerStats, regSeasonStats]);
   const teamNameMap = useMemo(
     () => buildTeamNameMap(teamStats ?? []),
     [teamStats]

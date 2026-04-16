@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { getPlayoffBracket } from '@sportsnot/nhl-api';
+import { CURRENT_SEASON } from '@sportsnot/types';
 import { useMockData } from '../../mock/MockDataProvider';
 import { isAllSeriesComplete } from '../utils/roundUtils';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
-const CURRENT_SEASON = '20242025';
 const MAX_ROUND = 4;
 
 export interface RoundCompleteResult {
