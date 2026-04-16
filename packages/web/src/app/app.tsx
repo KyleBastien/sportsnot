@@ -251,7 +251,7 @@ export function App() {
                 }
               />
               <Route
-                path="/roster/:leagueId"
+                path="/roster/:leagueId/:leagueMemberId?"
                 element={
                   <ProtectedRoute>
                     <RosterPage />

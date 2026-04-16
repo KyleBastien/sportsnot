@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -12,6 +12,7 @@ import {
   Alert,
   Button,
   Group,
+  Anchor,
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
@@ -216,8 +217,14 @@ export function StandingsPage() {
                       )}
                     </Table.Td>
                     <Table.Td>
-                      {member.team_name}
-                      {seasonComplete && index === 0 && ' 🏆'}
+                      <Anchor
+                        component={Link}
+                        to={`/roster/${leagueId}/${member.id}`}
+                        fw={isMe ? 700 : undefined}
+                      >
+                        {member.team_name}
+                        {seasonComplete && index === 0 && ' 🏆'}
+                      </Anchor>
                     </Table.Td>
                     <Table.Td>
                       {member.users?.display_name ?? 'Unknown'}
