@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -43,7 +42,6 @@ function createSupabaseProfileClient(): ProfileUpdateClient {
 
 export function ProfilePage() {
   const { user, signOut } = useAuthContext();
-  const navigate = useNavigate();
   const mockProfile = useMockUpdateProfile();
   const [displayName, setDisplayName] = useState(
     (user?.user_metadata?.['display_name'] as string) ?? ''
@@ -74,9 +72,8 @@ export function ProfilePage() {
     setSaving(false);
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/auth/login');
+  const handleSignOut = () => {
+    signOut();
   };
 
   const initial =
