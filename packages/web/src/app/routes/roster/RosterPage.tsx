@@ -19,6 +19,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   supabase,
+  useLeague,
   usePlayoffPlayers,
   usePlayoffTeams,
 } from '@sportsnot/supabase';
@@ -33,6 +34,7 @@ import {
   useMockRoster,
   useMockActivateIR,
 } from '../../../mock/hooks/useMockRoster';
+import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import {
   useMockPlayoffPlayers,
   useMockPlayoffTeams,
@@ -120,6 +122,17 @@ export function RosterPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { data, isLoading, error } = useMyRoster(leagueId!);
   const queryClient = useQueryClient();
+
+  // Fetch league's allow_ir_slots setting
+  const mockLeagueResult = useMockLeague(leagueId);
+  const realLeagueResult = useLeague(leagueId);
+  const leagueData = IS_MOCK ? mockLeagueResult.data : realLeagueResult.data;
+  const allowIrSlots = (leagueData?.allow_ir_slots ?? true) as boolean;
+
+  const positionOrder = allowIrSlots
+    ? POSITION_ORDER
+    : POSITION_ORDER.filter((p) => p !== 'IR_F' && p !== 'IR_D');
+
   const [irModal, setIrModal] = useState<{
     irSlotId: string;
     candidates: RosterSlotRow[];
@@ -212,7 +225,7 @@ export function RosterPage() {
   }
 
   // Group slots by position
-  const groupedSlots = POSITION_ORDER.map((pos) => ({
+  const groupedSlots = positionOrder.map((pos) => ({
     position: pos,
     label: POSITION_LABELS[pos],
     players: slots.filter((s: RosterSlotRow) => s.position === pos),

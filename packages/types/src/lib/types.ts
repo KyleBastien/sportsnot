@@ -19,6 +19,7 @@ export interface League {
   maxParticipants: number;
   currentRound: number;
   status: LeagueStatus;
+  allowIrSlots: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -107,6 +108,20 @@ export const ROSTER_COMPOSITION = {
   irForwards: 1,
   irDefensemen: 1,
 } as const;
+
+/**
+ * Returns roster composition based on whether IR slots are enabled.
+ * When IR is disabled, irForwards and irDefensemen are set to 0.
+ */
+export function getRosterComposition(allowIrSlots: boolean) {
+  return {
+    forwards: ROSTER_COMPOSITION.forwards,
+    defensemen: ROSTER_COMPOSITION.defensemen,
+    goalies: ROSTER_COMPOSITION.goalies,
+    irForwards: allowIrSlots ? ROSTER_COMPOSITION.irForwards : 0,
+    irDefensemen: allowIrSlots ? ROSTER_COMPOSITION.irDefensemen : 0,
+  };
+}
 
 // Scoring constants
 export const SCORING = {
