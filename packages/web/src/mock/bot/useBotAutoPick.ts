@@ -28,7 +28,8 @@ export function useBotAutoPick(): void {
     const memberId = getBotMemberId(state, botUserId);
     if (!memberId) return;
 
-    const result = selectBotPick(ds, botUserId);
+    const league = state.leagues.find((l) => l.id === ds.draft.leagueId);
+    const result = selectBotPick(ds, botUserId, league?.allowIrSlots ?? true);
     if (!result) return;
 
     // Delay 1-2 seconds (random for realistic feel)

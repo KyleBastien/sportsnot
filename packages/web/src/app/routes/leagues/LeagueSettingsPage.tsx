@@ -25,6 +25,7 @@ import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { generateInviteCode } from '@sportsnot/utils';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
+import { useMockData } from '../../../mock/MockDataProvider';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -41,6 +42,7 @@ export function LeagueSettingsPage() {
   const { user } = useAuthContext();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { dispatch: mockDispatch } = useMockData();
 
   const mockResult = useMockLeague(leagueId);
 
@@ -94,6 +96,12 @@ export function LeagueSettingsPage() {
   const handleSave = async () => {
     if (!leagueId || !leagueName.trim()) return;
     if (IS_MOCK) {
+      if (leagueId) {
+        mockDispatch({
+          type: 'UPDATE_LEAGUE_SETTINGS',
+          payload: { leagueId, allowIrSlots },
+        });
+      }
       setSuccess('Settings saved!');
       setTimeout(() => setSuccess(''), 3000);
       return;
