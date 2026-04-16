@@ -147,8 +147,8 @@ async function setupAuthMocks(page: Page, authenticated: boolean) {
     });
   });
 
-  // POST /auth/v1/logout — alternative logout endpoint
-  await page.route('**/auth/v1/logout', (route) => {
+  // POST /auth/v1/logout — logout endpoint (needs trailing ** for ?scope= query params)
+  await page.route('**/auth/v1/logout**', (route) => {
     return route.fulfill({
       status: 204,
       body: '',
