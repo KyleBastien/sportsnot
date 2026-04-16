@@ -120,7 +120,6 @@ function UserMenu() {
         <Menu.Item onClick={() => navigate('/profile')}>Profile</Menu.Item>
         <Menu.Divider />
         <Menu.Item color="red" onClick={() => signOut()}>
-
           Sign Out
         </Menu.Item>
       </Menu.Dropdown>
