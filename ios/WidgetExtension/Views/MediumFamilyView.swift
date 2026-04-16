@@ -15,7 +15,7 @@ struct MediumFamilyView: View {
                     let top = Array(snapshot.players.sorted(by: { $0.fantasyPoints > $1.fantasyPoints }).prefix(3))
                     ForEach(top, id: \.id) { p in
                         HStack {
-                            Text(p.teamAbbrev).font(.caption2.bold()).foregroundStyle(.accent)
+                            Text(p.teamAbbrev).font(.caption2.bold()).foregroundStyle(Color.accentColor)
                                 .frame(width: 34, alignment: .leading)
                             Text(p.name).font(.caption).lineLimit(1)
                             Spacer()

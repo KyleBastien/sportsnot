@@ -1,0 +1,14 @@
+{
+	"appId": "com.sportsnot.app",
+	"appName": "SportsNot",
+	"webDir": "packages/web/dist",
+	"ios": {
+		"contentInset": "always",
+		"scheme": "SportsNot"
+	},
+	"server": {
+		"androidScheme": "https",
+		"iosScheme": "https"
+	},
+	"packageClassList": []
+}

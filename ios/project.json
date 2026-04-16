@@ -31,7 +31,7 @@
       "dependsOn": ["sync-web"],
       "options": {
         "commands": [
-          "xcodebuild -workspace ios/App/App.xcworkspace -scheme SportsNotWidgetExtension -configuration Debug -destination 'generic/platform=iOS Simulator' build"
+          "xcodebuild -workspace ios/App/App.xcworkspace -scheme SportsNotWidget -configuration Debug -destination 'generic/platform=iOS Simulator' build"
         ],
         "cwd": "{workspaceRoot}"
       }
@@ -60,7 +60,7 @@
       "executor": "nx:run-commands",
       "cache": false,
       "options": {
-        "commands": ["npx cap update ios", "pod install"],
+        "commands": ["npx cap sync ios", "pod install"],
         "cwd": "ios/App",
         "parallel": false
       }
