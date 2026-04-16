@@ -1,5 +1,6 @@
 import { useMockData, type MockDraftState } from '../MockDataProvider';
 import type { DraftPick, Position } from '@sportsnot/types';
+import { getRosterComposition } from '@sportsnot/types';
 import { players } from '@sportsnot/mock-data';
 import { getEliminatedAbbreviations } from './useMockNhlApi';
 
@@ -137,8 +138,14 @@ export function useMockStartDraft() {
 
       const memberUserIds = league.members.map((m) => m.userId);
 
-      // 11 rounds of snake draft (5F + 3D + 1G + 1IR_F + 1IR_D = 11 roster slots)
-      const totalDraftRounds = 11;
+      // Roster size depends on whether IR slots are enabled
+      const comp = getRosterComposition(league.allowIrSlots);
+      const totalDraftRounds =
+        comp.forwards +
+        comp.defensemen +
+        comp.goalies +
+        comp.irForwards +
+        comp.irDefensemen;
       const draftOrder =
         params.draftOrder ??
         generateSnakeDraftOrder(memberUserIds, totalDraftRounds);
@@ -239,7 +246,13 @@ export function useMockStartReDraft() {
       const league = state.leagues.find((l) => l.id === params.leagueId);
       if (!league) throw new Error('League not found');
 
-      const totalDraftRounds = 11;
+      const comp = getRosterComposition(league.allowIrSlots);
+      const totalDraftRounds =
+        comp.forwards +
+        comp.defensemen +
+        comp.goalies +
+        comp.irForwards +
+        comp.irDefensemen;
       const draftOrder = generateSnakeDraftOrder(
         params.draftOrder,
         totalDraftRounds
