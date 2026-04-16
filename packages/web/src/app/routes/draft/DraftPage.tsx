@@ -1038,10 +1038,7 @@ export function DraftPage() {
               onToggleCompare={handleToggleCompare}
               isRound1={isRound1}
               mySlotCounts={mySlotCounts}
-              regSeasonStats={(regSeasonStats ?? []).map((r) => ({
-                player_id: r.player_id,
-                points: r.points,
-              }))}
+              regSeasonStats={regSeasonStats ?? []}
             />
           )}
         </Card>
