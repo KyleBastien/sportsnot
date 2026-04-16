@@ -23,6 +23,7 @@ import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import { useMockData } from '../../../mock/MockDataProvider';
 import { useRoundComplete } from '../../hooks/useRoundComplete';
 import { useWinnerConfetti } from '../../hooks/useWinnerConfetti';
+import { FeatureOnWidgetButton } from '../../components/FeatureOnWidgetButton';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -162,6 +163,11 @@ export function LeagueDashboardPage() {
                 Settings
               </Button>
             )}
+            <FeatureOnWidgetButton
+              leagueId={league.id}
+              leagueName={league.name}
+              shareCode={league.share_code ?? null}
+            />
             {league.status === 'setup' && isCommissioner && (
               <Button
                 onClick={() => navigate(`/draft/${leagueId}/lobby`)}
