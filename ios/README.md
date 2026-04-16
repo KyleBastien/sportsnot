@@ -22,14 +22,43 @@ If the `ios/App` Xcode workspace doesn't exist yet (first checkout on a
 new macOS dev box), run:
 
 ```bash
-npx cap add ios   # generates ios/App/* from capacitor.config.ts
+npx cap add ios                                    # generates ios/App/*
+ruby scripts/ios/setup-xcode-project.rb            # wires SportsNotWidget target
 ```
 
-then copy the files in [`WidgetExtension/`](./WidgetExtension/) and
-[`SportsNotWidgetShared/`](./SportsNotWidgetShared/) into the Xcode
-project and enable the App Group `group.com.sportsnot.widget` on both
-the App and Widget targets. See [`WidgetExtension/README.md`](./WidgetExtension/README.md)
-for the step-by-step.
+The setup script (idempotent) adds the `SportsNotWidget` Widget Extension
+target, wires Swift sources from `ios/WidgetExtension/`,
+`ios/SportsNotWidgetShared/` (shared with App), and
+`ios/CapacitorPlugins/WidgetBridge/` (App only), creates entitlements
+files, enables App Groups + Push Notifications, and embeds the widget
+in the App bundle. Requires the `xcodeproj` gem:
+
+```bash
+gem install --user-install xcodeproj
+```
+
+## Remaining manual steps
+
+1. **Signing team** — open `ios/App/App.xcworkspace`, select a Team in
+   Signing & Capabilities for both the `App` and `SportsNotWidget`
+   targets (required for device builds; Simulator works without).
+2. **APNs secrets** — for the `push-live-activity-updates` edge function
+   to send Live Activity pushes, set these on the Supabase project
+   (`supabase secrets set …`):
+   - `APNS_KEY_ID` — 10-char key id from Apple Developer portal
+   - `APNS_TEAM_ID` — Apple developer team id
+   - `APNS_BUNDLE_ID` — `com.sportsnot.app`
+   - `APNS_ENV` — `sandbox` (TestFlight/Simulator) or `production`
+   - `APNS_P8` — contents of the `AuthKey_XXXXXX.p8` file
+     (`supabase secrets set --from-literal APNS_P8="$(cat AuthKey_X.p8)"`)
+3. **Push cron** — in the Supabase dashboard, Edge Functions →
+   `push-live-activity-updates` → Cron, add a schedule (e.g. `* * * * *`
+   every minute during playoff games).
+4. **SUPABASE_URL / SUPABASE_ANON_KEY** — both `App/Info.plist` and
+   `SportsNotWidget/Info.plist` read `$(SUPABASE_URL)` and
+   `$(SUPABASE_ANON_KEY)` from build settings. Set them in Xcode's
+   build settings per target, or via a CI build phase that substitutes
+   env vars.
 
 ## Nx targets
 

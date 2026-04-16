@@ -24,9 +24,8 @@ CREATE TABLE public.live_activity_tokens (
 CREATE INDEX idx_live_activity_tokens_league
   ON public.live_activity_tokens(league_id);
 
-CREATE INDEX idx_live_activity_tokens_active
-  ON public.live_activity_tokens(league_id, expires_at)
-  WHERE expires_at IS NULL OR expires_at > NOW();
+CREATE INDEX idx_live_activity_tokens_expires
+  ON public.live_activity_tokens(expires_at);
 
 ALTER TABLE public.live_activity_tokens ENABLE ROW LEVEL SECURITY;
 
