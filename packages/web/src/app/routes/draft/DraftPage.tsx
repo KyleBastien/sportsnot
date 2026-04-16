@@ -474,6 +474,7 @@ export function DraftPage() {
   );
   const [confirmPosition, setConfirmPosition] = useState<Position>('F');
   const [submitting, setSubmitting] = useState(false);
+  const [pickError, setPickError] = useState<string | null>(null);
   const [comparePlayers, setComparePlayers] = useState<ComparePlayer[]>([]);
   const [myTeamOpened, { toggle: toggleMyTeam }] = useDisclosure(false);
   const mockMakePick = useMockMakePick();
@@ -743,69 +744,77 @@ export function DraftPage() {
       position: confirmPosition,
     });
 
-    if (!error) {
-      // Also create the corresponding roster entry
-      await supabase.from('rosters').insert({
-        league_member_id: myMember.id,
-        round: draft.round,
-        player_id: isGoalie ? null : confirmPlayer.id,
-        team_id: isGoalie ? confirmPlayer.teamId : null,
-        position: confirmPosition,
-      });
+    if (error) {
+      setPickError(
+        'Failed to submit pick. Please try again.'
+      );
+      setSubmitting(false);
+      return;
+    }
 
-      const totalExpectedPicks = draftOrder.length; // snake order already expanded
-      const nextPick = draft.current_pick + 1;
+    setPickError(null);
 
-      if (nextPick > totalExpectedPicks) {
-        // Draft is complete — mark draft as completed and league as active
-        await supabase
-          .from('drafts')
-          .update({
-            status: 'completed',
-            current_pick: nextPick,
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', draft.id);
+    // Also create the corresponding roster entry
+    await supabase.from('rosters').insert({
+      league_member_id: myMember.id,
+      round: draft.round,
+      player_id: isGoalie ? null : confirmPlayer.id,
+      team_id: isGoalie ? confirmPlayer.teamId : null,
+      position: confirmPosition,
+    });
 
-        await supabase
-          .from('leagues')
-          .update({ status: 'active' })
-          .eq('id', draft.league_id);
+    const totalExpectedPicks = draftOrder.length; // snake order already expanded
+    const nextPick = draft.current_pick + 1;
 
-        // R3 draft covers both Conference Finals and Stanley Cup Final:
-        // duplicate all R3 roster rows into R4 so scoring works immediately.
-        if (draft.round === 3) {
-          const memberIds = members?.map((m) => m.id) ?? [];
-          const { data: r3Slots } = await supabase
-            .from('rosters')
-            .select('*')
-            .eq('round', 3)
-            .in('league_member_id', memberIds);
+    if (nextPick > totalExpectedPicks) {
+      // Draft is complete — mark draft as completed and league as active
+      await supabase
+        .from('drafts')
+        .update({
+          status: 'completed',
+          current_pick: nextPick,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', draft.id);
 
-          if (r3Slots && r3Slots.length > 0) {
-            const r4Slots = r3Slots.map(
-              ({
-                id: _id,
-                ...slot
-              }: {
-                id: string;
-                [key: string]: unknown;
-              }) => ({
-                ...slot,
-                round: 4,
-                points_earned: 0,
-              })
-            );
-            await supabase.from('rosters').insert(r4Slots);
-          }
+      await supabase
+        .from('leagues')
+        .update({ status: 'active' })
+        .eq('id', draft.league_id);
+
+      // R3 draft covers both Conference Finals and Stanley Cup Final:
+      // duplicate all R3 roster rows into R4 so scoring works immediately.
+      if (draft.round === 3) {
+        const memberIds = members?.map((m) => m.id) ?? [];
+        const { data: r3Slots } = await supabase
+          .from('rosters')
+          .select('*')
+          .eq('round', 3)
+          .in('league_member_id', memberIds);
+
+        if (r3Slots && r3Slots.length > 0) {
+          const r4Slots = r3Slots.map(
+            ({
+              id: _id,
+              ...slot
+            }: {
+              id: string;
+              [key: string]: unknown;
+            }) => ({
+              ...slot,
+              round: 4,
+              points_earned: 0,
+            })
+          );
+          await supabase.from('rosters').insert(r4Slots);
         }
-      } else {
-        // Advance the pick
-        await supabase
-          .from('drafts')
-          .update({ current_pick: nextPick })
-          .eq('id', draft.id);
       }
+    } else {
+      // Advance the pick
+      await supabase
+        .from('drafts')
+        .update({ current_pick: nextPick })
+        .eq('id', draft.id);
     }
 
     setSubmitting(false);
@@ -832,9 +841,11 @@ export function DraftPage() {
                 Pick #{draft.current_pick}
               </Text>
               <Text fw={700} size="lg">
-                {currentPicker
-                  ? (currentPicker as DraftMemberRow).team_name
-                  : 'Unknown'}
+                {isDraftComplete
+                  ? 'Draft Complete'
+                  : currentPicker
+                    ? (currentPicker as DraftMemberRow).team_name
+                    : 'Waiting...'}
               </Text>
               {isMyTurn && (
                 <Badge color="green" size="lg">
@@ -1082,11 +1093,19 @@ export function DraftPage() {
         {/* Confirm Pick Modal */}
         <Modal
           opened={!!confirmPlayer}
-          onClose={() => setConfirmPlayer(null)}
+          onClose={() => {
+            setConfirmPlayer(null);
+            setPickError(null);
+          }}
           title="Confirm Draft Pick"
         >
           {confirmPlayer && (
             <Stack gap="md">
+              {pickError && (
+                <Alert color="red" title="Pick Failed">
+                  {pickError}
+                </Alert>
+              )}
               <Text>
                 Draft <strong>{confirmPlayer.fullName}</strong> (
                 {confirmPlayer.team})?
