@@ -175,6 +175,10 @@ export type MockAction =
       payload: { leagueId: string; draftState: MockDraftState };
     }
   | { type: 'UPDATE_PROFILE'; payload: { displayName: string } }
+  | {
+      type: 'UPDATE_LEAGUE_SETTINGS';
+      payload: { leagueId: string; allowIrSlots: boolean };
+    }
   | { type: 'RESET_ALL' };
 
 // ── Reducer ────────────────────────────────────────────────────────────
@@ -189,6 +193,14 @@ export function mockReducer(state: MockState, action: MockAction): MockState {
         leagues: [...state.leagues, action.payload.league],
         currentLeague: action.payload.league.id,
       };
+    case 'UPDATE_LEAGUE_SETTINGS': {
+      const updatedLeagues = state.leagues.map((l) =>
+        l.id === action.payload.leagueId
+          ? { ...l, allowIrSlots: action.payload.allowIrSlots }
+          : l
+      );
+      return { ...state, leagues: updatedLeagues };
+    }
     case 'JOIN_LEAGUE': {
       const updated = state.leagues.map((l) =>
         l.id === action.payload.leagueId

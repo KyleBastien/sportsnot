@@ -18,12 +18,14 @@ import {
   ActionIcon,
   CopyButton,
   Tooltip,
+  Switch,
 } from '@mantine/core';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { generateInviteCode } from '@sportsnot/utils';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
+import { useMockData } from '../../../mock/MockDataProvider';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -40,6 +42,7 @@ export function LeagueSettingsPage() {
   const { user } = useAuthContext();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { dispatch: mockDispatch } = useMockData();
 
   const mockResult = useMockLeague(leagueId);
 
@@ -48,6 +51,9 @@ export function LeagueSettingsPage() {
   );
   const [maxParticipants, setMaxParticipants] = useState<number>(
     IS_MOCK && mockResult.data ? mockResult.data.max_participants : 12
+  );
+  const [allowIrSlots, setAllowIrSlots] = useState<boolean>(
+    IS_MOCK && mockResult.data ? (mockResult.data.allow_ir_slots ?? true) : true
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -69,6 +75,7 @@ export function LeagueSettingsPage() {
 
       setLeagueName(data.name);
       setMaxParticipants(data.max_participants);
+      setAllowIrSlots(data.allow_ir_slots ?? true);
       return data;
     },
     enabled: !IS_MOCK && !!leagueId,
@@ -78,10 +85,21 @@ export function LeagueSettingsPage() {
 
   const isCommissioner = league?.commissioner_id === user?.id;
   const canModify = isCommissioner && league?.status === 'setup';
+  // IR setting can be changed during setup or while round 1 draft is in progress
+  const canModifyIr =
+    isCommissioner &&
+    (league?.status === 'setup' ||
+      (league?.status === 'drafting' && (league?.current_round ?? 0) <= 1));
 
   const handleSave = async () => {
     if (!leagueId || !leagueName.trim()) return;
     if (IS_MOCK) {
+      if (leagueId) {
+        mockDispatch({
+          type: 'UPDATE_LEAGUE_SETTINGS',
+          payload: { leagueId, allowIrSlots },
+        });
+      }
       setSuccess('Settings saved!');
       setTimeout(() => setSuccess(''), 3000);
       return;
@@ -94,6 +112,7 @@ export function LeagueSettingsPage() {
       .update({
         name: leagueName.trim(),
         max_participants: maxParticipants,
+        allow_ir_slots: allowIrSlots,
       })
       .eq('id', leagueId);
 
@@ -264,7 +283,14 @@ export function LeagueSettingsPage() {
               max={12}
               disabled={!canModify}
             />
-            {canModify && (
+            <Switch
+              label="Allow IR (Injured Reserve) Slots"
+              description="When disabled, IR Forward and IR Defenseman roster slots are removed from drafts and rosters."
+              checked={allowIrSlots}
+              onChange={(event) => setAllowIrSlots(event.currentTarget.checked)}
+              disabled={!canModifyIr}
+            />
+            {(canModify || canModifyIr) && (
               <Button onClick={handleSave} loading={saving}>
                 Save Changes
               </Button>

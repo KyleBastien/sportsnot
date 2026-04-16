@@ -1,16 +1,30 @@
 import type { NHLPlayer } from '@sportsnot/types';
+import { getRosterComposition } from '@sportsnot/types';
 import { players } from '@sportsnot/mock-data';
 import type { MockDraftState, MockState } from '../MockDataProvider';
 
-// ── Roster slot targets (11 total: 5F + 3D + 1G + 1IR_F + 1IR_D) ──────
-const SLOT_TARGETS: Record<string, number> = {
-  F: 5,
-  D: 3,
-  G: 1,
-  IR_F: 1,
-  IR_D: 1,
-};
-const TOTAL_ROSTER_SIZE = 11;
+// ── Roster slot targets (dynamic based on IR setting) ──────────────────
+function getSlotTargets(allowIrSlots: boolean): Record<string, number> {
+  const comp = getRosterComposition(allowIrSlots);
+  return {
+    F: comp.forwards,
+    D: comp.defensemen,
+    G: comp.goalies,
+    IR_F: comp.irForwards,
+    IR_D: comp.irDefensemen,
+  };
+}
+
+function getTotalRosterSize(allowIrSlots: boolean): number {
+  const comp = getRosterComposition(allowIrSlots);
+  return (
+    comp.forwards +
+    comp.defensemen +
+    comp.goalies +
+    comp.irForwards +
+    comp.irDefensemen
+  );
+}
 
 // ── Flat player lookup ─────────────────────────────────────────────────
 const ALL_PLAYERS: NHLPlayer[] = Object.values(
@@ -44,15 +58,19 @@ function countSlots(
 }
 
 /** Determine the slot with greatest remaining need, returning slot code and player type */
-function greatestNeed(counts: Record<string, number>): {
+function greatestNeed(
+  counts: Record<string, number>,
+  allowIrSlots: boolean
+): {
   slot: string;
   playerType: string;
 } {
+  const slotTargets = getSlotTargets(allowIrSlots);
   // Fill regular slots first based on greatest remaining need
   const regularSlots: [string, number, string][] = [
-    ['F', SLOT_TARGETS.F, 'Forward'],
-    ['D', SLOT_TARGETS.D, 'Defenseman'],
-    ['G', SLOT_TARGETS.G, 'Goalie'],
+    ['F', slotTargets.F, 'Forward'],
+    ['D', slotTargets.D, 'Defenseman'],
+    ['G', slotTargets.G, 'Goalie'],
   ];
 
   let maxNeed = 0;
@@ -68,11 +86,11 @@ function greatestNeed(counts: Record<string, number>): {
     }
   }
 
-  // If all regular slots are filled, fill IR slots
-  if (maxNeed <= 0) {
-    if ((counts['IR_F'] ?? 0) < SLOT_TARGETS.IR_F)
+  // If all regular slots are filled, fill IR slots (only when IR is enabled)
+  if (maxNeed <= 0 && allowIrSlots) {
+    if ((counts['IR_F'] ?? 0) < slotTargets.IR_F)
       return { slot: 'IR_F', playerType: 'Forward' };
-    if ((counts['IR_D'] ?? 0) < SLOT_TARGETS.IR_D)
+    if ((counts['IR_D'] ?? 0) < slotTargets.IR_D)
       return { slot: 'IR_D', playerType: 'Defenseman' };
   }
 
@@ -86,10 +104,11 @@ function greatestNeed(counts: Record<string, number>): {
  */
 export function selectBotPick(
   draftState: MockDraftState,
-  botUserId: string
+  botUserId: string,
+  allowIrSlots = true
 ): { playerId: number; position: string; nhlTeamId?: number } | null {
   const counts = countSlots(draftState, botUserId);
-  const { slot, playerType } = greatestNeed(counts);
+  const { slot, playerType } = greatestNeed(counts, allowIrSlots);
   const available = new Set(draftState.availablePlayerIds);
 
   // Filter to players matching the needed player type
@@ -167,4 +186,6 @@ export function botPickCount(
 }
 
 /** Maximum draft rounds (matches useMockDraft.ts) */
-export const MAX_DRAFT_ROUNDS = TOTAL_ROSTER_SIZE;
+export function getMaxDraftRounds(allowIrSlots = true): number {
+  return getTotalRosterSize(allowIrSlots);
+}

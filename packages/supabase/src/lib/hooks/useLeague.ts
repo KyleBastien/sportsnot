@@ -9,7 +9,7 @@ export function useLeagues(userId: string | undefined) {
       const { data, error } = await supabase
         .from('league_members')
         .select(
-          'id, team_name, total_points, leagues(id, name, status, current_round, max_participants, commissioner_id, invite_code)'
+          'id, team_name, total_points, leagues(id, name, status, current_round, max_participants, commissioner_id, invite_code, allow_ir_slots)'
         )
         .eq('user_id', userId);
 

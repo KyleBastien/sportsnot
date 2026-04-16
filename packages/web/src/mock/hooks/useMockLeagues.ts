@@ -116,6 +116,7 @@ export function useMockMyLeagues() {
     max_participants: league.maxParticipants,
     commissioner_id: league.commissionerId,
     invite_code: league.inviteCode,
+    allow_ir_slots: league.allowIrSlots,
     league_members: league.members.map((m) => ({
       team_name: m.teamName,
       total_points: calculateMemberPoints(state, m.id).totalPoints,
@@ -151,6 +152,7 @@ export function useMockLeagues(_userId: string | undefined) {
         max_participants: league.maxParticipants,
         commissioner_id: league.commissionerId,
         invite_code: league.inviteCode,
+        allow_ir_slots: league.allowIrSlots,
       },
     };
   });
@@ -177,6 +179,7 @@ export function useMockLeague(leagueId: string | undefined) {
         max_participants: league.maxParticipants,
         current_round: league.currentRound,
         status: league.status,
+        allow_ir_slots: league.allowIrSlots,
         created_at: league.createdAt,
         updated_at: league.updatedAt,
         isMock: league.isMock,
@@ -245,6 +248,7 @@ export function useMockCreateLeague() {
         maxParticipants: params.maxParticipants,
         currentRound: 0,
         status: 'setup',
+        allowIrSlots: true,
         createdAt: now,
         updatedAt: now,
         members: [commissionerMember, ...botMembers],
