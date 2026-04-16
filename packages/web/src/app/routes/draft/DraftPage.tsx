@@ -141,6 +141,23 @@ function useLeagueMembers(leagueId: string) {
   return IS_MOCK ? mockResult : queryResult;
 }
 
+function useLeagueCommissioner(leagueId: string) {
+  return useQuery({
+    queryKey: ['league-commissioner', leagueId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('leagues')
+        .select('commissioner_id')
+        .eq('id', leagueId)
+        .single();
+
+      if (error) throw error;
+      return data?.commissioner_id as string | null;
+    },
+    enabled: !IS_MOCK,
+  });
+}
+
 interface ComparePlayer {
   id: number;
   fullName: string;
@@ -171,7 +188,7 @@ interface AvailablePlayerBoardProps {
   draftedTeamIds: Set<number>;
   positionFilter: string;
   searchQuery: string;
-  isMyTurn: boolean;
+  canPick: boolean;
   onSelectPlayer: (player: DraftablePlayer) => void;
   comparePlayers: ComparePlayer[];
   onToggleCompare: (player: ComparePlayer) => void;
@@ -187,7 +204,7 @@ function AvailablePlayerBoard({
   draftedTeamIds,
   positionFilter,
   searchQuery,
-  isMyTurn,
+  canPick,
   onSelectPlayer,
   comparePlayers,
   onToggleCompare,
@@ -330,7 +347,7 @@ function AvailablePlayerBoard({
                   <Table.Th style={{ textAlign: 'right' }}>Pts</Table.Th>
                   <Table.Th style={{ textAlign: 'right' }}>GP</Table.Th>
                   <Table.Th />
-                  {isMyTurn && <Table.Th />}
+                  {canPick && <Table.Th />}
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -385,7 +402,7 @@ function AvailablePlayerBoard({
                           {isCompared ? 'Compared' : 'Compare'}
                         </Button>
                       </Table.Td>
-                      {isMyTurn && (
+                      {canPick && (
                         <Table.Td>
                           <Button
                             size="xs"
@@ -412,7 +429,7 @@ function AvailablePlayerBoard({
                 })}
                 {filteredSkaters.length === 0 && (
                   <Table.Tr>
-                    <Table.Td colSpan={(isRound1 ? 8 : 7) + (isMyTurn ? 1 : 0)}>
+                    <Table.Td colSpan={(isRound1 ? 8 : 7) + (canPick ? 1 : 0)}>
                       <Text c="dimmed" ta="center" size="sm">
                         No available skaters match your filters
                       </Text>
@@ -436,7 +453,7 @@ function AvailablePlayerBoard({
                 <Table.Th>Team</Table.Th>
                 <Table.Th style={{ textAlign: 'right' }}>Wins</Table.Th>
                 <Table.Th style={{ textAlign: 'right' }}>Shutouts</Table.Th>
-                {isMyTurn && <Table.Th />}
+                {canPick && <Table.Th />}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -447,7 +464,7 @@ function AvailablePlayerBoard({
                   <Table.Td style={{ textAlign: 'right' }}>
                     {t.shutouts}
                   </Table.Td>
-                  {isMyTurn && (
+                  {canPick && (
                     <Table.Td>
                       <Button
                         size="xs"
@@ -473,7 +490,7 @@ function AvailablePlayerBoard({
               ))}
               {filteredTeams.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={isMyTurn ? 4 : 3}>
+                  <Table.Td colSpan={canPick ? 4 : 3}>
                     <Text c="dimmed" ta="center" size="sm">
                       No available teams match your filters
                     </Text>
@@ -494,6 +511,7 @@ export function DraftPage() {
   const { user } = useAuthContext();
   const { data: draft, isLoading: draftLoading } = useDraft(leagueId!);
   const { data: members } = useLeagueMembers(leagueId!);
+  const { data: commissionerId } = useLeagueCommissioner(leagueId!);
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmPlayer, setConfirmPlayer] = useState<DraftablePlayer | null>(
@@ -564,6 +582,14 @@ export function DraftPage() {
   const isMyTurn = currentPickerUserId === user?.id;
   const myMember = members?.find((m) => m.user_id === user?.id);
   const currentPicker = members?.find((m) => m.user_id === currentPickerUserId);
+  const isCommissioner = Boolean(
+    commissionerId && user?.id && commissionerId === user.id
+  );
+  const canPick = isMyTurn || (isCommissioner && !isDraftComplete);
+  const pickingMember =
+    isCommissioner && !isMyTurn
+      ? members?.find((m) => m.user_id === currentPickerUserId)
+      : myMember;
 
   // Track which players/teams have already been drafted
   const draftedPlayerIds = useMemo(
@@ -600,14 +626,15 @@ export function DraftPage() {
       IR_F: 0,
       IR_D: 0,
     };
-    if (!myMember) return counts;
+    const member = pickingMember ?? myMember;
+    if (!member) return counts;
     for (const pick of picks) {
-      if (pick.league_members?.user_id === myMember.user_id && pick.position) {
+      if (pick.league_members?.user_id === member.user_id && pick.position) {
         counts[pick.position] = (counts[pick.position] ?? 0) + 1;
       }
     }
     return counts;
-  }, [picks, myMember]);
+  }, [picks, pickingMember, myMember]);
 
   // Build my roster slots grouped by position for the My Team section
   const myRosterSlots = useMemo(() => {
@@ -742,7 +769,8 @@ export function DraftPage() {
   }
 
   const handleConfirmPick = async () => {
-    if (!confirmPlayer || !myMember || !draft) return;
+    const activeMember = pickingMember ?? myMember;
+    if (!confirmPlayer || !activeMember || !draft) return;
 
     setSubmitting(true);
 
@@ -751,7 +779,7 @@ export function DraftPage() {
     if (IS_MOCK && mockMakePick) {
       mockMakePick.mutate({
         draftId: draft.id,
-        leagueMemberId: myMember.id,
+        leagueMemberId: activeMember.id,
         pickNumber: draft.current_pick,
         playerId: isGoalie ? null : confirmPlayer.id,
         teamId: isGoalie ? confirmPlayer.teamId : null,
@@ -764,7 +792,7 @@ export function DraftPage() {
 
     const { error } = await supabase.from('draft_picks').insert({
       draft_id: draft.id,
-      league_member_id: myMember.id,
+      league_member_id: activeMember.id,
       pick_number: draft.current_pick,
       player_id: isGoalie ? null : confirmPlayer.id,
       team_id: isGoalie ? confirmPlayer.teamId : null,
@@ -781,7 +809,7 @@ export function DraftPage() {
 
     // Also create the corresponding roster entry
     await supabase.from('rosters').insert({
-      league_member_id: myMember.id,
+      league_member_id: activeMember.id,
       round: draft.round,
       player_id: isGoalie ? null : confirmPlayer.id,
       team_id: isGoalie ? confirmPlayer.teamId : null,
@@ -869,6 +897,12 @@ export function DraftPage() {
               {isMyTurn && (
                 <Badge color="green" size="lg">
                   Your Turn!
+                </Badge>
+              )}
+              {isCommissioner && !isMyTurn && !isDraftComplete && (
+                <Badge color="orange" size="lg">
+                  Picking for:{' '}
+                  {(currentPicker as DraftMemberRow)?.team_name ?? 'Unknown'}
                 </Badge>
               )}
             </Stack>
@@ -993,7 +1027,7 @@ export function DraftPage() {
                 No player data available yet. Ensure the NHL stats sync edge
                 function has been run to populate playoff player data.
               </Text>
-              {isMyTurn ? (
+              {canPick ? (
                 <Alert color="green" title="It's your turn!">
                   Once player data is synced, you'll see a selectable list here.
                 </Alert>
@@ -1015,7 +1049,7 @@ export function DraftPage() {
               draftedTeamIds={draftedTeamIds}
               positionFilter={positionFilter}
               searchQuery={searchQuery}
-              isMyTurn={isMyTurn}
+              canPick={canPick}
               onSelectPlayer={(player) => {
                 setConfirmPlayer(player);
                 if (player.position === 'G') {
