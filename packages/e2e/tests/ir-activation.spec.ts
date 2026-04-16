@@ -3,10 +3,9 @@ import {
   setupSupabaseMocks,
   mockTableList,
 } from '../fixtures/supabase-mock.fixture';
-import { mockUser } from '../fixtures/auth.fixture';
+import { mockUser, SUPABASE_URL } from '../fixtures/auth.fixture';
 
 const NAV_TIMEOUT = { timeout: 15000 };
-const SUPABASE_URL = 'http://localhost:54321';
 const LEAGUE_ID = 'ir-test-league-1111-2222-333333333333';
 const MEMBER_ID = 'member-ir-test-user-001';
 
