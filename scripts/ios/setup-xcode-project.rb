@@ -104,6 +104,18 @@ Dir[REPO.join("ios/CapacitorPlugins/WidgetBridge/*.swift").to_s].sort.each do |p
   add_file_to_target(PROJECT, plugin_group, Pathname.new(path), app_target)
 end
 
+# MainViewController.swift (App target only) - subclass of CAPBridgeViewController
+# that registers plugins compiled directly into the app (Capacitor v6 only
+# auto-discovers plugins from installed pods).
+app_group_for_mvc = main_group.children.find { |g| g.respond_to?(:name) && g.name == "App" } || main_group["App"]
+if app_group_for_mvc
+  mvc_path = REPO.join("ios/App/App/MainViewController.swift")
+  unless app_group_for_mvc.files.any? { |f| f.real_path == mvc_path }
+    file_ref = app_group_for_mvc.new_file("MainViewController.swift")
+    app_target.source_build_phase.add_file_reference(file_ref) unless app_target.source_build_phase.files_references.include?(file_ref)
+  end
+end
+
 # --- Widget Info.plist + entitlements file references (not in sources) -----
 widget_info_plist = REPO.join("ios/App/SportsNotWidget/Info.plist")
 widget_entitlements = REPO.join("ios/App/SportsNotWidget/SportsNotWidget.entitlements")

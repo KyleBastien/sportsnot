@@ -38,6 +38,7 @@
 		ACD5D8F3CD04C2859F318FC4 /* AccessoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF49076DB1E412B25E273B91 /* AccessoryViews.swift */; };
 		AE2C633419E7956B3F7DDFA4 /* SportsNotLockScreenWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977FA6A88F6BBFA23678A02D /* SportsNotLockScreenWidget.swift */; };
 		B80C624357AFBC4869507B53 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 66FB08B3DAC47C8C2BF64218 /* Foundation.framework */; };
+		C928B26BD9F9BAB9296D544B /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD3821A532458CC5C7FA9F6C /* MainViewController.swift */; };
 		CB71E883729EB76F1533EFFF /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1455368C1C3E13D054268651 /* WidgetSnapshot.swift */; };
 		CC706482A8B94F5DF3BCA699 /* WidgetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E51528B85EFCE04FFB1C6E /* WidgetBridge.swift */; };
 		D0B4777EB9B13F2E9E6D71A3 /* FeaturedLeagueIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55828ED4DF418806664C4336 /* FeaturedLeagueIntent.swift */; };
@@ -104,6 +105,7 @@
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		B1D06DF469FA7400950A4DD3 /* LargeFamilyView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LargeFamilyView.swift; sourceTree = "<group>"; };
+		DD3821A532458CC5C7FA9F6C /* MainViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		EF49076DB1E412B25E273B91 /* AccessoryViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccessoryViews.swift; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 		FE26CF179638416BA4686062 /* App.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
@@ -181,6 +183,7 @@
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
 				FE26CF179638416BA4686062 /* App.entitlements */,
+				DD3821A532458CC5C7FA9F6C /* MainViewController.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -430,6 +433,7 @@
 				835D0DC9D87B89441CD2EE62 /* WidgetSnapshot.swift in Sources */,
 				CC706482A8B94F5DF3BCA699 /* WidgetBridge.swift in Sources */,
 				8D75EAFF2621C89860A8B9A6 /* WidgetBridgePlugin.swift in Sources */,
+				C928B26BD9F9BAB9296D544B /* MainViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
