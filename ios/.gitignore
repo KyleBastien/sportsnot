@@ -1,0 +1,9 @@
+App/App/public/
+App/Pods/
+App/build/
+App/DerivedData/
+App/App.xcworkspace/xcuserdata/
+App/App.xcodeproj/xcuserdata/
+App/App.xcodeproj/project.xcworkspace/xcuserdata/
+build/
+*.xcuserstate

@@ -29,6 +29,9 @@
     },
     {
       "path": "./packages/widget-api"
+    },
+    {
+      "path": "./packages/widget-bridge"
     }
   ]
 }

@@ -25,7 +25,8 @@
       "@sportsnot/nhl-api": ["packages/nhl-api/src/index.ts"],
       "@sportsnot/supabase": ["packages/supabase/src/index.ts"],
       "@sportsnot/mock-data": ["packages/mock-data/src/index.ts"],
-      "@sportsnot/widget-api": ["packages/widget-api/src/index.ts"]
+      "@sportsnot/widget-api": ["packages/widget-api/src/index.ts"],
+      "@sportsnot/widget-bridge": ["packages/widget-bridge/src/index.ts"]
     }
   }
 }
