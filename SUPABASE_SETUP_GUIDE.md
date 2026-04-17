@@ -480,84 +480,24 @@ During the playoffs, you want stats to update automatically. Set up a cron job t
 
 ### Option A: Supabase Cron (pg_cron) — Recommended
 
-Supabase includes `pg_cron` for scheduling. Go to **SQL Editor** and run:
+Supabase includes `pg_cron` for scheduling. The canonical schedule lives in the migration [`packages/supabase-db/migrations/007_schedule_sync_nhl_stats_cron.sql`](packages/supabase-db/migrations/007_schedule_sync_nhl_stats_cron.sql) — run that (or let your migration runner apply it) instead of hand-crafting the SQL.
 
-```sql
--- Enable the pg_cron and pg_net extensions if not already enabled
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
+**Before the migration runs**, you must add the service role key to **Vault** so `pg_cron` can authenticate without leaking the secret into `cron.job` plaintext:
 
--- Off-season: schedule a weekly health-check sync (every Sunday at midnight UTC)
--- This keeps the function warm and verifies the pipeline works before playoffs start.
--- When the playoffs begin, update to every 15 minutes (see below).
-SELECT cron.schedule(
-  'sync-nhl-stats',
-  '0 0 * * 0',  -- Every Sunday at midnight UTC
-  $$
-  SELECT net.http_post(
-    url := 'https://<your-project-ref>.supabase.co/functions/v1/sync-nhl-stats',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true)
-    ),
-    body := jsonb_build_object(
-      'season', '20252026',
-      'playoff_round', 1
-    )
-  );
-  $$
-);
-```
+1. Dashboard → **Project Settings → Vault → Add new secret**
+2. **Name:** `service_role_key` (exact spelling — the cron looks it up by name)
+3. **Secret:** paste the `service_role` key from **Project Settings → API Keys**
 
-> **When the playoffs start,** switch to every 15 minutes:
-> ```sql
-> SELECT cron.unschedule('sync-nhl-stats');
-> SELECT cron.schedule(
->   'sync-nhl-stats',
->   '*/15 * * * *',  -- Every 15 minutes
->   $$
->   SELECT net.http_post(
->     url := 'https://<your-project-ref>.supabase.co/functions/v1/sync-nhl-stats',
->     headers := jsonb_build_object(
->       'Content-Type', 'application/json',
->       'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true)
->     ),
->     body := jsonb_build_object(
->       'season', '20252026',
->       'playoff_round', 1
->     )
->   );
->   $$
-> );
-> ```
+> ⚠️ Hosted Supabase blocks `ALTER DATABASE postgres SET app.settings.service_role_key = ...` with `permission denied to set parameter`. That's why the migration reads from `vault.decrypted_secrets` rather than `current_setting('app.settings.service_role_key', true)`.
 
-> **Note:** You'll need to update the `playoff_round` value in the cron body as the playoffs progress (1 → 2 → 3 → 4). You can also pass `round_start_date` and `round_end_date` to filter stats to a specific round's date range.
+The migration:
 
-To update the cron for a new round:
+- Enables `pg_cron` + `pg_net` (already on for SportsNot).
+- Unschedules any prior `sync-nhl-stats` job and reschedules it at `*/15 * * * *`.
+- Wraps `net.http_post` in a `CASE WHEN now() >= '2026-04-18 18:00:00+00'` guard so the job is a no-op until Round 1 puck drop (11 AM PDT on 4/18).
+- Sets `timeout_milliseconds := 120000` because the function fans out to the NHL API for every drafted player and will exceed `pg_net`'s 5 s default.
 
-```sql
--- Unschedule the old cron
-SELECT cron.unschedule('sync-nhl-stats');
-
--- Reschedule for Round 2
-SELECT cron.schedule(
-  'sync-nhl-stats',
-  '*/15 * * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://<your-project-ref>.supabase.co/functions/v1/sync-nhl-stats',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true)
-    ),
-    body := jsonb_build_object(
-      'season', '20252026',
-      'playoff_round', 2
-    )
-  );
-  $$
-);
-```
+**Updating for a new round** (Round 1 → 2 → 3 → 4): edit the migration's `playoff_round` value and re-run the `cron.unschedule` + `cron.schedule` block. You can also pass `round_start_date` / `round_end_date` in the body to restrict stats to a specific round's date range.
 
 ### Option B: External Cron (if pg_cron doesn't work for you)
 
