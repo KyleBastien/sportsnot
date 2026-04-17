@@ -28,29 +28,24 @@ export function FeatureOnWidgetButton({
   const [saved, setSaved] = useState(false);
 
   if (!shareCode) return null;
-
-  const native = isWidgetBridgeAvailable();
+  if (!isWidgetBridgeAvailable()) return null;
 
   const handleClick = async () => {
     setSaving(true);
     setSaved(false);
     try {
       await WidgetBridge.setFeaturedLeague({ shareCode });
-      if (native) {
-        const supported = await WidgetBridge.isLiveActivitySupported();
-        if (supported.supported) {
-          const hasGamesToday = await leagueHasGamesToday(shareCode);
-          if (hasGamesToday) {
-            await WidgetBridge.startLiveActivity({
-              shareCode,
-              leagueId,
-              leagueName,
-            });
-          } else {
-            // No games today: don't clutter the Live Activity tray.
-            // End any previously-started activity for this league.
-            await WidgetBridge.endLiveActivity();
-          }
+      const supported = await WidgetBridge.isLiveActivitySupported();
+      if (supported.supported) {
+        const hasGamesToday = await leagueHasGamesToday(shareCode);
+        if (hasGamesToday) {
+          await WidgetBridge.startLiveActivity({
+            shareCode,
+            leagueId,
+            leagueName,
+          });
+        } else {
+          await WidgetBridge.endLiveActivity();
         }
       }
       setSaved(true);
@@ -60,19 +55,11 @@ export function FeatureOnWidgetButton({
     }
   };
 
-  const label = saved
-    ? 'Widget updated'
-    : native
-      ? 'Feature on iOS widget'
-      : 'Preview on widget';
+  const label = saved ? 'Widget updated' : 'Feature on iOS widget';
 
   return (
     <Tooltip
-      label={
-        native
-          ? 'Sets this league as the featured one in your Home Screen widget. If a game is on today, starts a Live Activity too.'
-          : 'iOS Home Screen widget feature — tap to preview (actual widget only appears in the iOS app).'
-      }
+      label="Sets this league as the featured one in your Home Screen widget. If a game is on today, starts a Live Activity too."
       multiline
       w={260}
     >

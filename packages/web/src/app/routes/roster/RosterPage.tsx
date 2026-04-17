@@ -108,7 +108,7 @@ function useMemberRoster(leagueId: string, leagueMemberId?: string) {
       if (error) throw error;
 
       return {
-        memberId,
+        memberId: memberId as string,
         round: league.current_round,
         slots: (roster ?? []).map((s: RosterSlotRow) => ({
           ...s,
