@@ -60,8 +60,11 @@
       "executor": "nx:run-commands",
       "cache": false,
       "options": {
-        "commands": ["npx cap sync ios", "pod install"],
-        "cwd": "ios/App",
+        "commands": [
+          "npx cap sync ios",
+          "cd ios/App && pod install"
+        ],
+        "cwd": "{workspaceRoot}",
         "parallel": false
       }
     }
