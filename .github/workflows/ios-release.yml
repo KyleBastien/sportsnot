@@ -126,21 +126,11 @@ jobs:
             echo "Installed $label profile $UUID"
           done
 
-      - name: Set build number from GITHUB_RUN_NUMBER
-        run: |
-          set -euo pipefail
-          BUILD_NUMBER=$GITHUB_RUN_NUMBER
-          echo "Setting CFBundleVersion to $BUILD_NUMBER"
-          # App target Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" ios/App/App/Info.plist
-          # Widget extension Info.plist (path may vary; adjust if needed)
-          if [ -f ios/App/SportsNotWidget/Info.plist ]; then
-            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" ios/App/SportsNotWidget/Info.plist
-          fi
-
       - name: Archive App (Release, signed)
         run: |
           set -euo pipefail
+          BUILD_NUMBER=$GITHUB_RUN_NUMBER
+          echo "Archiving with CURRENT_PROJECT_VERSION=$BUILD_NUMBER"
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
             -scheme App \
@@ -151,6 +141,7 @@ jobs:
             DEVELOPMENT_TEAM=$TEAM_ID \
             PROVISIONING_PROFILE_SPECIFIER="$APP_PROFILE_NAME" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
+            CURRENT_PROJECT_VERSION=$BUILD_NUMBER \
             archive
 
       - name: Write ExportOptions.plist
