@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'SportsNot',
   webDir: 'packages/web/dist',
   ios: {
-    contentInset: 'always',
+    contentInset: 'never',
     scheme: 'SportsNot',
   },
   server: {

@@ -173,7 +173,10 @@ export function App() {
         </Suspense>
       )}
       <MockWrapper>
-        <AppShell header={{ height: 60 }} padding="md">
+        <AppShell
+          header={{ height: 'calc(60px + env(safe-area-inset-top))' }}
+          padding="md"
+        >
           <AppShell.Header>
             <Group h="100%" px="md" justify="space-between">
               <UnstyledButton component={Link} to="/">
