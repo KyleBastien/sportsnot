@@ -17,7 +17,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { getRosterComposition } from '@sportsnot/types';
-import { generateSnakeDraftOrder } from '@sportsnot/utils';
+import { generateSnakeDraftOrder, shuffleArray } from '@sportsnot/utils';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import {
@@ -132,7 +132,7 @@ export function DraftLobbyPage() {
     }
 
     const memberUserIds = members.map((m: LobbyMember) => m.user_id);
-    const shuffled = [...memberUserIds].sort(() => Math.random() - 0.5);
+    const shuffled = shuffleArray(memberUserIds);
     const draftOrder = generateSnakeDraftOrder(shuffled, picksPerMember);
 
     const { error } = await supabase.from('drafts').insert({
