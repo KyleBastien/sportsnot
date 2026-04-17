@@ -23,7 +23,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
-import { generateInviteCode } from '@sportsnot/utils';
+import { generateInviteCode, shuffleArray } from '@sportsnot/utils';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import { useMockData } from '../../../mock/MockDataProvider';
 
@@ -186,7 +186,7 @@ export function LeagueSettingsPage() {
 
     // Randomize draft order for round 1
     const memberUserIds = members.map((m: SettingsMemberRow) => m.user_id);
-    const shuffled = [...memberUserIds].sort(() => Math.random() - 0.5);
+    const shuffled = shuffleArray(memberUserIds);
 
     const { error: draftError } = await supabase.from('drafts').insert({
       league_id: leagueId,
