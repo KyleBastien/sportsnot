@@ -244,10 +244,10 @@ function AvailablePlayerBoard({
     return false;
   };
 
-  // Build a lookup for regular season points by player ID
-  const regSeasonMap = new Map(
-    regSeasonStats.map((r) => [r.player_id, r.points])
-  );
+  // Build a lookup for regular season stats by player ID. Used both for
+  // Round 1 sort ordering and as a fallback for name/team/position when the
+  // playoff stats cache rows are missing those fields.
+  const regSeasonMap = new Map(regSeasonStats.map((r) => [r.player_id, r]));
 
   // Round 1 fallback: use regular season data when playoff stats aren't available yet
   const useRegSeasonFallback = isRound1 && playerStats.length === 0;
@@ -274,20 +274,24 @@ function AvailablePlayerBoard({
     : playerStats
         .filter((p) => !draftedPlayerIds.has(p.player_id))
         .filter((p) => !p.is_injured)
-        .map((p) => ({
-          id: p.player_id,
-          fullName: p.player_name ?? `Player #${p.player_id}`,
-          firstName: '',
-          lastName: '',
-          position: p.position ?? 'F',
-          team: p.team_abbreviation ?? 'NHL',
-          teamId: 0,
-          goals: p.goals ?? 0,
-          assists: p.assists ?? 0,
-          points: (p.goals ?? 0) + (p.assists ?? 0),
-          gamesPlayed: p.games_played ?? 0,
-          regSeasonPts: regSeasonMap.get(p.player_id) ?? 0,
-        }));
+        .map((p) => {
+          const reg = regSeasonMap.get(p.player_id);
+          return {
+            id: p.player_id,
+            fullName:
+              p.player_name ?? reg?.player_name ?? `Player #${p.player_id}`,
+            firstName: '',
+            lastName: '',
+            position: p.position ?? reg?.position ?? 'F',
+            team: p.team_abbreviation ?? reg?.team_abbreviation ?? 'NHL',
+            teamId: 0,
+            goals: p.goals ?? 0,
+            assists: p.assists ?? 0,
+            points: (p.goals ?? 0) + (p.assists ?? 0),
+            gamesPlayed: p.games_played ?? 0,
+            regSeasonPts: reg?.points ?? 0,
+          };
+        });
 
   // Build team/goalie rows from team_stats_cache
   const teamRows = teamStats
@@ -568,16 +572,12 @@ export function DraftPage() {
   const supabaseTeamResult = usePlayoffTeams(currentSeason, currentRound);
   const { data: teamStats } = IS_MOCK ? mockTeamResult : supabaseTeamResult;
 
-  // Fetch regular season stats (only in round 1)
+  // Fetch regular season stats. Used for Round 1 sorting/fallback display
+  // AND as a name/position/team lookup for later rounds when the playoff
+  // stats cache rows are missing those fields.
   const isRound1 = currentRound === 1;
-  const mockRegSeasonResult = useMockRegularSeasonPlayers(
-    currentSeason,
-    isRound1
-  );
-  const supabaseRegSeasonResult = useRegularSeasonPlayers(
-    currentSeason,
-    isRound1
-  );
+  const mockRegSeasonResult = useMockRegularSeasonPlayers(currentSeason, true);
+  const supabaseRegSeasonResult = useRegularSeasonPlayers(currentSeason, true);
   const { data: regSeasonStats } = IS_MOCK
     ? mockRegSeasonResult
     : supabaseRegSeasonResult;
