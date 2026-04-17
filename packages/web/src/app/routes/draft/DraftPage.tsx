@@ -249,8 +249,15 @@ function AvailablePlayerBoard({
   // playoff stats cache rows are missing those fields.
   const regSeasonMap = new Map(regSeasonStats.map((r) => [r.player_id, r]));
 
-  // Round 1 fallback: use regular season data when playoff stats aren't available yet
-  const useRegSeasonFallback = isRound1 && playerStats.length === 0;
+  // Round 1 fallback: use regular season data when playoff stats aren't
+  // available yet. The sync-nhl-stats job pre-creates placeholder rows for
+  // already-drafted players (with null names and 0 games) before any playoff
+  // games are played, so we can't rely on `playerStats.length === 0` alone —
+  // we also fall back when none of the cached rows have a played game yet.
+  const useRegSeasonFallback =
+    isRound1 &&
+    (playerStats.length === 0 ||
+      playerStats.every((p) => (p.games_played ?? 0) === 0));
 
   // Build skater rows — prefer playoff stats, fall back to regular season in Round 1
   const skaterRows = useRegSeasonFallback
