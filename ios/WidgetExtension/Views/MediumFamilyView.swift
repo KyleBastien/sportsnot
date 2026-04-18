@@ -8,9 +8,17 @@ struct MediumFamilyView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(entry.snapshot?.league.name ?? "SportsNot")
-                    .font(.caption.bold())
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(entry.snapshot?.league.name ?? "SportsNot")
+                        .font(.caption.bold())
+                        .lineLimit(1)
+                    Spacer()
+                    if entry.totalPages > 1 {
+                        Text("\(entry.pageIndex + 1)/\(entry.totalPages)")
+                            .font(.system(size: 9).monospacedDigit())
+                            .foregroundStyle(.tertiary)
+                    }
+                }
                 if let snapshot = entry.snapshot {
                     let playingToday = snapshot.players
                         .filter { $0.gameId != nil }
@@ -20,7 +28,11 @@ struct MediumFamilyView: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(Array(playingToday.prefix(3)), id: \.id) { p in
+                        let perPage = SnapshotTimelineProvider.playersPerPage(for: .systemMedium)
+                        let start = min(entry.pageIndex * perPage, playingToday.count)
+                        let end = min(start + perPage, playingToday.count)
+                        let page = Array(playingToday[start..<end])
+                        ForEach(page, id: \.id) { p in
                             HStack {
                                 Text(p.teamAbbrev).font(.caption2.bold()).foregroundStyle(Color.accentColor)
                                     .frame(width: 34, alignment: .leading)
