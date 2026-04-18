@@ -162,122 +162,124 @@ export function StandingsPage() {
         </Group>
 
         <Card shadow="sm" padding="md" radius="md" withBorder>
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th style={{ width: 60 }}>Rank</Table.Th>
-                <Table.Th>Team</Table.Th>
-                <Table.Th>Manager</Table.Th>
-                {hasBreakdown && (
-                  <>
-                    <Table.Th style={{ textAlign: 'right' }}>
-                      Player Pts
+          <Table.ScrollContainer minWidth={600}>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th style={{ width: 60 }}>Rank</Table.Th>
+                  <Table.Th>Team</Table.Th>
+                  <Table.Th>Manager</Table.Th>
+                  {hasBreakdown && (
+                    <>
+                      <Table.Th style={{ textAlign: 'right' }}>
+                        Player Pts
+                      </Table.Th>
+                      <Table.Th style={{ textAlign: 'right' }}>
+                        Goalie Pts
+                      </Table.Th>
+                    </>
+                  )}
+                  {roundNumbers.map((r) => (
+                    <Table.Th key={r} style={{ textAlign: 'right' }}>
+                      R{r}
                     </Table.Th>
-                    <Table.Th style={{ textAlign: 'right' }}>
-                      Goalie Pts
-                    </Table.Th>
-                  </>
-                )}
-                {roundNumbers.map((r) => (
-                  <Table.Th key={r} style={{ textAlign: 'right' }}>
-                    R{r}
-                  </Table.Th>
-                ))}
-                <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {typedMembers.map((member, index) => {
-                const isMe = member.user_id === user?.id;
-                return (
-                  <Table.Tr
-                    key={member.id}
-                    style={{
-                      fontWeight: isMe ? 700 : undefined,
-                      backgroundColor: isMe
-                        ? 'var(--mantine-color-blue-light)'
-                        : undefined,
-                    }}
-                  >
-                    <Table.Td>
-                      {index === 0 ? (
-                        <Badge color="gold" variant="filled">
-                          1st
-                        </Badge>
-                      ) : index === 1 ? (
-                        <Badge color="gray" variant="filled">
-                          2nd
-                        </Badge>
-                      ) : index === 2 ? (
-                        <Badge color="orange" variant="filled">
-                          3rd
-                        </Badge>
-                      ) : (
-                        index + 1
+                  ))}
+                  <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {typedMembers.map((member, index) => {
+                  const isMe = member.user_id === user?.id;
+                  return (
+                    <Table.Tr
+                      key={member.id}
+                      style={{
+                        fontWeight: isMe ? 700 : undefined,
+                        backgroundColor: isMe
+                          ? 'var(--mantine-color-blue-light)'
+                          : undefined,
+                      }}
+                    >
+                      <Table.Td>
+                        {index === 0 ? (
+                          <Badge color="gold" variant="filled">
+                            1st
+                          </Badge>
+                        ) : index === 1 ? (
+                          <Badge color="gray" variant="filled">
+                            2nd
+                          </Badge>
+                        ) : index === 2 ? (
+                          <Badge color="orange" variant="filled">
+                            3rd
+                          </Badge>
+                        ) : (
+                          index + 1
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        <Anchor
+                          component={Link}
+                          to={`/roster/${leagueId}/${member.id}`}
+                          fw={isMe ? 700 : undefined}
+                        >
+                          {member.team_name}
+                          {seasonComplete && index === 0 && ' 🏆'}
+                        </Anchor>
+                      </Table.Td>
+                      <Table.Td>
+                        {member.users?.display_name ?? 'Unknown'}
+                        {isMe && (
+                          <Badge size="xs" ml="xs" variant="light">
+                            You
+                          </Badge>
+                        )}
+                      </Table.Td>
+                      {hasBreakdown && (
+                        <>
+                          <Table.Td
+                            style={{
+                              textAlign: 'right',
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {member.player_points ?? 0}
+                          </Table.Td>
+                          <Table.Td
+                            style={{
+                              textAlign: 'right',
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {member.goalie_points ?? 0}
+                          </Table.Td>
+                        </>
                       )}
-                    </Table.Td>
-                    <Table.Td>
-                      <Anchor
-                        component={Link}
-                        to={`/roster/${leagueId}/${member.id}`}
-                        fw={isMe ? 700 : undefined}
-                      >
-                        {member.team_name}
-                        {seasonComplete && index === 0 && ' 🏆'}
-                      </Anchor>
-                    </Table.Td>
-                    <Table.Td>
-                      {member.users?.display_name ?? 'Unknown'}
-                      {isMe && (
-                        <Badge size="xs" ml="xs" variant="light">
-                          You
-                        </Badge>
-                      )}
-                    </Table.Td>
-                    {hasBreakdown && (
-                      <>
+                      {roundNumbers.map((r) => (
                         <Table.Td
+                          key={r}
                           style={{
                             textAlign: 'right',
                             fontVariantNumeric: 'tabular-nums',
                           }}
                         >
-                          {member.player_points ?? 0}
+                          {member.round_points?.[r] ?? 0}
                         </Table.Td>
-                        <Table.Td
-                          style={{
-                            textAlign: 'right',
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          {member.goalie_points ?? 0}
-                        </Table.Td>
-                      </>
-                    )}
-                    {roundNumbers.map((r) => (
+                      ))}
                       <Table.Td
-                        key={r}
                         style={{
                           textAlign: 'right',
                           fontVariantNumeric: 'tabular-nums',
                         }}
                       >
-                        {member.round_points?.[r] ?? 0}
+                        {member.total_points ?? 0}
                       </Table.Td>
-                    ))}
-                    <Table.Td
-                      style={{
-                        textAlign: 'right',
-                        fontVariantNumeric: 'tabular-nums',
-                      }}
-                    >
-                      {member.total_points ?? 0}
-                    </Table.Td>
-                  </Table.Tr>
-                );
-              })}
-            </Table.Tbody>
-          </Table>
+                    </Table.Tr>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         </Card>
       </Stack>
     </Container>

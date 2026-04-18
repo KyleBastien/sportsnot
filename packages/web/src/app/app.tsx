@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { Route, Routes, Link, useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
@@ -18,6 +18,9 @@ import { useAuthContext } from './context/AuthContext';
 import logoSrc from '../assets/sportsnot-logo.png';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { initWidgetBridge } from './widget/initWidgetBridge';
+
+const WIDGET_BUNDLE_ID = 'com.sportsnot.app';
 
 // Mock mode — only loaded when VITE_MOCK_MODE is 'true'
 const MockModeBanner =
@@ -144,6 +147,24 @@ function MockWrapper({ children }: { children: ReactNode }) {
 }
 
 export function App() {
+  useEffect(() => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !anonKey) return;
+
+    const handlePromise = initWidgetBridge({
+      supabaseUrl,
+      anonKey,
+      bundleId: WIDGET_BUNDLE_ID,
+    });
+
+    return () => {
+      void handlePromise
+        .then((handle) => handle.remove())
+        .catch(() => undefined);
+    };
+  }, []);
+
   return (
     <ErrorBoundary>
       {MockModeBanner && (
@@ -152,7 +173,10 @@ export function App() {
         </Suspense>
       )}
       <MockWrapper>
-        <AppShell header={{ height: 60 }} padding="md">
+        <AppShell
+          header={{ height: 'calc(60px + env(safe-area-inset-top))' }}
+          padding="md"
+        >
           <AppShell.Header>
             <Group h="100%" px="md" justify="space-between">
               <UnstyledButton component={Link} to="/">

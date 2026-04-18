@@ -1,0 +1,12 @@
+{
+  "name": "@sportsnot/widget-bridge",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/widget-bridge/src",
+  "projectType": "library",
+  "targets": {
+    "test": {
+      "command": "rstest",
+      "options": { "cwd": "{projectRoot}" }
+    }
+  }
+}

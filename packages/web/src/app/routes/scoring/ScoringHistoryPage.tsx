@@ -138,53 +138,55 @@ export function ScoringHistoryPage() {
         </Group>
 
         <Card shadow="sm" padding="md" radius="md" withBorder>
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Player</Table.Th>
-                <Table.Th>Team</Table.Th>
-                <Table.Th>Event</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
-                <Table.Th>Date</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filtered.length === 0 ? (
+          <Table.ScrollContainer minWidth={600}>
+            <Table striped highlightOnHover>
+              <Table.Thead>
                 <Table.Tr>
-                  <Table.Td colSpan={5}>
-                    <Text ta="center" c="dimmed" py="md">
-                      No scoring events found
-                    </Text>
-                  </Table.Td>
+                  <Table.Th>Player</Table.Th>
+                  <Table.Th>Team</Table.Th>
+                  <Table.Th>Event</Table.Th>
+                  <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
+                  <Table.Th>Date</Table.Th>
                 </Table.Tr>
-              ) : (
-                filtered.map((event, index) => (
-                  <Table.Tr key={event.id ?? index}>
-                    <Table.Td>{event.player_name}</Table.Td>
-                    <Table.Td>
-                      <Badge variant="light" color="gray">
-                        {event.team_abbreviation}
-                      </Badge>
+              </Table.Thead>
+              <Table.Tbody>
+                {filtered.length === 0 ? (
+                  <Table.Tr>
+                    <Table.Td colSpan={5}>
+                      <Text ta="center" c="dimmed" py="md">
+                        No scoring events found
+                      </Text>
                     </Table.Td>
-                    <Table.Td>
-                      <Badge color={EVENT_COLORS[event.event_type] ?? 'gray'}>
-                        {event.event_type}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td
-                      style={{
-                        textAlign: 'right',
-                        fontVariantNumeric: 'tabular-nums',
-                      }}
-                    >
-                      +{event.points}
-                    </Table.Td>
-                    <Table.Td>{event.game_date}</Table.Td>
                   </Table.Tr>
-                ))
-              )}
-            </Table.Tbody>
-          </Table>
+                ) : (
+                  filtered.map((event, index) => (
+                    <Table.Tr key={event.id ?? index}>
+                      <Table.Td>{event.player_name}</Table.Td>
+                      <Table.Td>
+                        <Badge variant="light" color="gray">
+                          {event.team_abbreviation}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge color={EVENT_COLORS[event.event_type] ?? 'gray'}>
+                          {event.event_type}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td
+                        style={{
+                          textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        +{event.points}
+                      </Table.Td>
+                      <Table.Td>{event.game_date}</Table.Td>
+                    </Table.Tr>
+                  ))
+                )}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         </Card>
       </Stack>
     </Container>

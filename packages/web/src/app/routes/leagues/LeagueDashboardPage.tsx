@@ -23,6 +23,7 @@ import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import { useMockData } from '../../../mock/MockDataProvider';
 import { useRoundComplete } from '../../hooks/useRoundComplete';
 import { useWinnerConfetti } from '../../hooks/useWinnerConfetti';
+import { FeatureOnWidgetButton } from '../../components/FeatureOnWidgetButton';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -162,6 +163,11 @@ export function LeagueDashboardPage() {
                 Settings
               </Button>
             )}
+            <FeatureOnWidgetButton
+              leagueId={league.id}
+              leagueName={league.name}
+              shareCode={league.share_code ?? null}
+            />
             {league.status === 'setup' && isCommissioner && (
               <Button
                 onClick={() => navigate(`/draft/${leagueId}/lobby`)}
@@ -251,36 +257,40 @@ export function LeagueDashboardPage() {
           <Title order={4} mb="md">
             Standings
           </Title>
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Rank</Table.Th>
-                <Table.Th>Team</Table.Th>
-                <Table.Th>Manager</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {sortedMembers.map((member: LeagueMemberRow, index: number) => (
-                <Table.Tr
-                  key={member.id}
-                  style={{
-                    fontWeight: member.user_id === user?.id ? 700 : undefined,
-                  }}
-                >
-                  <Table.Td>{index + 1}</Table.Td>
-                  <Table.Td>
-                    {member.team_name}
-                    {seasonComplete && index === 0 && ' 🏆'}
-                  </Table.Td>
-                  <Table.Td>{member.users?.display_name ?? 'Unknown'}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>
-                    {member.total_points ?? 0}
-                  </Table.Td>
+          <Table.ScrollContainer minWidth={600}>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Rank</Table.Th>
+                  <Table.Th>Team</Table.Th>
+                  <Table.Th>Manager</Table.Th>
+                  <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {sortedMembers.map((member: LeagueMemberRow, index: number) => (
+                  <Table.Tr
+                    key={member.id}
+                    style={{
+                      fontWeight: member.user_id === user?.id ? 700 : undefined,
+                    }}
+                  >
+                    <Table.Td>{index + 1}</Table.Td>
+                    <Table.Td>
+                      {member.team_name}
+                      {seasonComplete && index === 0 && ' 🏆'}
+                    </Table.Td>
+                    <Table.Td>
+                      {member.users?.display_name ?? 'Unknown'}
+                    </Table.Td>
+                    <Table.Td style={{ textAlign: 'right' }}>
+                      {member.total_points ?? 0}
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         </Card>
       </Stack>
     </Container>
