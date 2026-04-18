@@ -131,16 +131,18 @@ jobs:
           set -euo pipefail
           BUILD_NUMBER=$GITHUB_RUN_NUMBER
           echo "Archiving with CURRENT_PROJECT_VERSION=$BUILD_NUMBER"
+          # Per-target signing (style, profile, identity) is configured in
+          # ios/App/App.xcodeproj for the Release configuration so Pods
+          # targets remain unsigned and the App + Widget targets each pick
+          # up their own provisioning profile. Don't pass signing overrides
+          # on the CLI here — they would apply to every target in the
+          # workspace and break the Pods build.
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
             -scheme App \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$ARCHIVE_PATH" \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=$TEAM_ID \
-            PROVISIONING_PROFILE_SPECIFIER="$APP_PROFILE_NAME" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             CURRENT_PROJECT_VERSION=$BUILD_NUMBER \
             archive
 
