@@ -167,6 +167,10 @@ export function LeagueDashboardPage() {
               leagueId={league.id}
               leagueName={league.name}
               shareCode={league.share_code ?? null}
+              myTeamName={
+                members.find((m: LeagueMemberRow) => m.user_id === user?.id)
+                  ?.team_name ?? null
+              }
             />
             {league.status === 'setup' && isCommissioner && (
               <Button

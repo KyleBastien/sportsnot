@@ -1,14 +1,23 @@
 export interface SetFeaturedLeagueOptions {
   shareCode: string;
+  /**
+   * The current user's `team_name` within this league. Stored per-share-code
+   * in the App Group so the iOS widget can compute "your team's points" for
+   * a league that's otherwise rendered league-wide.
+   */
+  myTeamName?: string;
 }
 
 export interface SetFeaturedLeagueResult {
   shareCode: string;
+  myTeamName?: string | null;
 }
 
 export interface GetFeaturedLeagueResult {
   shareCode: string | null;
   allShareCodes: string[];
+  /** Team name of the current user inside the currently-featured league. */
+  myTeamName?: string | null;
 }
 
 export interface StartLiveActivityOptions {

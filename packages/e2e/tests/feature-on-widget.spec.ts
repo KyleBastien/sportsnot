@@ -159,7 +159,10 @@ test.describe('FeatureOnWidgetButton', () => {
     expect(methods).toContain('startLiveActivity');
 
     const setFeatured = calls.find((c) => c.method === 'setFeaturedLeague');
-    expect(setFeatured?.args).toEqual({ shareCode: SHARE_CODE });
+    expect(setFeatured?.args).toEqual({
+      shareCode: SHARE_CODE,
+      myTeamName: 'Alpha',
+    });
 
     const startLive = calls.find((c) => c.method === 'startLiveActivity');
     expect(startLive?.args).toEqual({
