@@ -52,6 +52,66 @@ test.describe('FeatureOnWidgetButton', () => {
     authenticatedPage,
   }) => {
     await installWidgetBridgeStub(authenticatedPage);
+
+    // Stub the widget-league-snapshot fetch in-page so the button finds
+    // a game today and dispatches startLiveActivity (rather than the
+    // endLiveActivity off-day path). We patch window.fetch via initScript
+    // because Playwright's page.route does not always intercept this
+    // request consistently across environments.
+    const snapshotBody = JSON.stringify({
+      league: {
+        id: LEAGUE_ID,
+        name: 'Widget League',
+        shareCode: SHARE_CODE,
+        currentRound: 1,
+        status: 'active',
+      },
+      date: new Date().toISOString().slice(0, 10),
+      generatedAt: new Date().toISOString(),
+      games: [
+        {
+          id: 1,
+          startsAt: new Date().toISOString(),
+          state: 'LIVE',
+          homeTeamId: 1,
+          homeTeamAbbrev: 'EDM',
+          homeTeamName: 'Oilers',
+          homeScore: 2,
+          awayTeamId: 2,
+          awayTeamAbbrev: 'LAK',
+          awayTeamName: 'Kings',
+          awayScore: 1,
+          period: 2,
+          timeRemaining: '05:32',
+          hasDraftedPlayers: true,
+        },
+      ],
+      players: [],
+    });
+    await authenticatedPage.addInitScript((body: string) => {
+      const origFetch = window.fetch.bind(window);
+      window.fetch = function (
+        input: Parameters<typeof fetch>[0],
+        init?: Parameters<typeof fetch>[1]
+      ): Promise<Response> {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : (input as Request).url;
+        if (url.includes('/functions/v1/widget-league-snapshot')) {
+          return Promise.resolve(
+            new Response(body, {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          );
+        }
+        return origFetch(input, init);
+      };
+    }, snapshotBody);
+
     const league = buildLeague();
     await setupSupabaseMocks(authenticatedPage, {
       leagues: async (route) => {

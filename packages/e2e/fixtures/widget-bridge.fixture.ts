@@ -58,41 +58,55 @@ export async function installWidgetBridgeStub(page: Page): Promise<void> {
       },
     };
 
-    const currentPlatform = {
-      name: 'ios',
-      getPlatform: () => 'ios',
-      isNativePlatform: () => true,
-      isPluginAvailable: (name: string) => name === 'WidgetBridge',
-      getPluginHeader: () => undefined,
-      registerPlugin: (name: string, options: Record<string, unknown>) => {
-        if (name === 'WidgetBridge') return widgetBridgeStub;
-        const webFactory = options['web'];
-        if (typeof webFactory === 'function') {
-          const result = (webFactory as () => unknown)();
-          if (
-            result &&
-            typeof (result as Promise<unknown>).then === 'function'
-          ) {
-            return new Proxy(
-              {},
-              {
-                get: () => () => Promise.resolve(undefined),
-              }
-            );
-          }
-          return result;
+    // Capacitor's getPlatform() reads from window.CapacitorCustomPlatform.
+    // Setting this to { name: 'ios' } makes Capacitor.isNativePlatform()
+    // return true and Capacitor.getPlatform() return 'ios', which is what
+    // isWidgetBridgeAvailable() checks.
+    (
+      window as unknown as { CapacitorCustomPlatform: { name: string } }
+    ).CapacitorCustomPlatform = { name: 'ios' };
+
+    // For native plugins, registerPlugin() returns a Proxy whose method
+    // wrappers call cap.nativePromise(pluginName, methodName, args) — but
+    // only when there's a matching PluginHeader entry on window.Capacitor.
+    // We seed a PluginHeader for WidgetBridge and replace nativePromise
+    // with a recorder that delegates to our stub.
+    const cap =
+      (
+        window as unknown as {
+          Capacitor?: Record<string, unknown>;
         }
-        return new Proxy({}, { get: () => () => Promise.resolve(undefined) });
+      ).Capacitor ?? {};
+
+    cap.PluginHeaders = [
+      {
+        name: 'WidgetBridge',
+        methods: [
+          { name: 'setFeaturedLeague', rtype: 'promise' },
+          { name: 'getFeaturedLeague', rtype: 'promise' },
+          { name: 'isLiveActivitySupported', rtype: 'promise' },
+          { name: 'startLiveActivity', rtype: 'promise' },
+          { name: 'endLiveActivity', rtype: 'promise' },
+        ],
       },
+    ];
+
+    cap.nativePromise = (
+      pluginName: string,
+      methodName: string,
+      options: unknown
+    ) => {
+      if (pluginName !== 'WidgetBridge') return Promise.resolve(undefined);
+      const stub = widgetBridgeStub as Record<
+        string,
+        (args: unknown) => Promise<unknown>
+      >;
+      const fn = stub[methodName];
+      if (typeof fn === 'function') return fn(options ?? {});
+      return Promise.resolve(undefined);
     };
 
-    (window as unknown as { CapacitorPlatforms: unknown }).CapacitorPlatforms =
-      {
-        currentPlatform,
-        platforms: new Map([['ios', currentPlatform]]),
-        addPlatform: () => undefined,
-        setPlatform: () => undefined,
-      };
+    (window as unknown as { Capacitor: typeof cap }).Capacitor = cap;
   });
 }
 
