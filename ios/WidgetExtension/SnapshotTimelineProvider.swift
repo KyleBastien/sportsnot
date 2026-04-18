@@ -63,6 +63,7 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
                 staleFromCache: base.staleFromCache,
                 shareCode: base.shareCode,
                 errorMessage: base.errorMessage,
+                myTeamName: base.myTeamName,
                 pageIndex: 0,
                 totalPages: 1
             )]
@@ -84,6 +85,7 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
                 staleFromCache: base.staleFromCache,
                 shareCode: base.shareCode,
                 errorMessage: base.errorMessage,
+                myTeamName: base.myTeamName,
                 pageIndex: i % totalPages,
                 totalPages: totalPages
             )
@@ -94,13 +96,15 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
 
     private func entry(for configuration: FeaturedLeagueIntent) async -> SnapshotEntry {
         let shareCode = configuration.shareCode ?? AppGroup.featuredShareCode
+        let myTeamName = shareCode.flatMap { AppGroup.myTeamName(forShareCode: $0) }
         guard let code = shareCode, !code.isEmpty else {
             return SnapshotEntry(
                 date: .now,
                 snapshot: nil,
                 staleFromCache: false,
                 shareCode: nil,
-                errorMessage: "Open SportsNot and tap Feature on widget in a league."
+                errorMessage: "Open SportsNot and tap Feature on widget in a league.",
+                myTeamName: nil
             )
         }
         guard let config = SnapshotAPIConfig.fromBundle() else {
@@ -109,7 +113,8 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
                 snapshot: AppGroup.cachedSnapshot()?.snapshot,
                 staleFromCache: AppGroup.cachedSnapshot() != nil,
                 shareCode: code,
-                errorMessage: "Widget is not configured"
+                errorMessage: "Widget is not configured",
+                myTeamName: myTeamName
             )
         }
         let api = SnapshotAPI(config: config)
@@ -121,7 +126,8 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
                 snapshot: fresh,
                 staleFromCache: false,
                 shareCode: code,
-                errorMessage: nil
+                errorMessage: nil,
+                myTeamName: myTeamName
             )
         } catch {
             let cached = AppGroup.cachedSnapshot()
@@ -130,7 +136,8 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
                 snapshot: cached?.snapshot,
                 staleFromCache: cached != nil,
                 shareCode: code,
-                errorMessage: cached == nil ? "Couldn't load snapshot" : nil
+                errorMessage: cached == nil ? "Couldn't load snapshot" : nil,
+                myTeamName: myTeamName
             )
         }
     }

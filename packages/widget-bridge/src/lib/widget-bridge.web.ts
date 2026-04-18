@@ -11,6 +11,7 @@ import type {
 
 const STORAGE_KEY = 'sportsnot.widget.featuredShareCode';
 const ALL_KEY = 'sportsnot.widget.shareCodes';
+const MY_TEAM_NAMES_KEY = 'sportsnot.widget.myTeamNamesByShareCode';
 
 /**
  * No-op browser fallback. Persists the selected share code in
@@ -27,17 +28,27 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
         all.push(options.shareCode);
         window.localStorage.setItem(ALL_KEY, JSON.stringify(all));
       }
+      if (options.myTeamName) {
+        const map = this.readTeamNames();
+        map[options.shareCode] = options.myTeamName;
+        window.localStorage.setItem(MY_TEAM_NAMES_KEY, JSON.stringify(map));
+      }
     }
-    return { shareCode: options.shareCode };
+    return {
+      shareCode: options.shareCode,
+      myTeamName: options.myTeamName ?? null,
+    };
   }
 
   async getFeaturedLeague(): Promise<GetFeaturedLeagueResult> {
     if (typeof window === 'undefined') {
-      return { shareCode: null, allShareCodes: [] };
+      return { shareCode: null, allShareCodes: [], myTeamName: null };
     }
+    const code = window.localStorage.getItem(STORAGE_KEY);
     return {
-      shareCode: window.localStorage.getItem(STORAGE_KEY),
+      shareCode: code,
       allShareCodes: this.readAll(),
+      myTeamName: code ? (this.readTeamNames()[code] ?? null) : null,
     };
   }
 
@@ -66,6 +77,25 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
         : [];
     } catch {
       return [];
+    }
+  }
+
+  private readTeamNames(): Record<string, string> {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = window.localStorage.getItem(MY_TEAM_NAMES_KEY);
+      if (!raw) return {};
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return {};
+      }
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+        if (typeof v === 'string') out[k] = v;
+      }
+      return out;
+    } catch {
+      return {};
     }
   }
 }
