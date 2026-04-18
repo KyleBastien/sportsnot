@@ -10,6 +10,7 @@ const NHL_API_BASE = 'https://api-web.nhle.com/v1';
 interface PlayerGameLog {
   gameId: number;
   gameDate: string;
+  teamAbbrev?: string;
   goals: number;
   assists: number;
 }
@@ -197,20 +198,33 @@ Deno.serve(async (req: Request) => {
           0
         );
 
+        // Extract team abbreviation from the most recent game log entry.
+        // allGames (unfiltered) is used so we pick up the team even for
+        // games outside the current round date window.
+        const teamAbbrev =
+          allGames.length > 0
+            ? (allGames[allGames.length - 1].teamAbbrev ?? null)
+            : null;
+
+        const upsertRow: Record<string, unknown> = {
+          player_id: playerId,
+          nhl_season: season,
+          playoff_round: playoffRound,
+          goals: totalGoals,
+          assists: totalAssists,
+          games_played: games.length,
+          last_updated: new Date().toISOString(),
+        };
+        if (teamAbbrev) {
+          upsertRow.team_abbreviation = teamAbbrev;
+        }
+
         const ok = await pgUpsert(
           supabaseUrl,
           supabaseKey,
           'player_stats_cache',
           'player_id,nhl_season,playoff_round',
-          {
-            player_id: playerId,
-            nhl_season: season,
-            playoff_round: playoffRound,
-            goals: totalGoals,
-            assists: totalAssists,
-            games_played: games.length,
-            last_updated: new Date().toISOString(),
-          }
+          upsertRow
         );
         if (ok) playerUpdates++;
       } catch {
