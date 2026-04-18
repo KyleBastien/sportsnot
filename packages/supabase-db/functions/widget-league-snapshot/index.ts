@@ -169,12 +169,17 @@ Deno.serve(async (req: Request) => {
           );
     const playerStatsById = new Map(playerStats.map((p) => [p.player_id, p]));
 
-    // Fallback: for players not yet in the playoff-round cache (e.g.
-    // before the round's first stat sync), look them up in the
-    // regular-season cache so the widget can still show a name.
-    const missingNameIds = playerIds.filter((pid) => !playerStatsById.has(pid));
+    // Fallback: for players not yet in the playoff-round cache, or whose
+    // cached entry is missing team_abbreviation or player_name (e.g. when
+    // sync-nhl-stats ran but did not write those columns), look them up in
+    // the regular-season cache so the widget can show the correct name and
+    // correlate the player to today's game.
+    const missingTeamInfoIds = playerIds.filter((pid) => {
+      const stats = playerStatsById.get(pid);
+      return !stats || !stats.team_abbreviation || !stats.player_name;
+    });
     const regularSeasonStats =
-      missingNameIds.length === 0
+      missingTeamInfoIds.length === 0
         ? []
         : await pgSelect<{
             player_id: number;
@@ -183,7 +188,7 @@ Deno.serve(async (req: Request) => {
           }>(
             cfg,
             'regular_season_stats_cache',
-            `select=player_id,player_name,team_abbreviation&player_id=in.(${missingNameIds.join(',')})`
+            `select=player_id,player_name,team_abbreviation&player_id=in.(${missingTeamInfoIds.join(',')})`
           );
     const regularSeasonStatsById = new Map(
       regularSeasonStats.map((p) => [p.player_id, p])
