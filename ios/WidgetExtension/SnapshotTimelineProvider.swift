@@ -13,10 +13,81 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
     }
 
     func timeline(for configuration: FeaturedLeagueIntent, in context: Context) async -> Timeline<SnapshotEntry> {
-        let entry = await self.entry(for: configuration)
-        // Reload every 2 minutes when any game is live, every 15 minutes otherwise.
-        let nextRefresh = refreshDate(for: entry.snapshot)
-        return Timeline(entries: [entry], policy: .after(nextRefresh))
+        let baseEntry = await self.entry(for: configuration)
+        let nextRefresh = refreshDate(for: baseEntry.snapshot)
+        let entries = paginatedEntries(
+            base: baseEntry,
+            family: context.family,
+            nextRefresh: nextRefresh
+        )
+        return Timeline(entries: entries, policy: .after(nextRefresh))
+    }
+
+    // MARK: - Pagination
+
+    // Visual rotation cadence between pages. WidgetKit forbids true
+    // sub-minute timeline reloads, but pre-built entries spaced N seconds
+    // apart are honored by the system when rendering the timeline that the
+    // provider returned.
+    private static let pageDurationSeconds: TimeInterval = 30
+
+    /// How many drafted players each family can render per page. Small only
+    /// fits a single player line; Medium matches the previous static cap of
+    /// 3; Large gets ~8 rows comfortably.
+    static func playersPerPage(for family: WidgetFamily) -> Int {
+        switch family {
+        case .systemSmall: return 1
+        case .systemMedium: return 3
+        case .systemLarge: return 8
+        default: return 0  // accessory families don't paginate
+        }
+    }
+
+    private func paginatedEntries(
+        base: SnapshotEntry,
+        family: WidgetFamily,
+        nextRefresh: Date
+    ) -> [SnapshotEntry] {
+        let perPage = Self.playersPerPage(for: family)
+        let players = base.snapshot?.players.filter { $0.gameId != nil } ?? []
+        let totalPages = perPage > 0
+            ? max(1, Int(ceil(Double(players.count) / Double(perPage))))
+            : 1
+
+        if totalPages <= 1 {
+            // Single entry preserves prior behavior for accessory families
+            // and for snapshots that fit in one page.
+            return [SnapshotEntry(
+                date: base.date,
+                snapshot: base.snapshot,
+                staleFromCache: base.staleFromCache,
+                shareCode: base.shareCode,
+                errorMessage: base.errorMessage,
+                pageIndex: 0,
+                totalPages: 1
+            )]
+        }
+
+        // Fill the time until the next data refresh with rotating page
+        // entries, cycling page indices if there is room for more rotations
+        // than there are pages.
+        let availableSeconds = max(
+            Self.pageDurationSeconds,
+            nextRefresh.timeIntervalSince(base.date)
+        )
+        let slots = max(1, Int(floor(availableSeconds / Self.pageDurationSeconds)))
+
+        return (0..<slots).map { i in
+            SnapshotEntry(
+                date: base.date.addingTimeInterval(Self.pageDurationSeconds * Double(i)),
+                snapshot: base.snapshot,
+                staleFromCache: base.staleFromCache,
+                shareCode: base.shareCode,
+                errorMessage: base.errorMessage,
+                pageIndex: i % totalPages,
+                totalPages: totalPages
+            )
+        }
     }
 
     // MARK: - Helpers

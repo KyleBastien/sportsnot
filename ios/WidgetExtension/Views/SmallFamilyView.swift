@@ -16,10 +16,33 @@ struct SmallFamilyView: View {
                 let total = snapshot.players.reduce(0) { $0 + $1.fantasyPoints }
                 Text(String(format: "%.0f pts", total))
                     .font(.title3.bold().monospacedDigit())
-                if let top = snapshot.players.max(by: { $0.fantasyPoints < $1.fantasyPoints }) {
+
+                let playingToday = snapshot.players
+                    .filter { $0.gameId != nil }
+                    .sorted(by: { $0.fantasyPoints > $1.fantasyPoints })
+                if let player = playingToday[safe: entry.pageIndex] {
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 4) {
+                            Text(player.teamAbbrev)
+                                .font(.caption2.bold())
+                                .foregroundStyle(Color.accentColor)
+                            Text(player.name)
+                                .font(.caption2)
+                                .lineLimit(1)
+                        }
+                        Text(String(format: "%.0f pts", player.fantasyPoints))
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let top = snapshot.players.max(by: { $0.fantasyPoints < $1.fantasyPoints }) {
                     Text("Top: \(top.name)")
                         .font(.caption2)
                         .lineLimit(1)
+                }
+                if entry.totalPages > 1 {
+                    Text("\(entry.pageIndex + 1)/\(entry.totalPages)")
+                        .font(.system(size: 8).monospacedDigit())
+                        .foregroundStyle(.tertiary)
                 }
                 if let liveCount = liveGameCount(snapshot) {
                     Label("\(liveCount) live", systemImage: "dot.radiowaves.left.and.right")
@@ -40,5 +63,11 @@ struct SmallFamilyView: View {
     private func liveGameCount(_ s: WidgetSnapshot) -> Int? {
         let c = s.games.filter { $0.state == "LIVE" }.count
         return c == 0 ? nil : c
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

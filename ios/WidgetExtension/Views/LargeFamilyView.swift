@@ -34,7 +34,15 @@ struct LargeFamilyView: View {
 
             Divider()
 
-            Text("Drafted players").font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Text("Drafted players").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if entry.totalPages > 1 {
+                    Text("\(entry.pageIndex + 1)/\(entry.totalPages)")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+            }
             if let snapshot = entry.snapshot {
                 let playingToday = snapshot.players
                     .filter { $0.gameId != nil }
@@ -42,7 +50,11 @@ struct LargeFamilyView: View {
                 if playingToday.isEmpty {
                     Text("No players playing today").font(.caption).foregroundStyle(.secondary)
                 } else {
-                    ForEach(playingToday, id: \.id) { p in
+                    let perPage = SnapshotTimelineProvider.playersPerPage(for: .systemLarge)
+                    let start = min(entry.pageIndex * perPage, playingToday.count)
+                    let end = min(start + perPage, playingToday.count)
+                    let page = Array(playingToday[start..<end])
+                    ForEach(page, id: \.id) { p in
                         HStack {
                             Text(p.teamAbbrev).font(.caption2.bold()).foregroundStyle(Color.accentColor)
                                 .frame(width: 36, alignment: .leading)
