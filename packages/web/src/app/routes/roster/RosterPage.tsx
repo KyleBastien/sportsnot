@@ -507,7 +507,9 @@ export function RosterPage() {
                             </Table.Td>
                             <Table.Td>
                               {slot.player_id != null
-                                ? (playerTeamAbbreviationMap.get(slot.player_id) ?? '—')
+                                ? (playerTeamAbbreviationMap.get(
+                                    slot.player_id
+                                  ) ?? '—')
                                 : slot.team_id != null
                                   ? (teamAbbreviationMap.get(slot.team_id) ??
                                     '—')
