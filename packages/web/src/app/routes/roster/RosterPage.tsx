@@ -238,6 +238,25 @@ export function RosterPage() {
     [teamStats]
   );
 
+  const playerTeamAbbreviationMap = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const p of regSeasonStats ?? []) {
+      if (p.team_abbreviation) map.set(p.player_id, p.team_abbreviation);
+    }
+    for (const p of playerStats ?? []) {
+      if (p.team_abbreviation) map.set(p.player_id, p.team_abbreviation);
+    }
+    return map;
+  }, [playerStats, regSeasonStats]);
+
+  const teamAbbreviationMap = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const t of teamStats ?? []) {
+      if (t.team_abbreviation) map.set(t.team_id, t.team_abbreviation);
+    }
+    return map;
+  }, [teamStats]);
+
   const injuredPlayerIds = useMemo(() => {
     const ids = new Set<number>();
     for (const p of playerStats ?? []) {
@@ -439,11 +458,12 @@ export function RosterPage() {
                   No player drafted in this slot
                 </Text>
               ) : (
-                <Table.ScrollContainer minWidth={600}>
+                <Table.ScrollContainer minWidth={640}>
                   <Table>
                     <Table.Thead>
                       <Table.Tr>
                         <Table.Th>Player/Team</Table.Th>
+                        <Table.Th>NHL Team</Table.Th>
                         <Table.Th>Status</Table.Th>
                         <Table.Th style={{ textAlign: 'right' }}>
                           Points
@@ -484,6 +504,14 @@ export function RosterPage() {
                                   teamNameMap
                                 )}
                               </span>
+                            </Table.Td>
+                            <Table.Td>
+                              {slot.player_id != null
+                                ? (playerTeamAbbreviationMap.get(slot.player_id) ?? '—')
+                                : slot.team_id != null
+                                  ? (teamAbbreviationMap.get(slot.team_id) ??
+                                    '—')
+                                  : '—'}
                             </Table.Td>
                             <Table.Td>
                               {slot.is_eliminated ? (
