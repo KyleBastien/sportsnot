@@ -11,6 +11,12 @@ interface FeatureOnWidgetButtonProps {
   leagueId: string;
   leagueName: string;
   shareCode: string | null | undefined;
+  /**
+   * The current user's `team_name` within this league. Persisted alongside
+   * the share code in the App Group so the iOS widget can compute the
+   * user's own fantasy total against the league-wide snapshot.
+   */
+  myTeamName?: string | null;
 }
 
 /**
@@ -23,6 +29,7 @@ export function FeatureOnWidgetButton({
   leagueId,
   leagueName,
   shareCode,
+  myTeamName,
 }: FeatureOnWidgetButtonProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -34,7 +41,10 @@ export function FeatureOnWidgetButton({
     setSaving(true);
     setSaved(false);
     try {
-      await WidgetBridge.setFeaturedLeague({ shareCode });
+      await WidgetBridge.setFeaturedLeague({
+        shareCode,
+        myTeamName: myTeamName ?? undefined,
+      });
       const supported = await WidgetBridge.isLiveActivitySupported();
       if (supported.supported) {
         const hasGamesToday = await leagueHasGamesToday(shareCode);
