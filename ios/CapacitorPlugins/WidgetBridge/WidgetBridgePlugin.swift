@@ -23,16 +23,24 @@ public class WidgetBridgePlugin: CAPPlugin, CAPBridgedPlugin {
         }
         AppGroup.featuredShareCode = shareCode
         AppGroup.rememberShareCode(shareCode)
+        let myTeamName = call.getString("myTeamName")
+        AppGroup.setMyTeamName(myTeamName, forShareCode: shareCode)
         if #available(iOS 14.0, *) {
             WidgetCenter.shared.reloadAllTimelines()
         }
-        call.resolve(["shareCode": shareCode])
+        call.resolve([
+            "shareCode": shareCode,
+            "myTeamName": myTeamName ?? NSNull()
+        ])
     }
 
     @objc func getFeaturedLeague(_ call: CAPPluginCall) {
+        let code = AppGroup.featuredShareCode
+        let myTeamName = code.flatMap { AppGroup.myTeamName(forShareCode: $0) }
         call.resolve([
-            "shareCode": AppGroup.featuredShareCode ?? NSNull(),
-            "allShareCodes": AppGroup.shareCodes
+            "shareCode": code ?? NSNull(),
+            "allShareCodes": AppGroup.shareCodes,
+            "myTeamName": myTeamName ?? NSNull()
         ])
     }
 

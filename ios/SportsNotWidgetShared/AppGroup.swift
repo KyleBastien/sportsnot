@@ -15,6 +15,7 @@ public enum AppGroup {
         static let shareCodes = "shareCodes"
         static let lastSnapshot = "lastSnapshot"
         static let lastSnapshotAt = "lastSnapshotAt"
+        static let myTeamNames = "myTeamNamesByShareCode"
     }
 
     public static var featuredShareCode: String? {
@@ -35,6 +36,30 @@ public enum AppGroup {
             all.append(code)
             shareCodes = all
         }
+    }
+
+    /// Per-league mapping of share code → the current user's `team_name`
+    /// within that league. Used by the widget to compute the user's own
+    /// fantasy total against an otherwise league-wide snapshot.
+    public static var myTeamNamesByShareCode: [String: String] {
+        get {
+            (defaults.dictionary(forKey: Keys.myTeamNames) as? [String: String]) ?? [:]
+        }
+        set { defaults.set(newValue, forKey: Keys.myTeamNames) }
+    }
+
+    public static func myTeamName(forShareCode code: String) -> String? {
+        myTeamNamesByShareCode[code]
+    }
+
+    public static func setMyTeamName(_ name: String?, forShareCode code: String) {
+        var map = myTeamNamesByShareCode
+        if let name, !name.isEmpty {
+            map[code] = name
+        } else {
+            map.removeValue(forKey: code)
+        }
+        myTeamNamesByShareCode = map
     }
 
     public static func cacheSnapshot(_ snapshot: WidgetSnapshot) throws {

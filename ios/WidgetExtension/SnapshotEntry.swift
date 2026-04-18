@@ -7,6 +7,9 @@ struct SnapshotEntry: TimelineEntry {
     let staleFromCache: Bool
     let shareCode: String?
     let errorMessage: String?
+    /// The current user's `team_name` within the featured league, used to
+    /// compute "your team" totals against the league-wide snapshot.
+    let myTeamName: String?
     // Index into the paginated player list for rotating widget views.
     // Provider emits multiple entries with increasing pageIndex so the
     // system cycles through pages without re-fetching the snapshot.
@@ -19,6 +22,7 @@ struct SnapshotEntry: TimelineEntry {
         staleFromCache: Bool,
         shareCode: String?,
         errorMessage: String?,
+        myTeamName: String? = nil,
         pageIndex: Int = 0,
         totalPages: Int = 1
     ) {
@@ -27,6 +31,7 @@ struct SnapshotEntry: TimelineEntry {
         self.staleFromCache = staleFromCache
         self.shareCode = shareCode
         self.errorMessage = errorMessage
+        self.myTeamName = myTeamName
         self.pageIndex = pageIndex
         self.totalPages = totalPages
     }
