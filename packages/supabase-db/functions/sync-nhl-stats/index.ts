@@ -15,6 +15,113 @@ interface PlayerGameLog {
   assists: number;
 }
 
+interface BoxscorePlayer {
+  playerId: number;
+  goals?: number;
+  assists?: number;
+}
+
+interface BoxscoreTeamStats {
+  forwards?: BoxscorePlayer[];
+  defense?: BoxscorePlayer[];
+  goalies?: BoxscorePlayer[];
+}
+
+interface NhlScoreGameLite {
+  id: number;
+  gameType: number;
+  gameState: string;
+  gameDate?: string;
+  homeTeam?: { id?: number; abbrev?: string };
+  awayTeam?: { id?: number; abbrev?: string };
+}
+
+interface LiveDelta {
+  goals: number;
+  assists: number;
+  teamAbbrev: string | null;
+}
+
+/**
+ * Fetch live/in-progress playoff games and aggregate per-player goal/assist
+ * deltas from each game's boxscore. Returns a Map keyed by playerId.
+ *
+ * Live games are NOT yet present in the per-player game-log endpoint, so
+ * adding these deltas on top of the finalized game-log totals gives a
+ * "season-to-date including in-progress" total without double-counting.
+ */
+async function fetchLivePlayerDeltas(
+  roundStartDate?: string,
+  roundEndDate?: string
+): Promise<Map<number, LiveDelta>> {
+  const deltas = new Map<number, LiveDelta>();
+  try {
+    const resp = await fetch(`${NHL_API_BASE}/score/now`);
+    if (!resp.ok) return deltas;
+    const data = await resp.json();
+    const games = (data.games ?? []) as NhlScoreGameLite[];
+    const liveGames = games.filter((g) => {
+      if (g.gameType !== 3) return false;
+      if (g.gameState !== 'LIVE' && g.gameState !== 'CRIT') return false;
+      if (roundStartDate && roundEndDate && g.gameDate) {
+        if (g.gameDate < roundStartDate || g.gameDate > roundEndDate)
+          return false;
+      }
+      return true;
+    });
+
+    for (const game of liveGames) {
+      try {
+        const bxResp = await fetch(
+          `${NHL_API_BASE}/gamecenter/${game.id}/boxscore`
+        );
+        if (!bxResp.ok) continue;
+        const bx = await bxResp.json();
+        const sides: Array<{
+          stats?: BoxscoreTeamStats;
+          abbrev?: string;
+        }> = [
+          {
+            stats: bx?.playerByGameStats?.homeTeam,
+            abbrev: game.homeTeam?.abbrev,
+          },
+          {
+            stats: bx?.playerByGameStats?.awayTeam,
+            abbrev: game.awayTeam?.abbrev,
+          },
+        ];
+
+        for (const side of sides) {
+          const players = [
+            ...(side.stats?.forwards ?? []),
+            ...(side.stats?.defense ?? []),
+            ...(side.stats?.goalies ?? []),
+          ];
+          for (const p of players) {
+            if (!p?.playerId) continue;
+            const existing = deltas.get(p.playerId) ?? {
+              goals: 0,
+              assists: 0,
+              teamAbbrev: side.abbrev ?? null,
+            };
+            existing.goals += p.goals ?? 0;
+            existing.assists += p.assists ?? 0;
+            if (!existing.teamAbbrev && side.abbrev) {
+              existing.teamAbbrev = side.abbrev;
+            }
+            deltas.set(p.playerId, existing);
+          }
+        }
+      } catch {
+        // Continue on individual game failures
+      }
+    }
+  } catch {
+    // Network/parse failures: return whatever deltas we collected.
+  }
+  return deltas;
+}
+
 interface RosterRow {
   player_id: number | null;
   team_id: number | null;
@@ -170,6 +277,13 @@ Deno.serve(async (req: Request) => {
     let playerUpdates = 0;
     let teamUpdates = 0;
 
+    // Pull live boxscore deltas once so we can layer in-progress goals/
+    // assists on top of the finalized per-player game-log totals.
+    const liveDeltas = await fetchLivePlayerDeltas(
+      roundStartDate,
+      roundEndDate
+    );
+
     // ── Sync player stats from NHL API ─────────────────────────
     for (const playerId of playerIds) {
       try {
@@ -189,22 +303,30 @@ Deno.serve(async (req: Request) => {
               )
             : allGames;
 
-        const totalGoals = games.reduce(
+        const finalizedGoals = games.reduce(
           (sum: number, g: PlayerGameLog) => sum + (g.goals ?? 0),
           0
         );
-        const totalAssists = games.reduce(
+        const finalizedAssists = games.reduce(
           (sum: number, g: PlayerGameLog) => sum + (g.assists ?? 0),
           0
         );
 
-        // Extract team abbreviation from the most recent game log entry.
-        // allGames (unfiltered) is used so we pick up the team even for
-        // games outside the current round date window.
+        // Layer live in-progress totals on top of finalized totals. The
+        // boxscore reflects only the current game, and the game-log only
+        // includes finalized games, so summing the two cannot double-count.
+        const live = liveDeltas.get(playerId);
+        const totalGoals = finalizedGoals + (live?.goals ?? 0);
+        const totalAssists = finalizedAssists + (live?.assists ?? 0);
+        const totalGamesPlayed = games.length + (live ? 1 : 0);
+
+        // Extract team abbreviation: prefer the live game (most current),
+        // then the most recent finalized game-log entry.
         const teamAbbrev =
-          allGames.length > 0
+          live?.teamAbbrev ??
+          (allGames.length > 0
             ? (allGames[allGames.length - 1].teamAbbrev ?? null)
-            : null;
+            : null);
 
         const upsertRow: Record<string, unknown> = {
           player_id: playerId,
@@ -212,7 +334,7 @@ Deno.serve(async (req: Request) => {
           playoff_round: playoffRound,
           goals: totalGoals,
           assists: totalAssists,
-          games_played: games.length,
+          games_played: totalGamesPlayed,
           last_updated: new Date().toISOString(),
         };
         if (teamAbbrev) {
