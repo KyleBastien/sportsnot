@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   testflight:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     env:
       # Bundle identifiers (must match Apple Developer portal + project.pbxproj)
@@ -46,11 +46,11 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Select Xcode 16
+      - name: Select Xcode 26
         run: |
-          XCODE_PATH=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          XCODE_PATH=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
           if [ -z "$XCODE_PATH" ]; then
-            echo "No Xcode 16.x found on runner"
+            echo "No Xcode 26.x found on runner"
             ls /Applications | grep -i xcode || true
             exit 1
           fi
