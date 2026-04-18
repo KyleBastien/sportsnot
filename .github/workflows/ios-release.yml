@@ -1,0 +1,215 @@
+name: iOS Release (TestFlight)
+
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: 'Optional notes for this TestFlight build'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-release
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      # Bundle identifiers (must match Apple Developer portal + project.pbxproj)
+      APP_BUNDLE_ID: com.sportsnot.app
+      WIDGET_BUNDLE_ID: com.sportsnot.app.SportsNotWidget
+      TEAM_ID: ZFQ3QT5UV8
+      # Build outputs
+      ARCHIVE_PATH: ${{ github.workspace }}/ios/build/App.xcarchive
+      EXPORT_PATH: ${{ github.workspace }}/ios/build/export
+      # Provisioning profile names — set these to the names you used in the
+      # Apple Developer portal when you created the App Store profiles.
+      APP_PROFILE_NAME: SportsNot App Store
+      WIDGET_PROFILE_NAME: SportsNot Widget App Store
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Select Xcode 16
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_PATH" ]; then
+            echo "No Xcode 16.x found on runner"
+            ls /Applications | grep -i xcode || true
+            exit 1
+          fi
+          echo "Selecting $XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH"
+          xcodebuild -version
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build web bundle (production)
+        run: yarn nx build @sportsnot/web
+        env:
+          VITE_MOCK_MODE: 'false'
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Sync web bundle into iOS
+        run: yarn nx sync-web @sportsnot/ios-app
+
+      - name: Pod install
+        run: yarn nx pod-install @sportsnot/ios-app
+
+      - name: Import signing certificate
+        env:
+          IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/dist.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+
+          echo "$IOS_DIST_CERT_P12_BASE64" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERT_PATH" \
+            -P "$IOS_DIST_CERT_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$IOS_KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH" >/dev/null
+
+          # Add our keychain to the search list so xcodebuild can find the cert.
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$KEYCHAIN_PATH"
+
+          rm -f "$CERT_PATH"
+
+      - name: Install provisioning profiles
+        env:
+          IOS_PROVISION_APP_BASE64: ${{ secrets.IOS_PROVISION_APP_BASE64 }}
+          IOS_PROVISION_WIDGET_BASE64: ${{ secrets.IOS_PROVISION_WIDGET_BASE64 }}
+        run: |
+          set -euo pipefail
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+
+          for entry in "app:$IOS_PROVISION_APP_BASE64" "widget:$IOS_PROVISION_WIDGET_BASE64"; do
+            label="${entry%%:*}"
+            data="${entry#*:}"
+            tmp="$RUNNER_TEMP/$label.mobileprovision"
+            echo "$data" | base64 --decode > "$tmp"
+            # Extract the UUID from the profile and copy with that filename.
+            UUID=$(security cms -D -i "$tmp" | plutil -extract UUID raw -)
+            cp "$tmp" "$PROFILE_DIR/$UUID.mobileprovision"
+            echo "Installed $label profile $UUID"
+          done
+
+      - name: Archive App (Release, signed)
+        run: |
+          set -euo pipefail
+          BUILD_NUMBER=$GITHUB_RUN_NUMBER
+          echo "Archiving with CURRENT_PROJECT_VERSION=$BUILD_NUMBER"
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=$TEAM_ID \
+            PROVISIONING_PROFILE_SPECIFIER="$APP_PROFILE_NAME" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CURRENT_PROJECT_VERSION=$BUILD_NUMBER \
+            archive
+
+      - name: Write ExportOptions.plist
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${TEAM_ID}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>destination</key>
+            <string>export</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${APP_BUNDLE_ID}</key>
+              <string>${APP_PROFILE_NAME}</string>
+              <key>${WIDGET_BUNDLE_ID}</key>
+              <string>${WIDGET_PROFILE_NAME}</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Export .ipa
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$EXPORT_PATH"
+          ls -la "$EXPORT_PATH"
+
+      - name: Upload to TestFlight
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          # xcrun altool reads the key from ~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode \
+            > "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+
+          IPA_PATH=$(ls "$EXPORT_PATH"/*.ipa | head -1)
+          echo "Uploading $IPA_PATH"
+
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA_PATH" \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/build.keychain-db" || true
+          rm -rf "$HOME/.appstoreconnect/private_keys"

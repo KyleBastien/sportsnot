@@ -1,0 +1,72 @@
+{
+  "name": "@sportsnot/ios-app",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "ios",
+  "projectType": "application",
+  "tags": ["platform:ios", "requires:macos"],
+  "implicitDependencies": ["@sportsnot/web", "@sportsnot/widget-api"],
+  "targets": {
+    "sync-web": {
+      "executor": "nx:run-commands",
+      "dependsOn": [{ "projects": ["@sportsnot/web"], "target": "build" }],
+      "options": {
+        "commands": ["npx cap sync ios"],
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["sync-web"],
+      "options": {
+        "commands": [
+          "xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug -destination 'generic/platform=iOS Simulator' build"
+        ],
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build-widget": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["sync-web"],
+      "options": {
+        "commands": [
+          "xcodebuild -workspace ios/App/App.xcworkspace -scheme SportsNotWidget -configuration Debug -destination 'generic/platform=iOS Simulator' build"
+        ],
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "run-ios": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["sync-web"],
+      "options": {
+        "commands": ["npx cap run ios"],
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "archive": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["sync-web"],
+      "options": {
+        "commands": [
+          "xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -archivePath ios/build/App.xcarchive archive"
+        ],
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "pod-install": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "commands": [
+          "npx cap sync ios",
+          "cd ios/App && pod install"
+        ],
+        "cwd": "{workspaceRoot}",
+        "parallel": false
+      }
+    }
+  }
+}

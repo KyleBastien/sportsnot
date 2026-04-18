@@ -1,0 +1,12 @@
+{
+  "name": "@sportsnot/widget-api",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/widget-api/src",
+  "projectType": "library",
+  "targets": {
+    "test": {
+      "command": "rstest",
+      "options": { "cwd": "{projectRoot}" }
+    }
+  }
+}

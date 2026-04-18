@@ -354,112 +354,120 @@ function AvailablePlayerBoard({
             Skaters ({filteredSkaters.length} available)
           </Text>
           <ScrollArea h={300}>
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Player</Table.Th>
-                  <Table.Th>Pos</Table.Th>
-                  {isRound1 && (
-                    <Table.Th style={{ textAlign: 'right' }}>
-                      Reg Season Pts
-                    </Table.Th>
-                  )}
-                  <Table.Th style={{ textAlign: 'right' }}>G</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>A</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Pts</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>GP</Table.Th>
-                  <Table.Th />
-                  {canPick && <Table.Th />}
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {filteredSkaters.map((p) => {
-                  const isCompared = comparePlayers.some((c) => c.id === p.id);
-                  const compareFull = comparePlayers.length >= MAX_COMPARE;
-                  return (
-                    <Table.Tr key={p.id}>
-                      <Table.Td>{p.fullName}</Table.Td>
-                      <Table.Td>
-                        <Badge size="xs" variant="light">
-                          {p.position}
-                        </Badge>
-                      </Table.Td>
-                      {isRound1 && (
+            <Table.ScrollContainer minWidth={600}>
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Player</Table.Th>
+                    <Table.Th>Pos</Table.Th>
+                    {isRound1 && (
+                      <Table.Th style={{ textAlign: 'right' }}>
+                        Reg Season Pts
+                      </Table.Th>
+                    )}
+                    <Table.Th style={{ textAlign: 'right' }}>G</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>A</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Pts</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>GP</Table.Th>
+                    <Table.Th />
+                    {canPick && <Table.Th />}
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {filteredSkaters.map((p) => {
+                    const isCompared = comparePlayers.some(
+                      (c) => c.id === p.id
+                    );
+                    const compareFull = comparePlayers.length >= MAX_COMPARE;
+                    return (
+                      <Table.Tr key={p.id}>
+                        <Table.Td>{p.fullName}</Table.Td>
+                        <Table.Td>
+                          <Badge size="xs" variant="light">
+                            {p.position}
+                          </Badge>
+                        </Table.Td>
+                        {isRound1 && (
+                          <Table.Td
+                            style={{ textAlign: 'right', fontWeight: 600 }}
+                          >
+                            {p.regSeasonPts}
+                          </Table.Td>
+                        )}
+                        <Table.Td style={{ textAlign: 'right' }}>
+                          {p.goals}
+                        </Table.Td>
+                        <Table.Td style={{ textAlign: 'right' }}>
+                          {p.assists}
+                        </Table.Td>
                         <Table.Td
                           style={{ textAlign: 'right', fontWeight: 600 }}
                         >
-                          {p.regSeasonPts}
+                          {p.points}
                         </Table.Td>
-                      )}
-                      <Table.Td style={{ textAlign: 'right' }}>
-                        {p.goals}
-                      </Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>
-                        {p.assists}
-                      </Table.Td>
-                      <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
-                        {p.points}
-                      </Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>
-                        {p.gamesPlayed}
-                      </Table.Td>
-                      <Table.Td>
-                        <Button
-                          size="xs"
-                          variant={isCompared ? 'filled' : 'outline'}
-                          color={isCompared ? 'blue' : 'gray'}
-                          disabled={!isCompared && compareFull}
-                          onClick={() =>
-                            onToggleCompare({
-                              id: p.id,
-                              fullName: p.fullName,
-                              position: p.position,
-                              team: p.team,
-                              goals: p.goals,
-                              assists: p.assists,
-                              points: p.points,
-                            })
-                          }
-                        >
-                          {isCompared ? 'Compared' : 'Compare'}
-                        </Button>
-                      </Table.Td>
-                      {canPick && (
+                        <Table.Td style={{ textAlign: 'right' }}>
+                          {p.gamesPlayed}
+                        </Table.Td>
                         <Table.Td>
                           <Button
                             size="xs"
-                            variant="light"
-                            disabled={isPositionFull(p.position)}
+                            variant={isCompared ? 'filled' : 'outline'}
+                            color={isCompared ? 'blue' : 'gray'}
+                            disabled={!isCompared && compareFull}
                             onClick={() =>
-                              onSelectPlayer({
+                              onToggleCompare({
                                 id: p.id,
                                 fullName: p.fullName,
-                                firstName: p.firstName,
-                                lastName: p.lastName,
                                 position: p.position,
                                 team: p.team,
-                                teamId: p.teamId,
+                                goals: p.goals,
+                                assists: p.assists,
+                                points: p.points,
                               })
                             }
                           >
-                            Draft
+                            {isCompared ? 'Compared' : 'Compare'}
                           </Button>
                         </Table.Td>
-                      )}
+                        {canPick && (
+                          <Table.Td>
+                            <Button
+                              size="xs"
+                              variant="light"
+                              disabled={isPositionFull(p.position)}
+                              onClick={() =>
+                                onSelectPlayer({
+                                  id: p.id,
+                                  fullName: p.fullName,
+                                  firstName: p.firstName,
+                                  lastName: p.lastName,
+                                  position: p.position,
+                                  team: p.team,
+                                  teamId: p.teamId,
+                                })
+                              }
+                            >
+                              Draft
+                            </Button>
+                          </Table.Td>
+                        )}
+                      </Table.Tr>
+                    );
+                  })}
+                  {filteredSkaters.length === 0 && (
+                    <Table.Tr>
+                      <Table.Td
+                        colSpan={(isRound1 ? 8 : 7) + (canPick ? 1 : 0)}
+                      >
+                        <Text c="dimmed" ta="center" size="sm">
+                          No available skaters match your filters
+                        </Text>
+                      </Table.Td>
                     </Table.Tr>
-                  );
-                })}
-                {filteredSkaters.length === 0 && (
-                  <Table.Tr>
-                    <Table.Td colSpan={(isRound1 ? 8 : 7) + (canPick ? 1 : 0)}>
-                      <Text c="dimmed" ta="center" size="sm">
-                        No available skaters match your filters
-                      </Text>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
+                  )}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
           </ScrollArea>
         </>
       )}
@@ -469,58 +477,60 @@ function AvailablePlayerBoard({
           <Text fw={600} size="sm">
             Teams / Goaltending ({filteredTeams.length} available)
           </Text>
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Team</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Wins</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Shutouts</Table.Th>
-                {canPick && <Table.Th />}
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filteredTeams.map((t) => (
-                <Table.Tr key={t.teamId}>
-                  <Table.Td>{t.fullName}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>{t.wins}</Table.Td>
-                  <Table.Td style={{ textAlign: 'right' }}>
-                    {t.shutouts}
-                  </Table.Td>
-                  {canPick && (
-                    <Table.Td>
-                      <Button
-                        size="xs"
-                        variant="light"
-                        disabled={isPositionFull('G')}
-                        onClick={() =>
-                          onSelectPlayer({
-                            id: t.teamId,
-                            fullName: t.fullName,
-                            firstName: '',
-                            lastName: '',
-                            position: 'G',
-                            team: t.team,
-                            teamId: t.teamId,
-                          })
-                        }
-                      >
-                        Draft
-                      </Button>
-                    </Table.Td>
-                  )}
-                </Table.Tr>
-              ))}
-              {filteredTeams.length === 0 && (
+          <Table.ScrollContainer minWidth={600}>
+            <Table striped highlightOnHover>
+              <Table.Thead>
                 <Table.Tr>
-                  <Table.Td colSpan={canPick ? 4 : 3}>
-                    <Text c="dimmed" ta="center" size="sm">
-                      No available teams match your filters
-                    </Text>
-                  </Table.Td>
+                  <Table.Th>Team</Table.Th>
+                  <Table.Th style={{ textAlign: 'right' }}>Wins</Table.Th>
+                  <Table.Th style={{ textAlign: 'right' }}>Shutouts</Table.Th>
+                  {canPick && <Table.Th />}
                 </Table.Tr>
-              )}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {filteredTeams.map((t) => (
+                  <Table.Tr key={t.teamId}>
+                    <Table.Td>{t.fullName}</Table.Td>
+                    <Table.Td style={{ textAlign: 'right' }}>{t.wins}</Table.Td>
+                    <Table.Td style={{ textAlign: 'right' }}>
+                      {t.shutouts}
+                    </Table.Td>
+                    {canPick && (
+                      <Table.Td>
+                        <Button
+                          size="xs"
+                          variant="light"
+                          disabled={isPositionFull('G')}
+                          onClick={() =>
+                            onSelectPlayer({
+                              id: t.teamId,
+                              fullName: t.fullName,
+                              firstName: '',
+                              lastName: '',
+                              position: 'G',
+                              team: t.team,
+                              teamId: t.teamId,
+                            })
+                          }
+                        >
+                          Draft
+                        </Button>
+                      </Table.Td>
+                    )}
+                  </Table.Tr>
+                ))}
+                {filteredTeams.length === 0 && (
+                  <Table.Tr>
+                    <Table.Td colSpan={canPick ? 4 : 3}>
+                      <Text c="dimmed" ta="center" size="sm">
+                        No available teams match your filters
+                      </Text>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         </>
       )}
     </Stack>
@@ -757,35 +767,37 @@ export function DraftPage() {
               Draft History
             </Title>
             <ScrollArea h={400}>
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Pick</Table.Th>
-                    <Table.Th>Team</Table.Th>
-                    <Table.Th>Player</Table.Th>
-                    <Table.Th>Position</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {picks.map((pick) => (
-                    <Table.Tr key={pick.id}>
-                      <Table.Td>{pick.pick_number}</Table.Td>
-                      <Table.Td>
-                        {pick.league_members?.team_name ?? 'Unknown'}
-                      </Table.Td>
-                      <Table.Td>
-                        {resolvePickName(
-                          pick.player_id,
-                          pick.team_id,
-                          playerNameMap,
-                          teamNameMap
-                        )}
-                      </Table.Td>
-                      <Table.Td>{pick.position}</Table.Td>
+              <Table.ScrollContainer minWidth={600}>
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Pick</Table.Th>
+                      <Table.Th>Team</Table.Th>
+                      <Table.Th>Player</Table.Th>
+                      <Table.Th>Position</Table.Th>
                     </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {picks.map((pick) => (
+                      <Table.Tr key={pick.id}>
+                        <Table.Td>{pick.pick_number}</Table.Td>
+                        <Table.Td>
+                          {pick.league_members?.team_name ?? 'Unknown'}
+                        </Table.Td>
+                        <Table.Td>
+                          {resolvePickName(
+                            pick.player_id,
+                            pick.team_id,
+                            playerNameMap,
+                            teamNameMap
+                          )}
+                        </Table.Td>
+                        <Table.Td>{pick.position}</Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
             </ScrollArea>
           </Card>
           <Button
@@ -1126,46 +1138,48 @@ export function DraftPage() {
                 Clear All
               </Button>
             </Group>
-            <Table striped>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Player</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Goals</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Assists</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
-                  <Table.Th />
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {comparePlayers.map((p) => (
-                  <Table.Tr key={p.id}>
-                    <Table.Td>
-                      {p.fullName} ({p.team})
-                    </Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>
-                      {p.goals}
-                    </Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>
-                      {p.assists}
-                    </Table.Td>
-                    <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
-                      {p.points}
-                    </Table.Td>
-                    <Table.Td>
-                      <Button
-                        size="xs"
-                        variant="subtle"
-                        color="red"
-                        onClick={() => handleRemoveCompare(p.id)}
-                        aria-label={`Remove ${p.fullName}`}
-                      >
-                        ✕
-                      </Button>
-                    </Table.Td>
+            <Table.ScrollContainer minWidth={600}>
+              <Table striped>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Player</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Goals</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Assists</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
+                    <Table.Th />
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
+                </Table.Thead>
+                <Table.Tbody>
+                  {comparePlayers.map((p) => (
+                    <Table.Tr key={p.id}>
+                      <Table.Td>
+                        {p.fullName} ({p.team})
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>
+                        {p.goals}
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>
+                        {p.assists}
+                      </Table.Td>
+                      <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
+                        {p.points}
+                      </Table.Td>
+                      <Table.Td>
+                        <Button
+                          size="xs"
+                          variant="subtle"
+                          color="red"
+                          onClick={() => handleRemoveCompare(p.id)}
+                          aria-label={`Remove ${p.fullName}`}
+                        >
+                          ✕
+                        </Button>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
           </Card>
         )}
 

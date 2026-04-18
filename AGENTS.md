@@ -19,8 +19,14 @@ Nx monorepo using Yarn 4 (with node-modules as it's nodeLinker via `.yarnrc.yml`
 | `utils`       | Pure utility functions                                                              |
 | `mock-data`   | Static fixture data (players, teams, games, bracket) for mock mode                  |
 | `e2e`         | Playwright end-to-end tests with page objects                                       |
+| `widget-api`  | Shared TS types + HTTP client for the `widget-league-snapshot` edge function        |
+| `widget-bridge` | Capacitor plugin bridging the web app to the native iOS `WidgetBridgePlugin`      |
 
-**Dependency flow:** `web` → `supabase`, `nhl-api`, `ui`, `utils`, `types`, `mock-data`
+Native iOS code (Capacitor host + `SportsNotWidget` WidgetKit extension +
+ActivityKit Live Activity) lives in the top-level [`ios/`](./ios/) directory,
+registered as the Nx project `@sportsnot/ios-app`.
+
+**Dependency flow:** `web` → `supabase`, `nhl-api`, `ui`, `utils`, `types`, `mock-data`, `widget-bridge`, `widget-api`
 
 ## Build, Test, and Lint Commands
 
@@ -104,6 +110,33 @@ supabase functions deploy sync-regular-season-stats --no-verify-jwt
 ```
 
 **Important:** Edge functions use raw `fetch` to the PostgREST API — not the `@supabase/supabase-js` client library. The `esm.sh` CDN build of supabase-js is unreliable in the Deno edge runtime (`.upsert()` returns `undefined`). The `supabase/functions/` directory is gitignored.
+
+## iOS App + Widget
+
+The iOS build wraps the web app in Capacitor and ships a WidgetKit
+extension with Home Screen, Lock Screen, Dynamic Island, and ActivityKit
+Live Activity surfaces. See [`ios/README.md`](./ios/README.md) for the
+full one-time macOS setup.
+
+Nx targets (macOS only):
+
+```bash
+yarn nx sync-web @sportsnot/ios-app       # build web + cap sync ios
+yarn nx build @sportsnot/ios-app          # xcodebuild App scheme
+yarn nx build-widget @sportsnot/ios-app   # xcodebuild SportsNotWidget scheme
+yarn nx run-ios @sportsnot/ios-app        # cap run ios (simulator)
+yarn nx archive @sportsnot/ios-app        # xcodebuild archive
+yarn nx pod-install @sportsnot/ios-app    # cap update ios + pod install
+```
+
+Required Supabase function secrets for `push-live-activity-updates`:
+`APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_P8`, `APNS_BUNDLE_ID`, `APNS_ENV`
+(`sandbox` for TestFlight/simulator, `production` for App Store).
+
+The iOS CI workflow (`.github/workflows/ios-build.yml`) runs on
+`macos-14` and is **not** part of the default `nx affected` lint/test
+gate — it triggers only on PRs touching `ios/`, `packages/widget-*`,
+`packages/web/`, or `capacitor.config.ts`.
 
 ## Ralph Agent System
 

@@ -197,55 +197,57 @@ export function RoundTransitionPage() {
         <Card shadow="sm" padding="lg" radius="md" withBorder>
           <Stack gap="md">
             <Title order={4}>Round {currentRound} Final Standings</Title>
-            <Table>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Rank</Table.Th>
-                  <Table.Th>Team</Table.Th>
-                  <Table.Th>Player</Table.Th>
-                  <Table.Th>Points</Table.Th>
-                  <Table.Th>Re-Draft Pick</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {sortMembersForReDraft(
-                  (league.league_members ?? []) as TransitionMemberRow[]
-                )
-                  .reverse()
-                  .map((m: TransitionMemberRow, index: number) => (
-                    <Table.Tr key={m.id}>
-                      <Table.Td>
-                        <Badge
-                          variant="light"
-                          color={index === 0 ? 'yellow' : 'gray'}
-                        >
-                          #{index + 1}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>{m.team_name}</Table.Td>
-                      <Table.Td>
-                        {m.users?.display_name ?? 'Unknown'}
-                        {m.user_id === user?.id && (
+            <Table.ScrollContainer minWidth={600}>
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Rank</Table.Th>
+                    <Table.Th>Team</Table.Th>
+                    <Table.Th>Player</Table.Th>
+                    <Table.Th>Points</Table.Th>
+                    <Table.Th>Re-Draft Pick</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {sortMembersForReDraft(
+                    (league.league_members ?? []) as TransitionMemberRow[]
+                  )
+                    .reverse()
+                    .map((m: TransitionMemberRow, index: number) => (
+                      <Table.Tr key={m.id}>
+                        <Table.Td>
                           <Badge
-                            size="xs"
-                            ml="xs"
-                            color="green"
                             variant="light"
+                            color={index === 0 ? 'yellow' : 'gray'}
                           >
-                            You
+                            #{index + 1}
                           </Badge>
-                        )}
-                      </Table.Td>
-                      <Table.Td fw={700}>{m.total_points ?? 0}</Table.Td>
-                      <Table.Td>
-                        <Badge variant="outline">
-                          #{sortedMembers.length - index}
-                        </Badge>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-              </Table.Tbody>
-            </Table>
+                        </Table.Td>
+                        <Table.Td>{m.team_name}</Table.Td>
+                        <Table.Td>
+                          {m.users?.display_name ?? 'Unknown'}
+                          {m.user_id === user?.id && (
+                            <Badge
+                              size="xs"
+                              ml="xs"
+                              color="green"
+                              variant="light"
+                            >
+                              You
+                            </Badge>
+                          )}
+                        </Table.Td>
+                        <Table.Td fw={700}>{m.total_points ?? 0}</Table.Td>
+                        <Table.Td>
+                          <Badge variant="outline">
+                            #{sortedMembers.length - index}
+                          </Badge>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
           </Stack>
         </Card>
 
