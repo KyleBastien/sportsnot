@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   ios-build:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -37,18 +37,21 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Select Xcode 16
+      - name: Select Xcode 26
         run: |
-          # macos-15 ships multiple Xcode versions; pick the highest 16.x available.
-          XCODE_PATH=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          # macos-26 ships multiple Xcode versions; pick the highest 26.x available.
+          XCODE_PATH=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
           if [ -z "$XCODE_PATH" ]; then
-            echo "No Xcode 16.x found on runner"
+            echo "No Xcode 26.x found on runner"
             ls /Applications | grep -i xcode || true
             exit 1
           fi
           echo "Selecting $XCODE_PATH"
           sudo xcode-select -s "$XCODE_PATH"
           xcodebuild -version
+
+      - name: Install iOS platform
+        run: xcodebuild -downloadPlatform iOS
 
       - name: Install dependencies
         run: yarn install --immutable
