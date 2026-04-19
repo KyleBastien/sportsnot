@@ -15,7 +15,7 @@
           "supabase functions deploy --project-ref $SUPABASE_PROJECT_REF --no-verify-jwt"
         ],
         "cwd": "{workspaceRoot}",
-        "sequential": true
+        "parallel": false
       }
     }
   }
