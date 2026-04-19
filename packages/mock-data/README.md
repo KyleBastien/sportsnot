@@ -21,16 +21,16 @@ This will fetch:
 
 All files are written to `packages/mock-data/src/data/`:
 
-| File                  | Export              | Description                                      |
-| --------------------- | ------------------- | ------------------------------------------------ |
-| `teams.ts`            | `teams`             | `NHLTeam[]` — 16 playoff teams                  |
-| `players.ts`          | `players`           | `Record<string, NHLPlayer[]>` — rosters by team  |
-| `bracket.ts`          | `bracket`           | `NHLPlayoffSeries[]` — bracket/series data       |
-| `games-r1.ts`         | `gamesR1`           | `NHLGame[]` — Round 1 games                     |
-| `games-r2.ts`         | `gamesR2`           | `NHLGame[]` — Round 2 games                     |
-| `games-cf.ts`         | `gamesCf`           | `NHLGame[]` — Conference Finals games            |
-| `games-scf.ts`        | `gamesScf`          | `NHLGame[]` — Stanley Cup Final games            |
-| `player-game-logs.ts` | `playerGameLogs`    | `Record<number, NHLPlayerStats[]>` — game logs   |
+| File                  | Export           | Description                                     |
+| --------------------- | ---------------- | ----------------------------------------------- |
+| `teams.ts`            | `teams`          | `NHLTeam[]` — 16 playoff teams                  |
+| `players.ts`          | `players`        | `Record<string, NHLPlayer[]>` — rosters by team |
+| `bracket.ts`          | `bracket`        | `NHLPlayoffSeries[]` — bracket/series data      |
+| `games-r1.ts`         | `gamesR1`        | `NHLGame[]` — Round 1 games                     |
+| `games-r2.ts`         | `gamesR2`        | `NHLGame[]` — Round 2 games                     |
+| `games-cf.ts`         | `gamesCf`        | `NHLGame[]` — Conference Finals games           |
+| `games-scf.ts`        | `gamesScf`       | `NHLGame[]` — Stanley Cup Final games           |
+| `player-game-logs.ts` | `playerGameLogs` | `Record<number, NHLPlayerStats[]>` — game logs  |
 
 ### Notes
 
