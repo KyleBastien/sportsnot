@@ -442,7 +442,16 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Sync team stats (wins/shutouts) ────────────────────────
-    for (const teamId of teamIds) {
+    // Sync ALL teams that appear in completed games, not just those on
+    // active rosters. The dashboard displays every playoff team's record.
+    const allGameTeamIds = new Set<number>();
+    for (const game of allRoundFinalGames) {
+      if (game.homeTeam?.id != null) allGameTeamIds.add(game.homeTeam.id);
+      if (game.awayTeam?.id != null) allGameTeamIds.add(game.awayTeam.id);
+    }
+    for (const id of teamIds) allGameTeamIds.add(id);
+
+    for (const teamId of allGameTeamIds) {
       try {
         let wins = 0;
         let shutouts = 0;
