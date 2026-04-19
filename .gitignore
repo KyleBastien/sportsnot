@@ -59,6 +59,7 @@ Thumbs.db
 test-results/
 playwright-report/
 blob-report/
+.playwright-cli/
 
 # Ralph working files
 scripts/ralph/prd.json
