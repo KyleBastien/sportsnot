@@ -17,6 +17,7 @@ import {
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
+import { useIsMobile, MobileCardList, DataRow } from '@sportsnot/ui';
 import { useMockScoringHistory } from '../../../mock/hooks/useMockScoringHistory';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
@@ -65,6 +66,7 @@ export function ScoringHistoryPage() {
   const [playerFilter, setPlayerFilter] = useState('');
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState('');
+  const isMobile = useIsMobile();
 
   if (isLoading) {
     return (
@@ -138,55 +140,103 @@ export function ScoringHistoryPage() {
         </Group>
 
         <Card shadow="sm" padding="md" radius="md" withBorder>
-          <Table.ScrollContainer minWidth={600}>
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Player</Table.Th>
-                  <Table.Th>Team</Table.Th>
-                  <Table.Th>Event</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
-                  <Table.Th>Date</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {filtered.length === 0 ? (
-                  <Table.Tr>
-                    <Table.Td colSpan={5}>
-                      <Text ta="center" c="dimmed" py="md">
-                        No scoring events found
-                      </Text>
-                    </Table.Td>
-                  </Table.Tr>
-                ) : (
-                  filtered.map((event, index) => (
-                    <Table.Tr key={event.id ?? index}>
-                      <Table.Td>{event.player_name}</Table.Td>
-                      <Table.Td>
-                        <Badge variant="light" color="gray">
-                          {event.team_abbreviation}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge color={EVENT_COLORS[event.event_type] ?? 'gray'}>
-                          {event.event_type}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td
-                        style={{
-                          textAlign: 'right',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
+          {isMobile ? (
+            <MobileCardList emptyMessage="No scoring events found">
+              {filtered.map((event, index) => (
+                <Card
+                  key={event.id ?? index}
+                  padding="sm"
+                  radius="sm"
+                  withBorder
+                >
+                  <Group justify="space-between" mb={4}>
+                    <Text fw={500} size="sm">
+                      {event.player_name}
+                    </Text>
+                    <Badge
+                      color={EVENT_COLORS[event.event_type] ?? 'gray'}
+                      size="sm"
+                    >
+                      {event.event_type}
+                    </Badge>
+                  </Group>
+                  <DataRow
+                    label="Team"
+                    value={
+                      <Badge variant="light" color="gray" size="sm">
+                        {event.team_abbreviation}
+                      </Badge>
+                    }
+                  />
+                  <DataRow
+                    label="Points"
+                    value={
+                      <Text
+                        size="sm"
+                        fw={500}
+                        style={{ fontVariantNumeric: 'tabular-nums' }}
                       >
                         +{event.points}
+                      </Text>
+                    }
+                  />
+                  <DataRow label="Date" value={event.game_date} />
+                </Card>
+              ))}
+            </MobileCardList>
+          ) : (
+            <Table.ScrollContainer minWidth={600}>
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Player</Table.Th>
+                    <Table.Th>Team</Table.Th>
+                    <Table.Th>Event</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
+                    <Table.Th>Date</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {filtered.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={5}>
+                        <Text ta="center" c="dimmed" py="md">
+                          No scoring events found
+                        </Text>
                       </Table.Td>
-                      <Table.Td>{event.game_date}</Table.Td>
                     </Table.Tr>
-                  ))
-                )}
-              </Table.Tbody>
-            </Table>
-          </Table.ScrollContainer>
+                  ) : (
+                    filtered.map((event, index) => (
+                      <Table.Tr key={event.id ?? index}>
+                        <Table.Td>{event.player_name}</Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="gray">
+                            {event.team_abbreviation}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge
+                            color={EVENT_COLORS[event.event_type] ?? 'gray'}
+                          >
+                            {event.event_type}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td
+                          style={{
+                            textAlign: 'right',
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
+                        >
+                          +{event.points}
+                        </Table.Td>
+                        <Table.Td>{event.game_date}</Table.Td>
+                      </Table.Tr>
+                    ))
+                  )}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
+          )}
         </Card>
       </Stack>
     </Container>
