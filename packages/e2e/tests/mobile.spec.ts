@@ -520,11 +520,11 @@ test.describe('Mobile Viewport', () => {
     await expect(authenticatedPage.getByText('Connor McDavid')).toBeHidden();
     await searchInput.clear();
 
-    // Click Draft button — modal should appear and be usable
-    const row = authenticatedPage
-      .getByRole('row')
+    // Click Draft button — on mobile the table is a card layout (no rows)
+    const playerCard = authenticatedPage
+      .locator('[class*="Card"]')
       .filter({ hasText: 'Connor McDavid' });
-    await row.getByRole('button', { name: /Draft/i }).click();
+    await playerCard.getByRole('button', { name: /Draft/i }).click();
 
     const modal = authenticatedPage.getByRole('dialog');
     await expect(modal).toBeVisible();
@@ -655,11 +655,11 @@ test.describe('Mobile Viewport', () => {
       authenticatedPage.getByRole('heading', { name: /Draft Room/i })
     ).toBeVisible(NAV_TIMEOUT);
 
-    // Open the draft confirmation modal
-    const row = authenticatedPage
-      .getByRole('row')
+    // Open the draft confirmation modal — on mobile, cards replace rows
+    const playerCard = authenticatedPage
+      .locator('[class*="Card"]')
       .filter({ hasText: 'Connor McDavid' });
-    await row.getByRole('button', { name: /Draft/i }).click();
+    await playerCard.getByRole('button', { name: /Draft/i }).click();
 
     const modal = authenticatedPage.getByRole('dialog');
     await expect(modal).toBeVisible();
