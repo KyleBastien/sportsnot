@@ -3,24 +3,17 @@
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "defaultBase": "main",
   "namedInputs": {
-    "default": [
-      "{projectRoot}/**/*",
-      "sharedGlobals"
-    ],
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
       "default",
       "!{projectRoot}/**/*.spec.ts",
       "!{projectRoot}/**/*.test.ts"
     ],
-    "sharedGlobals": [
-      "{workspaceRoot}/.github/workflows/**/*"
-    ]
+    "sharedGlobals": ["{workspaceRoot}/.github/workflows/**/*"]
   },
   "targetDefaults": {
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
+      "dependsOn": ["^build"],
       "inputs": [
         "production",
         "^production",

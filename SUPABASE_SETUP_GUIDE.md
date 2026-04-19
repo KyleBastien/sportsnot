@@ -39,11 +39,11 @@ This is a step-by-step guide to set up a production Supabase project so SportsNo
 
 Once the project is ready, go to **Settings → API** and note:
 
-| Value | Where to find it | What it's for |
-|---|---|---|
-| **Project URL** | `Settings → API → Project URL` | `VITE_SUPABASE_URL` in your `.env` |
-| **anon / public key** | `Settings → API → Project API keys → anon public` | `VITE_SUPABASE_ANON_KEY` in your `.env` |
-| **service_role key** | `Settings → API → Project API keys → service_role secret` | Used by the edge function only (server-side) |
+| Value                 | Where to find it                                          | What it's for                                |
+| --------------------- | --------------------------------------------------------- | -------------------------------------------- |
+| **Project URL**       | `Settings → API → Project URL`                            | `VITE_SUPABASE_URL` in your `.env`           |
+| **anon / public key** | `Settings → API → Project API keys → anon public`         | `VITE_SUPABASE_ANON_KEY` in your `.env`      |
+| **service_role key**  | `Settings → API → Project API keys → service_role secret` | Used by the edge function only (server-side) |
 
 > ⚠️ **NEVER** put the `service_role` key in your `.env` file or expose it to the browser. It bypasses Row Level Security. The edge function accesses it automatically through `Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')` — Supabase injects it for you at runtime.
 
@@ -86,19 +86,20 @@ However, note that `supabase db push` expects migrations in the standard Supabas
 
 **Tables (9 total):**
 
-| Table | Purpose |
-|---|---|
-| `users` | User profiles (extends Supabase `auth.users`) |
-| `leagues` | Fantasy hockey leagues |
-| `league_members` | Users joined to leagues (with points & standings) |
-| `drafts` | One draft per league per playoff round |
-| `draft_picks` | Individual pick records within a draft |
-| `rosters` | Active roster slots per member per round |
-| `player_stats_cache` | Cached NHL player stats (goals, assists, GP) |
-| `team_stats_cache` | Cached NHL team stats (wins, shutouts) |
+| Table                        | Purpose                                                |
+| ---------------------------- | ------------------------------------------------------ |
+| `users`                      | User profiles (extends Supabase `auth.users`)          |
+| `leagues`                    | Fantasy hockey leagues                                 |
+| `league_members`             | Users joined to leagues (with points & standings)      |
+| `drafts`                     | One draft per league per playoff round                 |
+| `draft_picks`                | Individual pick records within a draft                 |
+| `rosters`                    | Active roster slots per member per round               |
+| `player_stats_cache`         | Cached NHL player stats (goals, assists, GP)           |
+| `team_stats_cache`           | Cached NHL team stats (wins, shutouts)                 |
 | `regular_season_stats_cache` | Cached regular season stats for Round 1 draft rankings |
 
 **Functions (7 total):**
+
 - `handle_updated_at()` — Auto-updates `updated_at` timestamps
 - `handle_new_user()` — Auto-creates a user profile row when someone signs up via Supabase Auth
 - `calculate_member_points()` — Sums points for a member's active roster
@@ -108,6 +109,7 @@ However, note that `supabase db push` expects migrations in the standard Supabas
 - `get_user_league_ids()` — `SECURITY DEFINER` helper that returns league IDs for the current user, used by RLS policies to avoid infinite recursion (from migration 004)
 
 **Triggers (3 total):**
+
 - `set_updated_at_users` — On `users` table updates
 - `set_updated_at_leagues` — On `leagues` table updates
 - `on_auth_user_created` — On `auth.users` insert → creates `public.users` row
@@ -121,6 +123,7 @@ After running all four migrations, verify everything is in place.
 ### Check Tables
 
 Go to **Table Editor** (left sidebar). You should see all 9 tables listed:
+
 - `users`
 - `leagues`
 - `league_members`
@@ -136,6 +139,7 @@ Click into `league_members` and verify it has columns `player_points`, `goalie_p
 ### Check Functions
 
 Go to **Database → Functions** (left sidebar). You should see:
+
 - `handle_updated_at`
 - `handle_new_user`
 - `calculate_member_points`
@@ -175,16 +179,16 @@ You should see `on_auth_user_created` on the `users` table in the `auth` schema.
 
 Go to **Authentication → Policies** (or **Table Editor → select a table → RLS Policies tab**). Every table should have RLS **enabled** (the toggle should be ON). Check that each table has its policies:
 
-| Table | Expected Policies |
-|---|---|
-| `users` | "Users can read own profile", "Users can update own profile", "Users can read other users in same league" |
-| `leagues` | "League members can read their leagues", "Anyone can read league by invite code", "Authenticated users can create leagues", "Commissioners can update their leagues" |
-| `league_members` | "Members can read league members", "Users can join leagues", "Users can leave leagues" |
-| `drafts` | "League members can read drafts", "Commissioners can manage drafts" |
-| `draft_picks` | "League members can read draft picks", "Members can insert own draft picks" |
-| `rosters` | "League members can read rosters", "Members can manage own rosters" |
-| `player_stats_cache` | "Authenticated users can read player stats" |
-| `team_stats_cache` | "Authenticated users can read team stats" |
+| Table                | Expected Policies                                                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`              | "Users can read own profile", "Users can update own profile", "Users can read other users in same league"                                                            |
+| `leagues`            | "League members can read their leagues", "Anyone can read league by invite code", "Authenticated users can create leagues", "Commissioners can update their leagues" |
+| `league_members`     | "Members can read league members", "Users can join leagues", "Users can leave leagues"                                                                               |
+| `drafts`             | "League members can read drafts", "Commissioners can manage drafts"                                                                                                  |
+| `draft_picks`        | "League members can read draft picks", "Members can insert own draft picks"                                                                                          |
+| `rosters`            | "League members can read rosters", "Members can manage own rosters"                                                                                                  |
+| `player_stats_cache` | "Authenticated users can read player stats"                                                                                                                          |
+| `team_stats_cache`   | "Authenticated users can read team stats"                                                                                                                            |
 
 > ⚠️ **DO NOT** disable RLS on any table "just to test things." This is the #1 mistake people make. RLS is critical — without it, any user can read/write any data. If something isn't working, the issue is almost always a missing policy, not RLS itself.
 
@@ -236,6 +240,7 @@ SportsNot uses **Magic Link (email OTP)** authentication — no passwords. Users
 ### Step 5b: Disable Unused Auth Providers
 
 Go through the provider list and make sure everything else is **disabled** unless you specifically want social login:
+
 - Google: OFF (unless you plan to add it)
 - GitHub: OFF
 - Apple: OFF
@@ -255,6 +260,7 @@ This is **critical** for magic links to work. The magic link email contains a re
      - Any preview/staging URLs if applicable
 
 The magic link flow works like this:
+
 1. User enters email on the login page
 2. SportsNot calls `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: '${window.location.origin}/auth/callback' } })`
 3. Supabase sends an email with a link pointing to your Site URL + `/auth/callback`
@@ -285,19 +291,31 @@ Supabase sends default emails for magic links that look generic. Customize them 
 3. Customize the template. Here's a recommended template:
 
 **Subject:**
+
 ```
 Your SportsNot Login Link 🏒
 ```
 
 **Body (HTML):**
+
 ```html
 <div style="text-align: center; margin-bottom: 24px;">
-  <img src="https://www.sportsnot.net/sportsnot-logo.f136dd23d873e889.png" alt="SportsNot" width="120" style="display: inline-block;" />
+  <img
+    src="https://www.sportsnot.net/sportsnot-logo.f136dd23d873e889.png"
+    alt="SportsNot"
+    width="120"
+    style="display: inline-block;"
+  />
 </div>
 <h2 style="text-align: center;">Welcome to SportsNot!</h2>
-<p>Click the link below to sign in to your NHL Playoff Fantasy Hockey account:</p>
+<p>
+  Click the link below to sign in to your NHL Playoff Fantasy Hockey account:
+</p>
 <p><a href="{{ .ConfirmationURL }}">Sign In to SportsNot</a></p>
-<p>This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
+<p>
+  This link expires in 1 hour. If you didn't request this, you can safely ignore
+  this email.
+</p>
 <p>Good luck in the 2026 Playoffs! 🏆</p>
 ```
 
@@ -316,68 +334,75 @@ Supabase's built-in email sending only delivers to **project team members' email
 #### Step-by-Step: Setting Up Resend as Your SMTP Provider
 
 **1. Create a Resend account**
-   - Go to [https://resend.com](https://resend.com) and sign up.
-   - Free tier: 100 emails/day, 3,000 emails/month — more than enough for SportsNot.
+
+- Go to [https://resend.com](https://resend.com) and sign up.
+- Free tier: 100 emails/day, 3,000 emails/month — more than enough for SportsNot.
 
 **2. Verify your domain**
-   - Go to [https://resend.com/domains](https://resend.com/domains) and click **"Add Domain"**.
-   - Enter your domain (e.g., `sportsnot.net`).
-   - Resend will give you **DNS records** to add (MX, TXT for SPF, and CNAME for DKIM). Add these records at your domain registrar (e.g., Cloudflare, Namecheap, GoDaddy).
-   - Wait for verification (usually a few minutes, sometimes up to 24 hours).
-   - **Why this matters:** Without domain verification, emails may go to spam or not send at all. Supabase requires the sender email to match a verified domain.
+
+- Go to [https://resend.com/domains](https://resend.com/domains) and click **"Add Domain"**.
+- Enter your domain (e.g., `sportsnot.net`).
+- Resend will give you **DNS records** to add (MX, TXT for SPF, and CNAME for DKIM). Add these records at your domain registrar (e.g., Cloudflare, Namecheap, GoDaddy).
+- Wait for verification (usually a few minutes, sometimes up to 24 hours).
+- **Why this matters:** Without domain verification, emails may go to spam or not send at all. Supabase requires the sender email to match a verified domain.
 
 > ⚠️ **DO NOT** skip domain verification and use Resend's `onboarding@resend.dev` test address. It will not work with Supabase in production — your users' magic link emails will be rejected or filtered as spam.
 
 **3. Create an API key**
-   - Go to [https://resend.com/api-keys](https://resend.com/api-keys).
-   - Click **"Create API Key"**.
-   - Name it something like `supabase-sportsnot`.
-   - Permission: **Sending access** is sufficient.
-   - Copy the key immediately — you won't see it again.
+
+- Go to [https://resend.com/api-keys](https://resend.com/api-keys).
+- Click **"Create API Key"**.
+- Name it something like `supabase-sportsnot`.
+- Permission: **Sending access** is sufficient.
+- Copy the key immediately — you won't see it again.
 
 **4. Configure SMTP in Supabase**
-   - In your Supabase dashboard, go to **Authentication** (left sidebar).
-   - Click **Email** under the **Notifications** section.
-   - Click **SMTP Settings** and toggle it **ON**.
-   - Fill in the following values exactly:
 
-   | Setting | Value |
-   |---|---|
-   | **Sender email** | `noreply@sportsnot.net` (must match your verified Resend domain) |
-   | **Sender name** | `SportsNot` |
-   | **Host** | `smtp.resend.com` |
-   | **Port** | `465` |
-   | **Username** | `resend` (literally the word "resend" — not your email) |
-   | **Password** | Your Resend API key (the `re_` prefixed key you copied) |
+- In your Supabase dashboard, go to **Authentication** (left sidebar).
+- Click **Email** under the **Notifications** section.
+- Click **SMTP Settings** and toggle it **ON**.
+- Fill in the following values exactly:
 
-   - Click **Save**.
+| Setting          | Value                                                            |
+| ---------------- | ---------------------------------------------------------------- |
+| **Sender email** | `noreply@sportsnot.net` (must match your verified Resend domain) |
+| **Sender name**  | `SportsNot`                                                      |
+| **Host**         | `smtp.resend.com`                                                |
+| **Port**         | `465`                                                            |
+| **Username**     | `resend` (literally the word "resend" — not your email)          |
+| **Password**     | Your Resend API key (the `re_` prefixed key you copied)          |
+
+- Click **Save**.
 
 > ⚠️ **Common mistakes with Resend setup:**
+>
 > - **Wrong username:** The username is literally `resend`, not your Resend account email.
 > - **Wrong port:** Use `465` (SSL). Port `587` (STARTTLS) also works but `465` is what Resend recommends.
 > - **Sender email doesn't match verified domain:** If your domain is `sportsnot.net`, the sender must be `something@sportsnot.net`. Using `noreply@gmail.com` will fail.
 > - **API key copied wrong:** The key starts with `re_`. Make sure there are no extra spaces.
 
 **5. Test it**
-   - After saving, go to your app and try signing in with a real email address (not just project team members — that restriction is now lifted).
-   - Check that the email arrives from `noreply@sportsnot.net` (or whatever you set) and not from `noreply@mail.app.supabase.io`.
-   - Check spam/junk if it doesn't appear within a minute.
-   - You can also monitor delivery in the Resend dashboard at [https://resend.com/emails](https://resend.com/emails).
+
+- After saving, go to your app and try signing in with a real email address (not just project team members — that restriction is now lifted).
+- Check that the email arrives from `noreply@sportsnot.net` (or whatever you set) and not from `noreply@mail.app.supabase.io`.
+- Check spam/junk if it doesn't appear within a minute.
+- You can also monitor delivery in the Resend dashboard at [https://resend.com/emails](https://resend.com/emails).
 
 **6. Adjust rate limits in Supabase**
-   - After configuring custom SMTP, Supabase defaults to 30 emails/hour.
-   - Go to **Authentication → Rate Limits** and increase if needed for your expected user count.
-   - Resend's free tier allows 100/day, so set your Supabase rate limit to stay within that.
+
+- After configuring custom SMTP, Supabase defaults to 30 emails/hour.
+- Go to **Authentication → Rate Limits** and increase if needed for your expected user count.
+- Resend's free tier allows 100/day, so set your Supabase rate limit to stay within that.
 
 #### Alternative SMTP Providers
 
 If you prefer not to use Resend, these also work with the same Supabase SMTP settings page:
 
-| Provider | Host | Port | Username | Password | Free Tier |
-|---|---|---|---|---|---|
-| **Postmark** | `smtp.postmarkapp.com` | `587` | Your Postmark Server API Token | Same token | 100 test emails |
-| **SendGrid** | `smtp.sendgrid.net` | `587` | `apikey` (literal) | Your SendGrid API key | 100 emails/day |
-| **AWS SES** | `email-smtp.us-east-1.amazonaws.com` | `587` | SMTP credential username | SMTP credential password | 200 emails/day (in sandbox) |
+| Provider     | Host                                 | Port  | Username                       | Password                 | Free Tier                   |
+| ------------ | ------------------------------------ | ----- | ------------------------------ | ------------------------ | --------------------------- |
+| **Postmark** | `smtp.postmarkapp.com`               | `587` | Your Postmark Server API Token | Same token               | 100 test emails             |
+| **SendGrid** | `smtp.sendgrid.net`                  | `587` | `apikey` (literal)             | Your SendGrid API key    | 100 emails/day              |
+| **AWS SES**  | `email-smtp.us-east-1.amazonaws.com` | `587` | SMTP credential username       | SMTP credential password | 200 emails/day (in sandbox) |
 
 > ⚠️ **Without custom SMTP, Supabase will only send emails to project team members and caps at 2/hour.** This is the #1 issue people hit when going live. Set up SMTP before inviting any real users.
 
@@ -432,6 +457,7 @@ supabase functions deploy sync-nhl-stats --project-ref your-project-ref
 > ⚠️ **Important:** Supabase expects edge functions in a specific directory structure. The `supabase functions deploy` command looks for `supabase/functions/<function-name>/index.ts` by default. Since SportsNot keeps functions in `packages/supabase-db/functions/`, you may need to either:
 >
 > **Option A (recommended):** Create a symlink so Supabase CLI finds the function without duplicating files. Run these commands from the **repo root** (`sportsnot/`):
+>
 > ```bash
 > mkdir -p supabase/functions
 > # Windows PowerShell (from repo root — requires Administrator or Developer Mode)
@@ -440,6 +466,7 @@ supabase functions deploy sync-nhl-stats --project-ref your-project-ref
 > ln -s ../../packages/supabase-db/functions/sync-nhl-stats supabase/functions/sync-nhl-stats
 > supabase functions deploy sync-nhl-stats
 > ```
+>
 > The symlink keeps a single source of truth — edits to `packages/supabase-db/functions/sync-nhl-stats/index.ts` are automatically picked up by the CLI.
 >
 > **Option B:** Use the `--legacy-bundle` or specify the source directory if your Supabase CLI version supports it.
@@ -513,11 +540,11 @@ curl -X POST https://<your-project-ref>.supabase.co/functions/v1/sync-nhl-stats 
 
 ### Frequency Recommendations
 
-| Period | Frequency | Why |
-|---|---|---|
-| During active games (7 PM - 1 AM ET) | Every 10-15 minutes | Players are scoring; users want fresh stats |
-| Between games / off-days | Every 1-2 hours or manual | Nothing is changing; save API calls |
-| Off-season | Disabled | No data to sync |
+| Period                               | Frequency                 | Why                                         |
+| ------------------------------------ | ------------------------- | ------------------------------------------- |
+| During active games (7 PM - 1 AM ET) | Every 10-15 minutes       | Players are scoring; users want fresh stats |
+| Between games / off-days             | Every 1-2 hours or manual | Nothing is changing; save API calls         |
+| Off-season                           | Disabled                  | No data to sync                             |
 
 > ⚠️ **DO NOT** set the cron to run every minute. The NHL API isn't real-time anyway (there's a delay), and you'll burn through edge function invocations and potentially get rate-limited by the NHL API.
 
@@ -563,6 +590,7 @@ The CI workflow (`.github/workflows/ci.yml`) already reads Supabase credentials 
 4. That's it. The next push to `main` (or manual workflow dispatch) will build and deploy with your real Supabase credentials.
 
 > **How it works:** The CI workflow builds the app twice:
+>
 > - **Production build** — uses `VITE_MOCK_MODE: 'false'` and injects your Supabase secrets. This becomes the main site at `sportsnot.net`.
 > - **Demo build** — uses `VITE_MOCK_MODE: 'true'` and ignores Supabase entirely. This becomes the demo at `sportsnot.net/demo/`.
 >
@@ -693,23 +721,23 @@ Before the first puck drop, go through this checklist:
 
 ## 12. Common Mistakes to Avoid
 
-| Mistake | Why It's Bad | Fix |
-|---|---|---|
-| Running migrations out of order | 002 depends on tables from 001 | Always run 001 first, then 002, 003, 004 in order |
-| Running migrations twice | `CREATE TABLE` fails if table exists | If it errors, tables already exist — just move on |
-| Disabling RLS "to test" | Any user can read/modify all data | Never disable. Fix policies instead |
-| Putting `service_role` key in `.env` | Exposes it to the browser; bypasses all RLS | Only use in edge functions and server-side cron |
-| Wrong Site URL in Auth settings | Magic links redirect to wrong place; users can't log in | Must match your app's actual domain + port |
-| Missing `/auth/callback` in Redirect URLs | Supabase rejects the redirect; auth fails silently | Add both localhost and production callback URLs |
-| Forgetting to set `VITE_MOCK_MODE=false` | App uses in-memory mock data instead of Supabase | Set to `false` in `.env` for production |
-| Leaving `VITE_SUPABASE_URL` as `http://localhost:54321` | App tries to connect to local Supabase (which doesn't exist) | Set to your real project URL |
-| Setting cron to every minute | Burns edge function invocations, may hit NHL rate limits | Every 10-15 minutes during games is plenty |
-| Forgetting to update `playoff_round` in cron | Stats sync for wrong round; points don't update | Update cron body when each round starts |
-| Not setting up custom SMTP | Magic link emails hit rate limits or go to spam | Use Resend, Postmark, SendGrid, or AWS SES |
-| Adding INSERT policies to stats cache tables | Users could write fake stats | Only the edge function (service_role) writes to these |
-| Enabling Realtime on stats cache tables | Wastes database connections for infrequently-updated data | Only enable Realtime for draft/roster tables |
-| Not setting up `regular_season_stats_cache` | Round 1 draft can't show regular season stats for player rankings | Run migration 003 and deploy `sync-regular-season-stats` edge function |
-| "Infinite recursion detected in policy for relation 'league_members'" | Self-referencing RLS policy causes Postgres to loop infinitely | Run migration 004 to fix the policy with a `SECURITY DEFINER` helper function |
+| Mistake                                                               | Why It's Bad                                                      | Fix                                                                           |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Running migrations out of order                                       | 002 depends on tables from 001                                    | Always run 001 first, then 002, 003, 004 in order                             |
+| Running migrations twice                                              | `CREATE TABLE` fails if table exists                              | If it errors, tables already exist — just move on                             |
+| Disabling RLS "to test"                                               | Any user can read/modify all data                                 | Never disable. Fix policies instead                                           |
+| Putting `service_role` key in `.env`                                  | Exposes it to the browser; bypasses all RLS                       | Only use in edge functions and server-side cron                               |
+| Wrong Site URL in Auth settings                                       | Magic links redirect to wrong place; users can't log in           | Must match your app's actual domain + port                                    |
+| Missing `/auth/callback` in Redirect URLs                             | Supabase rejects the redirect; auth fails silently                | Add both localhost and production callback URLs                               |
+| Forgetting to set `VITE_MOCK_MODE=false`                              | App uses in-memory mock data instead of Supabase                  | Set to `false` in `.env` for production                                       |
+| Leaving `VITE_SUPABASE_URL` as `http://localhost:54321`               | App tries to connect to local Supabase (which doesn't exist)      | Set to your real project URL                                                  |
+| Setting cron to every minute                                          | Burns edge function invocations, may hit NHL rate limits          | Every 10-15 minutes during games is plenty                                    |
+| Forgetting to update `playoff_round` in cron                          | Stats sync for wrong round; points don't update                   | Update cron body when each round starts                                       |
+| Not setting up custom SMTP                                            | Magic link emails hit rate limits or go to spam                   | Use Resend, Postmark, SendGrid, or AWS SES                                    |
+| Adding INSERT policies to stats cache tables                          | Users could write fake stats                                      | Only the edge function (service_role) writes to these                         |
+| Enabling Realtime on stats cache tables                               | Wastes database connections for infrequently-updated data         | Only enable Realtime for draft/roster tables                                  |
+| Not setting up `regular_season_stats_cache`                           | Round 1 draft can't show regular season stats for player rankings | Run migration 003 and deploy `sync-regular-season-stats` edge function        |
+| "Infinite recursion detected in policy for relation 'league_members'" | Self-referencing RLS policy causes Postgres to loop infinitely    | Run migration 004 to fix the policy with a `SECURITY DEFINER` helper function |
 
 ### Setting Up `regular_season_stats_cache` (Required for Round 1 Draft)
 
@@ -720,6 +748,7 @@ The `useRegularSeasonPlayers` hook queries a `regular_season_stats_cache` table 
 A new migration file exists at `packages/supabase-db/migrations/003_regular_season_stats_cache.sql`. Run it the same way you ran the others — paste the contents into the **SQL Editor** and click **Run**.
 
 This creates the table with:
+
 - `player_id`, `nhl_season` — unique key per player per season
 - `player_name`, `team_abbreviation`, `position` — display fields
 - `goals`, `assists`, `points`, `games_played` — aggregated regular season totals
@@ -778,6 +807,7 @@ curl -X POST https://<your-project-ref>.supabase.co/functions/v1/sync-regular-se
 ```
 
 Expected response:
+
 ```json
 {
   "message": "Regular season stats synced",
@@ -808,22 +838,22 @@ LIMIT 20;
 
 ## Quick Reference Card
 
-| What | Value |
-|---|---|
-| **Supabase Dashboard** | `https://supabase.com/dashboard/project/<your-ref>` |
-| **Project URL** | `https://<your-ref>.supabase.co` |
-| **App Dev URL** | `http://localhost:4200` |
-| **Auth Callback Path** | `/auth/callback` |
-| **Auth Method** | Magic Link (email OTP) |
-| **Edge Functions** | `sync-nhl-stats`, `sync-regular-season-stats` |
-| **NHL Season Code** | `20252026` |
-| **Playoff Rounds** | 1 (First Round), 2 (Second Round), 3 (Conference Finals), 4 (Stanley Cup Final) |
-| **Scoring: Goal** | 1 point |
-| **Scoring: Assist** | 1 point |
-| **Scoring: Team Win** | 2 points |
-| **Scoring: Shutout** | 4 points (replaces win points) |
-| **Roster Limits** | 5F, 3D, 1G + IR slots (IR_F, IR_D) |
+| What                   | Value                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| **Supabase Dashboard** | `https://supabase.com/dashboard/project/<your-ref>`                             |
+| **Project URL**        | `https://<your-ref>.supabase.co`                                                |
+| **App Dev URL**        | `http://localhost:4200`                                                         |
+| **Auth Callback Path** | `/auth/callback`                                                                |
+| **Auth Method**        | Magic Link (email OTP)                                                          |
+| **Edge Functions**     | `sync-nhl-stats`, `sync-regular-season-stats`                                   |
+| **NHL Season Code**    | `20252026`                                                                      |
+| **Playoff Rounds**     | 1 (First Round), 2 (Second Round), 3 (Conference Finals), 4 (Stanley Cup Final) |
+| **Scoring: Goal**      | 1 point                                                                         |
+| **Scoring: Assist**    | 1 point                                                                         |
+| **Scoring: Team Win**  | 2 points                                                                        |
+| **Scoring: Shutout**   | 4 points (replaces win points)                                                  |
+| **Roster Limits**      | 5F, 3D, 1G + IR slots (IR_F, IR_D)                                              |
 
 ---
 
-*Last updated: February 2026. Ready for the 2026 NHL Playoffs!* 🏒
+_Last updated: February 2026. Ready for the 2026 NHL Playoffs!_ 🏒

@@ -1,0 +1,3 @@
+# Force LF line endings for all text files so Prettier's endOfLine: "lf"
+# rule never triggers on checkout, regardless of OS core.autocrlf setting.
+* text=auto eol=lf
