@@ -56,9 +56,15 @@ gem install --user-install xcodeproj
    every minute during playoff games).
 4. **SUPABASE_URL / SUPABASE_ANON_KEY** — both `App/Info.plist` and
    `SportsNotWidget/Info.plist` read `$(SUPABASE_URL)` and
-   `$(SUPABASE_ANON_KEY)` from build settings. Set them in Xcode's
-   build settings per target, or via a CI build phase that substitutes
-   env vars.
+   `$(SUPABASE_ANON_KEY)` from build settings. Create a local xcconfig:
+
+   ```bash
+   cp ios/App/Secrets.xcconfig.example ios/App/Secrets.xcconfig
+   # Edit ios/App/Secrets.xcconfig with your real Supabase values
+   ```
+
+   `Secrets.xcconfig` is gitignored and loaded by Nx xcodebuild targets
+   via `-xcconfig`. CI workflows generate it from GitHub secrets.
 
 ## Nx targets
 

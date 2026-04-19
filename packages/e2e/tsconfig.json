@@ -8,13 +8,6 @@
     "moduleResolution": "bundler",
     "types": ["node"]
   },
-  "include": [
-    "**/*.ts",
-    "../../packages/types/src/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "test-results",
-    "playwright-report"
-  ]
+  "include": ["**/*.ts", "../../packages/types/src/**/*.ts"],
+  "exclude": ["node_modules", "test-results", "playwright-report"]
 }

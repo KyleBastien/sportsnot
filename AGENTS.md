@@ -17,19 +17,19 @@ SportsNot is an NHL playoff fantasy hockey app. Users create/join leagues, draft
 
 Nx monorepo using Yarn 4 (with node-modules as it's nodeLinker via `.yarnrc.yml`). All packages live under `packages/` and are scoped `@sportsnot/*`.
 
-| Package       | Purpose                                                                             |
-| ------------- | ----------------------------------------------------------------------------------- |
-| `web`         | React 19 SPA — the main app (Rspack bundled, Mantine UI, react-router-dom)          |
-| `types`       | Shared TypeScript types (domain models: League, Draft, RosterSlot, NHL types)       |
-| `supabase`    | Supabase client + React Query hooks (useAuth, useLeague, useDraft, useRoster, etc.) |
-| `supabase-db` | SQL migrations and Supabase edge functions                                          |
-| `nhl-api`     | NHL API client for fetching live playoff stats                                      |
-| `ui`          | Shared UI components + vanilla-extract styling (theme, sprinkles)                   |
-| `utils`       | Pure utility functions                                                              |
-| `mock-data`   | Static fixture data (players, teams, games, bracket) for mock mode                  |
-| `e2e`         | Playwright end-to-end tests with page objects                                       |
-| `widget-api`  | Shared TS types + HTTP client for the `widget-league-snapshot` edge function        |
-| `widget-bridge` | Capacitor plugin bridging the web app to the native iOS `WidgetBridgePlugin`      |
+| Package         | Purpose                                                                             |
+| --------------- | ----------------------------------------------------------------------------------- |
+| `web`           | React 19 SPA — the main app (Rspack bundled, Mantine UI, react-router-dom)          |
+| `types`         | Shared TypeScript types (domain models: League, Draft, RosterSlot, NHL types)       |
+| `supabase`      | Supabase client + React Query hooks (useAuth, useLeague, useDraft, useRoster, etc.) |
+| `supabase-db`   | SQL migrations and Supabase edge functions                                          |
+| `nhl-api`       | NHL API client for fetching live playoff stats                                      |
+| `ui`            | Shared UI components + vanilla-extract styling (theme, sprinkles)                   |
+| `utils`         | Pure utility functions                                                              |
+| `mock-data`     | Static fixture data (players, teams, games, bracket) for mock mode                  |
+| `e2e`           | Playwright end-to-end tests with page objects                                       |
+| `widget-api`    | Shared TS types + HTTP client for the `widget-league-snapshot` edge function        |
+| `widget-bridge` | Capacitor plugin bridging the web app to the native iOS `WidgetBridgePlugin`        |
 
 Native iOS code (Capacitor host + `SportsNotWidget` WidgetKit extension +
 ActivityKit Live Activity) lives in the top-level [`ios/`](./ios/) directory,

@@ -1,18 +1,43 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <title>SportsNot - NHL Fantasy Playoff Hockey</title>
     <base href="/" />
 
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <!-- Lock viewport zoom inside Capacitor iOS shell only.
+         Web users retain pinch-to-zoom for accessibility. -->
+    <script>
+      try {
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+          var meta = document.querySelector('meta[name="viewport"]');
+          if (meta) {
+            meta.setAttribute(
+              'content',
+              'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'
+            );
+          }
+        }
+      } catch (e) {}
+    </script>
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
     <!-- Mantine color scheme script — prevents flash of wrong theme -->
     <script>
       try {
         var cs = window.localStorage.getItem('mantine-color-scheme-value');
-        var resolved = cs || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        document.documentElement.setAttribute('data-mantine-color-scheme', resolved);
+        var resolved =
+          cs ||
+          (window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light');
+        document.documentElement.setAttribute(
+          'data-mantine-color-scheme',
+          resolved
+        );
       } catch (e) {}
     </script>
     <!-- GitHub Pages SPA redirect handler -->
