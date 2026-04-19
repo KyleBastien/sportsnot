@@ -238,6 +238,7 @@ jobs:
         run: supabase db push
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
       - name: Deploy affected edge functions
         run: yarn nx affected -t deploy --base=${{ env.NX_BASE }} --head=${{ env.NX_HEAD }}
