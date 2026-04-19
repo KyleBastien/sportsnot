@@ -40,6 +40,19 @@ html {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Prevent iOS auto-zoom on input focus (triggers when font-size < 16px).
+ * Applies to both web and Capacitor builds. */
+input,
+select,
+textarea,
+.mantine-Select-input,
+.mantine-TextInput-input,
+.mantine-NativeSelect-input,
+.mantine-NumberInput-input,
+.mantine-Textarea-input {
+  font-size: 16px !important;
+}
+
 /* Keep images from ever forcing layout wider than their container. */
 img {
   max-width: 100%;
