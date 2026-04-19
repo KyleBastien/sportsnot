@@ -131,7 +131,9 @@ export function DraftLobbyPage() {
       return;
     }
 
-    const memberUserIds = members.map((m: LobbyMember) => m.user_id);
+    const memberUserIds: string[] = members.map(
+      (m: LobbyMember) => m.user_id
+    );
     const shuffled = shuffleArray(memberUserIds);
     const draftOrder = generateSnakeDraftOrder(shuffled, picksPerMember);
 
