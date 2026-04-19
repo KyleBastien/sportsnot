@@ -380,13 +380,15 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ── Collect all FINAL playoff games for the round ──────────
+    // ── Collect all completed playoff games for the round ─────
     // We fetch scores for every date in the round window so that wins and
     // shutouts are cumulative round-to-date totals. Fetching only /score/now
     // (today's games) and upserting from zero would reset historical totals on
     // every sync run.
-    // Only FINAL playoff (gameType=3) games are collected to avoid storing
+    // Only completed playoff (gameType=3) games are collected to avoid storing
     // in-progress or non-playoff games that would be skipped in the team loop.
+    // The NHL API uses 'OFF' (official) for finished games; 'FINAL' is
+    // accepted as a defensive fallback in case the API ever changes.
     const allRoundFinalGames: NhlScoreGameLite[] = [];
     if (roundStartDate) {
       // .toISOString() always returns a UTC timestamp; splitting on 'T' gives
@@ -404,7 +406,9 @@ Deno.serve(async (req: Request) => {
             const games = (data.games ?? []) as NhlScoreGameLite[];
             allRoundFinalGames.push(
               ...games.filter(
-                (g) => g.gameType === 3 && g.gameState === 'FINAL'
+                (g) =>
+                  g.gameType === 3 &&
+                  (g.gameState === 'OFF' || g.gameState === 'FINAL')
               )
             );
           }
@@ -425,7 +429,11 @@ Deno.serve(async (req: Request) => {
           const data = await resp.json();
           const games = (data.games ?? []) as NhlScoreGameLite[];
           allRoundFinalGames.push(
-            ...games.filter((g) => g.gameType === 3 && g.gameState === 'FINAL')
+            ...games.filter(
+              (g) =>
+                g.gameType === 3 &&
+                (g.gameState === 'OFF' || g.gameState === 'FINAL')
+            )
           );
         }
       } catch {
