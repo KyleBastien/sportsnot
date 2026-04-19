@@ -284,6 +284,28 @@ Deno.serve(async (req: Request) => {
       roundEndDate
     );
 
+    // ── Pre-fetch player names from regular season cache ───────
+    // The NHL game-log endpoint does not return player names, so
+    // we look them up from the regular_season_stats_cache table
+    // and write them into the playoff cache for widget display.
+    const playerNameById = new Map<number, string>();
+    if (playerIds.length > 0) {
+      const regRows = await pgSelect<{
+        player_id: number;
+        player_name: string | null;
+      }>(
+        supabaseUrl,
+        supabaseKey,
+        'regular_season_stats_cache',
+        `select=player_id,player_name&player_id=in.(${playerIds.join(',')})`
+      );
+      for (const row of regRows) {
+        if (row.player_name) {
+          playerNameById.set(row.player_id, row.player_name);
+        }
+      }
+    }
+
     // ── Sync player stats from NHL API ─────────────────────────
     for (const playerId of playerIds) {
       try {
@@ -339,6 +361,10 @@ Deno.serve(async (req: Request) => {
         };
         if (teamAbbrev) {
           upsertRow.team_abbreviation = teamAbbrev;
+        }
+        const cachedName = playerNameById.get(playerId);
+        if (cachedName) {
+          upsertRow.player_name = cachedName;
         }
 
         const ok = await pgUpsert(
