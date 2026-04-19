@@ -1,0 +1,22 @@
+{
+  "name": "@sportsnot/supabase-db",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/supabase-db",
+  "projectType": "library",
+  "targets": {
+    "deploy": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "inputs": ["default"],
+      "options": {
+        "commands": [
+          "mkdir -p supabase/functions",
+          "cp -r packages/supabase-db/functions/. supabase/functions/",
+          "supabase functions deploy --project-ref $SUPABASE_PROJECT_REF --no-verify-jwt"
+        ],
+        "cwd": "{workspaceRoot}",
+        "sequential": true
+      }
+    }
+  }
+}
