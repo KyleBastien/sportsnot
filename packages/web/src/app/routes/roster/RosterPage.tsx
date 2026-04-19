@@ -42,6 +42,7 @@ import {
   useMockPlayoffTeams,
   useMockRegularSeasonPlayers,
 } from '../../../mock/hooks/useMockNhlApi';
+import { useIsMobile, MobileCardList, DataRow } from '@sportsnot/ui';
 import { groupHasActions } from './rosterUtils';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
@@ -267,6 +268,8 @@ export function RosterPage() {
     return ids;
   }, [playerStats]);
 
+  const isMobile = useIsMobile();
+
   if (isLoading) {
     return (
       <Center h="50vh">
@@ -457,6 +460,109 @@ export function RosterPage() {
                 <Text c="dimmed" size="sm">
                   No player drafted in this slot
                 </Text>
+              ) : isMobile ? (
+                <MobileCardList>
+                  {group.players.map((slot: RosterSlotRow) => {
+                    const isIrSlot =
+                      slot.position === 'IR_F' || slot.position === 'IR_D';
+                    const matchingPosition =
+                      slot.position === 'IR_F' ? 'F' : 'D';
+                    const injuredCandidates = slots.filter(
+                      (s: RosterSlotRow) =>
+                        s.position === matchingPosition &&
+                        s.is_active &&
+                        s.id !== slot.id &&
+                        s.player_id !== null &&
+                        injuredPlayerIds.has(s.player_id)
+                    );
+
+                    return (
+                      <Card key={slot.id} padding="sm" radius="sm" withBorder>
+                        <Group justify="space-between" mb={4}>
+                          <Text
+                            fw={500}
+                            size="sm"
+                            style={
+                              slot.is_eliminated
+                                ? { textDecoration: 'line-through' }
+                                : undefined
+                            }
+                          >
+                            {resolvePickName(
+                              slot.player_id,
+                              slot.team_id,
+                              playerNameMap,
+                              teamNameMap
+                            )}
+                          </Text>
+                          <Text size="sm" fw={500}>
+                            {slot.points_earned ?? 0}
+                          </Text>
+                        </Group>
+                        <DataRow
+                          label="NHL Team"
+                          value={
+                            slot.player_id != null
+                              ? (playerTeamAbbreviationMap.get(
+                                  slot.player_id
+                                ) ?? '—')
+                              : slot.team_id != null
+                                ? (teamAbbreviationMap.get(slot.team_id) ?? '—')
+                                : '—'
+                          }
+                        />
+                        <DataRow
+                          label="Status"
+                          value={
+                            <Group gap={4}>
+                              {slot.is_eliminated ? (
+                                <Badge color="red" size="sm">
+                                  Eliminated
+                                </Badge>
+                              ) : slot.is_active ? (
+                                <Badge color="green" size="sm">
+                                  Active
+                                </Badge>
+                              ) : (
+                                <Badge color="gray" size="sm">
+                                  Inactive
+                                </Badge>
+                              )}
+                              {slot.activated_from_ir && (
+                                <Badge color="orange" size="sm">
+                                  From IR
+                                </Badge>
+                              )}
+                            </Group>
+                          }
+                        />
+                        {isOwnRoster &&
+                          isIrSlot &&
+                          !slot.activated_from_ir &&
+                          injuredCandidates.length > 0 && (
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              color="orange"
+                              mt="xs"
+                              fullWidth
+                              onClick={() => {
+                                setIrModal({
+                                  irSlotId: slot.id,
+                                  candidates: injuredCandidates,
+                                });
+                                setSelectedInjuredSlotId(
+                                  injuredCandidates[0].id
+                                );
+                              }}
+                            >
+                              Activate IR
+                            </Button>
+                          )}
+                      </Card>
+                    );
+                  })}
+                </MobileCardList>
               ) : (
                 <Table.ScrollContainer minWidth={640}>
                   <Table>
@@ -477,7 +583,6 @@ export function RosterPage() {
                           slot.position === 'IR_F' || slot.position === 'IR_D';
                         const matchingPosition =
                           slot.position === 'IR_F' ? 'F' : 'D';
-                        // Find active, injured players at the matching position
                         const injuredCandidates = slots.filter(
                           (s: RosterSlotRow) =>
                             s.position === matchingPosition &&

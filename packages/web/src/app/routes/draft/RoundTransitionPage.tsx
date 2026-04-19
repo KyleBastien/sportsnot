@@ -16,6 +16,7 @@ import {
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
+import { useIsMobile, MobileCardList, DataRow } from '@sportsnot/ui';
 import { useAuthContext } from '../../context/AuthContext';
 import { deriveCurrentRound, deriveNextRound } from '../../utils/roundUtils';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
@@ -108,6 +109,7 @@ export function RoundTransitionPage() {
   const { data: league, isLoading } = useTransitionLeague(leagueId);
   const { data: completedDrafts } = useCompletedDrafts(leagueId);
   const mockStartReDraft = useMockStartReDraft();
+  const isMobile = useIsMobile();
 
   const isCommissioner = league?.commissioner_id === user?.id;
   const completedCount = completedDrafts?.length ?? 0;
@@ -197,57 +199,110 @@ export function RoundTransitionPage() {
         <Card shadow="sm" padding="lg" radius="md" withBorder>
           <Stack gap="md">
             <Title order={4}>Round {currentRound} Final Standings</Title>
-            <Table.ScrollContainer minWidth={600}>
-              <Table>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Rank</Table.Th>
-                    <Table.Th>Team</Table.Th>
-                    <Table.Th>Player</Table.Th>
-                    <Table.Th>Points</Table.Th>
-                    <Table.Th>Re-Draft Pick</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {sortMembersForReDraft(
-                    (league.league_members ?? []) as TransitionMemberRow[]
-                  )
-                    .reverse()
-                    .map((m: TransitionMemberRow, index: number) => (
-                      <Table.Tr key={m.id}>
-                        <Table.Td>
+            {isMobile ? (
+              <MobileCardList>
+                {sortMembersForReDraft(
+                  (league.league_members ?? []) as TransitionMemberRow[]
+                )
+                  .reverse()
+                  .map((m: TransitionMemberRow, index: number) => (
+                    <Card key={m.id} padding="sm" radius="sm" withBorder>
+                      <Group justify="space-between" mb={4}>
+                        <Group gap="xs">
                           <Badge
                             variant="light"
                             color={index === 0 ? 'yellow' : 'gray'}
+                            size="sm"
                           >
                             #{index + 1}
                           </Badge>
-                        </Table.Td>
-                        <Table.Td>{m.team_name}</Table.Td>
-                        <Table.Td>
-                          {m.users?.display_name ?? 'Unknown'}
-                          {m.user_id === user?.id && (
+                          <Text fw={500} size="sm">
+                            {m.team_name}
+                          </Text>
+                        </Group>
+                        <Badge variant="outline" size="sm">
+                          Pick #{sortedMembers.length - index}
+                        </Badge>
+                      </Group>
+                      <DataRow
+                        label="Player"
+                        value={
+                          <Group gap={4}>
+                            <Text size="sm" fw={500}>
+                              {m.users?.display_name ?? 'Unknown'}
+                            </Text>
+                            {m.user_id === user?.id && (
+                              <Badge size="xs" color="green" variant="light">
+                                You
+                              </Badge>
+                            )}
+                          </Group>
+                        }
+                      />
+                      <DataRow
+                        label="Points"
+                        value={
+                          <Text size="sm" fw={700}>
+                            {m.total_points ?? 0}
+                          </Text>
+                        }
+                      />
+                    </Card>
+                  ))}
+              </MobileCardList>
+            ) : (
+              <Table.ScrollContainer minWidth={600}>
+                <Table>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Rank</Table.Th>
+                      <Table.Th>Team</Table.Th>
+                      <Table.Th>Player</Table.Th>
+                      <Table.Th>Points</Table.Th>
+                      <Table.Th>Re-Draft Pick</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {sortMembersForReDraft(
+                      (league.league_members ?? []) as TransitionMemberRow[]
+                    )
+                      .reverse()
+                      .map((m: TransitionMemberRow, index: number) => (
+                        <Table.Tr key={m.id}>
+                          <Table.Td>
                             <Badge
-                              size="xs"
-                              ml="xs"
-                              color="green"
                               variant="light"
+                              color={index === 0 ? 'yellow' : 'gray'}
                             >
-                              You
+                              #{index + 1}
                             </Badge>
-                          )}
-                        </Table.Td>
-                        <Table.Td fw={700}>{m.total_points ?? 0}</Table.Td>
-                        <Table.Td>
-                          <Badge variant="outline">
-                            #{sortedMembers.length - index}
-                          </Badge>
-                        </Table.Td>
-                      </Table.Tr>
-                    ))}
-                </Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
+                          </Table.Td>
+                          <Table.Td>{m.team_name}</Table.Td>
+                          <Table.Td>
+                            {m.users?.display_name ?? 'Unknown'}
+                            {m.user_id === user?.id && (
+                              <Badge
+                                size="xs"
+                                ml="xs"
+                                color="green"
+                                variant="light"
+                              >
+                                You
+                              </Badge>
+                            )}
+                          </Table.Td>
+                          <Table.Td fw={700}>{m.total_points ?? 0}</Table.Td>
+                          <Table.Td>
+                            <Badge variant="outline">
+                              #{sortedMembers.length - index}
+                            </Badge>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
+            )}
           </Stack>
         </Card>
 
