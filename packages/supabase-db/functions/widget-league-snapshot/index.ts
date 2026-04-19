@@ -112,8 +112,14 @@ Deno.serve(async (req: Request) => {
     if (!shareCode) {
       return jsonResponse({ error: 'shareCode is required' }, 400);
     }
+    // Use Eastern Time (America/New_York) for "today" since NHL games are
+    // scheduled in ET. Using UTC would roll to the next date as early as
+    // ~8 pm ET in summer (midnight UTC), showing tomorrow's slate too soon.
     const date =
-      url.searchParams.get('date') ?? new Date().toISOString().slice(0, 10);
+      url.searchParams.get('date') ??
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(
+        new Date()
+      );
 
     const cfg = { url: supabaseUrl, key: apiKey };
 
