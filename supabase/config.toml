@@ -1,0 +1,8 @@
+[api]
+enabled = false
+
+[db]
+major_version = 17
+
+[studio]
+enabled = false
