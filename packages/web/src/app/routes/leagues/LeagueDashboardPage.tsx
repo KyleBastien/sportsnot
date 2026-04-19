@@ -1,5 +1,6 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
+  Anchor,
   Container,
   Title,
   Text,
@@ -281,8 +282,14 @@ export function LeagueDashboardPage() {
                   >
                     <Table.Td>{index + 1}</Table.Td>
                     <Table.Td>
-                      {member.team_name}
-                      {seasonComplete && index === 0 && ' 🏆'}
+                      <Anchor
+                        component={Link}
+                        to={`/roster/${leagueId}/${member.id}`}
+                        fw={member.user_id === user?.id ? 700 : undefined}
+                      >
+                        {member.team_name}
+                        {seasonComplete && index === 0 && ' 🏆'}
+                      </Anchor>
                     </Table.Td>
                     <Table.Td>
                       {member.users?.display_name ?? 'Unknown'}
