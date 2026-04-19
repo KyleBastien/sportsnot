@@ -520,9 +520,11 @@ test.describe('Mobile Viewport', () => {
     await expect(authenticatedPage.getByText('Connor McDavid')).toBeHidden();
     await searchInput.clear();
 
-    // Click Draft button — on mobile the table is a card layout (no rows)
+    // Click Draft button — on mobile, cards replace table rows.
+    // The player cards are nested inside a parent Card, so use
+    // nested selector to target only the leaf-level player cards.
     const playerCard = authenticatedPage
-      .locator('[class*="Card"]')
+      .locator('.mantine-Card-root .mantine-Card-root')
       .filter({ hasText: 'Connor McDavid' });
     await playerCard.getByRole('button', { name: /Draft/i }).click();
 
@@ -657,7 +659,7 @@ test.describe('Mobile Viewport', () => {
 
     // Open the draft confirmation modal — on mobile, cards replace rows
     const playerCard = authenticatedPage
-      .locator('[class*="Card"]')
+      .locator('.mantine-Card-root .mantine-Card-root')
       .filter({ hasText: 'Connor McDavid' });
     await playerCard.getByRole('button', { name: /Draft/i }).click();
 
