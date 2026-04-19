@@ -4,55 +4,35 @@ import { IconChevronLeft } from '@tabler/icons-react';
 import { useIsNativeIOS } from '../hooks/useIsNativeIOS';
 
 /**
+ * Map of route pattern → back-destination builder.
+ * Patterns are tested in order; first match wins.
+ * Capture group 1 is the leagueId where applicable.
+ */
+const BACK_ROUTES = new Map<RegExp, ((m: RegExpMatchArray) => string) | null>([
+  [/^\/leagues\/create$/, () => '/'],
+  [/^\/leagues\/join$/, () => '/'],
+  [/^\/leagues\/([^/]+)\/settings$/, (m) => `/leagues/${m[1]}`],
+  [/^\/leagues\/([^/]+)$/, () => '/'],
+  [/^\/draft\/([^/]+)\/lobby$/, (m) => `/leagues/${m[1]}`],
+  [/^\/draft\//, null],
+  [/^\/roster\/([^/]+)\/history$/, (m) => `/roster/${m[1]}`],
+  [/^\/roster\/([^/]+)/, (m) => `/leagues/${m[1]}`],
+  [/^\/standings\/([^/]+)/, (m) => `/leagues/${m[1]}`],
+  [/^\/scoring\/([^/]+)/, (m) => `/leagues/${m[1]}`],
+  [/^\/profile$/, () => '/'],
+]);
+
+/**
  * Given the current pathname, returns the "back" destination or null
  * when no back button should be shown (home, auth, mid-draft, transition).
  */
 function getBackDestination(pathname: string): string | null {
-  // No back button on home, auth, or draft/transition pages
   if (pathname === '/' || pathname.startsWith('/auth')) return null;
 
-  // /draft/:leagueId (exact) — mid-draft, no back
-  // /draft/:leagueId/transition — no back
-  const draftMatch = pathname.match(/^\/draft\/([^/]+)(\/.*)?$/);
-  if (draftMatch) {
-    const suffix = draftMatch[2] ?? '';
-    if (suffix === '' || suffix === '/transition') return null;
-    // /draft/:leagueId/lobby → league dashboard
-    if (suffix === '/lobby') return `/leagues/${draftMatch[1]}`;
-    return null;
+  for (const [pattern, builder] of BACK_ROUTES) {
+    const match = pathname.match(pattern);
+    if (match) return builder ? builder(match) : null;
   }
-
-  // /leagues/create or /leagues/join → dashboard
-  if (pathname === '/leagues/create' || pathname === '/leagues/join') {
-    return '/';
-  }
-
-  // /leagues/:leagueId/settings → league dashboard
-  const settingsMatch = pathname.match(/^\/leagues\/([^/]+)\/settings$/);
-  if (settingsMatch) return `/leagues/${settingsMatch[1]}`;
-
-  // /leagues/:leagueId → dashboard
-  const leagueMatch = pathname.match(/^\/leagues\/([^/]+)$/);
-  if (leagueMatch) return '/';
-
-  // /roster/:leagueId/history → roster page
-  const rosterHistoryMatch = pathname.match(/^\/roster\/([^/]+)\/history$/);
-  if (rosterHistoryMatch) return `/roster/${rosterHistoryMatch[1]}`;
-
-  // /roster/:leagueId/:leagueMemberId? → league dashboard
-  const rosterMatch = pathname.match(/^\/roster\/([^/]+)/);
-  if (rosterMatch) return `/leagues/${rosterMatch[1]}`;
-
-  // /standings/:leagueId → league dashboard
-  const standingsMatch = pathname.match(/^\/standings\/([^/]+)/);
-  if (standingsMatch) return `/leagues/${standingsMatch[1]}`;
-
-  // /scoring/:leagueId → league dashboard
-  const scoringMatch = pathname.match(/^\/scoring\/([^/]+)/);
-  if (scoringMatch) return `/leagues/${scoringMatch[1]}`;
-
-  // /profile → dashboard
-  if (pathname === '/profile') return '/';
 
   return null;
 }
