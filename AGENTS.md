@@ -1,5 +1,14 @@
 # AGENTS.md — SportsNot
 
+## Always Talk Like Caveman
+
+Terse like caveman. Technical substance exact. Only fluff die.
+Drop: articles, filler (just/really/basically), pleasantries, hedging.
+Fragments OK. Short synonyms. Code unchanged.
+Pattern: [thing] [action] [reason]. [next step].
+ACTIVE EVERY RESPONSE. No revert after many turns. No filler drift.
+Code/commits/PRs: normal. Off: "stop caveman" / "normal mode".
+
 ## Project Overview
 
 SportsNot is an NHL playoff fantasy hockey app. Users create/join leagues, draft real NHL playoff players through a multi-round snake draft, manage rosters with IR slots, and compete based on live NHL stats. The app supports a full offline mock mode for development without Supabase/NHL API credentials.
