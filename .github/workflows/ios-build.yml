@@ -50,6 +50,9 @@ jobs:
           sudo xcode-select -s "$XCODE_PATH"
           xcodebuild -version
 
+      - name: Install iOS platform
+        run: xcodebuild -downloadPlatform iOS
+
       - name: Install dependencies
         run: yarn install --immutable
 
