@@ -17,6 +17,7 @@ import { IconSun, IconMoon } from '@tabler/icons-react';
 import { useAuthContext } from './context/AuthContext';
 import logoSrc from '../assets/sportsnot-logo.png';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { NativeBackButton } from './components/NativeBackButton';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { initWidgetBridge } from './widget/initWidgetBridge';
 
@@ -179,15 +180,18 @@ export function App() {
         >
           <AppShell.Header>
             <Group h="100%" px="md" justify="space-between">
-              <UnstyledButton component={Link} to="/">
-                <Image
-                  src={logoSrc}
-                  alt="SportsNot Fantasy Hockey"
-                  h={40}
-                  w="auto"
-                  fit="contain"
-                />
-              </UnstyledButton>
+              <Group gap="xs">
+                <NativeBackButton />
+                <UnstyledButton component={Link} to="/">
+                  <Image
+                    src={logoSrc}
+                    alt="SportsNot Fantasy Hockey"
+                    h={40}
+                    w="auto"
+                    fit="contain"
+                  />
+                </UnstyledButton>
+              </Group>
               <Group gap="sm">
                 <ColorSchemeToggle />
                 <UserMenu />
