@@ -69,3 +69,4 @@ scripts/ralph/archive/
 # Supabase CLI
 supabase/.temp/
 supabase/functions/
+supabase/migrations/

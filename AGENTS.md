@@ -99,6 +99,30 @@ The `packages/web/src/mock/` directory contains all mock infrastructure. The hoo
 - **Prettier:** Single quotes, trailing commas (es5), 2-space indent, 80 char width.
 - **E2E tests:** Use page object pattern (`packages/e2e/page-objects/`) with test fixtures (`packages/e2e/fixtures/`).
 - **Database:** Supabase with RLS policies. Schema in `packages/supabase-db/migrations/`. Edge functions in `packages/supabase-db/functions/`.
+- **Migrations:** Use Supabase CLI timestamp format: `{YYYYMMDDHHmmss}_{name}.sql`. Migrations auto-deploy to production when CI+E2E pass on main.
+
+## Database Migration Deployment
+
+Migration source lives in `packages/supabase-db/migrations/` using Supabase CLI timestamp naming (`{YYYYMMDDHHmmss}_{name}.sql`). CI copies them to `supabase/migrations/` and runs `supabase db push` after CI+E2E pass on main.
+
+**Adding a new migration:**
+
+1. Generate a timestamp: `date +%Y%m%d%H%M%S` (or use current UTC time)
+2. Create `packages/supabase-db/migrations/{timestamp}_{name}.sql`
+3. Commit, open PR, merge to main — migration auto-deploys
+
+**Manual deployment (local):**
+
+```bash
+# Copy migrations to supabase directory
+Copy-Item packages\supabase-db\migrations\*.sql supabase\migrations\ -Force
+
+# Link and push
+supabase link --project-ref <project-ref>
+supabase db push
+```
+
+The `supabase/migrations/` directory is gitignored — CI creates it at deploy time.
 
 ## Edge Function Deployment
 
