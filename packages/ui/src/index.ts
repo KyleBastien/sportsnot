@@ -1,5 +1,10 @@
 export { PlayerCard } from './lib/PlayerCard';
 export type { PlayerCardProps } from './lib/PlayerCard';
+export { useIsMobile } from './lib/useIsMobile';
+export { MobileCardList } from './lib/MobileCardList';
+export type { MobileCardListProps } from './lib/MobileCardList';
+export { DataRow } from './lib/DataRow';
+export type { DataRowProps } from './lib/DataRow';
 export { vars } from './lib/styles/theme.css';
 export { sprinkles } from './lib/styles/sprinkles.css';
 export type { Sprinkles } from './lib/styles/sprinkles.css';

@@ -120,68 +120,66 @@ export function RosterHistoryPage() {
             {sortedRosters.length === 0 ? (
               <Text c="dimmed">No roster data for this round</Text>
             ) : (
-              <Table.ScrollContainer minWidth={600}>
-                <Table>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Position</Table.Th>
-                      <Table.Th>Player/Team ID</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Points</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {sortedRosters.map((slot) => (
-                      <Table.Tr
-                        key={slot.id}
-                        style={{
-                          opacity: slot.is_active ? 1 : 0.5,
-                        }}
-                      >
-                        <Table.Td>
-                          <Badge
-                            variant="light"
-                            color={
-                              slot.position.startsWith('IR')
-                                ? 'red'
-                                : slot.position === 'G'
-                                  ? 'grape'
-                                  : slot.position === 'D'
-                                    ? 'blue'
-                                    : 'green'
-                            }
-                          >
-                            {slot.position}
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Position</Table.Th>
+                    <Table.Th>Player/Team ID</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Points</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {sortedRosters.map((slot) => (
+                    <Table.Tr
+                      key={slot.id}
+                      style={{
+                        opacity: slot.is_active ? 1 : 0.5,
+                      }}
+                    >
+                      <Table.Td>
+                        <Badge
+                          variant="light"
+                          color={
+                            slot.position.startsWith('IR')
+                              ? 'red'
+                              : slot.position === 'G'
+                                ? 'grape'
+                                : slot.position === 'D'
+                                  ? 'blue'
+                                  : 'green'
+                          }
+                        >
+                          {slot.position}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        {slot.player_id
+                          ? `Player #${slot.player_id}`
+                          : slot.team_id
+                            ? `Team #${slot.team_id}`
+                            : 'Empty'}
+                      </Table.Td>
+                      <Table.Td>
+                        {slot.activated_from_ir ? (
+                          <Badge color="orange" size="sm">
+                            IR Activated
                           </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          {slot.player_id
-                            ? `Player #${slot.player_id}`
-                            : slot.team_id
-                              ? `Team #${slot.team_id}`
-                              : 'Empty'}
-                        </Table.Td>
-                        <Table.Td>
-                          {slot.activated_from_ir ? (
-                            <Badge color="orange" size="sm">
-                              IR Activated
-                            </Badge>
-                          ) : slot.is_active ? (
-                            <Badge color="green" size="sm">
-                              Active
-                            </Badge>
-                          ) : (
-                            <Badge color="red" size="sm">
-                              Inactive
-                            </Badge>
-                          )}
-                        </Table.Td>
-                        <Table.Td fw={700}>{slot.points_earned ?? 0}</Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </Table.ScrollContainer>
+                        ) : slot.is_active ? (
+                          <Badge color="green" size="sm">
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge color="red" size="sm">
+                            Inactive
+                          </Badge>
+                        )}
+                      </Table.Td>
+                      <Table.Td fw={700}>{slot.points_earned ?? 0}</Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
             )}
           </Stack>
         </Card>
