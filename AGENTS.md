@@ -111,6 +111,17 @@ Migration source lives in `packages/supabase-db/migrations/` using Supabase CLI 
 2. Create `packages/supabase-db/migrations/{timestamp}_{name}.sql`
 3. Commit, open PR, merge to main — migration auto-deploys
 
+**⚠️ Avoiding migration timestamp drift:**
+
+`supabase db push` fails if the remote `schema_migrations` table contains a version that doesn't match any local filename. This happens when a migration is pushed manually (e.g. `supabase db push` from a local machine) with a different filename than what's committed to the repo.
+
+To prevent drift:
+
+- **Never run `supabase db push` manually** against production. Let CI handle it on merge to main.
+- If you must push manually, ensure the **exact filename** (including timestamp) matches what's committed in `packages/supabase-db/migrations/`.
+- After any manual push, verify with `supabase migration list` that remote versions match local filenames.
+- If drift occurs, rename the local file to match the remote version and commit the rename.
+
 **Manual deployment (local):**
 
 ```bash
