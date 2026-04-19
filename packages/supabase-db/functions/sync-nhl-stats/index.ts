@@ -32,8 +32,8 @@ interface NhlScoreGameLite {
   gameType: number;
   gameState: string;
   gameDate?: string;
-  homeTeam?: { id?: number; abbrev?: string };
-  awayTeam?: { id?: number; abbrev?: string };
+  homeTeam?: { id?: number; abbrev?: string; score?: number };
+  awayTeam?: { id?: number; abbrev?: string; score?: number };
 }
 
 interface LiveDelta {
@@ -354,21 +354,66 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // ── Collect all FINAL playoff games for the round ──────────
+    // We fetch scores for every date in the round window so that wins and
+    // shutouts are cumulative round-to-date totals. Fetching only /score/now
+    // (today's games) and upserting from zero would reset historical totals on
+    // every sync run.
+    // Only FINAL playoff (gameType=3) games are collected to avoid storing
+    // in-progress or non-playoff games that would be skipped in the team loop.
+    const allRoundFinalGames: NhlScoreGameLite[] = [];
+    if (roundStartDate) {
+      // .toISOString() always returns a UTC timestamp; splitting on 'T' gives
+      // the UTC calendar date, which is consistent with the NHL API's gameDate
+      // field (also UTC-based).
+      const todayStr = new Date().toISOString().split('T')[0];
+      const endStr = roundEndDate ?? todayStr;
+      const effectiveEndStr = endStr <= todayStr ? endStr : todayStr;
+      let currentDateStr = roundStartDate;
+      while (currentDateStr <= effectiveEndStr) {
+        try {
+          const resp = await fetch(`${NHL_API_BASE}/score/${currentDateStr}`);
+          if (resp.ok) {
+            const data = await resp.json();
+            const games = (data.games ?? []) as NhlScoreGameLite[];
+            allRoundFinalGames.push(
+              ...games.filter(
+                (g) => g.gameType === 3 && g.gameState === 'FINAL'
+              )
+            );
+          }
+        } catch {
+          // Continue on individual date fetch failures
+        }
+        // Noon UTC avoids any ambiguity when UTC methods are applied during
+        // the date increment; .setUTCDate()/.toISOString() still produce the
+        // correct next-day string regardless of the server's local timezone.
+        const d = new Date(currentDateStr + 'T12:00:00Z');
+        d.setUTCDate(d.getUTCDate() + 1);
+        currentDateStr = d.toISOString().split('T')[0];
+      }
+    } else {
+      try {
+        const resp = await fetch(`${NHL_API_BASE}/score/now`);
+        if (resp.ok) {
+          const data = await resp.json();
+          const games = (data.games ?? []) as NhlScoreGameLite[];
+          allRoundFinalGames.push(
+            ...games.filter((g) => g.gameType === 3 && g.gameState === 'FINAL')
+          );
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
     // ── Sync team stats (wins/shutouts) ────────────────────────
     for (const teamId of teamIds) {
       try {
-        const resp = await fetch(`${NHL_API_BASE}/score/now`);
-        if (!resp.ok) continue;
-
-        const data = await resp.json();
-        const games = data.games ?? [];
-
         let wins = 0;
         let shutouts = 0;
 
-        for (const game of games) {
-          if (game.gameType !== 3 || game.gameState !== 'FINAL') continue;
-
+        for (const game of allRoundFinalGames) {
           if (roundStartDate && roundEndDate && game.gameDate) {
             if (game.gameDate < roundStartDate || game.gameDate > roundEndDate)
               continue;
@@ -379,11 +424,11 @@ Deno.serve(async (req: Request) => {
           if (!isHome && !isAway) continue;
 
           const teamScore = isHome
-            ? game.homeTeam?.score
-            : game.awayTeam?.score;
+            ? (game.homeTeam?.score ?? 0)
+            : (game.awayTeam?.score ?? 0);
           const opponentScore = isHome
-            ? game.awayTeam?.score
-            : game.homeTeam?.score;
+            ? (game.awayTeam?.score ?? 0)
+            : (game.homeTeam?.score ?? 0);
 
           if (teamScore > opponentScore) {
             wins++;
