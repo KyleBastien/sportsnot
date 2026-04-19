@@ -70,3 +70,6 @@ scripts/ralph/archive/
 supabase/.temp/
 supabase/functions/
 supabase/migrations/
+
+# iOS secrets (xcconfig with real Supabase keys)
+ios/App/Secrets.xcconfig

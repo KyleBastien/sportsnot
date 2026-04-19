@@ -75,6 +75,13 @@ jobs:
       - name: Pod install
         run: yarn nx pod-install @sportsnot/ios-app
 
+      - name: Generate Secrets.xcconfig
+        run: |
+          cat > ios/App/Secrets.xcconfig <<EOF
+          SUPABASE_URL = ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY = ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          EOF
+
       - name: Build App target
         run: yarn nx build @sportsnot/ios-app
 
