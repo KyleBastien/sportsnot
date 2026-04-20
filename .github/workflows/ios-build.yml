@@ -53,7 +53,7 @@ jobs:
       - name: Install iOS platform
         run: |
           xcodebuild -runFirstLaunch
-          xcodebuild -downloadPlatform iOS || echo "⚠️ downloadPlatform failed — continuing (SDK bundled with Xcode)"
+          sudo xcodebuild -downloadPlatform iOS
 
       - name: Install dependencies
         run: yarn install --immutable
