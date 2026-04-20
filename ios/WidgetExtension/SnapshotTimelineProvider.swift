@@ -107,7 +107,19 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
     private static let staleFallbackMaxAge: TimeInterval = 60 * 60 // 1 hour
 
     private func entry(for configuration: FeaturedLeagueIntent) async -> SnapshotEntry {
-        let shareCode = configuration.shareCode ?? AppGroup.featuredShareCode
+        // Only honour a configuration override if it matches a share code
+        // the main app has actually linked via setFeaturedLeague. iOS exposes
+        // the @Parameter as a free-text field in Edit Widget; users have
+        // typed their league's invite_code (visible in-app) into that field
+        // by mistake, which produces a 404 from the snapshot endpoint. When
+        // the configured value is unknown, fall back to whatever the app
+        // last wrote so the widget self-heals after the next foreground.
+        let knownCodes = Set(AppGroup.shareCodes)
+        let configuredCode: String? = {
+            guard let c = configuration.shareCode, !c.isEmpty else { return nil }
+            return knownCodes.contains(c) ? c : nil
+        }()
+        let shareCode = configuredCode ?? AppGroup.featuredShareCode
         let myTeamName = shareCode.flatMap { AppGroup.myTeamName(forShareCode: $0) }
         guard let code = shareCode, !code.isEmpty else {
             return SnapshotEntry(

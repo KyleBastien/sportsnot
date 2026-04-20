@@ -54,7 +54,9 @@ struct MediumFamilyView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Today").font(.caption.bold())
-                    if let games = entry.snapshot?.games, !games.isEmpty {
+                    if entry.snapshot == nil, let error = entry.errorMessage {
+                        Text(error).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                    } else if let games = entry.snapshot?.games, !games.isEmpty {
                         ForEach(games.prefix(4)) { g in
                             HStack(spacing: 4) {
                                 Text("\(g.awayTeamAbbrev) \(g.awayScore)")

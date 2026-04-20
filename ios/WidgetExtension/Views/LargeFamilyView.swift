@@ -22,7 +22,12 @@ struct LargeFamilyView: View {
                     .lineLimit(1)
             }
             Text("Today's games").font(.caption).foregroundStyle(.secondary)
-            if let games = entry.snapshot?.games, !games.isEmpty {
+            if let error = entry.errorMessage, entry.snapshot == nil {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            } else if let games = entry.snapshot?.games, !games.isEmpty {
                 ForEach(games.prefix(6)) { g in
                     HStack(spacing: 6) {
                         Text("\(g.awayTeamAbbrev) \(g.awayScore)")
