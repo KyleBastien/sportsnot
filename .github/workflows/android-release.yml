@@ -3,10 +3,6 @@ name: Android Release
 on:
   workflow_dispatch:
     inputs:
-      version_name:
-        description: 'Version name (e.g. 1.0.0)'
-        required: true
-        type: string
       notes:
         description: 'Release notes (optional)'
         required: false
@@ -49,6 +45,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Derive version
+        run: |
+          VERSION_NAME=$(node -p "require('./package.json').version")
+          VERSION_CODE=${{ github.run_number }}
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+          echo "Building $VERSION_NAME ($VERSION_CODE)"
+
       - name: Install dependencies
         run: yarn install --immutable
 
@@ -68,14 +72,6 @@ jobs:
       - name: Generate google-services.json
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
-      - name: Set version code from run number
-        run: |
-          VERSION_CODE=${{ github.run_number }}
-          VERSION_NAME=${{ inputs.version_name }}
-          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
-          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
-          echo "Building version $VERSION_NAME ($VERSION_CODE)"
-
       - name: Decode signing keystore
         run: |
           echo '${{ secrets.ANDROID_KEYSTORE_BASE64 }}' | base64 --decode > android/app/release.keystore
@@ -93,7 +89,7 @@ jobs:
       - name: Upload release AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-${{ env.VERSION_NAME }}
+          name: app-release-${{ env.VERSION_NAME }}-${{ env.VERSION_CODE }}
           path: android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 90
 
