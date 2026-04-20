@@ -47,7 +47,7 @@ jobs:
 
       - name: Derive version
         run: |
-          VERSION_NAME=$(node -p "require('./package.json').version")
+          VERSION_NAME="1.0.${{ github.run_number }}"
           VERSION_CODE=${{ github.run_number }}
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
