@@ -25,9 +25,10 @@ public class WidgetBridgePlugin: CAPPlugin, CAPBridgedPlugin {
         AppGroup.rememberShareCode(shareCode)
         let myTeamName = call.getString("myTeamName")
         AppGroup.setMyTeamName(myTeamName, forShareCode: shareCode)
-        if #available(iOS 14.0, *) {
-            WidgetCenter.shared.reloadAllTimelines()
-        }
+        // Prime the AppGroup cache from the main process and reload the
+        // widget timeline. This avoids relying solely on the extension's
+        // (budget-throttled, network-constrained) own fetch.
+        WidgetSnapshotPrimer.refresh(reason: "setFeaturedLeague")
         call.resolve([
             "shareCode": shareCode,
             "myTeamName": myTeamName ?? NSNull()

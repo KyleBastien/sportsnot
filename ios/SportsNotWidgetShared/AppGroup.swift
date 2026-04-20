@@ -75,4 +75,19 @@ public enum AppGroup {
         else { return nil }
         return (snapshot, stored)
     }
+
+    /// Returns the cached snapshot only if it was stored within `maxAge`
+    /// seconds. Used by the widget extension to avoid showing yesterday's
+    /// data when both fresh fetches and recent app-primed cache are absent.
+    public static func cachedSnapshot(maxAge: TimeInterval) -> (snapshot: WidgetSnapshot, stored: Date)? {
+        guard let cached = cachedSnapshot() else { return nil }
+        guard Date().timeIntervalSince(cached.stored) <= maxAge else { return nil }
+        return cached
+    }
+
+    /// Age in seconds of the most recently cached snapshot, or nil if none.
+    public static var cachedSnapshotAge: TimeInterval? {
+        guard let stored = defaults.object(forKey: Keys.lastSnapshotAt) as? Date else { return nil }
+        return Date().timeIntervalSince(stored)
+    }
 }

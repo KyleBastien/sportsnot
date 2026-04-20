@@ -23,15 +23,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
-        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
+        // Prime the widget cache as soon as we know the app is heading to
+        // foreground so data is fresh by the time the user sees the widget
+        // again on app exit.
+        WidgetSnapshotPrimer.refresh(reason: "willEnterForeground")
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Force widget timeline refresh so the widget picks up latest data
-        // even if its own WidgetKit budget is exhausted.
-        if #available(iOS 14.0, *) {
-            WidgetCenter.shared.reloadAllTimelines()
-        }
+        // Defensive: also fire on didBecomeActive (cold launch from a widget
+        // tap doesn't hit willEnterForeground; the primer coalesces dupes).
+        WidgetSnapshotPrimer.refresh(reason: "didBecomeActive")
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
@@ -39,6 +40,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        // Widget tap → URL deep link launches the app. Prime immediately so
+        // the widget refresh isn't gated on WidgetKit's own reload budget.
+        WidgetSnapshotPrimer.refresh(reason: "openURL")
         // Called when the app was launched with a url. Feel free to add additional processing here,
         // but if you want the App API to support tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
