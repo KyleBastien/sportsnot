@@ -6,9 +6,10 @@ const nativeBridge = registerPlugin<WidgetBridgePlugin>('WidgetBridge', {
 });
 
 /**
- * Returns true when running inside the Capacitor iOS shell (not a web browser).
+ * Returns true when running inside a Capacitor native shell (iOS or Android).
  */
 export const isWidgetBridgeAvailable = (): boolean =>
-  Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+  Capacitor.isNativePlatform() &&
+  (Capacitor.getPlatform() === 'ios' || Capacitor.getPlatform() === 'android');
 
 export const WidgetBridge = nativeBridge;

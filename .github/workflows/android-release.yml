@@ -1,0 +1,100 @@
+name: Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: 'Release notes (optional)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  APP_BUNDLE_ID: com.sportsnot.app
+
+jobs:
+  android-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VITE_MOCK_MODE: 'false'
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build web bundle
+        run: yarn nx build @sportsnot/web
+
+      - name: Sync web bundle into Android
+        run: npx cap sync android
+
+      - name: Generate secrets.properties
+        run: |
+          cat > android/app/secrets.properties <<EOF
+          SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          EOF
+
+      - name: Generate google-services.json
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Decode signing keystore
+        run: |
+          echo '${{ secrets.ANDROID_KEYSTORE_BASE64 }}' | base64 --decode > android/app/release.keystore
+
+      - name: Build release AAB
+        run: |
+          cd android && ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.keystore \
+            -Pandroid.injected.signing.store.password='${{ secrets.ANDROID_KEYSTORE_PASSWORD }}' \
+            -Pandroid.injected.signing.key.alias='${{ secrets.ANDROID_KEY_ALIAS }}' \
+            -Pandroid.injected.signing.key.password='${{ secrets.ANDROID_KEY_PASSWORD }}'
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
+      - name: Upload release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Upload to Play Store
+        if: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.sportsnot.app
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          whatsNewDirectory: ''
+
+      - name: Cleanup keystore
+        if: always()
+        run: rm -f android/app/release.keystore

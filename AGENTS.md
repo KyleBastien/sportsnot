@@ -29,11 +29,15 @@ Nx monorepo using Yarn 4 (with node-modules as it's nodeLinker via `.yarnrc.yml`
 | `mock-data`     | Static fixture data (players, teams, games, bracket) for mock mode                  |
 | `e2e`           | Playwright end-to-end tests with page objects                                       |
 | `widget-api`    | Shared TS types + HTTP client for the `widget-league-snapshot` edge function        |
-| `widget-bridge` | Capacitor plugin bridging the web app to the native iOS `WidgetBridgePlugin`        |
+| `widget-bridge` | Capacitor plugin bridging the web app to native widget code (iOS + Android)         |
 
 Native iOS code (Capacitor host + `SportsNotWidget` WidgetKit extension +
 ActivityKit Live Activity) lives in the top-level [`ios/`](./ios/) directory,
 registered as the Nx project `@sportsnot/ios-app`.
+
+Native Android code (Capacitor host + Home Screen widgets + FCM + Live
+Update notifications) lives in the top-level [`android/`](./android/)
+directory, registered as the Nx project `@sportsnot/android-app`.
 
 **Dependency flow:** `web` → `supabase`, `nhl-api`, `ui`, `utils`, `types`, `mock-data`, `widget-bridge`, `widget-api`
 
@@ -180,6 +184,30 @@ Required Supabase function secrets for `push-live-activity-updates`:
 The iOS CI workflow (`.github/workflows/ios-build.yml`) runs on
 `macos-14` and is **not** part of the default `nx affected` lint/test
 gate — it triggers only on PRs touching `ios/`, `packages/widget-*`,
+`packages/web/`, or `capacitor.config.ts`.
+
+## Android App + Widgets
+
+The Android build wraps the web app in Capacitor with native Kotlin code
+for Home Screen widgets (small/medium/large), FCM push notifications, and
+Android 15+ Live Update notifications. See [`android/README.md`](./android/README.md)
+for the full setup.
+
+Nx targets:
+
+```bash
+yarn nx sync-web @sportsnot/android-app       # build web + cap sync android
+yarn nx build @sportsnot/android-app          # gradlew assembleDebug
+yarn nx run-android @sportsnot/android-app    # cap run android (emulator/device)
+yarn nx assemble-release @sportsnot/android-app  # gradlew bundleRelease (AAB)
+```
+
+Required Supabase function secrets for Android push (alongside iOS APNs
+secrets): `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_JSON`.
+
+The Android CI workflow (`.github/workflows/android-build.yml`) runs on
+`ubuntu-latest` and is **not** part of the default `nx affected` lint/test
+gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
 `packages/web/`, or `capacitor.config.ts`.
 
 ## Ralph Agent System

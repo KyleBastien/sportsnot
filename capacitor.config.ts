@@ -8,6 +8,9 @@ const config: CapacitorConfig = {
     contentInset: 'never',
     scheme: 'SportsNot',
   },
+  android: {
+    allowMixedContent: false,
+  },
   server: {
     androidScheme: 'https',
     iosScheme: 'https',
