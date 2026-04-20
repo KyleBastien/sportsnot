@@ -85,4 +85,18 @@ object WidgetPreferences {
             null
         }
     }
+
+    // Page rotation for widget player lists (mirrors iOS 30s timeline entries)
+    fun getPageIndex(context: Context, widgetId: Int): Int =
+        prefs(context).getInt("pageIndex_$widgetId", 0)
+
+    fun advancePage(context: Context, widgetId: Int, totalPages: Int): Int {
+        val next = if (totalPages <= 1) 0 else (getPageIndex(context, widgetId) + 1) % totalPages
+        prefs(context).edit().putInt("pageIndex_$widgetId", next).apply()
+        return next
+    }
+
+    fun clearPageIndex(context: Context, widgetId: Int) {
+        prefs(context).edit().remove("pageIndex_$widgetId").apply()
+    }
 }

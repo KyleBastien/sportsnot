@@ -1,5 +1,4 @@
 apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
 apply plugin: 'kotlinx-serialization'
 
 def secretsFile = rootProject.file("app/secrets.properties")
@@ -34,7 +33,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
@@ -54,19 +53,19 @@ dependencies {
     implementation project(':capacitor-cordova-android-plugins')
 
     // Kotlin
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:2.1.21"
-    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:2.3.20"
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
 
     // Android widgets
-    implementation "androidx.work:work-runtime-ktx:2.10.1"
+    implementation "androidx.work:work-runtime-ktx:2.11.2"
 
     // Firebase Cloud Messaging
-    implementation platform('com.google.firebase:firebase-bom:33.14.0')
+    implementation platform('com.google.firebase:firebase-bom:34.12.0')
     implementation 'com.google.firebase:firebase-messaging'
 
     // OkHttp for widget API calls
-    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    implementation "com.squareup.okhttp3:okhttp:5.3.2"
 
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
@@ -80,6 +79,6 @@ try {
     if (servicesJSON.text) {
         apply plugin: 'com.google.gms.google-services'
     }
-} catch(Exception e) {
+} catch(Exception ignored) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }

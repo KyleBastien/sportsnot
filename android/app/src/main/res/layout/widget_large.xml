@@ -6,7 +6,7 @@
     android:padding="12dp"
     android:background="@drawable/widget_background">
 
-    <!-- Header: league name + team total -->
+    <!-- Header: league name + page indicator + team total -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -23,6 +23,14 @@
             android:textStyle="bold"
             android:ellipsize="end"
             android:maxLines="1" />
+
+        <TextView
+            android:id="@+id/page_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#808080"
+            android:textSize="10sp"
+            android:paddingEnd="8dp" />
 
         <TextView
             android:id="@+id/team_total"
