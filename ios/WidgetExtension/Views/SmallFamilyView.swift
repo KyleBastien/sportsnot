@@ -61,7 +61,7 @@ struct SmallFamilyView: View {
     }
 
     private func liveGameCount(_ s: WidgetSnapshot) -> Int? {
-        let c = s.games.filter { $0.state == "LIVE" }.count
+        let c = s.games.filter { $0.state == "LIVE" || $0.state == "CRIT" }.count
         return c == 0 ? nil : c
     }
 }

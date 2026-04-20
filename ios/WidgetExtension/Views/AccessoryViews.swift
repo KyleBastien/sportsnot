@@ -47,7 +47,7 @@ struct AccessoryInlineView: View {
 
     var body: some View {
         let total = entry.snapshot.map { $0.players.reduce(0) { $0 + $1.fantasyPoints } } ?? 0
-        let liveCount = entry.snapshot.map { $0.games.filter { $0.state == "LIVE" }.count } ?? 0
+        let liveCount = entry.snapshot.map { $0.games.filter { $0.state == "LIVE" || $0.state == "CRIT" }.count } ?? 0
         Text("🏒 \(String(format: "%.0f", total)) pts · \(liveCount) live")
     }
 }
