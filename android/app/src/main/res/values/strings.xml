@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SportsNot</string>
+    <string name="title_activity_main">SportsNot</string>
+    <string name="package_name">com.sportsnot.app</string>
+    <string name="custom_url_scheme">com.sportsnot.app</string>
+    <string name="widget_small_description">Shows a featured player with fantasy points</string>
+    <string name="widget_medium_description">Shows top players and today\'s games</string>
+    <string name="widget_large_description">Shows games and all drafted players with points</string>
+    <string name="widget_config_title">Choose League</string>
+    <string name="live_update_channel">Live Scores</string>
+    <string name="live_update_channel_desc">Real-time playoff game score updates</string>
+</resources>

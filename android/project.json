@@ -1,0 +1,49 @@
+{
+  "name": "@sportsnot/android-app",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "android",
+  "projectType": "application",
+  "tags": ["platform:android"],
+  "implicitDependencies": ["@sportsnot/web", "@sportsnot/widget-api"],
+  "targets": {
+    "sync-web": {
+      "executor": "nx:run-commands",
+      "dependsOn": [{ "projects": ["@sportsnot/web"], "target": "build" }],
+      "options": {
+        "commands": ["npx cap sync android"],
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["sync-web"],
+      "options": {
+        "commands": [
+          "cd android && .\\gradlew assembleDebug"
+        ],
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "run-android": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["sync-web"],
+      "options": {
+        "commands": ["npx cap run android"],
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "assemble-release": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["sync-web"],
+      "options": {
+        "commands": [
+          "cd android && .\\gradlew bundleRelease"
+        ],
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

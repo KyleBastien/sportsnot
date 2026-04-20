@@ -1304,6 +1304,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@capacitor/android@npm:8.3.1":
+  version: 8.3.1
+  resolution: "@capacitor/android@npm:8.3.1"
+  peerDependencies:
+    "@capacitor/core": ^8.3.0
+  checksum: 10c0/c7b59e0561c1ceade4da5d096af3f30750d4c6082b2a5debe16c1d7dd46fb5821c43e81e2af4eb098b31a35a9e846a7e57e9aa8181067e82e1ec25d1a23bf539
+  languageName: node
+  linkType: hard
+
 "@capacitor/cli@npm:8.3.1":
   version: 8.3.1
   resolution: "@capacitor/cli@npm:8.3.1"
@@ -4374,6 +4383,7 @@ __metadata:
   dependencies:
     "@babel/core": "npm:^7.14.5"
     "@babel/preset-react": "npm:^7.14.5"
+    "@capacitor/android": "npm:8.3.1"
     "@capacitor/cli": "npm:8.3.1"
     "@capacitor/core": "npm:8.3.1"
     "@capacitor/ios": "npm:8.3.1"

@@ -62,7 +62,8 @@ export interface WidgetSnapshot {
 export interface RegisterLiveActivityTokenRequest {
   shareCode: string;
   token: string;
-  kind: 'activity' | 'start';
+  kind: 'activity' | 'start' | 'fcm';
   bundleId: string;
+  platform?: 'ios' | 'android';
   expiresAt?: string;
 }

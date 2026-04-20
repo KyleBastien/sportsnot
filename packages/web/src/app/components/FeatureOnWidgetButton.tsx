@@ -13,17 +13,17 @@ interface FeatureOnWidgetButtonProps {
   shareCode: string | null | undefined;
   /**
    * The current user's `team_name` within this league. Persisted alongside
-   * the share code in the App Group so the iOS widget can compute the
+   * the share code in device storage so the native widget can compute the
    * user's own fantasy total against the league-wide snapshot.
    */
   myTeamName?: string | null;
 }
 
 /**
- * Renders a button that, when running inside the Capacitor iOS shell,
- * writes the league's share code into the App Group so the native
- * widget starts following this league. On the web this is a no-op that
- * still exercises the localStorage fallback so QA can preview behavior.
+ * Renders a button that, when running inside the Capacitor native shell
+ * (iOS or Android), writes the league's share code into device storage
+ * so the native widget starts following this league. On the web this is
+ * a no-op that still exercises the localStorage fallback for QA.
  */
 export function FeatureOnWidgetButton({
   leagueId,
@@ -65,7 +65,7 @@ export function FeatureOnWidgetButton({
     }
   };
 
-  const label = saved ? 'Widget updated' : 'Feature on iOS widget';
+  const label = saved ? 'Widget updated' : 'Feature on widget';
 
   return (
     <Tooltip

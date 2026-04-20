@@ -74,3 +74,7 @@ supabase/migrations/
 
 # iOS secrets (xcconfig with real Supabase keys)
 ios/App/Secrets.xcconfig
+
+# Android secrets
+android/app/secrets.properties
+android/app/google-services.json

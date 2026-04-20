@@ -142,7 +142,7 @@ test.describe('FeatureOnWidgetButton', () => {
     ).toBeVisible(NAV_TIMEOUT);
 
     const button = authenticatedPage.getByRole('button', {
-      name: /feature on iOS widget/i,
+      name: /feature on widget/i,
     });
     await expect(button).toBeVisible();
     await button.click();

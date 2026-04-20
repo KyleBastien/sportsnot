@@ -1,8 +1,7 @@
 // Supabase Edge Function: register-live-activity-token
-// Called by the iOS host app to register an APNs push token (either a Live
-// Activity update token or a push-to-start token) against a public league
-// share code. Auth: verify_jwt = false — we authenticate via share code
-// ownership only.
+// Called by the iOS/Android host app to register a push token (APNs for iOS,
+// FCM for Android) against a public league share code. Auth: verify_jwt = false
+// — we authenticate via share code ownership only.
 // Deploy: supabase functions deploy register-live-activity-token --no-verify-jwt
 
 /// <reference path="../deno.d.ts" />
@@ -12,8 +11,9 @@ import { jsonResponse, pgInsert, pgSelect, sha256Hex } from '../_shared/pg.ts';
 interface RegisterBody {
   shareCode?: string;
   token?: string;
-  kind?: 'activity' | 'start';
+  kind?: 'activity' | 'start' | 'fcm';
   bundleId?: string;
+  platform?: 'ios' | 'android';
   expiresAt?: string;
 }
 
@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = (await req.json().catch(() => ({}))) as RegisterBody;
-    const { shareCode, token, kind, bundleId, expiresAt } = body;
+    const { shareCode, token, kind, bundleId, expiresAt, platform } = body;
 
     if (!shareCode || !token || !kind || !bundleId) {
       return jsonResponse(
@@ -47,9 +47,13 @@ Deno.serve(async (req: Request) => {
         400
       );
     }
-    if (kind !== 'activity' && kind !== 'start') {
-      return jsonResponse({ error: 'kind must be "activity" or "start"' }, 400);
+    if (kind !== 'activity' && kind !== 'start' && kind !== 'fcm') {
+      return jsonResponse(
+        { error: 'kind must be "activity", "start", or "fcm"' },
+        400
+      );
     }
+    const resolvedPlatform = platform ?? (kind === 'fcm' ? 'android' : 'ios');
 
     const cfg = { url: supabaseUrl, key: apiKey };
 
@@ -72,7 +76,7 @@ Deno.serve(async (req: Request) => {
         league_id: leagueId,
         token_hash: tokenHash,
         token,
-        platform: 'ios',
+        platform: resolvedPlatform,
         kind,
         bundle_id: bundleId,
         expires_at: expiresAt ?? null,

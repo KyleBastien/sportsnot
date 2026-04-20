@@ -1,8 +1,9 @@
 // Supabase Edge Function: push-live-activity-updates
-// Fans out APNs Live Activity content-state updates to every registered
-// token whose league has at least one game in progress today. Schedule via
-// pg_cron (every ~30s while games are live). Auth: verify_jwt = false —
-// intended to be called by pg_cron / the Supabase scheduler.
+// Fans out push notifications to registered devices: APNs Live Activity
+// content-state updates (iOS) and FCM data messages (Android) for every
+// league with at least one game in progress today. Schedule via pg_cron
+// (every ~30s while games are live). Auth: verify_jwt = false — intended
+// to be called by pg_cron / the Supabase scheduler.
 // Deploy: supabase functions deploy push-live-activity-updates --no-verify-jwt
 
 /// <reference path="../deno.d.ts" />
@@ -41,8 +42,9 @@ interface TokenRow {
   id: string;
   league_id: string;
   token: string;
-  kind: 'activity' | 'start';
+  kind: 'activity' | 'start' | 'fcm';
   bundle_id: string;
+  platform: 'ios' | 'android';
   expires_at: string | null;
 }
 
@@ -165,6 +167,110 @@ async function fetchTodayGames(): Promise<NhlScoreGame[]> {
   }
 }
 
+// ── FCM (Android) helpers ─────────────────────────────────────────────
+
+interface FcmServiceAccount {
+  client_email: string;
+  private_key: string;
+  token_uri: string;
+}
+
+let cachedFcmToken: { token: string; exp: number } | null = null;
+
+async function getFcmAccessToken(serviceAccountJson: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedFcmToken && now < cachedFcmToken.exp - 60) {
+    return cachedFcmToken.token;
+  }
+
+  const sa: FcmServiceAccount = JSON.parse(serviceAccountJson);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const claims = {
+    iss: sa.client_email,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: sa.token_uri,
+    iat: now,
+    exp: now + 3600,
+  };
+
+  const enc = (obj: unknown) =>
+    b64url(new TextEncoder().encode(JSON.stringify(obj)));
+  const signingInput = `${enc(header)}.${enc(claims)}`;
+
+  const pemBody = sa.private_key
+    .replace(/-----BEGIN RSA PRIVATE KEY-----/g, '')
+    .replace(/-----END RSA PRIVATE KEY-----/g, '')
+    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\s+/g, '');
+  const keyDer = b64decode(pemBody);
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    keyDer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    cryptoKey,
+    new TextEncoder().encode(signingInput)
+  );
+  const jwt = `${signingInput}.${b64url(new Uint8Array(sig))}`;
+
+  const resp = await fetch(sa.token_uri, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  });
+  const data = await resp.json();
+  const accessToken = data.access_token as string;
+  cachedFcmToken = { token: accessToken, exp: now + 3600 };
+  return accessToken;
+}
+
+async function sendFcmPush(
+  projectId: string,
+  accessToken: string,
+  deviceToken: string,
+  contentState: unknown
+): Promise<PushResult> {
+  const resp = await fetch(
+    `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: {
+          token: deviceToken,
+          data: {
+            content: JSON.stringify(contentState),
+          },
+          android: {
+            priority: 'high',
+          },
+        },
+      }),
+    }
+  );
+  let reason: string | undefined;
+  if (!resp.ok) {
+    try {
+      const data = await resp.json();
+      reason =
+        typeof data?.error?.message === 'string'
+          ? data.error.message
+          : undefined;
+    } catch {
+      // ignore
+    }
+  }
+  return { ok: resp.ok, status: resp.status, reason };
+}
+
 Deno.serve(async (_req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -180,12 +286,8 @@ Deno.serve(async (_req: Request) => {
         500
       );
     }
-    if (!apnsKeyId || !apnsTeamId || !apnsP8) {
-      return jsonResponse(
-        { error: 'Missing APNS_KEY_ID / APNS_TEAM_ID / APNS_P8' },
-        500
-      );
-    }
+
+    const hasApns = !!(apnsKeyId && apnsTeamId && apnsP8);
 
     const cfg = { url: supabaseUrl, key: apiKey };
 
@@ -313,37 +415,72 @@ Deno.serve(async (_req: Request) => {
       });
     }
 
+    // ── Fetch tokens: iOS (APNs activity) + Android (FCM) ──────────────
     const tokens = await pgSelect<TokenRow>(
       cfg,
       'live_activity_tokens',
-      `select=id,league_id,token,kind,bundle_id,expires_at&kind=eq.activity&league_id=in.(${leagueIdsWithPayload.join(',')})`
+      `select=id,league_id,token,kind,bundle_id,platform,expires_at&kind=in.(activity,fcm)&league_id=in.(${leagueIdsWithPayload.join(',')})`
     );
 
-    const jwt = await getApnsJwt(apnsKeyId, apnsTeamId, apnsP8);
-    const apnsHost =
-      apnsEnv === 'sandbox'
-        ? 'https://api.sandbox.push.apple.com'
-        : 'https://api.push.apple.com';
+    const iosTokens = tokens.filter((t) => t.platform === 'ios');
+    const androidTokens = tokens.filter((t) => t.platform === 'android');
 
+    // ── APNs push (iOS) ─────────────────────────────────────────────────
     let pushed = 0;
     let failed = 0;
-    for (const t of tokens) {
-      if (t.expires_at && new Date(t.expires_at).getTime() < Date.now())
-        continue;
-      const payload = perLeaguePayload[t.league_id];
-      if (!payload) continue;
-      const result = await sendApnsPush(
-        apnsHost,
-        t.bundle_id,
-        t.token,
-        jwt,
-        payload,
-        { pushType: 'liveactivity', priority: 10 }
-      );
-      if (result.ok) {
-        pushed++;
-      } else {
-        failed++;
+
+    if (hasApns && iosTokens.length > 0) {
+      const jwt = await getApnsJwt(apnsKeyId!, apnsTeamId!, apnsP8!);
+      const apnsHost =
+        apnsEnv === 'sandbox'
+          ? 'https://api.sandbox.push.apple.com'
+          : 'https://api.push.apple.com';
+
+      for (const t of iosTokens) {
+        if (t.expires_at && new Date(t.expires_at).getTime() < Date.now())
+          continue;
+        const payload = perLeaguePayload[t.league_id];
+        if (!payload) continue;
+        const result = await sendApnsPush(
+          apnsHost,
+          t.bundle_id,
+          t.token,
+          jwt,
+          payload,
+          { pushType: 'liveactivity', priority: 10 }
+        );
+        if (result.ok) {
+          pushed++;
+        } else {
+          failed++;
+        }
+      }
+    }
+
+    // ── FCM push (Android) ──────────────────────────────────────────────
+    const fcmProjectId = Deno.env.get('FCM_PROJECT_ID');
+    const fcmServiceAccountJson = Deno.env.get('FCM_SERVICE_ACCOUNT_JSON');
+    if (fcmProjectId && fcmServiceAccountJson && androidTokens.length > 0) {
+      const fcmAccessToken = await getFcmAccessToken(fcmServiceAccountJson);
+      for (const t of androidTokens) {
+        if (t.expires_at && new Date(t.expires_at).getTime() < Date.now())
+          continue;
+        const leaguePayload = perLeaguePayload[t.league_id] as {
+          aps: { 'content-state': unknown };
+        };
+        if (!leaguePayload) continue;
+        const contentState = leaguePayload.aps['content-state'];
+        const fcmResult = await sendFcmPush(
+          fcmProjectId,
+          fcmAccessToken,
+          t.token,
+          contentState
+        );
+        if (fcmResult.ok) {
+          pushed++;
+        } else {
+          failed++;
+        }
       }
     }
 
