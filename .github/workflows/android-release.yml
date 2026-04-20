@@ -70,7 +70,9 @@ jobs:
           EOF
 
       - name: Generate google-services.json
-        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
 
       - name: Decode signing keystore
         run: |
@@ -100,6 +102,7 @@ jobs:
           packageName: com.sportsnot.app
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
           track: internal
+          status: draft
           releaseName: ${{ env.VERSION_NAME }} (${{ env.VERSION_CODE }})
 
       - name: Cleanup keystore
