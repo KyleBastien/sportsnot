@@ -15,9 +15,18 @@ public struct SnapshotAPIConfig: Sendable {
     public static func fromBundle(_ bundle: Bundle = .main) -> SnapshotAPIConfig? {
         guard
             let urlString = bundle.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
+            !urlString.isEmpty,
+            // Reject unsubstituted Info.plist macros like "$(SUPABASE_URL)" —
+            // these slip through when the build setting self-references and
+            // Xcode resolves it to an empty / literal value. URL(string:) is
+            // permissive enough to accept the literal so we have to guard
+            // explicitly or the network call fails opaquely on-device.
+            !urlString.contains("$("),
+            urlString.hasPrefix("http"),
             let url = URL(string: urlString),
             let key = bundle.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String,
-            !key.isEmpty
+            !key.isEmpty,
+            !key.contains("$(")
         else { return nil }
         return SnapshotAPIConfig(supabaseURL: url, anonKey: key)
     }
