@@ -51,7 +51,9 @@ jobs:
           xcodebuild -version
 
       - name: Install iOS platform
-        run: xcodebuild -downloadPlatform iOS
+        run: |
+          xcodebuild -runFirstLaunch
+          sudo xcodebuild -downloadPlatform iOS
 
       - name: Install dependencies
         run: yarn install --immutable
