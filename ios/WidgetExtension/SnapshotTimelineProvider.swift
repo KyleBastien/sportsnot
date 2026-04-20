@@ -107,7 +107,11 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
     private static let staleFallbackMaxAge: TimeInterval = 60 * 60 // 1 hour
 
     private func entry(for configuration: FeaturedLeagueIntent) async -> SnapshotEntry {
-        let shareCode = configuration.shareCode ?? AppGroup.featuredShareCode
+        // The featured league is controlled exclusively by the in-app
+        // Feature on widget button via AppGroup.featuredShareCode. The
+        // configuration intent intentionally exposes no editable fields,
+        // so there's nothing to read off `configuration` here.
+        let shareCode = AppGroup.featuredShareCode
         let myTeamName = shareCode.flatMap { AppGroup.myTeamName(forShareCode: $0) }
         guard let code = shareCode, !code.isEmpty else {
             return SnapshotEntry(

@@ -7,8 +7,11 @@ A WidgetKit app extension target containing:
    `.accessoryInline`.
 3. **Live Activity** (ActivityKit) for the Dynamic Island and Lock Screen,
    driven by APNs pushes from the `push-live-activity-updates` edge function.
-4. A configuration intent (`FeaturedLeagueIntent`) that lets the user pick
-   which of their linked share codes to show.
+4. A configuration intent (`FeaturedLeagueIntent`) with no editable
+   parameters. The featured league is set exclusively by the in-app
+   "Feature on widget" button (writes `AppGroup.featuredShareCode`),
+   which prevents users from accidentally typing the wrong code into
+   the Edit Widget sheet.
 
 ## Files
 
