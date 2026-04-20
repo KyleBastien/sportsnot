@@ -94,6 +94,18 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
 
     // MARK: - Helpers
 
+    // Cache TTLs:
+    //  - If the main app primed the cache within `freshCacheMaxAge`, the
+    //    extension reuses it instead of making its own network call. This
+    //    avoids hitting the constrained extension network and guarantees
+    //    the widget shows what the app last fetched.
+    //  - On a fetch failure, the extension only falls back to cached data
+    //    that is younger than `staleFallbackMaxAge`. Older cached data is
+    //    treated as missing so the widget surfaces an error rather than
+    //    showing yesterday's slate forever.
+    private static let freshCacheMaxAge: TimeInterval = 120        // 2 minutes
+    private static let staleFallbackMaxAge: TimeInterval = 60 * 60 // 1 hour
+
     private func entry(for configuration: FeaturedLeagueIntent) async -> SnapshotEntry {
         let shareCode = configuration.shareCode ?? AppGroup.featuredShareCode
         let myTeamName = shareCode.flatMap { AppGroup.myTeamName(forShareCode: $0) }
@@ -107,11 +119,26 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
                 myTeamName: nil
             )
         }
-        guard let config = SnapshotAPIConfig.fromBundle() else {
+
+        // Prefer a recently-primed cache (written by the main app on
+        // foreground) over making our own network call from the extension.
+        if let recent = AppGroup.cachedSnapshot(maxAge: Self.freshCacheMaxAge) {
             return SnapshotEntry(
                 date: .now,
-                snapshot: AppGroup.cachedSnapshot()?.snapshot,
-                staleFromCache: AppGroup.cachedSnapshot() != nil,
+                snapshot: recent.snapshot,
+                staleFromCache: false,
+                shareCode: code,
+                errorMessage: nil,
+                myTeamName: myTeamName
+            )
+        }
+
+        guard let config = SnapshotAPIConfig.fromBundle() else {
+            let cached = AppGroup.cachedSnapshot(maxAge: Self.staleFallbackMaxAge)
+            return SnapshotEntry(
+                date: .now,
+                snapshot: cached?.snapshot,
+                staleFromCache: cached != nil,
                 shareCode: code,
                 errorMessage: "Widget is not configured",
                 myTeamName: myTeamName
@@ -130,7 +157,10 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
                 myTeamName: myTeamName
             )
         } catch {
-            let cached = AppGroup.cachedSnapshot()
+            // Fall back to cached data only if it's still reasonably fresh.
+            // Anything older than `staleFallbackMaxAge` is dropped to avoid
+            // showing yesterday's games when the network is unreachable.
+            let cached = AppGroup.cachedSnapshot(maxAge: Self.staleFallbackMaxAge)
             return SnapshotEntry(
                 date: .now,
                 snapshot: cached?.snapshot,
