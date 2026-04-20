@@ -143,8 +143,10 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
     }
 
     private func refreshDate(for snapshot: WidgetSnapshot?) -> Date {
-        let anyLive = snapshot?.games.contains { $0.state == "LIVE" } ?? false
-        let minutes: Int = anyLive ? 2 : 15
+        let anyLive = snapshot?.games.contains { $0.state == "LIVE" || $0.state == "CRIT" } ?? false
+        // 5 minutes during live games balances freshness vs WidgetKit reload
+        // budget (~40-70/day). 2 minutes blows the budget in a single game.
+        let minutes: Int = anyLive ? 5 : 15
         return Calendar.current.date(byAdding: .minute, value: minutes, to: .now) ?? .now.addingTimeInterval(Double(minutes * 60))
     }
 }

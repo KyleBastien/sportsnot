@@ -98,7 +98,7 @@ struct MediumFamilyView: View {
     @ViewBuilder
     private func gameStatus(_ g: WidgetSnapshot.Game) -> some View {
         switch g.state {
-        case "LIVE":
+        case "LIVE", "CRIT":
             Text("P\(g.period ?? 0) \(g.timeRemaining ?? "")")
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.green)
