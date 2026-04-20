@@ -86,6 +86,18 @@ object WidgetPreferences {
         }
     }
 
+    /**
+     * Returns the cached snapshot only if it was stored within `maxAgeMs`
+     * milliseconds. Used as a stale-fallback guard so the widget doesn't
+     * render yesterday's slate forever when the network has been failing.
+     */
+    fun getCachedSnapshot(context: Context, maxAgeMs: Long): WidgetSnapshot? {
+        val storedAt = prefs(context).getLong(KEY_CACHED_SNAPSHOT_TIME, 0L)
+        if (storedAt == 0L) return null
+        if (System.currentTimeMillis() - storedAt > maxAgeMs) return null
+        return getCachedSnapshot(context)
+    }
+
     // Page rotation for widget player lists (mirrors iOS 30s timeline entries)
     fun getPageIndex(context: Context, widgetId: Int): Int =
         prefs(context).getInt("pageIndex_$widgetId", 0)

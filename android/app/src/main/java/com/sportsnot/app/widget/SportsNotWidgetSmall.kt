@@ -130,6 +130,8 @@ class SportsNotWidgetSmall : AppWidgetProvider() {
     }
 }
 
+internal const val WIDGET_STALE_CACHE_MAX_AGE_MS: Long = 60L * 60L * 1000L // 1 hour
+
 internal fun fetchOrCached(context: Context): WidgetSnapshot? {
     val shareCode = WidgetPreferences.getFeaturedShareCode(context) ?: return null
     return try {
@@ -137,7 +139,10 @@ internal fun fetchOrCached(context: Context): WidgetSnapshot? {
         WidgetPreferences.cacheSnapshot(context, snapshot)
         snapshot
     } catch (_: Exception) {
-        WidgetPreferences.getCachedSnapshot(context)
+        // Only fall back to cache that's still reasonably fresh. Older cached
+        // data is dropped so the widget surfaces an empty state instead of
+        // rendering yesterday's slate forever when the network is unreachable.
+        WidgetPreferences.getCachedSnapshot(context, WIDGET_STALE_CACHE_MAX_AGE_MS)
     }
 }
 
