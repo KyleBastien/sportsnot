@@ -23,7 +23,7 @@ public enum WidgetTelemetry {
     /// Cap the buffer so a misbehaving extension can't fill App Group
     /// storage. ~200 events is enough to cover several timeline cycles
     /// while staying well under the 1 MB UserDefaults soft limit.
-    private static let maxEvents = 200
+    public static let maxEvents = 200
 
     /// Identifies which target produced the event. Inferred from the
     /// bundle identifier so callers don't have to thread a target tag
