@@ -28,6 +28,8 @@
 		79C7D1CFAA562E6A53728EE1 /* SportsNotLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68BBDE2352FE5162648F0CF2 /* SportsNotLiveActivityWidget.swift */; };
 		829FB848E35F8A979F310927 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B6FFB89224696015E2356CA /* AppGroup.swift */; };
 		835D0DC9D87B89441CD2EE62 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1455368C1C3E13D054268651 /* WidgetSnapshot.swift */; };
+		B7C8D9E0F1A2B3C4D5E6F701 /* WidgetTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4D5E6F700 /* WidgetTelemetry.swift */; };
+		B7C8D9E0F1A2B3C4D5E6F702 /* WidgetTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E0F1A2B3C4D5E6F700 /* WidgetTelemetry.swift */; };
 		868582C8738E4FA4AE67C936 /* LargeFamilyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D06DF469FA7400950A4DD3 /* LargeFamilyView.swift */; };
 		896A79278EC92A075F9929E9 /* MediumFamilyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B414E72C08ED56274B14CB8 /* MediumFamilyView.swift */; };
 		8D75EAFF2621C89860A8B9A6 /* WidgetBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88ED71C0416A7441DA4DA6EE /* WidgetBridgePlugin.swift */; };
@@ -75,6 +77,7 @@
 		0D303B08EA055ACD92EF029C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		0ED3680842392C89325F454E /* SportsNotWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SportsNotWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		1455368C1C3E13D054268651 /* WidgetSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetSnapshot.swift; sourceTree = "<group>"; };
+		B7C8D9E0F1A2B3C4D5E6F700 /* WidgetTelemetry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetTelemetry.swift; sourceTree = "<group>"; };
 		14E51528B85EFCE04FFB1C6E /* WidgetBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetBridge.swift; sourceTree = "<group>"; };
 		22BA35097E4A876762452E3E /* SportsNotWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SportsNotWidgetBundle.swift; sourceTree = "<group>"; };
 		243AAA8C3467F36593343911 /* SmallFamilyView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmallFamilyView.swift; sourceTree = "<group>"; };
@@ -251,6 +254,7 @@
 				2714E9FDF48F880208B82676 /* LiveActivityAttributes.swift */,
 				81BDFD4747D3BE81A43CA68B /* SnapshotAPI.swift */,
 				1455368C1C3E13D054268651 /* WidgetSnapshot.swift */,
+				B7C8D9E0F1A2B3C4D5E6F700 /* WidgetTelemetry.swift */,
 			);
 			name = SportsNotWidgetShared;
 			path = ../SportsNotWidgetShared;
@@ -422,6 +426,7 @@
 				222AB300D23DEA4F43E460F1 /* LiveActivityAttributes.swift in Sources */,
 				146F3796F55F3235DC35C3CB /* SnapshotAPI.swift in Sources */,
 				CB71E883729EB76F1533EFFF /* WidgetSnapshot.swift in Sources */,
+				B7C8D9E0F1A2B3C4D5E6F701 /* WidgetTelemetry.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -435,6 +440,7 @@
 				0DBCD58385184BE722564E71 /* LiveActivityAttributes.swift in Sources */,
 				D5CF11DE7DCD858808FDAED4 /* SnapshotAPI.swift in Sources */,
 				835D0DC9D87B89441CD2EE62 /* WidgetSnapshot.swift in Sources */,
+				B7C8D9E0F1A2B3C4D5E6F702 /* WidgetTelemetry.swift in Sources */,
 				CC706482A8B94F5DF3BCA699 /* WidgetBridge.swift in Sources */,
 				8D75EAFF2621C89860A8B9A6 /* WidgetBridgePlugin.swift in Sources */,
 				C928B26BD9F9BAB9296D544B /* MainViewController.swift in Sources */,
