@@ -53,11 +53,13 @@ public enum WidgetTelemetry {
 
         // 1. Mirror to os_log so the event is visible in Console.app the
         //    instant it happens. Use %{public}@ so the message isn't
-        //    redacted on a production build.
+        //    redacted on a production build, and `.default` level so the
+        //    line shows up in Console without the user having to toggle
+        //    "Include Info Messages" first (`.info` is hidden by default).
         os_log(
             "%{public}@ | %{public}@ | %{public}@",
             log: log,
-            type: .info,
+            type: .default,
             event.target,
             event.name,
             formatContext(context)
