@@ -13,8 +13,22 @@ public struct SnapshotAPIConfig: Sendable {
     /// These keys are wired via an Xcode build phase from environment
     /// variables at build time so the anon key never lives in source control.
     public static func fromBundle(_ bundle: Bundle = .main) -> SnapshotAPIConfig? {
+        let urlString = bundle.object(forInfoDictionaryKey: "SUPABASE_URL") as? String
+        let key = bundle.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String
+
+        // Always emit telemetry about what was actually in Info.plist so we
+        // can distinguish "missing entirely" from "literal $(...) macro"
+        // from "valid but transport failed". The actual values are never
+        // logged — only metadata (presence, length, macro detection).
+        var ctx = WidgetTelemetry.describe(urlString)
+            .reduce(into: [String: String]()) { $0["url_\($1.key)"] = $1.value }
+        for (k, v) in WidgetTelemetry.describe(key) {
+            ctx["key_\(k)"] = v
+        }
+        ctx["bundleId"] = bundle.bundleIdentifier ?? "unknown"
+
         guard
-            let urlString = bundle.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
+            let urlString,
             !urlString.isEmpty,
             // Reject unsubstituted Info.plist macros like "$(SUPABASE_URL)" —
             // these slip through when the build setting self-references and
@@ -24,10 +38,14 @@ public struct SnapshotAPIConfig: Sendable {
             !urlString.contains("$("),
             urlString.hasPrefix("http"),
             let url = URL(string: urlString),
-            let key = bundle.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String,
+            let key,
             !key.isEmpty,
             !key.contains("$(")
-        else { return nil }
+        else {
+            WidgetTelemetry.record("config.load.failed", ctx)
+            return nil
+        }
+        WidgetTelemetry.record("config.load.ok", ctx)
         return SnapshotAPIConfig(supabaseURL: url, anonKey: key)
     }
 }
@@ -67,20 +85,41 @@ public struct SnapshotAPI: Sendable {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
+            WidgetTelemetry.record("api.fetch.transport_error", [
+                "shareCode": shareCode,
+                "error": String(describing: error),
+            ])
             throw SnapshotAPIError.transport(error)
         }
 
         guard let http = response as? HTTPURLResponse else {
+            WidgetTelemetry.record("api.fetch.no_http_response", ["shareCode": shareCode])
             throw SnapshotAPIError.badStatus(-1, "No HTTPURLResponse")
         }
         guard (200..<300).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
+            WidgetTelemetry.record("api.fetch.bad_status", [
+                "shareCode": shareCode,
+                "status": String(http.statusCode),
+                "bodyLen": String(body.count),
+                "bodyPreview": String(body.prefix(120)),
+            ])
             throw SnapshotAPIError.badStatus(http.statusCode, body)
         }
 
         do {
-            return try JSONDecoder().decode(WidgetSnapshot.self, from: data)
+            let snapshot = try JSONDecoder().decode(WidgetSnapshot.self, from: data)
+            WidgetTelemetry.record("api.fetch.ok", [
+                "shareCode": shareCode,
+                "games": String(snapshot.games.count),
+                "players": String(snapshot.players.count),
+            ])
+            return snapshot
         } catch {
+            WidgetTelemetry.record("api.fetch.decode_error", [
+                "shareCode": shareCode,
+                "error": String(describing: error),
+            ])
             throw SnapshotAPIError.decoding(error)
         }
     }

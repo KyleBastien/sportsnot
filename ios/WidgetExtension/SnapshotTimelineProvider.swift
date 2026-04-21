@@ -113,7 +113,13 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
         // so there's nothing to read off `configuration` here.
         let shareCode = AppGroup.featuredShareCode
         let myTeamName = shareCode.flatMap { AppGroup.myTeamName(forShareCode: $0) }
+        WidgetTelemetry.record("timeline.entry.start", [
+            "hasShareCode": shareCode == nil ? "false" : "true",
+            "shareCode": shareCode ?? "",
+            "cachedAge": AppGroup.cachedSnapshotAge.map { String(Int($0)) } ?? "nil",
+        ])
         guard let code = shareCode, !code.isEmpty else {
+            WidgetTelemetry.record("timeline.entry.no_share_code", [:])
             return SnapshotEntry(
                 date: .now,
                 snapshot: nil,
@@ -127,6 +133,9 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
         // Prefer a recently-primed cache (written by the main app on
         // foreground) over making our own network call from the extension.
         if let recent = AppGroup.cachedSnapshot(maxAge: Self.freshCacheMaxAge) {
+            WidgetTelemetry.record("timeline.cache.fresh", [
+                "ageSec": String(Int(Date().timeIntervalSince(recent.stored))),
+            ])
             return SnapshotEntry(
                 date: .now,
                 snapshot: recent.snapshot,
@@ -139,12 +148,15 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
 
         guard let config = SnapshotAPIConfig.fromBundle() else {
             let cached = AppGroup.cachedSnapshot(maxAge: Self.staleFallbackMaxAge)
+            WidgetTelemetry.record("timeline.config_missing", [
+                "hasStaleFallback": cached == nil ? "false" : "true",
+            ])
             return SnapshotEntry(
                 date: .now,
                 snapshot: cached?.snapshot,
                 staleFromCache: cached != nil,
                 shareCode: code,
-                errorMessage: "Widget is not configured",
+                errorMessage: "Widget is not configured (E:cfg)",
                 myTeamName: myTeamName
             )
         }
@@ -152,6 +164,10 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
         do {
             let fresh = try await api.fetchSnapshot(shareCode: code)
             try? AppGroup.cacheSnapshot(fresh)
+            WidgetTelemetry.record("timeline.fetch.ok", [
+                "games": String(fresh.games.count),
+                "players": String(fresh.players.count),
+            ])
             return SnapshotEntry(
                 date: .now,
                 snapshot: fresh,
@@ -165,14 +181,34 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
             // Anything older than `staleFallbackMaxAge` is dropped to avoid
             // showing yesterday's games when the network is unreachable.
             let cached = AppGroup.cachedSnapshot(maxAge: Self.staleFallbackMaxAge)
+            let code = errorCode(for: error)
+            WidgetTelemetry.record("timeline.fetch.error", [
+                "errorCode": code,
+                "error": String(describing: error),
+                "hasStaleFallback": cached == nil ? "false" : "true",
+            ])
             return SnapshotEntry(
                 date: .now,
                 snapshot: cached?.snapshot,
                 staleFromCache: cached != nil,
-                shareCode: code,
-                errorMessage: cached == nil ? "Couldn't load snapshot" : nil,
+                shareCode: shareCode,
+                errorMessage: cached == nil ? "Couldn't load snapshot (E:\(code))" : nil,
                 myTeamName: myTeamName
             )
+        }
+    }
+
+    /// Compresses a `SnapshotAPIError` into a short token that's safe to
+    /// embed in the user-visible "Couldn't load snapshot" string. Lets a
+    /// user report the failure mode at a glance without needing to grab
+    /// device logs.
+    private func errorCode(for error: Error) -> String {
+        guard let api = error as? SnapshotAPIError else { return "unk" }
+        switch api {
+        case .missingConfig: return "cfg"
+        case .badStatus(let code, _): return "h\(code)"
+        case .decoding: return "dec"
+        case .transport: return "net"
         }
     }
 

@@ -46,12 +46,15 @@ enum WidgetSnapshotPrimer {
     }
 
     private static func runRefresh(reason: String) async {
+        WidgetTelemetry.record("primer.start", ["reason": reason])
         guard let shareCode = AppGroup.featuredShareCode, !shareCode.isEmpty else {
             os_log("Skip refresh (%{public}@): no featured share code", log: log, type: .debug, reason)
+            WidgetTelemetry.record("primer.skip.no_share_code", ["reason": reason])
             return
         }
         guard let config = SnapshotAPIConfig.fromBundle() else {
             os_log("Skip refresh (%{public}@): missing SUPABASE config", log: log, type: .error, reason)
+            WidgetTelemetry.record("primer.skip.no_config", ["reason": reason])
             return
         }
 
@@ -61,15 +64,25 @@ enum WidgetSnapshotPrimer {
             try? AppGroup.cacheSnapshot(snapshot)
             os_log("Primed snapshot (%{public}@): games=%{public}d players=%{public}d",
                    log: log, type: .info, reason, snapshot.games.count, snapshot.players.count)
+            WidgetTelemetry.record("primer.ok", [
+                "reason": reason,
+                "games": String(snapshot.games.count),
+                "players": String(snapshot.players.count),
+            ])
         } catch {
             os_log("Primer fetch failed (%{public}@): %{public}@",
                    log: log, type: .error, reason, String(describing: error))
+            WidgetTelemetry.record("primer.fetch_error", [
+                "reason": reason,
+                "error": String(describing: error),
+            ])
             // Still reload — the extension may still have a recent cache, or
             // may want to surface its own error UI.
         }
 
         if #available(iOS 14.0, *) {
             WidgetCenter.shared.reloadAllTimelines()
+            WidgetTelemetry.record("primer.reload_timelines", ["reason": reason])
         }
     }
 }
