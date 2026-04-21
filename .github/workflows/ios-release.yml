@@ -131,11 +131,27 @@ jobs:
           done
 
       - name: Generate Secrets.xcconfig
+        env:
+          SUPABASE_URL_RAW: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY_RAW: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
+          set -euo pipefail
+          # xcconfig files treat '//' as the start of a line comment, so
+          # writing "SUPABASE_URL = https://foo.bar" is silently parsed
+          # as SUPABASE_URL = "https:" (length 6) with the rest dropped.
+          # Escape every '//' using Xcode's standard workaround: an
+          # empty variable reference /$()/ between the slashes breaks
+          # the comment token but resolves to the original value.
+          # See: https://pewpewthespells.com/blog/xcconfig_guide.html
+          ESCAPED_URL=$(printf '%s' "$SUPABASE_URL_RAW" | sed 's|//|/$()/|g')
+          ESCAPED_KEY=$(printf '%s' "$SUPABASE_ANON_KEY_RAW" | sed 's|//|/$()/|g')
           cat > ios/App/Secrets.xcconfig <<EOF
-          SUPABASE_URL = ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_ANON_KEY = ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_URL = ${ESCAPED_URL}
+          SUPABASE_ANON_KEY = ${ESCAPED_KEY}
           EOF
+          # Log lengths only (never the values) so regressions show up
+          # in the CI output without leaking secrets.
+          echo "xcconfig written. url_length=${#SUPABASE_URL_RAW} key_length=${#SUPABASE_ANON_KEY_RAW}"
 
       - name: Archive App (Release, signed)
         run: |
@@ -178,17 +194,22 @@ jobs:
             echo "Checking $plist"
             URL=$(/usr/libexec/PlistBuddy -c "Print SUPABASE_URL" "$plist" 2>/dev/null || echo "")
             KEY=$(/usr/libexec/PlistBuddy -c "Print SUPABASE_ANON_KEY" "$plist" 2>/dev/null || echo "")
-            if [ -z "$URL" ] || [[ "$URL" == *'$('* ]] || [[ "$URL" != http* ]]; then
-              echo "::error::SUPABASE_URL not substituted in $plist (got: '$URL')"
+            # Require at least 20 chars on URL so a silently-truncated
+            # value like "https:" (which matches http*) is caught. Real
+            # Supabase URLs are 30+ chars.
+            if [ -z "$URL" ] || [[ "$URL" == *'$('* ]] || [[ "$URL" != https://* ]] || [ "${#URL}" -lt 20 ]; then
+              echo "::error::SUPABASE_URL not substituted in $plist (length=${#URL} value='$URL')"
               exit 1
             fi
-            if [ -z "$KEY" ] || [[ "$KEY" == *'$('* ]]; then
-              echo "::error::SUPABASE_ANON_KEY not substituted in $plist"
+            # Anon keys are either 200+ char JWTs (eyJ...) or 40+ char
+            # sb_publishable_* strings. Anything under 30 is suspicious.
+            if [ -z "$KEY" ] || [[ "$KEY" == *'$('* ]] || [ "${#KEY}" -lt 30 ]; then
+              echo "::error::SUPABASE_ANON_KEY not substituted in $plist (length=${#KEY})"
               exit 1
             fi
-            # Don't echo the key itself; just confirm it has a sane prefix.
-            echo "  ✓ SUPABASE_URL ok ($URL)"
-            echo "  ✓ SUPABASE_ANON_KEY length=${#KEY}"
+            # Don't echo the key itself; just confirm it has a sane length.
+            echo "  ✓ SUPABASE_URL ok (length=${#URL})"
+            echo "  ✓ SUPABASE_ANON_KEY ok (length=${#KEY})"
           done
 
       - name: Write ExportOptions.plist
