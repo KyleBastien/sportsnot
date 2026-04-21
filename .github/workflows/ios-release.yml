@@ -148,6 +148,14 @@ jobs:
           # up their own provisioning profile. Don't pass signing overrides
           # on the CLI here — they would apply to every target in the
           # workspace and break the Pods build.
+          # Pass SUPABASE_URL / SUPABASE_ANON_KEY as CLI build settings in
+          # addition to the xcconfig. CLI args have the highest precedence
+          # in xcodebuild's resolution order, so they override anything any
+          # target / xcconfig might define and guarantee both the App and
+          # Widget targets see the correct values for Info.plist
+          # substitution. Past target-level entries silently broke the
+          # widget extension's substitution and produced literal
+          # "$(SUPABASE_URL)" strings in its Info.plist.
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
             -scheme App \
@@ -156,7 +164,32 @@ jobs:
             -archivePath "$ARCHIVE_PATH" \
             -xcconfig ios/App/Secrets.xcconfig \
             CURRENT_PROJECT_VERSION=$BUILD_NUMBER \
+            SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}" \
+            SUPABASE_ANON_KEY="${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
             archive
+
+      - name: Verify Info.plist SUPABASE_* substitution
+        run: |
+          set -euo pipefail
+          APP_PLIST="$ARCHIVE_PATH/Products/Applications/App.app/Info.plist"
+          WIDGET_PLIST="$ARCHIVE_PATH/Products/Applications/App.app/PlugIns/SportsNotWidget.appex/Info.plist"
+
+          for plist in "$APP_PLIST" "$WIDGET_PLIST"; do
+            echo "Checking $plist"
+            URL=$(/usr/libexec/PlistBuddy -c "Print SUPABASE_URL" "$plist" 2>/dev/null || echo "")
+            KEY=$(/usr/libexec/PlistBuddy -c "Print SUPABASE_ANON_KEY" "$plist" 2>/dev/null || echo "")
+            if [ -z "$URL" ] || [[ "$URL" == *'$('* ]] || [[ "$URL" != http* ]]; then
+              echo "::error::SUPABASE_URL not substituted in $plist (got: '$URL')"
+              exit 1
+            fi
+            if [ -z "$KEY" ] || [[ "$KEY" == *'$('* ]]; then
+              echo "::error::SUPABASE_ANON_KEY not substituted in $plist"
+              exit 1
+            fi
+            # Don't echo the key itself; just confirm it has a sane prefix.
+            echo "  ✓ SUPABASE_URL ok ($URL)"
+            echo "  ✓ SUPABASE_ANON_KEY length=${#KEY}"
+          done
 
       - name: Write ExportOptions.plist
         run: |
