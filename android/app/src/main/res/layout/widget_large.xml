@@ -6,7 +6,6 @@
     android:padding="12dp"
     android:background="@drawable/widget_background">
 
-    <!-- Header: league name + page indicator + team total -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -29,119 +28,128 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="#808080"
-            android:textSize="10sp"
-            android:paddingEnd="8dp" />
-
-        <TextView
-            android:id="@+id/team_total"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#FFD700"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textSize="10sp" />
     </LinearLayout>
 
-    <!-- Games section -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Today&#39;s Games"
-        android:textColor="#808080"
-        android:textSize="10sp"
-        android:layout_marginBottom="4dp" />
-
     <LinearLayout
-        android:id="@+id/games_container"
+        android:id="@+id/game_section_1"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:layout_marginBottom="8dp">
 
-        <LinearLayout
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/game_1_header"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
 
-            <TextView android:id="@+id/game_1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="11sp" />
-            <TextView android:id="@+id/game_2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="11sp" />
-            <TextView android:id="@+id/game_3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/game_1_body"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView android:id="@+id/game_4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="11sp" />
-            <TextView android:id="@+id/game_5" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="11sp" />
-            <TextView android:id="@+id/game_6" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="11sp" />
-        </LinearLayout>
+            android:layout_marginTop="3dp"
+            android:textColor="#D7D7D7"
+            android:textSize="10sp"
+            android:maxLines="7"
+            android:ellipsize="end" />
     </LinearLayout>
-
-    <!-- Players section -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Drafted Players"
-        android:textColor="#808080"
-        android:textSize="10sp"
-        android:layout_marginBottom="4dp" />
 
     <LinearLayout
+        android:id="@+id/game_section_2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:orientation="vertical"
+        android:layout_marginBottom="8dp">
 
-        <LinearLayout
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/game_2_header"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
 
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="2dp">
-                <TextView android:id="@+id/player_1_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#FFFFFF" android:textSize="11sp" android:ellipsize="end" android:maxLines="1" />
-                <TextView android:id="@+id/player_1_pts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFD700" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="2dp">
-                <TextView android:id="@+id/player_2_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#FFFFFF" android:textSize="11sp" android:ellipsize="end" android:maxLines="1" />
-                <TextView android:id="@+id/player_2_pts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFD700" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="2dp">
-                <TextView android:id="@+id/player_3_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#FFFFFF" android:textSize="11sp" android:ellipsize="end" android:maxLines="1" />
-                <TextView android:id="@+id/player_3_pts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFD700" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-                <TextView android:id="@+id/player_4_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#FFFFFF" android:textSize="11sp" android:ellipsize="end" android:maxLines="1" />
-                <TextView android:id="@+id/player_4_pts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFD700" android:textSize="11sp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/game_2_body"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:paddingStart="8dp">
-
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="2dp">
-                <TextView android:id="@+id/player_5_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#FFFFFF" android:textSize="11sp" android:ellipsize="end" android:maxLines="1" />
-                <TextView android:id="@+id/player_5_pts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFD700" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="2dp">
-                <TextView android:id="@+id/player_6_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#FFFFFF" android:textSize="11sp" android:ellipsize="end" android:maxLines="1" />
-                <TextView android:id="@+id/player_6_pts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFD700" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="2dp">
-                <TextView android:id="@+id/player_7_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#FFFFFF" android:textSize="11sp" android:ellipsize="end" android:maxLines="1" />
-                <TextView android:id="@+id/player_7_pts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFD700" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-                <TextView android:id="@+id/player_8_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#FFFFFF" android:textSize="11sp" android:ellipsize="end" android:maxLines="1" />
-                <TextView android:id="@+id/player_8_pts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFD700" android:textSize="11sp" />
-            </LinearLayout>
-        </LinearLayout>
+            android:layout_marginTop="3dp"
+            android:textColor="#D7D7D7"
+            android:textSize="10sp"
+            android:maxLines="7"
+            android:ellipsize="end" />
     </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/game_section_3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/game_3_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/game_3_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:textColor="#D7D7D7"
+            android:textSize="10sp"
+            android:maxLines="7"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/game_section_4"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/game_4_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/game_4_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:textColor="#D7D7D7"
+            android:textSize="10sp"
+            android:maxLines="7"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/footer_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="#808080"
+        android:textSize="9sp"
+        android:ellipsize="end"
+        android:maxLines="1" />
 
 </LinearLayout>

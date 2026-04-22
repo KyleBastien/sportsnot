@@ -68,7 +68,8 @@ class WidgetConfigActivity : Activity() {
         // Trigger initial widget update
         val manager = AppWidgetManager.getInstance(this)
         val views = android.widget.RemoteViews(packageName, R.layout.widget_small)
-        views.setTextViewText(R.id.player_name, "Loading…")
+        views.setTextViewText(R.id.game_header, "Loading…")
+        views.setTextViewText(R.id.league_name, "SportsNot")
         manager.updateAppWidget(appWidgetId, views)
 
         finish()

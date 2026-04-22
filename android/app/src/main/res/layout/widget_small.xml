@@ -4,52 +4,60 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="12dp"
-    android:background="@drawable/widget_background"
-    android:gravity="center">
+    android:background="@drawable/widget_background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="6dp">
+
+        <TextView
+            android:id="@+id/league_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#B0B0B0"
+            android:textSize="10sp"
+            android:ellipsize="end"
+            android:maxLines="1" />
+
+        <TextView
+            android:id="@+id/page_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#808080"
+            android:textSize="9sp" />
+    </LinearLayout>
 
     <TextView
-        android:id="@+id/player_name"
-        android:layout_width="wrap_content"
+        android:id="@+id/game_header"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textColor="#FFFFFF"
-        android:textSize="14sp"
+        android:textSize="13sp"
         android:textStyle="bold"
-        android:ellipsize="end"
-        android:maxLines="1" />
+        android:maxLines="2"
+        android:ellipsize="end" />
 
     <TextView
-        android:id="@+id/player_team"
-        android:layout_width="wrap_content"
+        android:id="@+id/game_body"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="#B0B0B0"
-        android:textSize="11sp"
-        android:layout_marginTop="2dp" />
-
-    <TextView
-        android:id="@+id/player_points"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="#FFD700"
-        android:textSize="28sp"
-        android:textStyle="bold"
-        android:layout_marginTop="8dp" />
-
-    <TextView
-        android:id="@+id/points_label"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="PTS"
-        android:textColor="#808080"
-        android:textSize="10sp" />
-
-    <TextView
-        android:id="@+id/league_name"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="#808080"
+        android:layout_marginTop="6dp"
+        android:textColor="#D7D7D7"
         android:textSize="10sp"
+        android:maxLines="3"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/footer_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
+        android:textColor="#808080"
+        android:textSize="9sp"
         android:ellipsize="end"
-        android:maxLines="1" />
+        android:maxLines="2" />
 
 </LinearLayout>

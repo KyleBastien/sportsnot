@@ -20,7 +20,7 @@
       "dependsOn": ["sync-web"],
       "options": {
         "commands": [
-          "cd android && .\\gradlew assembleDebug"
+          "node -e \"const {spawnSync}=require('node:child_process'); const isWin=process.platform==='win32'; const cmd=isWin?'gradlew.bat':'./gradlew'; const result=spawnSync(cmd,['assembleDebug'],{cwd:'android',stdio:'inherit',shell:isWin}); process.exit(result.status ?? 1);\""
         ],
         "cwd": "{workspaceRoot}"
       }
@@ -40,7 +40,7 @@
       "dependsOn": ["sync-web"],
       "options": {
         "commands": [
-          "cd android && .\\gradlew bundleRelease"
+          "node -e \"const {spawnSync}=require('node:child_process'); const isWin=process.platform==='win32'; const cmd=isWin?'gradlew.bat':'./gradlew'; const result=spawnSync(cmd,['bundleRelease'],{cwd:'android',stdio:'inherit',shell:isWin}); process.exit(result.status ?? 1);\""
         ],
         "cwd": "{workspaceRoot}"
       }

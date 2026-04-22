@@ -5,113 +5,111 @@ import WidgetKit
 struct LargeFamilyView: View {
     let entry: SnapshotEntry
 
+    private let columns = [
+        GridItem(.flexible(), spacing: 10, alignment: .topLeading),
+        GridItem(.flexible(), spacing: 10, alignment: .topLeading),
+    ]
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(entry.snapshot?.league.name ?? "SportsNot").font(.headline).lineLimit(1)
-                Spacer()
-                if let totalLabel = myTeamTotalLabel() {
-                    Text(totalLabel)
-                        .font(.subheadline.monospacedDigit().bold())
-                }
-            }
-            if let team = entry.myTeamName, !team.isEmpty {
-                Text(team)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+        let sections = WidgetScheduleLayout.pageSections(
+            for: entry.snapshot,
+            family: .systemLarge,
+            pageIndex: entry.pageIndex
+        )
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text(entry.snapshot?.league.name ?? "SportsNot")
+                    .font(.headline)
                     .lineLimit(1)
-            }
-            Text("Today's games").font(.caption).foregroundStyle(.secondary)
-            if let error = entry.errorMessage, entry.snapshot == nil {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            } else if let games = entry.snapshot?.games, !games.isEmpty {
-                ForEach(games.prefix(6)) { g in
-                    HStack(spacing: 6) {
-                        Text("\(g.awayTeamAbbrev) \(g.awayScore)")
-                            .font(.caption.monospacedDigit())
-                        Text("@").font(.caption2).foregroundStyle(.secondary)
-                        Text("\(g.homeTeamAbbrev) \(g.homeScore)")
-                            .font(.caption.monospacedDigit())
-                        Spacer()
-                        statusLabel(for: g)
-                    }
-                }
-            } else {
-                Text("No games today").font(.caption).foregroundStyle(.secondary)
-            }
-
-            Divider()
-
-            HStack {
-                Text("Drafted players").font(.caption).foregroundStyle(.secondary)
-                Spacer()
+                Spacer(minLength: 4)
                 if entry.totalPages > 1 {
                     Text("\(entry.pageIndex + 1)/\(entry.totalPages)")
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.tertiary)
                 }
             }
-            if let snapshot = entry.snapshot {
-                let playingToday = snapshot.players
-                    .filter { $0.gameId != nil }
-                    .sorted(by: { $0.fantasyPoints > $1.fantasyPoints })
-                if playingToday.isEmpty {
-                    Text("No players playing today").font(.caption).foregroundStyle(.secondary)
-                } else {
-                    let perPage = SnapshotTimelineProvider.playersPerPage(for: .systemLarge)
-                    let start = min(entry.pageIndex * perPage, playingToday.count)
-                    let end = min(start + perPage, playingToday.count)
-                    let page = Array(playingToday[start..<end])
-                    ForEach(page, id: \.id) { p in
-                        HStack {
-                            Text(p.teamAbbrev).font(.caption2.bold()).foregroundStyle(Color.accentColor)
-                                .frame(width: 36, alignment: .leading)
-                            Text(p.name).font(.caption).lineLimit(1)
-                            Spacer()
-                            Text(p.ownedByTeamName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                            Text(String(format: "%.0f", p.fantasyPoints))
-                                .font(.caption.monospacedDigit())
-                                .frame(width: 44, alignment: .trailing)
+
+            if let error = entry.errorMessage, entry.snapshot == nil {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(4)
+            } else if sections.isEmpty {
+                Text("No games today")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(WidgetScheduleLayout.headerText(for: section.game))
+                            .font(.subheadline.bold())
+                            .lineLimit(1)
+                        let visibleTeams = WidgetScheduleLayout.visibleFantasyTeams(
+                            for: section,
+                            family: .systemLarge
+                        )
+                        if visibleTeams.isEmpty {
+                            Text("No drafted teams in this game")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
+                                ForEach(visibleTeams) { team in
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(team.name)
+                                            .font(.caption.bold())
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.85)
+
+                                        ForEach(
+                                            WidgetScheduleLayout.teamLines(
+                                                for: team,
+                                                family: .systemLarge
+                                            ),
+                                            id: \.self
+                                        ) { line in
+                                            Text(line)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.72)
+                                        }
+                                    }
+                                }
+                            }
+
+                            let hiddenTeams = WidgetScheduleLayout.hiddenFantasyTeamCount(
+                                for: section,
+                                family: .systemLarge
+                            )
+                            if hiddenTeams > 0 {
+                                Text("+\(hiddenTeams) more teams")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
                         }
+                    }
+                    if index < sections.count - 1 {
+                        Divider()
                     }
                 }
             }
+
+            Spacer(minLength: 0)
+
+            if let footer = WidgetScheduleLayout.footerText(for: entry) {
+                Text(footer)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
             if entry.staleFromCache {
-                Text("• showing cached snapshot").font(.caption2).foregroundStyle(.tertiary)
+                Text("• showing cached snapshot")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    @ViewBuilder
-    private func statusLabel(for g: WidgetSnapshot.Game) -> some View {
-        switch g.state {
-        case "LIVE", "CRIT":
-            Text("P\(g.period ?? 0) \(g.timeRemaining ?? "")")
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.green)
-        case "FINAL", "OFF":
-            Text("F").font(.caption2).foregroundStyle(.secondary)
-        default:
-            Text(g.state).font(.caption2).foregroundStyle(.secondary)
-        }
-    }
-
-    /// Sum of fantasy points for players owned by the user's team in this
-    /// league. Falls back to the league-wide total if the user has not yet
-    /// linked a team (i.e. before tapping Feature on iOS widget post-update).
-    private func myTeamTotalLabel() -> String? {
-        guard let snapshot = entry.snapshot else { return nil }
-        if let team = entry.myTeamName, !team.isEmpty {
-            let total = snapshot.players
-                .filter { $0.ownedByTeamName == team }
-                .reduce(0) { $0 + $1.fantasyPoints }
-            return String(format: "%.0f pts", total)
-        }
-        let total = snapshot.players.reduce(0) { $0 + $1.fantasyPoints }
-        return String(format: "%.0f pts", total)
     }
 }

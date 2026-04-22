@@ -31,32 +31,17 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
     // provider returned.
     private static let pageDurationSeconds: TimeInterval = 30
 
-    /// How many drafted players each family can render per page. Small only
-    /// fits a single player line; Medium matches the previous static cap of
-    /// 3; Large gets ~8 rows comfortably.
-    static func playersPerPage(for family: WidgetFamily) -> Int {
-        switch family {
-        case .systemSmall: return 1
-        case .systemMedium: return 3
-        case .systemLarge: return 8
-        default: return 0  // accessory families don't paginate
-        }
-    }
-
     private func paginatedEntries(
         base: SnapshotEntry,
         family: WidgetFamily,
         nextRefresh: Date
     ) -> [SnapshotEntry] {
-        let perPage = Self.playersPerPage(for: family)
-        let players = base.snapshot?.players.filter { $0.gameId != nil } ?? []
-        let totalPages = perPage > 0
-            ? max(1, Int(ceil(Double(players.count) / Double(perPage))))
-            : 1
+        let totalPages = WidgetScheduleLayout.totalPages(
+            for: base.snapshot,
+            family: family
+        )
 
         if totalPages <= 1 {
-            // Single entry preserves prior behavior for accessory families
-            // and for snapshots that fit in one page.
             return [SnapshotEntry(
                 date: base.date,
                 snapshot: base.snapshot,
@@ -218,5 +203,396 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
         // budget (~40-70/day). 2 minutes blows the budget in a single game.
         let minutes: Int = anyLive ? 5 : 15
         return Calendar.current.date(byAdding: .minute, value: minutes, to: .now) ?? .now.addingTimeInterval(Double(minutes * 60))
+    }
+}
+
+@available(iOS 17.0, *)
+enum WidgetScheduleLayout {
+    struct AssetEntry: Hashable {
+        let name: String
+        let fantasyPoints: Double
+    }
+
+    struct FamilyConfig {
+        let gamesPerPage: Int
+        let maxFantasyTeamsPerGame: Int
+        let fantasyTeamColumns: Int
+        let maxNhlGroupsPerFantasyTeam: Int
+        let maxNamesPerLine: Int
+        let compactRows: Bool
+        let bodyLineLimit: Int
+    }
+
+    struct TeamAssetLine: Hashable {
+        let teamAbbrev: String
+        let assets: [AssetEntry]
+    }
+
+    struct FantasyTeamGroup: Hashable, Identifiable {
+        var id: String { name }
+        let name: String
+        let totalFantasyPoints: Double
+        let teamLines: [TeamAssetLine]
+    }
+
+    struct GameSection: Identifiable {
+        var id: Int { game.id }
+        let game: WidgetSnapshot.Game
+        let fantasyTeams: [FantasyTeamGroup]
+    }
+
+    private static let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static let displayTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter
+    }()
+
+    static func config(for family: WidgetFamily) -> FamilyConfig {
+        switch family {
+        case .systemSmall:
+            return FamilyConfig(
+                gamesPerPage: 1,
+                maxFantasyTeamsPerGame: 2,
+                fantasyTeamColumns: 1,
+                maxNhlGroupsPerFantasyTeam: 1,
+                maxNamesPerLine: 1,
+                compactRows: true,
+                bodyLineLimit: 3
+            )
+        case .systemMedium:
+            return FamilyConfig(
+                gamesPerPage: 1,
+                maxFantasyTeamsPerGame: 4,
+                fantasyTeamColumns: 2,
+                maxNhlGroupsPerFantasyTeam: 2,
+                maxNamesPerLine: 1,
+                compactRows: false,
+                bodyLineLimit: 10
+            )
+        case .systemLarge:
+            return FamilyConfig(
+                gamesPerPage: 2,
+                maxFantasyTeamsPerGame: 4,
+                fantasyTeamColumns: 2,
+                maxNhlGroupsPerFantasyTeam: 2,
+                maxNamesPerLine: 1,
+                compactRows: false,
+                bodyLineLimit: 12
+            )
+        default:
+            return FamilyConfig(
+                gamesPerPage: 1,
+                maxFantasyTeamsPerGame: 1,
+                fantasyTeamColumns: 1,
+                maxNhlGroupsPerFantasyTeam: 1,
+                maxNamesPerLine: 1,
+                compactRows: true,
+                bodyLineLimit: 2
+            )
+        }
+    }
+
+    static func totalPages(
+        for snapshot: WidgetSnapshot?,
+        family: WidgetFamily
+    ) -> Int {
+        guard supportsPagination(for: family) else { return 1 }
+        guard let snapshot else { return 1 }
+        let sections = sections(for: snapshot, family: family)
+        let gamesPerPage = max(1, config(for: family).gamesPerPage)
+        return max(1, Int(ceil(Double(sections.count) / Double(gamesPerPage))))
+    }
+
+    static func pageSections(
+        for snapshot: WidgetSnapshot?,
+        family: WidgetFamily,
+        pageIndex: Int
+    ) -> [GameSection] {
+        guard let snapshot else { return [] }
+        let sections = sections(for: snapshot, family: family)
+        let gamesPerPage = max(1, config(for: family).gamesPerPage)
+        let start = min(pageIndex * gamesPerPage, sections.count)
+        let end = min(start + gamesPerPage, sections.count)
+        return Array(sections[start..<end])
+    }
+
+    static func headerText(for game: WidgetSnapshot.Game) -> String {
+        let matchup = "\(game.awayTeamAbbrev) @ \(game.homeTeamAbbrev)"
+        switch game.state {
+        case "LIVE", "CRIT":
+            let score = "\(game.awayScore)-\(game.homeScore)"
+            let detail = liveDetail(for: game)
+            return "\(matchup) — \(score) \(detail)".trimmingCharacters(in: .whitespaces)
+        case "FINAL", "OFF":
+            return "\(matchup) — \(game.awayScore)-\(game.homeScore) F"
+        default:
+            return "\(matchup) — \(startTimeText(for: game.startsAt))"
+        }
+    }
+
+    static func bodyText(
+        for section: GameSection,
+        family: WidgetFamily
+    ) -> String? {
+        let cfg = config(for: family)
+        guard !section.fantasyTeams.isEmpty else { return nil }
+
+        let visibleTeams = visibleFantasyTeams(for: section, family: family)
+        var lines: [String] = []
+
+        if cfg.compactRows {
+            lines = visibleTeams.map { compactRowText(for: $0, cfg: cfg) }
+        } else {
+            for team in visibleTeams {
+                lines.append(team.name)
+                lines.append(contentsOf: teamLines(for: team, family: family))
+            }
+        }
+
+        let hiddenTeams = hiddenFantasyTeamCount(for: section, family: family)
+        if hiddenTeams > 0 {
+            lines.append("+\(hiddenTeams) more teams")
+        }
+
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
+
+    static func visibleFantasyTeams(
+        for section: GameSection,
+        family: WidgetFamily
+    ) -> [FantasyTeamGroup] {
+        Array(section.fantasyTeams.prefix(config(for: family).maxFantasyTeamsPerGame))
+    }
+
+    static func hiddenFantasyTeamCount(
+        for section: GameSection,
+        family: WidgetFamily
+    ) -> Int {
+        max(0, section.fantasyTeams.count - visibleFantasyTeams(
+            for: section,
+            family: family
+        ).count)
+    }
+
+    static func teamLines(
+        for team: FantasyTeamGroup,
+        family: WidgetFamily
+    ) -> [String] {
+        let cfg = config(for: family)
+        let visibleGroups = Array(team.teamLines.prefix(cfg.maxNhlGroupsPerFantasyTeam))
+        var lines: [String] = []
+        for group in visibleGroups {
+            let wrappedGroupLines = wrappedTeamAssetLines(
+                for: group,
+                cfg: cfg
+            )
+            lines.append(contentsOf: wrappedGroupLines)
+        }
+        let hiddenGroups = team.teamLines.count - visibleGroups.count
+        if hiddenGroups > 0 {
+            lines.append("- +\(hiddenGroups) more NHL groups")
+        }
+        return lines
+    }
+
+    static func footerText(for entry: SnapshotEntry) -> String? {
+        guard let team = entry.myTeamName, !team.isEmpty,
+              let snapshot = entry.snapshot else { return nil }
+        let total = snapshot.players
+            .filter { $0.ownedByTeamName == team }
+            .reduce(0) { $0 + $1.fantasyPoints }
+        return String(format: "%@ · %.0f pts", team, total)
+    }
+
+    private static func sections(
+        for snapshot: WidgetSnapshot,
+        family: WidgetFamily
+    ) -> [GameSection] {
+        let groupedGames = snapshot.games.map { game in
+            GameSection(
+                game: game,
+                fantasyTeams: groupedFantasyTeams(
+                    snapshot.players.filter { $0.gameId == game.id }
+                )
+            )
+        }
+
+        switch family {
+        case .systemSmall:
+            return groupedGames.sorted(by: smallPrioritySort)
+        default:
+            return groupedGames.sorted(by: chronologicalSort)
+        }
+    }
+
+    private static func supportsPagination(for family: WidgetFamily) -> Bool {
+        switch family {
+        case .systemSmall, .systemMedium, .systemLarge:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func groupedFantasyTeams(
+        _ players: [WidgetSnapshot.DraftedPlayer]
+    ) -> [FantasyTeamGroup] {
+        Dictionary(grouping: players, by: \.ownedByTeamName)
+            .map { teamName, members in
+                let total = members.reduce(0) { $0 + $1.fantasyPoints }
+                let teamLines = Dictionary(grouping: members, by: \.teamAbbrev)
+                    .map { abbrev, assets in
+                        TeamAssetLine(
+                            teamAbbrev: abbrev.isEmpty ? "NHL" : abbrev,
+                            assets: assets
+                                .sorted(by: draftedAssetSort)
+                                .map {
+                                    AssetEntry(
+                                        name: $0.name,
+                                        fantasyPoints: $0.fantasyPoints
+                                    )
+                                }
+                        )
+                    }
+                    .sorted {
+                        $0.teamAbbrev.localizedCaseInsensitiveCompare($1.teamAbbrev) == .orderedAscending
+                    }
+                return FantasyTeamGroup(
+                    name: teamName,
+                    totalFantasyPoints: total,
+                    teamLines: teamLines
+                )
+            }
+            .sorted {
+                if $0.totalFantasyPoints != $1.totalFantasyPoints {
+                    return $0.totalFantasyPoints > $1.totalFantasyPoints
+                }
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+    }
+
+    private static func compactRowText(
+        for team: FantasyTeamGroup,
+        cfg: FamilyConfig
+    ) -> String {
+        let visibleGroups = Array(team.teamLines.prefix(cfg.maxNhlGroupsPerFantasyTeam))
+        let segments = visibleGroups.map {
+            let namesText = $0.assets
+                .map(compactAssetText)
+                .joined(separator: ", ")
+            return "\($0.teamAbbrev): \(namesText)"
+        }
+        var row = team.name
+        if !segments.isEmpty {
+            row += " • " + segments.joined(separator: " • ")
+        }
+        let hiddenGroups = team.teamLines.count - visibleGroups.count
+        if hiddenGroups > 0 {
+            row += " • +\(hiddenGroups) more"
+        }
+        return row
+    }
+
+    private static func wrappedTeamAssetLines(
+        for group: TeamAssetLine,
+        cfg: FamilyConfig
+    ) -> [String] {
+        let assets = group.assets
+        guard !assets.isEmpty else { return ["- \(group.teamAbbrev)"] }
+
+        let chunkSize = max(1, cfg.maxNamesPerLine)
+        let chunks = stride(from: 0, to: assets.count, by: chunkSize).map {
+            Array(assets[$0..<min($0 + chunkSize, assets.count)])
+        }
+
+        return chunks.enumerated().map { index, chunk in
+            let namesText = chunk
+                .map(fullAssetText)
+                .joined(separator: ", ")
+            if index == 0 {
+                return "- \(group.teamAbbrev): \(namesText)"
+            }
+            return "  \(namesText)"
+        }
+    }
+
+    private static func compactAssetText(_ asset: AssetEntry) -> String {
+        "\(asset.name) \(pointsText(for: asset.fantasyPoints))"
+    }
+
+    private static func fullAssetText(_ asset: AssetEntry) -> String {
+        "\(asset.name) \(pointsText(for: asset.fantasyPoints))"
+    }
+
+    private static func pointsText(for value: Double) -> String {
+        if value.rounded(.towardZero) == value {
+            return String(format: "%.0f", value)
+        }
+        return String(format: "%.1f", value)
+    }
+
+    private static func chronologicalSort(_ lhs: GameSection, _ rhs: GameSection) -> Bool {
+        let leftDate = gameDate(for: lhs.game.startsAt) ?? .distantFuture
+        let rightDate = gameDate(for: rhs.game.startsAt) ?? .distantFuture
+        if leftDate != rightDate {
+            return leftDate < rightDate
+        }
+        return lhs.game.id < rhs.game.id
+    }
+
+    private static func smallPrioritySort(_ lhs: GameSection, _ rhs: GameSection) -> Bool {
+        let leftRank = smallPriorityRank(for: lhs)
+        let rightRank = smallPriorityRank(for: rhs)
+        if leftRank != rightRank {
+            return leftRank < rightRank
+        }
+        return chronologicalSort(lhs, rhs)
+    }
+
+    private static func smallPriorityRank(for section: GameSection) -> Int {
+        if !section.fantasyTeams.isEmpty && isLive(section.game) {
+            return 0
+        }
+        if !section.fantasyTeams.isEmpty {
+            return 1
+        }
+        return 2
+    }
+
+    private static func isLive(_ game: WidgetSnapshot.Game) -> Bool {
+        game.state == "LIVE" || game.state == "CRIT"
+    }
+
+    private static func draftedAssetSort(
+        _ lhs: WidgetSnapshot.DraftedPlayer,
+        _ rhs: WidgetSnapshot.DraftedPlayer
+    ) -> Bool {
+        if lhs.fantasyPoints != rhs.fantasyPoints {
+            return lhs.fantasyPoints > rhs.fantasyPoints
+        }
+        return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+    }
+
+    private static func startTimeText(for value: String) -> String {
+        guard let date = gameDate(for: value) else { return value }
+        return displayTimeFormatter.string(from: date)
+    }
+
+    private static func liveDetail(for game: WidgetSnapshot.Game) -> String {
+        let period = game.period.map { "P\($0)" } ?? "LIVE"
+        if let timeRemaining = game.timeRemaining, !timeRemaining.isEmpty {
+            return "\(period) \(timeRemaining)"
+        }
+        return period
+    }
+
+    private static func gameDate(for value: String) -> Date? {
+        isoFormatter.date(from: value)
     }
 }

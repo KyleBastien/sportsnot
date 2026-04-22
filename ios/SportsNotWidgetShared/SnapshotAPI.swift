@@ -61,19 +61,29 @@ public struct SnapshotAPI: Sendable {
     public let config: SnapshotAPIConfig
     public var session: URLSession
 
+    private static let localDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_CA_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     public init(config: SnapshotAPIConfig, session: URLSession = .shared) {
         self.config = config
         self.session = session
     }
 
     public func fetchSnapshot(shareCode: String, date: String? = nil) async throws -> WidgetSnapshot {
+        let requestedDate = date ?? Self.localDateFormatter.string(from: Date())
         var components = URLComponents(
             url: config.supabaseURL.appendingPathComponent("functions/v1/widget-league-snapshot"),
             resolvingAgainstBaseURL: false
         )!
-        var items = [URLQueryItem(name: "shareCode", value: shareCode)]
-        if let date { items.append(URLQueryItem(name: "date", value: date)) }
-        components.queryItems = items
+        components.queryItems = [
+            URLQueryItem(name: "shareCode", value: shareCode),
+            URLQueryItem(name: "date", value: requestedDate),
+        ]
 
         var request = URLRequest(url: components.url!)
         request.httpMethod = "GET"

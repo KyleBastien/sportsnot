@@ -98,14 +98,19 @@ object WidgetPreferences {
         return getCachedSnapshot(context)
     }
 
-    // Page rotation for widget player lists (mirrors iOS 30s timeline entries)
+    // Page rotation for widget schedule pages (mirrors iOS 30s timeline entries)
     fun getPageIndex(context: Context, widgetId: Int): Int =
         prefs(context).getInt("pageIndex_$widgetId", 0)
 
-    fun advancePage(context: Context, widgetId: Int, totalPages: Int): Int {
-        val next = if (totalPages <= 1) 0 else (getPageIndex(context, widgetId) + 1) % totalPages
+    fun consumePageIndex(context: Context, widgetId: Int, totalPages: Int): Int {
+        val current = if (totalPages <= 1) {
+            0
+        } else {
+            getPageIndex(context, widgetId).coerceIn(0, totalPages - 1)
+        }
+        val next = if (totalPages <= 1) 0 else (current + 1) % totalPages
         prefs(context).edit().putInt("pageIndex_$widgetId", next).apply()
-        return next
+        return current
     }
 
     fun clearPageIndex(context: Context, widgetId: Int) {

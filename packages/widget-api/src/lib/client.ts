@@ -16,6 +16,14 @@ export class WidgetApiClient {
     this.fetchImpl = opts.fetch ?? fetch;
   }
 
+  private localDateString(): string {
+    const now = new Date();
+    const year = String(now.getFullYear());
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   private fnUrl(name: string): string {
     return `${this.opts.supabaseUrl}/functions/v1/${name}`;
   }
@@ -29,8 +37,10 @@ export class WidgetApiClient {
   }
 
   async getSnapshot(shareCode: string, date?: string): Promise<WidgetSnapshot> {
-    const qs = new URLSearchParams({ shareCode });
-    if (date) qs.set('date', date);
+    const qs = new URLSearchParams({
+      shareCode,
+      date: date ?? this.localDateString(),
+    });
     const resp = await this.fetchImpl(
       `${this.fnUrl('widget-league-snapshot')}?${qs.toString()}`,
       { headers: this.headers() }
