@@ -19,7 +19,6 @@ class SportsNotWidgetLarge : AppWidgetProvider() {
     companion object {
         const val ACTION_ROTATE_PAGE = "com.sportsnot.app.ROTATE_PAGE_LARGE"
         const val EXTRA_WIDGET_ID = "widget_id"
-        const val PLAYERS_PER_PAGE = 8
         private const val PAGE_INTERVAL_MS = 30_000L
     }
 
@@ -60,7 +59,9 @@ class SportsNotWidgetLarge : AppWidgetProvider() {
             putExtra(EXTRA_WIDGET_ID, widgetId)
         }
         val pending = PendingIntent.getBroadcast(
-            context, 10000 + widgetId, intent,
+            context,
+            10000 + widgetId,
+            intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         alarmManager.set(
@@ -77,7 +78,9 @@ class SportsNotWidgetLarge : AppWidgetProvider() {
             putExtra(EXTRA_WIDGET_ID, widgetId)
         }
         val pending = PendingIntent.getBroadcast(
-            context, 10000 + widgetId, intent,
+            context,
+            10000 + widgetId,
+            intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         alarmManager.cancel(pending)
@@ -94,97 +97,128 @@ class SportsNotWidgetLarge : AppWidgetProvider() {
 
             if (snapshot != null) {
                 views.setTextViewText(R.id.league_name, snapshot.league.name)
-
-                // Team total
-                val myTeamName = WidgetPreferences.getMyTeamName(
+                val pageIndex = bindPageIndicator(
                     context,
-                    snapshot.league.shareCode
+                    views,
+                    snapshot,
+                    appWidgetId
                 )
-                val teamTotal = if (myTeamName != null) {
-                    val pts = snapshot.players
-                        .filter { it.ownedByTeamName == myTeamName }
-                        .sumOf { it.fantasyPoints }
-                    "${formatPoints(pts)} pts"
-                } else {
-                    val totalPts = snapshot.players.sumOf { it.fantasyPoints }
-                    "${formatPoints(totalPts)} pts total"
-                }
-                views.setTextViewText(R.id.team_total, teamTotal)
-
-                // Games (up to 6)
-                val games = snapshot.games.take(6)
-                val gameIds = listOf(
-                    R.id.game_1, R.id.game_2, R.id.game_3,
-                    R.id.game_4, R.id.game_5, R.id.game_6
+                val sections = WidgetScheduleLayout.pageSections(
+                    snapshot,
+                    WidgetHomeSize.LARGE,
+                    pageIndex
                 )
-                for (i in 0..5) {
-                    if (i < games.size) {
-                        val g = games[i]
-                        views.setViewVisibility(gameIds[i], View.VISIBLE)
-                        val scoreText = when (g.state) {
-                            "LIVE", "CRIT" -> "${g.awayTeamAbbrev} ${g.awayScore} - ${g.homeTeamAbbrev} ${g.homeScore} 🔴"
-                            "FINAL", "OFF" -> "${g.awayTeamAbbrev} ${g.awayScore} - ${g.homeTeamAbbrev} ${g.homeScore} F"
-                            else -> "${g.awayTeamAbbrev} @ ${g.homeTeamAbbrev}"
-                        }
-                        views.setTextViewText(gameIds[i], scoreText)
-                    } else {
-                        views.setViewVisibility(gameIds[i], View.GONE)
-                    }
-                }
-
-                // Players playing today, paginated (8 per page)
-                val playingToday = snapshot.players
-                    .filter { it.gameId != null }
-                    .sortedByDescending { it.fantasyPoints }
-
-                val totalPages = if (playingToday.isEmpty()) 1
-                    else ((playingToday.size + PLAYERS_PER_PAGE - 1) / PLAYERS_PER_PAGE)
-
-                val pageIndex = if (totalPages > 1) {
-                    WidgetPreferences.advancePage(context, appWidgetId, totalPages)
-                } else {
-                    0
-                }
-
-                // Page indicator
-                if (totalPages > 1) {
-                    views.setTextViewText(R.id.page_indicator, "${pageIndex + 1}/$totalPages")
-                    views.setViewVisibility(R.id.page_indicator, View.VISIBLE)
-                } else {
-                    views.setViewVisibility(R.id.page_indicator, View.GONE)
-                }
-
-                val start = (pageIndex * PLAYERS_PER_PAGE).coerceAtMost(playingToday.size)
-                val end = (start + PLAYERS_PER_PAGE).coerceAtMost(playingToday.size)
-                val page = playingToday.subList(start, end)
-
-                val nameIds = listOf(
-                    R.id.player_1_name, R.id.player_2_name, R.id.player_3_name, R.id.player_4_name,
-                    R.id.player_5_name, R.id.player_6_name, R.id.player_7_name, R.id.player_8_name
+                bindSection(
+                    views,
+                    R.id.game_section_1,
+                    R.id.game_1_header,
+                    R.id.game_1_body,
+                    sections.getOrNull(0)
                 )
-                val ptsIds = listOf(
-                    R.id.player_1_pts, R.id.player_2_pts, R.id.player_3_pts, R.id.player_4_pts,
-                    R.id.player_5_pts, R.id.player_6_pts, R.id.player_7_pts, R.id.player_8_pts
+                bindSection(
+                    views,
+                    R.id.game_section_2,
+                    R.id.game_2_header,
+                    R.id.game_2_body,
+                    sections.getOrNull(1)
                 )
-                for (i in 0..7) {
-                    if (i < page.size) {
-                        val p = page[i]
-                        views.setViewVisibility(nameIds[i], View.VISIBLE)
-                        views.setViewVisibility(ptsIds[i], View.VISIBLE)
-                        views.setTextViewText(nameIds[i], "${p.teamAbbrev} ${p.name}")
-                        views.setTextViewText(ptsIds[i], formatPoints(p.fantasyPoints))
-                    } else {
-                        views.setViewVisibility(nameIds[i], View.GONE)
-                        views.setViewVisibility(ptsIds[i], View.GONE)
-                    }
-                }
+                bindSection(
+                    views,
+                    R.id.game_section_3,
+                    R.id.game_3_header,
+                    R.id.game_3_body,
+                    sections.getOrNull(2)
+                )
+                bindSection(
+                    views,
+                    R.id.game_section_4,
+                    R.id.game_4_header,
+                    R.id.game_4_body,
+                    sections.getOrNull(3)
+                )
+                val footer = WidgetScheduleLayout.footerText(
+                    snapshot,
+                    WidgetPreferences.getMyTeamName(context, snapshot.league.shareCode)
+                ) ?: "Full playoff slate"
+                views.setTextViewText(R.id.footer_text, footer)
             } else {
                 views.setTextViewText(R.id.league_name, "SportsNot")
-                views.setTextViewText(R.id.team_total, "Tap to configure")
                 views.setViewVisibility(R.id.page_indicator, View.GONE)
+                bindEmptyState(
+                    views,
+                    R.id.game_section_1,
+                    R.id.game_1_header,
+                    R.id.game_1_body,
+                    "Tap to configure",
+                    "Feature a league in SportsNot to load grouped playoff games."
+                )
+                views.setViewVisibility(R.id.game_section_2, View.GONE)
+                views.setViewVisibility(R.id.game_section_3, View.GONE)
+                views.setViewVisibility(R.id.game_section_4, View.GONE)
+                views.setTextViewText(R.id.footer_text, "")
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
+    }
+
+    private fun bindPageIndicator(
+        context: Context,
+        views: RemoteViews,
+        snapshot: com.sportsnot.app.widget.models.WidgetSnapshot,
+        appWidgetId: Int
+    ): Int {
+        val totalPages = WidgetScheduleLayout.totalPages(
+            snapshot,
+            WidgetHomeSize.LARGE
+        )
+        val pageIndex = WidgetPreferences.consumePageIndex(
+            context,
+            appWidgetId,
+            totalPages
+        )
+        if (totalPages > 1) {
+            views.setViewVisibility(R.id.page_indicator, View.VISIBLE)
+            views.setTextViewText(R.id.page_indicator, "${pageIndex + 1}/$totalPages")
+        } else {
+            views.setViewVisibility(R.id.page_indicator, View.GONE)
+        }
+        return pageIndex
+    }
+
+    private fun bindSection(
+        views: RemoteViews,
+        containerId: Int,
+        headerId: Int,
+        bodyId: Int,
+        section: WidgetScheduleLayout.GameSection?
+    ) {
+        if (section == null) {
+            views.setViewVisibility(containerId, View.GONE)
+            return
+        }
+        views.setViewVisibility(containerId, View.VISIBLE)
+        views.setTextViewText(headerId, WidgetScheduleLayout.headerText(section.game))
+        val body = WidgetScheduleLayout.bodyText(section, WidgetHomeSize.LARGE)
+        if (body.isNullOrBlank()) {
+            views.setViewVisibility(bodyId, View.GONE)
+        } else {
+            views.setTextViewText(bodyId, body)
+            views.setViewVisibility(bodyId, View.VISIBLE)
+        }
+    }
+
+    private fun bindEmptyState(
+        views: RemoteViews,
+        containerId: Int,
+        headerId: Int,
+        bodyId: Int,
+        header: String,
+        body: String
+    ) {
+        views.setViewVisibility(containerId, View.VISIBLE)
+        views.setTextViewText(headerId, header)
+        views.setTextViewText(bodyId, body)
+        views.setViewVisibility(bodyId, View.VISIBLE)
     }
 }

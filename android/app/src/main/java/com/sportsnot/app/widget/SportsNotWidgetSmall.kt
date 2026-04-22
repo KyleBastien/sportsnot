@@ -7,6 +7,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
+import android.view.View
 import android.widget.RemoteViews
 import com.sportsnot.app.R
 import com.sportsnot.app.widget.models.WidgetSnapshot
@@ -19,7 +20,6 @@ class SportsNotWidgetSmall : AppWidgetProvider() {
     companion object {
         const val ACTION_ROTATE_PAGE = "com.sportsnot.app.ROTATE_PAGE_SMALL"
         const val EXTRA_WIDGET_ID = "widget_id"
-        const val PLAYERS_PER_PAGE = 1
         private const val PAGE_INTERVAL_MS = 30_000L
     }
 
@@ -60,7 +60,9 @@ class SportsNotWidgetSmall : AppWidgetProvider() {
             putExtra(EXTRA_WIDGET_ID, widgetId)
         }
         val pending = PendingIntent.getBroadcast(
-            context, 20000 + widgetId, intent,
+            context,
+            20000 + widgetId,
+            intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         alarmManager.set(
@@ -77,7 +79,9 @@ class SportsNotWidgetSmall : AppWidgetProvider() {
             putExtra(EXTRA_WIDGET_ID, widgetId)
         }
         val pending = PendingIntent.getBroadcast(
-            context, 20000 + widgetId, intent,
+            context,
+            20000 + widgetId,
+            intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         alarmManager.cancel(pending)
@@ -92,45 +96,79 @@ class SportsNotWidgetSmall : AppWidgetProvider() {
             val snapshot = fetchOrCached(context)
             val views = RemoteViews(context.packageName, R.layout.widget_small)
 
-            if (snapshot != null && snapshot.players.isNotEmpty()) {
-                val playingToday = snapshot.players
-                    .filter { it.gameId != null }
-                    .sortedByDescending { it.fantasyPoints }
-
-                val totalPages = playingToday.size.coerceAtLeast(1)
-                val pageIndex = if (totalPages > 1) {
-                    WidgetPreferences.advancePage(context, appWidgetId, totalPages)
-                } else {
-                    0
-                }
-
-                val player = if (playingToday.isNotEmpty()) {
-                    playingToday[pageIndex.coerceAtMost(playingToday.size - 1)]
-                } else {
-                    snapshot.players.maxByOrNull { it.fantasyPoints }
-                        ?: snapshot.players.first()
-                }
-
-                views.setTextViewText(R.id.player_name, player.name)
-                views.setTextViewText(R.id.player_team, "${player.teamAbbrev} · ${player.position}")
-                views.setTextViewText(
-                    R.id.player_points,
-                    formatPoints(player.fantasyPoints)
-                )
-                views.setTextViewText(R.id.league_name, snapshot.league.name)
+            if (snapshot != null) {
+                bindSnapshot(context, views, snapshot, appWidgetId)
             } else {
-                views.setTextViewText(R.id.player_name, "SportsNot")
-                views.setTextViewText(R.id.player_team, "")
-                views.setTextViewText(R.id.player_points, "--")
-                views.setTextViewText(R.id.league_name, "Tap to configure")
+                views.setTextViewText(R.id.league_name, "SportsNot")
+                views.setViewVisibility(R.id.page_indicator, View.GONE)
+                views.setTextViewText(R.id.game_header, "Tap to configure")
+                views.setTextViewText(
+                    R.id.game_body,
+                    "Feature a league in SportsNot to load playoff games."
+                )
+                views.setViewVisibility(R.id.game_body, View.VISIBLE)
+                views.setTextViewText(R.id.footer_text, "")
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
     }
+
+    private fun bindSnapshot(
+        context: Context,
+        views: RemoteViews,
+        snapshot: WidgetSnapshot,
+        appWidgetId: Int
+    ) {
+        views.setTextViewText(R.id.league_name, snapshot.league.name)
+
+        val totalPages = WidgetScheduleLayout.totalPages(
+            snapshot,
+            WidgetHomeSize.SMALL
+        )
+        val pageIndex = WidgetPreferences.consumePageIndex(
+            context,
+            appWidgetId,
+            totalPages
+        )
+        if (totalPages > 1) {
+            views.setViewVisibility(R.id.page_indicator, View.VISIBLE)
+            views.setTextViewText(R.id.page_indicator, "${pageIndex + 1}/$totalPages")
+        } else {
+            views.setViewVisibility(R.id.page_indicator, View.GONE)
+        }
+
+        val section = WidgetScheduleLayout.pageSections(
+            snapshot,
+            WidgetHomeSize.SMALL,
+            pageIndex
+        ).firstOrNull()
+
+        if (section == null) {
+            views.setTextViewText(R.id.game_header, "No games today")
+            views.setViewVisibility(R.id.game_body, View.GONE)
+        } else {
+            views.setTextViewText(
+                R.id.game_header,
+                WidgetScheduleLayout.headerText(section.game)
+            )
+            val body = WidgetScheduleLayout.bodyText(
+                section,
+                WidgetHomeSize.SMALL
+            ) ?: "No drafted teams in this game"
+            views.setTextViewText(R.id.game_body, body)
+            views.setViewVisibility(R.id.game_body, View.VISIBLE)
+        }
+
+        val footer = WidgetScheduleLayout.footerText(
+            snapshot,
+            WidgetPreferences.getMyTeamName(context, snapshot.league.shareCode)
+        ) ?: "Full playoff slate"
+        views.setTextViewText(R.id.footer_text, footer)
+    }
 }
 
-internal const val WIDGET_STALE_CACHE_MAX_AGE_MS: Long = 60L * 60L * 1000L // 1 hour
+internal const val WIDGET_STALE_CACHE_MAX_AGE_MS: Long = 60L * 60L * 1000L
 
 internal fun fetchOrCached(context: Context): WidgetSnapshot? {
     val shareCode = WidgetPreferences.getFeaturedShareCode(context) ?: return null
@@ -139,9 +177,6 @@ internal fun fetchOrCached(context: Context): WidgetSnapshot? {
         WidgetPreferences.cacheSnapshot(context, snapshot)
         snapshot
     } catch (_: Exception) {
-        // Only fall back to cache that's still reasonably fresh. Older cached
-        // data is dropped so the widget surfaces an empty state instead of
-        // rendering yesterday's slate forever when the network is unreachable.
         WidgetPreferences.getCachedSnapshot(context, WIDGET_STALE_CACHE_MAX_AGE_MS)
     }
 }

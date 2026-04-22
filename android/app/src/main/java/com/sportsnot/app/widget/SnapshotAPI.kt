@@ -6,6 +6,9 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 object SnapshotAPI {
@@ -19,11 +22,12 @@ object SnapshotAPI {
     fun fetchSnapshot(shareCode: String, date: String? = null): WidgetSnapshot {
         val supabaseUrl = BuildConfig.SUPABASE_URL
         val anonKey = BuildConfig.SUPABASE_ANON_KEY
+        val requestedDate = date ?: SimpleDateFormat(
+            "yyyy-MM-dd",
+            Locale.US
+        ).format(Date())
 
-        var url = "$supabaseUrl/functions/v1/widget-league-snapshot?shareCode=$shareCode"
-        if (date != null) {
-            url += "&date=$date"
-        }
+        val url = "$supabaseUrl/functions/v1/widget-league-snapshot?shareCode=$shareCode&date=$requestedDate"
 
         val request = Request.Builder()
             .url(url)

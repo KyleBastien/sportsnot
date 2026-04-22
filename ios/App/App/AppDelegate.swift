@@ -8,6 +8,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        #if targetEnvironment(simulator)
+        seedWidgetFromLaunchEnvironment()
+        #endif
         // Override point for customization after application launch.
         return true
     }
@@ -55,4 +58,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+    #if targetEnvironment(simulator)
+    private func seedWidgetFromLaunchEnvironment() {
+        let env = ProcessInfo.processInfo.environment
+        guard let shareCode = env["SPORTSNOT_WIDGET_SHARE_CODE"],
+              !shareCode.isEmpty else {
+            return
+        }
+
+        AppGroup.featuredShareCode = shareCode
+        AppGroup.rememberShareCode(shareCode)
+        AppGroup.setMyTeamName(
+            env["SPORTSNOT_WIDGET_MY_TEAM_NAME"],
+            forShareCode: shareCode
+        )
+    }
+    #endif
 }
