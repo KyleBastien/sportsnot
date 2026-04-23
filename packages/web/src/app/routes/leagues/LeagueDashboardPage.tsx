@@ -19,15 +19,19 @@ import {
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
+import { WidgetApiClient } from '@sportsnot/widget-api';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import { useMockData } from '../../../mock/MockDataProvider';
+import { useMockLeagueWidgetSnapshot } from '../../../mock/hooks/useMockLeagueWidgetSnapshot';
 import { useRoundComplete } from '../../hooks/useRoundComplete';
 import { useWinnerConfetti } from '../../hooks/useWinnerConfetti';
 import { FeatureOnWidgetButton } from '../../components/FeatureOnWidgetButton';
 import { useIsMobile } from '@sportsnot/ui';
+import { LeagueGameCardsSection } from './LeagueGameCardsSection';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
+const WIDGET_SNAPSHOT_STALE_TIME_MS = 5 * 60 * 1000;
 
 interface LeagueMemberRow {
   id: string;
@@ -66,6 +70,42 @@ function useLeague(leagueId: string) {
   return IS_MOCK ? mockResult : queryResult;
 }
 
+function useLeagueWidgetSnapshot(
+  leagueId: string | undefined,
+  shareCode: string | null | undefined,
+  leagueStatus: string | undefined
+) {
+  const mockResult = useMockLeagueWidgetSnapshot(leagueId);
+  const enabled = leagueStatus === 'active';
+
+  const queryResult = useQuery({
+    queryKey: ['league-widget-snapshot', shareCode],
+    queryFn: async () => {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as
+        | string
+        | undefined;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as
+        | string
+        | undefined;
+
+      if (!supabaseUrl || !anonKey) {
+        throw new Error('Supabase widget config missing');
+      }
+
+      if (!shareCode) {
+        throw new Error('League widget share code missing');
+      }
+
+      const client = new WidgetApiClient({ supabaseUrl, anonKey });
+      return client.getSnapshot(shareCode);
+    },
+    enabled: !IS_MOCK && enabled && !!shareCode,
+    staleTime: WIDGET_SNAPSHOT_STALE_TIME_MS,
+  });
+
+  return IS_MOCK ? mockResult : queryResult;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   setup: 'blue',
   drafting: 'orange',
@@ -79,6 +119,11 @@ export function LeagueDashboardPage() {
   const { user } = useAuthContext();
   const { dispatch } = useMockData();
   const { data: league, isLoading, error } = useLeague(leagueId!);
+  const {
+    data: widgetSnapshot,
+    isLoading: widgetSnapshotLoading,
+    error: widgetSnapshotError,
+  } = useLeagueWidgetSnapshot(leagueId, league?.share_code, league?.status);
 
   // Must be called unconditionally (rules of hooks)
   const currentRound = league?.current_round ?? 0;
@@ -127,6 +172,12 @@ export function LeagueDashboardPage() {
     (a: LeagueMemberRow, b: LeagueMemberRow) =>
       (b.total_points ?? 0) - (a.total_points ?? 0)
   );
+  const leagueGameCardsError =
+    league.status === 'active' && !IS_MOCK && !league.share_code
+      ? new Error('League widget share code missing')
+      : widgetSnapshotError instanceof Error
+        ? widgetSnapshotError
+        : null;
 
   const handleStartNextDraft = async () => {
     if (!leagueId) return;
@@ -306,6 +357,14 @@ export function LeagueDashboardPage() {
             </Table.Tbody>
           </Table>
         </Card>
+
+        {league.status === 'active' && (
+          <LeagueGameCardsSection
+            snapshot={widgetSnapshot}
+            isLoading={widgetSnapshotLoading}
+            error={leagueGameCardsError}
+          />
+        )}
       </Stack>
     </Container>
   );

@@ -14,12 +14,10 @@ type MockDataModule = typeof import('@sportsnot/mock-data');
 
 let cachedModule: MockDataModule | null = null;
 
-function localDateString(): string {
-  const now = new Date();
-  const year = String(now.getFullYear());
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function widgetDateString(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+  }).format(new Date());
 }
 
 async function loadMockData(): Promise<MockDataModule> {
@@ -75,7 +73,7 @@ export function createMockWidgetApiClient(): Pick<
       date?: string
     ): Promise<WidgetSnapshot> {
       const mod = await loadMockData();
-      const today = date ?? localDateString();
+      const today = date ?? widgetDateString();
       const games = pickTodayGames(mod, today);
       return {
         league: {

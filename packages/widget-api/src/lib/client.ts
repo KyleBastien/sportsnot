@@ -13,37 +13,32 @@ export class WidgetApiClient {
   private readonly fetchImpl: typeof fetch;
 
   constructor(private readonly opts: WidgetApiClientOptions) {
-    this.fetchImpl = opts.fetch ?? fetch;
+    this.fetchImpl =
+      opts.fetch ?? ((input, init) => globalThis.fetch(input, init));
   }
 
-  private localDateString(): string {
-    const now = new Date();
-    const year = String(now.getFullYear());
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+  private widgetDateString(): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York',
+    }).format(new Date());
   }
 
   private fnUrl(name: string): string {
     return `${this.opts.supabaseUrl}/functions/v1/${name}`;
   }
 
-  private headers(): Record<string, string> {
-    return {
-      'Content-Type': 'application/json',
-      apikey: this.opts.anonKey,
-      Authorization: `Bearer ${this.opts.anonKey}`,
-    };
-  }
-
   async getSnapshot(shareCode: string, date?: string): Promise<WidgetSnapshot> {
     const qs = new URLSearchParams({
       shareCode,
-      date: date ?? this.localDateString(),
+      date: date ?? this.widgetDateString(),
     });
     const resp = await this.fetchImpl(
       `${this.fnUrl('widget-league-snapshot')}?${qs.toString()}`,
-      { headers: this.headers() }
+      {
+        // Public read-only endpoint. Keep GET request "simple" so Capacitor
+        // WebView does not send a CORS preflight that Supabase may reject.
+        headers: { Accept: 'application/json' },
+      }
     );
     if (!resp.ok) {
       throw new Error(
@@ -60,7 +55,12 @@ export class WidgetApiClient {
       this.fnUrl('register-live-activity-token'),
       {
         method: 'POST',
-        headers: this.headers(),
+        // Public endpoint. Send plain-text JSON body to keep request
+        // "simple" and avoid Capacitor WebView CORS preflights.
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'text/plain',
+        },
         body: JSON.stringify(req),
       }
     );
