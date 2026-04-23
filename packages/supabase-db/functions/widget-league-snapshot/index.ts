@@ -7,6 +7,11 @@
 /// <reference path="../deno.d.ts" />
 
 import { calculatePlayerPoints } from '../_shared/scoring.ts';
+import {
+  buildDailyFantasyPointMaps,
+  type WidgetDailyFantasyBoxscore,
+  type WidgetDailyFantasyGame,
+} from '../_shared/widget-daily-fantasy.ts';
 import { jsonResponse, pgSelect } from '../_shared/pg.ts';
 
 const NHL_API_BASE = 'https://api-web.nhle.com/v1';
@@ -217,6 +222,23 @@ Deno.serve(async (req: Request) => {
       gameByTeamId.set(g.homeTeam.id, g);
       gameByTeamId.set(g.awayTeam.id, g);
     }
+    const boxscoresByGameId = await fetchBoxscoresForGames(games);
+    const { playerDailyPointsById, teamDailyPointsById } =
+      buildDailyFantasyPointMaps(
+        games.map<WidgetDailyFantasyGame>((g) => ({
+          id: g.id,
+          state: g.gameState,
+          homeTeam: {
+            id: g.homeTeam.id,
+            score: g.homeTeam.score ?? 0,
+          },
+          awayTeam: {
+            id: g.awayTeam.id,
+            score: g.awayTeam.score ?? 0,
+          },
+        })),
+        boxscoresByGameId
+      );
 
     // ── Build players payload ───────────────────────────────
     const playersPayload = [] as Array<{
@@ -227,6 +249,7 @@ Deno.serve(async (req: Request) => {
       position: string;
       gameId: number | null;
       fantasyPoints: number;
+      dailyFantasyPoints: number;
       ownedByTeamName: string;
     }>;
     for (const r of rosters) {
@@ -253,6 +276,7 @@ Deno.serve(async (req: Request) => {
           position: r.position,
           gameId: correlatePlayerGame(teamAbbrev, games),
           fantasyPoints,
+          dailyFantasyPoints: playerDailyPointsById.get(r.player_id) ?? 0,
           ownedByTeamName: teamName,
         });
         continue;
@@ -272,6 +296,7 @@ Deno.serve(async (req: Request) => {
           // the currently-persisted points_earned rather than recomputing
           // mid-game to avoid double-counting finals.
           fantasyPoints: r.points_earned ?? 0,
+          dailyFantasyPoints: teamDailyPointsById.get(r.team_id) ?? 0,
           ownedByTeamName: teamName,
         });
       }
@@ -327,4 +352,32 @@ function correlatePlayerGame(
       gg.homeTeam.abbrev === teamAbbrev || gg.awayTeam.abbrev === teamAbbrev
   );
   return g ? g.id : null;
+}
+
+async function fetchBoxscoresForGames(
+  games: NhlScoreGame[]
+): Promise<Map<number, WidgetDailyFantasyBoxscore>> {
+  const boxscoreEntries = await Promise.all(
+    games
+      .filter((game) => game.gameState !== 'FUT' && game.gameState !== 'PRE')
+      .map(async (game) => {
+        try {
+          const resp = await fetch(
+            `${NHL_API_BASE}/gamecenter/${game.id}/boxscore`
+          );
+          if (!resp.ok) return null;
+          const boxscore = (await resp.json()) as WidgetDailyFantasyBoxscore;
+          return [game.id, boxscore] as const;
+        } catch {
+          return null;
+        }
+      })
+  );
+
+  return new Map(
+    boxscoreEntries.filter(
+      (entry): entry is readonly [number, WidgetDailyFantasyBoxscore] =>
+        entry != null
+    )
+  );
 }

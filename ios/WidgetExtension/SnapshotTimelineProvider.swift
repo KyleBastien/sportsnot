@@ -211,6 +211,7 @@ enum WidgetScheduleLayout {
     struct AssetEntry: Hashable {
         let name: String
         let fantasyPoints: Double
+        let dailyFantasyPoints: Double
     }
 
     struct FamilyConfig {
@@ -455,7 +456,8 @@ enum WidgetScheduleLayout {
                                 .map {
                                     AssetEntry(
                                         name: $0.name,
-                                        fantasyPoints: $0.fantasyPoints
+                                        fantasyPoints: $0.fantasyPoints,
+                                        dailyFantasyPoints: $0.dailyFantasyPoints
                                     )
                                 }
                         )
@@ -523,11 +525,11 @@ enum WidgetScheduleLayout {
     }
 
     private static func compactAssetText(_ asset: AssetEntry) -> String {
-        "\(asset.name) \(pointsText(for: asset.fantasyPoints))"
+        "\(asset.name) \(pointsText(for: asset.fantasyPoints)) \(deltaText(for: asset.dailyFantasyPoints))"
     }
 
     private static func fullAssetText(_ asset: AssetEntry) -> String {
-        "\(asset.name) \(pointsText(for: asset.fantasyPoints))"
+        "\(asset.name) \(pointsText(for: asset.fantasyPoints)) \(deltaText(for: asset.dailyFantasyPoints))"
     }
 
     private static func pointsText(for value: Double) -> String {
@@ -535,6 +537,10 @@ enum WidgetScheduleLayout {
             return String(format: "%.0f", value)
         }
         return String(format: "%.1f", value)
+    }
+
+    private static func deltaText(for value: Double) -> String {
+        "+\(pointsText(for: value))"
     }
 
     private static func chronologicalSort(_ lhs: GameSection, _ rhs: GameSection) -> Bool {

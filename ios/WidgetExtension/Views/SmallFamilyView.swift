@@ -63,11 +63,6 @@ struct SmallFamilyView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            if entry.staleFromCache {
-                Text("• cached")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }

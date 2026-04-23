@@ -104,11 +104,6 @@ struct LargeFamilyView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            if entry.staleFromCache {
-                Text("• showing cached snapshot")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }

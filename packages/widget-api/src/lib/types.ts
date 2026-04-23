@@ -41,6 +41,8 @@ export interface WidgetDraftedPlayer {
   /** The id of the scheduled game today the player is in, or null if off-day. */
   gameId: number | null;
   fantasyPoints: number;
+  /** Fantasy points earned on snapshot.date. */
+  dailyFantasyPoints: number;
   /** Fantasy team name that drafted this player. */
   ownedByTeamName: string;
 }

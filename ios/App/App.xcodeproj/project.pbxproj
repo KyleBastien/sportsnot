@@ -91,6 +91,10 @@
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* WidgetSnapshotPrimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotPrimer.swift; sourceTree = "<group>"; };
+		E1A1B1C1D1E1F10111213141 /* App.debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.debug.xcconfig; sourceTree = "<group>"; };
+		E2A2B2C2D2E2F20212223242 /* App.release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.release.xcconfig; sourceTree = "<group>"; };
+		E3A3B3C3D3E3F30313233343 /* Widget.debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Widget.debug.xcconfig; sourceTree = "<group>"; };
+		E4A4B4C4D4E4F40414243444 /* Widget.release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Widget.release.xcconfig; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -158,6 +162,10 @@
 			children = (
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				E1A1B1C1D1E1F10111213141 /* App.debug.xcconfig */,
+				E2A2B2C2D2E2F20212223242 /* App.release.xcconfig */,
+				E3A3B3C3D3E3F30313233343 /* Widget.debug.xcconfig */,
+				E4A4B4C4D4E4F40414243444 /* Widget.release.xcconfig */,
 				7F8756D8B27F46E3366F6CEA /* Pods */,
 				27E2DDA53C4D2A4D1A88CE4A /* Frameworks */,
 				B7B39131E33375035242C702 /* WidgetExtension */,
@@ -598,7 +606,7 @@
 		};
 		504EC3171FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */;
+			baseConfigurationReference = E1A1B1C1D1E1F10111213141 /* App.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
@@ -623,7 +631,7 @@
 		};
 		504EC3181FED79650016851F /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */;
+			baseConfigurationReference = E2A2B2C2D2E2F20212223242 /* App.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
@@ -649,6 +657,7 @@
 		};
 		58B098D838984C0049091B96 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E4A4B4C4D4E4F40414243444 /* Widget.release.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = SportsNotWidget/SportsNotWidget.entitlements;
@@ -678,6 +687,7 @@
 		};
 		D4060ACABC48C8CB0DB7026E /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E3A3B3C3D3E3F30313233343 /* Widget.debug.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = SportsNotWidget/SportsNotWidget.entitlements;
