@@ -47,5 +47,6 @@ data class WidgetDraftedPlayer(
     val position: String,
     val gameId: Int? = null,
     val fantasyPoints: Double,
+    val dailyFantasyPoints: Double = 0.0,
     val ownedByTeamName: String
 )

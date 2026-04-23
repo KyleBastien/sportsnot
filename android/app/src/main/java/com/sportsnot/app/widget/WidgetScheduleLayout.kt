@@ -170,7 +170,7 @@ internal object WidgetScheduleLayout {
                                 teamAbbrev = teamAbbrev,
                                 assetNames = assets
                                     .sortedWith(Comparator(::draftedAssetComparator))
-                                    .map { it.name }
+                                    .map(::assetLabel)
                             )
                         }
                         .sortedBy { it.teamAbbrev }
@@ -258,4 +258,9 @@ internal object WidgetScheduleLayout {
     } catch (_: Exception) {
         null
     }
+
+    private fun assetLabel(player: WidgetDraftedPlayer): String =
+        "${player.name} ${formatPoints(player.fantasyPoints)} ${formatDelta(player.dailyFantasyPoints)}"
+
+    private fun formatDelta(points: Double): String = "+${formatPoints(points)}"
 }

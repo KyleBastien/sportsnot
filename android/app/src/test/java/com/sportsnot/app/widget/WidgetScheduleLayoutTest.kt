@@ -56,28 +56,32 @@ class WidgetScheduleLayoutTest {
                         ownedBy = "12 Bar Hughes",
                         teamAbbrev = "MTL",
                         name = "Cole Caufield",
-                        fantasyPoints = 5.0
+                        fantasyPoints = 5.0,
+                        dailyFantasyPoints = 1.0
                     ),
                     player(
                         gameId = 10,
                         ownedBy = "12 Bar Hughes",
                         teamAbbrev = "MTL",
                         name = "Nick Suzuki",
-                        fantasyPoints = 7.0
+                        fantasyPoints = 7.0,
+                        dailyFantasyPoints = 2.0
                     ),
                     player(
                         gameId = 10,
                         ownedBy = "12 Bar Hughes",
                         teamAbbrev = "TBL",
                         name = "Nikita Kucherov",
-                        fantasyPoints = 9.0
+                        fantasyPoints = 9.0,
+                        dailyFantasyPoints = 0.0
                     ),
                     player(
                         gameId = 10,
                         ownedBy = "Connor McJudah",
                         teamAbbrev = "TBL",
                         name = "Jake Guentzel",
-                        fantasyPoints = 4.0
+                        fantasyPoints = 4.0,
+                        dailyFantasyPoints = 1.0
                     )
                 )
             ),
@@ -88,9 +92,34 @@ class WidgetScheduleLayoutTest {
         val body = WidgetScheduleLayout.bodyText(section, WidgetHomeSize.LARGE)
 
         assertTrue(body!!.contains("12 Bar Hughes"))
-        assertTrue(body.contains("- MTL: Nick Suzuki, Cole Caufield"))
-        assertTrue(body.contains("- TBL: Nikita Kucherov"))
+        assertTrue(body.contains("- MTL: Nick Suzuki 7 +2, Cole Caufield 5 +1"))
+        assertTrue(body.contains("- TBL: Nikita Kucherov 9 +0"))
         assertTrue(body.contains("Connor McJudah"))
+    }
+
+    @Test
+    fun `compact rows keep zero delta visible`() {
+        val section = WidgetScheduleLayout.pageSections(
+            snapshot(
+                games = listOf(game(id = 11, startsAt = "2026-04-21T23:00:00Z")),
+                players = listOf(
+                    player(
+                        gameId = 11,
+                        ownedBy = "Connor McJudah",
+                        teamAbbrev = "TBL",
+                        name = "Jake Guentzel",
+                        fantasyPoints = 4.0,
+                        dailyFantasyPoints = 0.0
+                    )
+                )
+            ),
+            WidgetHomeSize.SMALL,
+            0
+        ).single()
+
+        val body = WidgetScheduleLayout.bodyText(section, WidgetHomeSize.SMALL)
+
+        assertTrue(body!!.contains("TBL: Jake Guentzel 4 +0"))
     }
 
     @Test
@@ -169,7 +198,8 @@ class WidgetScheduleLayoutTest {
         ownedBy: String,
         teamAbbrev: String = "MTL",
         name: String,
-        fantasyPoints: Double = 3.0
+        fantasyPoints: Double = 3.0,
+        dailyFantasyPoints: Double = 0.0
     ) = WidgetDraftedPlayer(
         playerId = null,
         teamId = null,
@@ -178,6 +208,7 @@ class WidgetScheduleLayoutTest {
         position = "F",
         gameId = gameId,
         fantasyPoints = fantasyPoints,
+        dailyFantasyPoints = dailyFantasyPoints,
         ownedByTeamName = ownedBy
     )
 }

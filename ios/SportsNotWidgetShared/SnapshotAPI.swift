@@ -13,14 +13,15 @@ public struct SnapshotAPIConfig: Sendable {
     /// These keys are wired via an Xcode build phase from environment
     /// variables at build time so the anon key never lives in source control.
     public static func fromBundle(_ bundle: Bundle = .main) -> SnapshotAPIConfig? {
-        let urlString = bundle.object(forInfoDictionaryKey: "SUPABASE_URL") as? String
+        let rawURLString = bundle.object(forInfoDictionaryKey: "SUPABASE_URL") as? String
         let key = bundle.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String
+        let urlString = rawURLString?.replacingOccurrences(of: "\\/", with: "/")
 
         // Always emit telemetry about what was actually in Info.plist so we
         // can distinguish "missing entirely" from "literal $(...) macro"
         // from "valid but transport failed". The actual values are never
         // logged — only metadata (presence, length, macro detection).
-        var ctx = WidgetTelemetry.describe(urlString)
+        var ctx = WidgetTelemetry.describe(rawURLString)
             .reduce(into: [String: String]()) { $0["url_\($1.key)"] = $1.value }
         for (k, v) in WidgetTelemetry.describe(key) {
             ctx["key_\(k)"] = v
