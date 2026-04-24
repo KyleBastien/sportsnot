@@ -7,6 +7,7 @@ const rootDir = dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   passWithNoTests: true,
+  testEnvironment: 'jsdom',
   resolve: {
     alias: {
       '@sportsnot/widget-bridge': resolve(
