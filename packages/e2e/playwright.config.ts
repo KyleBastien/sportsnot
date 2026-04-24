@@ -17,6 +17,12 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /.*native-swipe-back\.spec\.ts/,
+    },
+    {
+      name: 'mobile-chromium',
+      use: { ...devices['Pixel 7'] },
+      testMatch: /.*native-swipe-back\.spec\.ts/,
     },
   ],
 });
