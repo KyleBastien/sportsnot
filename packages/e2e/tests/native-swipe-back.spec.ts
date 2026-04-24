@@ -136,7 +136,9 @@ async function performEdgeSwipe(
         clientY,
       },
     ]);
-    await page.waitForTimeout(16);
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(resolve))
+    );
   }
 
   await dispatchTouch(page, 'touchend', [{ clientX: endX, clientY }]);
@@ -190,7 +192,9 @@ test.describe('native edge swipe back', () => {
     ).toBeVisible(NAV_TIMEOUT);
   });
 
-  test('does nothing on blocked draft routes', async ({ authenticatedPage }) => {
+  test('does nothing on blocked draft routes', async ({
+    authenticatedPage,
+  }) => {
     await installNativePlatform(authenticatedPage, 'ios');
 
     const league = buildTransitionLeague();
