@@ -22,11 +22,13 @@ describe('WidgetApiClient', () => {
   it('getSnapshot passes shareCode + optional date as query params', async () => {
     const snap = makeSnapshot();
     const calls: string[] = [];
+    const headers: Array<Record<string, string> | Headers | undefined> = [];
     const client = new WidgetApiClient({
       supabaseUrl: 'https://x.supabase.co',
       anonKey: 'anon',
-      fetch: async (input) => {
+      fetch: async (input, init) => {
         calls.push(String(input));
+        headers.push(init?.headers as Record<string, string> | Headers);
         return new Response(JSON.stringify(snap), { status: 200 });
       },
     });
@@ -35,6 +37,7 @@ describe('WidgetApiClient', () => {
     expect(calls[0]).toContain('shareCode=SHARE');
     expect(calls[0]).toContain('date=2026-04-16');
     expect(calls[0]).toContain('/functions/v1/widget-league-snapshot');
+    expect(headers[0]).toEqual({ Accept: 'application/json' });
   });
 
   it('getSnapshot throws on non-2xx', async () => {
@@ -51,12 +54,14 @@ describe('WidgetApiClient', () => {
   it('registerLiveActivityToken POSTs the request body', async () => {
     let capturedBody: unknown;
     let capturedMethod: string | undefined;
+    let capturedHeaders: Record<string, string> | Headers | undefined;
     const client = new WidgetApiClient({
       supabaseUrl: 'https://x.supabase.co',
       anonKey: 'anon',
       fetch: async (_input, init) => {
         capturedMethod = init?.method;
         capturedBody = init?.body;
+        capturedHeaders = init?.headers;
         return new Response(null, { status: 200 });
       },
     });
@@ -73,6 +78,10 @@ describe('WidgetApiClient', () => {
       token: 'TOKEN',
       kind: 'activity',
       bundleId: 'com.sportsnot.app',
+    });
+    expect(capturedHeaders).toEqual({
+      Accept: 'application/json',
+      'Content-Type': 'text/plain',
     });
   });
 });

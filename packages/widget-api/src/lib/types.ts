@@ -8,6 +8,7 @@ export type WidgetGameState =
   | 'FUT' // future / not started
   | 'PRE' // pregame
   | 'LIVE'
+  | 'CRIT'
   | 'FINAL'
   | 'OFF';
 

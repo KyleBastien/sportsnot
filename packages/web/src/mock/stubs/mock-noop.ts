@@ -28,6 +28,7 @@ export const useMockMyLeagues = noopQuery;
 export const useMockLeague = noopQuery;
 export const useMockCreateLeague = noopMutation;
 export const useMockLiveGamesTeamStats = noopQuery;
+export const useMockLeagueWidgetSnapshot = noopQuery;
 
 // mock/hooks/useMockDraft
 export const useMockDraft = noopQuery;
