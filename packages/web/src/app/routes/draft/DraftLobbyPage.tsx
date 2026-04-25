@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -14,16 +14,12 @@ import {
   Alert,
   List,
 } from '@mantine/core';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { getRosterComposition } from '@sportsnot/types';
 import { generateSnakeDraftOrder, shuffleArray } from '@sportsnot/utils';
 import { useAuthContext } from '../../context/AuthContext';
-import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
-import {
-  useMockDraft,
-  useMockStartDraft,
-} from '../../../mock/hooks/useMockDraft';
+import { useMockStartDraft } from '../../../mock/hooks/useMockDraft';
+import { useLeagueForLobby, useActiveDraftCheck } from './draftLobbyQueries';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -34,76 +30,18 @@ interface LobbyMember {
   users?: { display_name?: string } | null;
 }
 
-function useLeagueForLobby(leagueId: string) {
-  const mockResult = useMockLeague(leagueId);
-
-  const queryResult = useQuery({
-    queryKey: ['draft-lobby', leagueId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('leagues')
-        .select(
-          '*, league_members(id, user_id, team_name, users(display_name))'
-        )
-        .eq('id', leagueId)
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !IS_MOCK && !!leagueId,
-    refetchInterval: IS_MOCK ? false : 5000,
-  });
-
-  return IS_MOCK ? mockResult : queryResult;
-}
-
-function useActiveDraftCheck(leagueId: string) {
-  const mockDraftResult = useMockDraft(leagueId);
-
-  const queryResult = useQuery({
-    queryKey: ['active-draft-check', leagueId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('drafts')
-        .select('id, status')
-        .eq('league_id', leagueId)
-        .eq('status', 'active')
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !IS_MOCK && !!leagueId,
-    refetchInterval: IS_MOCK ? false : 3000,
-  });
-
-  if (IS_MOCK) {
-    return {
-      ...mockDraftResult,
-      data:
-        mockDraftResult.data?.status === 'active' ? mockDraftResult.data : null,
-    };
-  }
-
-  return queryResult;
-}
-
 export function DraftLobbyPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { user } = useAuthContext();
   const navigate = useNavigate();
   const [starting, setStarting] = useState(false);
 
-  const { data: league, isLoading } = useLeagueForLobby(leagueId!);
-  const { data: activeDraft } = useActiveDraftCheck(leagueId!);
+  const { data: league, isLoading: leagueLoading } = useLeagueForLobby(
+    leagueId!
+  );
+  const { data: activeDraft, isLoading: activeDraftLoading } =
+    useActiveDraftCheck(leagueId!);
   const mockStartDraft = useMockStartDraft();
-
-  useEffect(() => {
-    if (activeDraft?.status === 'active') {
-      navigate(`/draft/${leagueId}`);
-    }
-  }, [activeDraft, leagueId, navigate]);
 
   const isCommissioner = league?.commissioner_id === user?.id;
   const members = league?.league_members ?? [];
@@ -155,12 +93,16 @@ export function DraftLobbyPage() {
     setStarting(false);
   };
 
-  if (isLoading) {
+  if (leagueLoading || activeDraftLoading) {
     return (
       <Center h="50vh">
         <Loader size="lg" />
       </Center>
     );
+  }
+
+  if (activeDraft?.status === 'active') {
+    return <Navigate to={`/draft/${leagueId}`} replace />;
   }
 
   if (!league) {

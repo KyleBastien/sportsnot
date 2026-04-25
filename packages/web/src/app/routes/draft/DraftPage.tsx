@@ -21,13 +21,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { useQuery } from '@tanstack/react-query';
-import {
-  supabase,
-  usePlayoffPlayers,
-  usePlayoffTeams,
-  useRegularSeasonPlayers,
-} from '@sportsnot/supabase';
+import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import {
   type Position,
@@ -40,18 +34,17 @@ import {
   resolvePickName,
 } from '@sportsnot/utils';
 import { routes } from '../../utils/routes';
-import {
-  useMockDraft,
-  useMockLeagueMembers,
-  useMockMakePick,
-} from '../../../mock/hooks/useMockDraft';
+import { useMockMakePick } from '../../../mock/hooks/useMockDraft';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
-import {
-  useMockPlayoffPlayers,
-  useMockPlayoffTeams,
-  useMockRegularSeasonPlayers,
-} from '../../../mock/hooks/useMockNhlApi';
 import { useIsMobile, MobileCardList } from '@sportsnot/ui';
+import {
+  useDraft,
+  useLeagueMembers,
+  useLeagueInfo,
+  usePlayoffPlayersForDraft,
+  usePlayoffTeamsForDraft,
+  useRegularSeasonPlayersForDraft,
+} from './draftPageQueries';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -101,70 +94,6 @@ interface TeamStatRow {
   is_eliminated: boolean;
   wins: number;
   shutouts: number;
-}
-
-function useDraft(leagueId: string) {
-  const mockResult = useMockDraft(leagueId);
-
-  const queryResult = useQuery({
-    queryKey: ['draft', leagueId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('drafts')
-        .select('*, draft_picks(*, league_members(team_name, user_id))')
-        .eq('league_id', leagueId)
-        .order('round', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !IS_MOCK,
-    refetchInterval: IS_MOCK ? false : 3000,
-  });
-
-  return IS_MOCK ? mockResult : queryResult;
-}
-
-function useLeagueMembers(leagueId: string) {
-  const mockResult = useMockLeagueMembers(leagueId);
-
-  const queryResult = useQuery({
-    queryKey: ['league-members', leagueId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('league_members')
-        .select('id, user_id, team_name, total_points, users(display_name)')
-        .eq('league_id', leagueId);
-
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !IS_MOCK,
-  });
-
-  return IS_MOCK ? mockResult : queryResult;
-}
-
-function useLeagueInfo(leagueId: string) {
-  return useQuery({
-    queryKey: ['league-info', leagueId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('leagues')
-        .select('commissioner_id, allow_ir_slots')
-        .eq('id', leagueId)
-        .single();
-
-      if (error) throw error;
-      return {
-        commissionerId: data?.commissioner_id as string | null,
-        allowIrSlots: (data?.allow_ir_slots ?? true) as boolean,
-      };
-    },
-    enabled: !IS_MOCK,
-  });
 }
 
 interface ComparePlayer {
@@ -637,8 +566,12 @@ export function DraftPage() {
   const navigate = useNavigate();
   const { user } = useAuthContext();
   const { data: draft, isLoading: draftLoading } = useDraft(leagueId!);
-  const { data: members } = useLeagueMembers(leagueId!);
-  const { data: leagueInfo } = useLeagueInfo(leagueId!);
+  const { data: members, isLoading: membersLoading } = useLeagueMembers(
+    leagueId!
+  );
+  const { data: leagueInfo, isLoading: leagueInfoLoading } = useLeagueInfo(
+    leagueId!
+  );
   const mockLeagueResult = useMockLeague(leagueId);
   const commissionerId = IS_MOCK
     ? (mockLeagueResult.data?.commissioner_id ?? null)
@@ -673,27 +606,16 @@ export function DraftPage() {
     setComparePlayers((prev) => prev.filter((p) => p.id !== playerId));
   };
 
-  // Fetch cached NHL data
   const currentSeason = CURRENT_SEASON;
   const currentRound = draft?.round ?? 1;
-  const mockPlayerResult = useMockPlayoffPlayers(currentSeason, currentRound);
-  const supabasePlayerResult = usePlayoffPlayers(currentSeason, currentRound);
-  const { data: playerStats } = IS_MOCK
-    ? mockPlayerResult
-    : supabasePlayerResult;
-  const mockTeamResult = useMockPlayoffTeams(currentSeason, currentRound);
-  const supabaseTeamResult = usePlayoffTeams(currentSeason, currentRound);
-  const { data: teamStats } = IS_MOCK ? mockTeamResult : supabaseTeamResult;
+  const { data: playerStats, isLoading: playerStatsLoading } =
+    usePlayoffPlayersForDraft(currentSeason, currentRound);
+  const { data: teamStats, isLoading: teamStatsLoading } =
+    usePlayoffTeamsForDraft(currentSeason, currentRound);
 
-  // Fetch regular season stats. Used for Round 1 sorting/fallback display
-  // AND as a name/position/team lookup for later rounds when the playoff
-  // stats cache rows are missing those fields.
   const isRound1 = currentRound === 1;
-  const mockRegSeasonResult = useMockRegularSeasonPlayers(currentSeason, true);
-  const supabaseRegSeasonResult = useRegularSeasonPlayers(currentSeason, true);
-  const { data: regSeasonStats } = IS_MOCK
-    ? mockRegSeasonResult
-    : supabaseRegSeasonResult;
+  const { data: regSeasonStats } =
+    useRegularSeasonPlayersForDraft(currentSeason);
 
   // Derived state — compute before early returns to keep hook order stable
   const draftOrder: string[] = (draft?.draft_order as string[]) ?? [];
@@ -832,7 +754,14 @@ export function DraftPage() {
     };
   }, [leagueId]);
 
-  if (draftLoading) {
+  const isPageLoading =
+    draftLoading ||
+    membersLoading ||
+    leagueInfoLoading ||
+    playerStatsLoading ||
+    teamStatsLoading;
+
+  if (isPageLoading) {
     return (
       <Center h="50vh">
         <Loader size="lg" />

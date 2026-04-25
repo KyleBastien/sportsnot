@@ -17,14 +17,8 @@ import {
   Select,
 } from '@mantine/core';
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  supabase,
-  useLeague,
-  usePlayoffPlayers,
-  usePlayoffTeams,
-  useRegularSeasonPlayers,
-} from '@sportsnot/supabase';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { SCORING, CURRENT_SEASON } from '@sportsnot/types';
 import {
@@ -32,18 +26,16 @@ import {
   buildTeamNameMap,
   resolvePickName,
 } from '@sportsnot/utils';
-import {
-  useMockRoster,
-  useMockActivateIR,
-} from '../../../mock/hooks/useMockRoster';
-import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
-import {
-  useMockPlayoffPlayers,
-  useMockPlayoffTeams,
-  useMockRegularSeasonPlayers,
-} from '../../../mock/hooks/useMockNhlApi';
+import { useMockActivateIR } from '../../../mock/hooks/useMockRoster';
 import { useIsMobile, MobileCardList, DataRow } from '@sportsnot/ui';
 import { groupHasActions } from './rosterUtils';
+import {
+  useMemberRoster,
+  useLeagueForRoster,
+  usePlayoffPlayersForRoster,
+  usePlayoffTeamsForRoster,
+  useRegularSeasonPlayersForRoster,
+} from './rosterPageQueries';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -58,70 +50,6 @@ interface RosterSlotRow {
   points_earned: number;
   activated_from_ir: boolean;
   is_eliminated?: boolean;
-}
-
-function useMemberRoster(leagueId: string, leagueMemberId?: string) {
-  const mockResult = useMockRoster(leagueId, leagueMemberId);
-  const { user } = useAuthContext();
-
-  const queryResult = useQuery({
-    queryKey: ['roster', leagueId, leagueMemberId ?? user?.id],
-    queryFn: async () => {
-      let memberId = leagueMemberId;
-      let memberTotalPoints = 0;
-
-      if (memberId) {
-        const { data: member } = await supabase
-          .from('league_members')
-          .select('id, total_points')
-          .eq('id', memberId)
-          .single();
-
-        if (!member) throw new Error('Member not found');
-        memberTotalPoints = member.total_points ?? 0;
-      } else {
-        const { data: member } = await supabase
-          .from('league_members')
-          .select('id, total_points')
-          .eq('league_id', leagueId)
-          .eq('user_id', user!.id)
-          .single();
-
-        if (!member) throw new Error('Not a member of this league');
-        memberId = member.id;
-        memberTotalPoints = member.total_points ?? 0;
-      }
-
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('current_round')
-        .eq('id', leagueId)
-        .single();
-
-      if (!league) throw new Error('League not found');
-
-      const { data: roster, error } = await supabase
-        .from('rosters')
-        .select('*')
-        .eq('league_member_id', memberId)
-        .eq('round', league.current_round);
-
-      if (error) throw error;
-
-      return {
-        memberId: memberId as string,
-        round: league.current_round,
-        slots: (roster ?? []).map((s: RosterSlotRow) => ({
-          ...s,
-          is_eliminated: s.is_eliminated ?? false,
-        })),
-        totalPoints: memberTotalPoints,
-      };
-    },
-    enabled: !IS_MOCK && !!user,
-  });
-
-  return IS_MOCK ? mockResult : queryResult;
 }
 
 const POSITION_LABELS: Record<string, string> = {
@@ -144,10 +72,8 @@ export function RosterPage() {
   const { data, isLoading, error } = useMemberRoster(leagueId!, leagueMemberId);
   const queryClient = useQueryClient();
 
-  // Fetch league data (members list + settings)
-  const mockLeagueResult = useMockLeague(leagueId);
-  const realLeagueResult = useLeague(leagueId);
-  const leagueData = IS_MOCK ? mockLeagueResult.data : realLeagueResult.data;
+  const leagueResult = useLeagueForRoster(leagueId);
+  const leagueData = leagueResult.data;
   const allowIrSlots = (leagueData?.allow_ir_slots ?? true) as boolean;
 
   interface LeagueMemberRow {
@@ -186,45 +112,21 @@ export function RosterPage() {
   const [activating, setActivating] = useState(false);
   const mockActivateIR = useMockActivateIR();
 
-  // Fetch player/team stats for name resolution
   const currentSeason = CURRENT_SEASON;
   const currentRound = data?.round ?? 1;
-  // For Round 4, use Round 3 stats so eliminated players' names are still resolved
   const nameResolutionRound = currentRound >= 4 ? 3 : currentRound;
-  const mockPlayerResult = useMockPlayoffPlayers(
+  const { data: playerStats, isLoading: playerStatsLoading } =
+    usePlayoffPlayersForRoster(currentSeason, nameResolutionRound);
+  const { data: teamStats } = usePlayoffTeamsForRoster(
     currentSeason,
     nameResolutionRound
   );
-  const supabasePlayerResult = usePlayoffPlayers(
-    currentSeason,
-    nameResolutionRound
-  );
-  const { data: playerStats } = IS_MOCK
-    ? mockPlayerResult
-    : supabasePlayerResult;
-  const mockTeamResult = useMockPlayoffTeams(
-    currentSeason,
-    nameResolutionRound
-  );
-  const supabaseTeamResult = usePlayoffTeams(
-    currentSeason,
-    nameResolutionRound
-  );
-  const { data: teamStats } = IS_MOCK ? mockTeamResult : supabaseTeamResult;
 
-  // Fetch regular season stats for name resolution fallback in Round 1
   const isRound1 = currentRound === 1;
-  const mockRegSeasonResult = useMockRegularSeasonPlayers(
+  const { data: regSeasonStats } = useRegularSeasonPlayersForRoster(
     currentSeason,
     isRound1
   );
-  const supabaseRegSeasonResult = useRegularSeasonPlayers(
-    currentSeason,
-    isRound1
-  );
-  const { data: regSeasonStats } = IS_MOCK
-    ? mockRegSeasonResult
-    : supabaseRegSeasonResult;
 
   // Merge regular season names so roster resolves picks even before playoff data exists
   const playerNameMap = useMemo(() => {
@@ -433,6 +335,7 @@ export function RosterPage() {
         {groupedSlots.map((group) => {
           const hasAnyActions =
             isOwnRoster &&
+            !playerStatsLoading &&
             groupHasActions(
               group.position,
               group.players,
@@ -536,7 +439,8 @@ export function RosterPage() {
                             </Group>
                           }
                         />
-                        {isOwnRoster &&
+                        {!playerStatsLoading &&
+                          isOwnRoster &&
                           isIrSlot &&
                           !slot.activated_from_ir &&
                           injuredCandidates.length > 0 && (
