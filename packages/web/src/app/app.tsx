@@ -1,25 +1,21 @@
 import { lazy, Suspense, useEffect, type ReactNode } from 'react';
-import { Route, Routes, Link, useNavigate } from 'react-router-dom';
+import { Route, Routes, Link } from 'react-router-dom';
 import {
   ActionIcon,
   AppShell,
   Group,
-  Button,
-  Menu,
-  Avatar,
-  Text,
   UnstyledButton,
   Image,
   useComputedColorScheme,
   useMantineColorScheme,
 } from '@mantine/core';
 import { IconSun, IconMoon } from '@tabler/icons-react';
-import { useAuthContext } from './context/AuthContext';
 import logoSrc from '../assets/sportsnot-logo.png';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { NativeBackButton } from './components/NativeBackButton';
 import { NativeSwipeBackFrame } from './components/NativeSwipeBackFrame';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { UserMenu } from './UserMenu';
 import { initWidgetBridge } from './widget/initWidgetBridge';
 
 const WIDGET_BUNDLE_ID = 'com.sportsnot.app';
@@ -88,47 +84,6 @@ function ColorSchemeToggle() {
         <IconMoon size={20} />
       )}
     </ActionIcon>
-  );
-}
-
-function UserMenu() {
-  const { user, signOut } = useAuthContext();
-  const navigate = useNavigate();
-
-  if (!user) {
-    return (
-      <Button variant="outline" component={Link} to="/auth/login">
-        Sign In
-      </Button>
-    );
-  }
-
-  const displayName =
-    user.user_metadata?.['display_name'] ?? user.email?.split('@')[0] ?? 'User';
-
-  return (
-    <Menu shadow="md" width={200}>
-      <Menu.Target>
-        <UnstyledButton>
-          <Group gap="xs">
-            <Avatar size="sm" radius="xl">
-              {displayName[0]?.toUpperCase()}
-            </Avatar>
-            <Text size="sm" visibleFrom="sm">
-              {displayName}
-            </Text>
-          </Group>
-        </UnstyledButton>
-      </Menu.Target>
-      <Menu.Dropdown>
-        <Menu.Item onClick={() => navigate('/')}>Dashboard</Menu.Item>
-        <Menu.Item onClick={() => navigate('/profile')}>Profile</Menu.Item>
-        <Menu.Divider />
-        <Menu.Item color="red" onClick={() => signOut()}>
-          Sign Out
-        </Menu.Item>
-      </Menu.Dropdown>
-    </Menu>
   );
 }
 
