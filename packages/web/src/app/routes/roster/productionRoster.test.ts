@@ -106,6 +106,72 @@ describe('filterGamesByDateRange (sync-nhl-stats edge function logic)', () => {
   });
 });
 
+// ── Overlap-safe round classification (sync-nhl-stats scoreboard logic) ─────
+
+interface ScoreboardGame {
+  id: number;
+  gameType: number;
+  gameState: string;
+  seriesStatus?: {
+    round?: number;
+  } | null;
+}
+
+function collectCompletedRoundGameIds(
+  games: ScoreboardGame[],
+  round: number
+): number[] {
+  return games
+    .filter(
+      (game) =>
+        game.gameType === 3 &&
+        game.seriesStatus?.round === round &&
+        (game.gameState === 'OFF' || game.gameState === 'FINAL')
+    )
+    .map((game) => game.id);
+}
+
+describe('collectCompletedRoundGameIds', () => {
+  it('keeps Round 1 and Round 2 games separate on overlapping dates', () => {
+    const overlappingGames: ScoreboardGame[] = [
+      {
+        id: 101,
+        gameType: 3,
+        gameState: 'OFF',
+        seriesStatus: { round: 1 },
+      },
+      {
+        id: 202,
+        gameType: 3,
+        gameState: 'OFF',
+        seriesStatus: { round: 2 },
+      },
+    ];
+
+    expect(collectCompletedRoundGameIds(overlappingGames, 1)).toEqual([101]);
+    expect(collectCompletedRoundGameIds(overlappingGames, 2)).toEqual([202]);
+  });
+
+  it('ignores live games when building finalized game ids', () => {
+    const games: ScoreboardGame[] = [
+      {
+        id: 301,
+        gameType: 3,
+        gameState: 'LIVE',
+        seriesStatus: { round: 2 },
+      },
+      {
+        id: 302,
+        gameType: 3,
+        gameState: 'OFF',
+        seriesStatus: { round: 2 },
+      },
+    ];
+
+    expect(collectCompletedRoundGameIds(games, 2)).toEqual([302]);
+  });
+});
+
 // ── Roster page display: round points vs total points ──────────────────
 // US-004: The Roster page shows both "Round N Points" (current round active
 // slot sum) and "Total Points" (cumulative from data.totalPoints).

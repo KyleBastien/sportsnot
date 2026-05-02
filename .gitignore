@@ -78,3 +78,4 @@ ios/App/Secrets.xcconfig
 # Android secrets
 android/app/secrets.properties
 android/app/google-services.json
+sportsnot-release.keystore

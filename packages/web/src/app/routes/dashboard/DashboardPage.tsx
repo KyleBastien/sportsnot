@@ -24,8 +24,8 @@ interface TeamStatRow {
   wins: number;
   shutouts: number;
   is_eliminated: boolean;
+  playoff_round: number;
 }
-
 const STATUS_COLORS: Record<string, string> = {
   setup: 'blue',
   drafting: 'orange',
