@@ -59,12 +59,45 @@ function getEventTimeStamp(event: React.TouchEvent<HTMLDivElement>): number {
     : performance.now();
 }
 
+function isVisibleOverlayElement(
+  documentRef: Document,
+  element: Element
+): boolean {
+  const runtimeWindow = documentRef.defaultView;
+
+  if (!(element instanceof HTMLElement) || !runtimeWindow) {
+    return false;
+  }
+
+  let currentElement: HTMLElement | null = element;
+
+  while (currentElement) {
+    if (
+      currentElement.hidden ||
+      currentElement.getAttribute('aria-hidden') === 'true' ||
+      currentElement.hasAttribute('data-hidden')
+    ) {
+      return false;
+    }
+
+    const styles = runtimeWindow.getComputedStyle(currentElement);
+
+    if (styles.display === 'none' || styles.visibility === 'hidden') {
+      return false;
+    }
+
+    currentElement = currentElement.parentElement;
+  }
+
+  return true;
+}
+
 function hasBlockingOverlay(documentRef: Document): boolean {
-  return (
-    documentRef.querySelector(
+  return Array.from(
+    documentRef.querySelectorAll(
       '[role="dialog"], [role="menu"], [role="listbox"]'
-    ) !== null
-  );
+    )
+  ).some((element) => isVisibleOverlayElement(documentRef, element));
 }
 
 function trimPreviewCache(cache: Map<string, HTMLElement>) {
