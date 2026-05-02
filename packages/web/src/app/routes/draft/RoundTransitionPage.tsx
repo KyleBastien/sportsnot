@@ -14,16 +14,15 @@ import {
   Alert,
   Table,
 } from '@mantine/core';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useIsMobile, MobileCardList, DataRow } from '@sportsnot/ui';
 import { useAuthContext } from '../../context/AuthContext';
 import { deriveCurrentRound, deriveNextRound } from '../../utils/roundUtils';
-import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
+import { useMockStartReDraft } from '../../../mock/hooks/useMockDraft';
 import {
-  useMockCompletedDrafts,
-  useMockStartReDraft,
-} from '../../../mock/hooks/useMockDraft';
+  useTransitionLeague,
+  useCompletedDrafts,
+} from './roundTransitionQueries';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -53,61 +52,16 @@ interface CompletedDraftRow {
   completed_at: string | null;
 }
 
-// ── Hook wrappers for mock/live mode ──────────────────────────────────
-
-function useTransitionLeague(leagueId: string | undefined) {
-  const mockResult = useMockLeague(leagueId);
-
-  const queryResult = useQuery({
-    queryKey: ['round-transition', leagueId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('leagues')
-        .select(
-          '*, league_members(id, user_id, team_name, total_points, users(display_name))'
-        )
-        .eq('id', leagueId!)
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !IS_MOCK && !!leagueId,
-  });
-
-  return IS_MOCK ? mockResult : queryResult;
-}
-
-function useCompletedDrafts(leagueId: string | undefined) {
-  const mockResult = useMockCompletedDrafts(leagueId);
-
-  const queryResult = useQuery({
-    queryKey: ['completed-drafts', leagueId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('drafts')
-        .select('id, round, status, completed_at')
-        .eq('league_id', leagueId!)
-        .eq('status', 'completed')
-        .order('round', { ascending: true });
-
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !IS_MOCK && !!leagueId,
-  });
-
-  return IS_MOCK ? mockResult : queryResult;
-}
-
 export function RoundTransitionPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { user } = useAuthContext();
   const navigate = useNavigate();
   const [starting, setStarting] = useState(false);
 
-  const { data: league, isLoading } = useTransitionLeague(leagueId);
-  const { data: completedDrafts } = useCompletedDrafts(leagueId);
+  const { data: league, isLoading: leagueLoading } =
+    useTransitionLeague(leagueId);
+  const { data: completedDrafts, isLoading: completedDraftsLoading } =
+    useCompletedDrafts(leagueId);
   const mockStartReDraft = useMockStartReDraft();
   const isMobile = useIsMobile();
 
@@ -162,7 +116,7 @@ export function RoundTransitionPage() {
     setStarting(false);
   };
 
-  if (isLoading) {
+  if (leagueLoading || completedDraftsLoading) {
     return (
       <Center h="50vh">
         <Loader size="lg" />

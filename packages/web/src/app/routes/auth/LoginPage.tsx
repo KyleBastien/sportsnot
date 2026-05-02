@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Center,
   Container,
   Title,
   Text,
@@ -11,6 +12,7 @@ import {
   Alert,
   Image,
   Checkbox,
+  Loader,
   PinInput,
 } from '@mantine/core';
 import { useAuthContext } from '../../context/AuthContext';
@@ -25,8 +27,13 @@ import {
 } from './loginPageUtils';
 
 export function LoginPage() {
-  const { user, signInWithMagicLink, signInWithOtp, verifyOtp } =
-    useAuthContext();
+  const {
+    user,
+    loading: authLoading,
+    signInWithMagicLink,
+    signInWithOtp,
+    verifyOtp,
+  } = useAuthContext();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -103,6 +110,14 @@ export function LoginPage() {
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
     }
   };
+
+  if (authLoading || user) {
+    return (
+      <Center h="50vh" data-testid="login-loader">
+        <Loader size="lg" />
+      </Center>
+    );
+  }
 
   if (sent) {
     return (

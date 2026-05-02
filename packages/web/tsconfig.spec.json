@@ -1,0 +1,33 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@sportsnot/types": ["../../packages/types/src/index.ts"],
+      "@sportsnot/utils": ["../../packages/utils/src/index.ts"],
+      "@sportsnot/ui": ["./src/test-utils/uiStub.tsx"],
+      "@sportsnot/nhl-api": ["../../packages/nhl-api/src/index.ts"],
+      "@sportsnot/supabase": ["../../packages/supabase/src/index.ts"],
+      "@sportsnot/mock-data": ["../../packages/mock-data/src/index.ts"],
+      "@sportsnot/widget-api": ["../../packages/widget-api/src/index.ts"],
+      "@sportsnot/widget-bridge": ["../../packages/widget-bridge/src/index.ts"]
+    },
+    "outDir": "dist",
+    "jsx": "react-jsx",
+    "lib": ["dom", "dom.iterable"],
+    "types": ["node"],
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "../../packages/types/src/**/*.ts",
+    "../../packages/utils/src/**/*.ts",
+    "../../packages/supabase/src/**/*.ts",
+    "../../packages/nhl-api/src/**/*.ts",
+    "../../packages/ui/src/**/*.ts",
+    "../../packages/ui/src/**/*.tsx"
+  ]
+}
