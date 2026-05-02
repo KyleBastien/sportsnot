@@ -5,12 +5,29 @@
 
 /// <reference path="../deno.d.ts" />
 
+import {
+  derivePlayoffRoundsToSync,
+  getEffectiveRoundEndDate,
+  getPlayoffRoundWindow,
+  incrementIsoDate,
+  isPlayoffGameInRound,
+} from '../_shared/playoff-rounds.ts';
+import {
+  jsonResponse,
+  pgRpc,
+  pgSelect,
+  pgUpdate,
+  pgUpsert,
+  type PgConfig,
+} from '../_shared/pg.ts';
+
 const NHL_API_BASE = 'https://api-web.nhle.com/v1';
+const DEFAULT_SEASON = '20252026';
+const FINAL_GAME_STATES = new Set(['OFF', 'FINAL']);
+const LIVE_GAME_STATES = new Set(['LIVE', 'CRIT']);
 
 interface PlayerGameLog {
   gameId: number;
-  gameDate: string;
-  teamAbbrev?: string;
   goals: number;
   assists: number;
 }
@@ -27,6 +44,10 @@ interface BoxscoreTeamStats {
   goalies?: BoxscorePlayer[];
 }
 
+interface SeriesStatus {
+  round?: number;
+}
+
 interface NhlScoreGameLite {
   id: number;
   gameType: number;
@@ -34,6 +55,76 @@ interface NhlScoreGameLite {
   gameDate?: string;
   homeTeam?: { id?: number; abbrev?: string; score?: number };
   awayTeam?: { id?: number; abbrev?: string; score?: number };
+  seriesStatus?: SeriesStatus | null;
+}
+
+interface ScoreboardResponse {
+  games?: NhlScoreGameLite[];
+}
+
+interface BracketTeam {
+  id: number;
+  abbrev: string;
+  name?: { default?: string };
+}
+
+interface BracketSeries {
+  playoffRound: number;
+  topSeedTeam?: BracketTeam;
+  bottomSeedTeam?: BracketTeam;
+}
+
+interface BracketResponse {
+  series?: BracketSeries[];
+}
+
+interface TeamRosterPlayer {
+  id: number;
+  firstName: { default: string };
+  lastName: { default: string };
+}
+
+interface TeamRosterResponse {
+  forwards?: TeamRosterPlayer[];
+  defensemen?: TeamRosterPlayer[];
+}
+
+interface EligibleTeam {
+  id: number;
+  abbrev: string;
+  name: string;
+}
+
+interface EligiblePlayer {
+  id: number;
+  playerName: string;
+  position: 'F' | 'D';
+  teamId: number;
+  teamAbbrev: string;
+}
+
+interface LeagueRow {
+  id: string;
+  current_round: number | null;
+  status: string;
+}
+
+interface RosterRow {
+  league_member_id: string;
+  player_id: number | null;
+  team_id: number | null;
+}
+
+interface PlayerStatsRow {
+  player_id: number;
+  goals: number;
+  assists: number;
+}
+
+interface TeamStatsRow {
+  team_id: number;
+  wins: number;
+  shutouts: number;
 }
 
 interface LiveDelta {
@@ -42,185 +133,438 @@ interface LiveDelta {
   teamAbbrev: string | null;
 }
 
-/**
- * Fetch live/in-progress playoff games and aggregate per-player goal/assist
- * deltas from each game's boxscore. Returns a Map keyed by playerId.
- *
- * Live games are NOT yet present in the per-player game-log endpoint, so
- * adding these deltas on top of the finalized game-log totals gives a
- * "season-to-date including in-progress" total without double-counting.
- */
-async function fetchLivePlayerDeltas(
-  roundStartDate?: string,
-  roundEndDate?: string
-): Promise<Map<number, LiveDelta>> {
-  const deltas = new Map<number, LiveDelta>();
+function seasonToBracketYear(season: string): string {
+  return season.length === 8 ? season.slice(4) : season;
+}
+
+function parseRequestedRound(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+async function fetchJson<T>(url: string): Promise<T | null> {
   try {
-    const resp = await fetch(`${NHL_API_BASE}/score/now`);
-    if (!resp.ok) return deltas;
-    const data = await resp.json();
-    const games = (data.games ?? []) as NhlScoreGameLite[];
-    const liveGames = games.filter((g) => {
-      if (g.gameType !== 3) return false;
-      if (g.gameState !== 'LIVE' && g.gameState !== 'CRIT') return false;
-      if (roundStartDate && roundEndDate && g.gameDate) {
-        if (g.gameDate < roundStartDate || g.gameDate > roundEndDate)
-          return false;
+    const response = await fetch(url);
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+function isCompletedGame(game: NhlScoreGameLite): boolean {
+  return FINAL_GAME_STATES.has(game.gameState);
+}
+
+function isLiveGame(game: NhlScoreGameLite): boolean {
+  return LIVE_GAME_STATES.has(game.gameState);
+}
+
+async function fetchEligibleRoundTeams(
+  season: string,
+  playoffRound: number
+): Promise<EligibleTeam[]> {
+  const data = await fetchJson<BracketResponse>(
+    `${NHL_API_BASE}/playoff-bracket/${seasonToBracketYear(season)}`
+  );
+
+  if (!data?.series) {
+    return [];
+  }
+
+  const teamsById = new Map<number, EligibleTeam>();
+
+  for (const series of data.series) {
+    if (series.playoffRound !== playoffRound) {
+      continue;
+    }
+
+    for (const team of [series.topSeedTeam, series.bottomSeedTeam]) {
+      if (!team || team.id <= 0 || !team.abbrev || team.abbrev === 'TBD') {
+        continue;
       }
-      return true;
-    });
 
-    for (const game of liveGames) {
-      try {
-        const bxResp = await fetch(
-          `${NHL_API_BASE}/gamecenter/${game.id}/boxscore`
-        );
-        if (!bxResp.ok) continue;
-        const bx = await bxResp.json();
-        const sides: Array<{
-          stats?: BoxscoreTeamStats;
-          abbrev?: string;
-        }> = [
-          {
-            stats: bx?.playerByGameStats?.homeTeam,
-            abbrev: game.homeTeam?.abbrev,
-          },
-          {
-            stats: bx?.playerByGameStats?.awayTeam,
-            abbrev: game.awayTeam?.abbrev,
-          },
-        ];
-
-        for (const side of sides) {
-          const players = [
-            ...(side.stats?.forwards ?? []),
-            ...(side.stats?.defense ?? []),
-            ...(side.stats?.goalies ?? []),
-          ];
-          for (const p of players) {
-            if (!p?.playerId) continue;
-            const existing = deltas.get(p.playerId) ?? {
-              goals: 0,
-              assists: 0,
-              teamAbbrev: side.abbrev ?? null,
-            };
-            existing.goals += p.goals ?? 0;
-            existing.assists += p.assists ?? 0;
-            if (!existing.teamAbbrev && side.abbrev) {
-              existing.teamAbbrev = side.abbrev;
-            }
-            deltas.set(p.playerId, existing);
-          }
-        }
-      } catch {
-        // Continue on individual game failures
+      if (!teamsById.has(team.id)) {
+        teamsById.set(team.id, {
+          id: team.id,
+          abbrev: team.abbrev,
+          name: team.name?.default ?? team.abbrev,
+        });
       }
     }
-  } catch {
-    // Network/parse failures: return whatever deltas we collected.
   }
+
+  return [...teamsById.values()];
+}
+
+function mapRosterPlayers(
+  players: TeamRosterPlayer[] | undefined,
+  position: 'F' | 'D',
+  team: EligibleTeam
+): EligiblePlayer[] {
+  return (players ?? []).map((player) => ({
+    id: player.id,
+    playerName: `${player.firstName.default} ${player.lastName.default}`,
+    position,
+    teamId: team.id,
+    teamAbbrev: team.abbrev,
+  }));
+}
+
+async function fetchEligibleRoundPlayers(
+  season: string,
+  teams: EligibleTeam[]
+): Promise<EligiblePlayer[]> {
+  const playersById = new Map<number, EligiblePlayer>();
+
+  for (const team of teams) {
+    const roster = await fetchJson<TeamRosterResponse>(
+      `${NHL_API_BASE}/roster/${team.abbrev}/${season}`
+    );
+
+    if (!roster) {
+      continue;
+    }
+
+    const teamPlayers = [
+      ...mapRosterPlayers(roster.forwards, 'F', team),
+      ...mapRosterPlayers(roster.defensemen, 'D', team),
+    ];
+
+    for (const player of teamPlayers) {
+      playersById.set(player.id, player);
+    }
+  }
+
+  return [...playersById.values()];
+}
+
+async function fetchRoundGames(
+  playoffRound: number,
+  roundStartDate: string,
+  roundEndDate: string
+): Promise<NhlScoreGameLite[]> {
+  const games: NhlScoreGameLite[] = [];
+  let currentDate = roundStartDate;
+
+  while (currentDate <= roundEndDate) {
+    const data = await fetchJson<ScoreboardResponse>(
+      `${NHL_API_BASE}/score/${currentDate}`
+    );
+
+    for (const game of data?.games ?? []) {
+      if (isPlayoffGameInRound(game, playoffRound)) {
+        games.push(game);
+      }
+    }
+
+    currentDate = incrementIsoDate(currentDate);
+  }
+
+  return games;
+}
+
+async function fetchLivePlayerDeltas(
+  playoffRound: number
+): Promise<Map<number, LiveDelta>> {
+  const deltas = new Map<number, LiveDelta>();
+  const data = await fetchJson<ScoreboardResponse>(`${NHL_API_BASE}/score/now`);
+
+  if (!data?.games) {
+    return deltas;
+  }
+
+  const liveGames = data.games.filter(
+    (game) => isPlayoffGameInRound(game, playoffRound) && isLiveGame(game)
+  );
+
+  for (const game of liveGames) {
+    const boxscore = await fetchJson<{
+      playerByGameStats?: {
+        homeTeam?: BoxscoreTeamStats;
+        awayTeam?: BoxscoreTeamStats;
+      };
+    }>(`${NHL_API_BASE}/gamecenter/${game.id}/boxscore`);
+
+    if (!boxscore) {
+      continue;
+    }
+
+    const sides: Array<{
+      stats?: BoxscoreTeamStats;
+      abbrev?: string;
+    }> = [
+      {
+        stats: boxscore.playerByGameStats?.homeTeam,
+        abbrev: game.homeTeam?.abbrev,
+      },
+      {
+        stats: boxscore.playerByGameStats?.awayTeam,
+        abbrev: game.awayTeam?.abbrev,
+      },
+    ];
+
+    for (const side of sides) {
+      const players = [
+        ...(side.stats?.forwards ?? []),
+        ...(side.stats?.defense ?? []),
+        ...(side.stats?.goalies ?? []),
+      ];
+
+      for (const player of players) {
+        if (!player.playerId) {
+          continue;
+        }
+
+        const existing = deltas.get(player.playerId) ?? {
+          goals: 0,
+          assists: 0,
+          teamAbbrev: side.abbrev ?? null,
+        };
+
+        existing.goals += player.goals ?? 0;
+        existing.assists += player.assists ?? 0;
+
+        if (!existing.teamAbbrev && side.abbrev) {
+          existing.teamAbbrev = side.abbrev;
+        }
+
+        deltas.set(player.playerId, existing);
+      }
+    }
+  }
+
   return deltas;
 }
 
-interface RosterRow {
-  player_id: number | null;
-  team_id: number | null;
-  position: string;
-}
+async function syncRoundPlayerStats(
+  cfg: PgConfig,
+  season: string,
+  playoffRound: number,
+  players: EligiblePlayer[],
+  finalizedGameIds: Set<number>,
+  liveDeltas: Map<number, LiveDelta>
+): Promise<number> {
+  let playerUpdates = 0;
 
-interface PlayerStatsRow {
-  goals: number;
-  assists: number;
-}
+  for (const player of players) {
+    const data = await fetchJson<{ gameLog?: PlayerGameLog[] }>(
+      `${NHL_API_BASE}/player/${player.id}/game-log/${season}/3`
+    );
 
-interface TeamStatsRow {
-  wins: number;
-  shutouts: number;
-}
+    const finalizedGames = (data?.gameLog ?? []).filter((game) =>
+      finalizedGameIds.has(game.gameId)
+    );
 
-interface RosterMemberRow {
-  league_member_id: string;
-}
+    const finalizedGoals = finalizedGames.reduce(
+      (sum, game) => sum + (game.goals ?? 0),
+      0
+    );
+    const finalizedAssists = finalizedGames.reduce(
+      (sum, game) => sum + (game.assists ?? 0),
+      0
+    );
+    const live = liveDeltas.get(player.id);
 
-interface LeagueMemberRow {
-  id: string;
-  league_id: string;
-}
+    const ok = await pgUpsert(
+      cfg,
+      'player_stats_cache',
+      'player_id,nhl_season,playoff_round',
+      {
+        player_id: player.id,
+        nhl_season: season,
+        playoff_round: playoffRound,
+        player_name: player.playerName,
+        team_abbreviation: live?.teamAbbrev ?? player.teamAbbrev,
+        position: player.position,
+        goals: finalizedGoals + (live?.goals ?? 0),
+        assists: finalizedAssists + (live?.assists ?? 0),
+        games_played: finalizedGames.length + (live ? 1 : 0),
+        is_injured: false,
+        last_updated: new Date().toISOString(),
+      }
+    );
 
-/** Build standard PostgREST headers with service role auth. */
-function pgHeaders(apiKey: string): Record<string, string> {
-  return {
-    'Content-Type': 'application/json',
-    apikey: apiKey,
-    Authorization: `Bearer ${apiKey}`,
-  };
-}
-
-/** GET rows from a PostgREST table with query params. */
-async function pgSelect<T>(
-  baseUrl: string,
-  apiKey: string,
-  table: string,
-  params: string
-): Promise<T[]> {
-  const resp = await fetch(`${baseUrl}/rest/v1/${table}?${params}`, {
-    headers: pgHeaders(apiKey),
-  });
-  if (!resp.ok) return [];
-  return (await resp.json()) as T[];
-}
-
-/** UPSERT rows into a PostgREST table. */
-async function pgUpsert(
-  baseUrl: string,
-  apiKey: string,
-  table: string,
-  onConflict: string,
-  body: unknown
-): Promise<boolean> {
-  const resp = await fetch(
-    `${baseUrl}/rest/v1/${table}?on_conflict=${onConflict}`,
-    {
-      method: 'POST',
-      headers: {
-        ...pgHeaders(apiKey),
-        Prefer: 'resolution=merge-duplicates',
-      },
-      body: JSON.stringify(body),
+    if (ok) {
+      playerUpdates++;
     }
+  }
+
+  return playerUpdates;
+}
+
+async function syncRoundTeamStats(
+  cfg: PgConfig,
+  season: string,
+  playoffRound: number,
+  teams: EligibleTeam[],
+  finalGames: NhlScoreGameLite[]
+): Promise<number> {
+  let teamUpdates = 0;
+
+  for (const team of teams) {
+    let wins = 0;
+    let shutouts = 0;
+
+    for (const game of finalGames) {
+      const isHome = game.homeTeam?.id === team.id;
+      const isAway = game.awayTeam?.id === team.id;
+
+      if (!isHome && !isAway) {
+        continue;
+      }
+
+      const teamScore = isHome
+        ? (game.homeTeam?.score ?? 0)
+        : (game.awayTeam?.score ?? 0);
+      const opponentScore = isHome
+        ? (game.awayTeam?.score ?? 0)
+        : (game.homeTeam?.score ?? 0);
+
+      if (teamScore > opponentScore) {
+        wins++;
+        if (opponentScore === 0) {
+          shutouts++;
+        }
+      }
+    }
+
+    const ok = await pgUpsert(
+      cfg,
+      'team_stats_cache',
+      'team_id,nhl_season,playoff_round',
+      {
+        team_id: team.id,
+        nhl_season: season,
+        playoff_round: playoffRound,
+        team_name: team.name,
+        team_abbreviation: team.abbrev,
+        wins,
+        shutouts,
+        is_eliminated: false,
+        last_updated: new Date().toISOString(),
+      }
+    );
+
+    if (ok) {
+      teamUpdates++;
+    }
+  }
+
+  return teamUpdates;
+}
+
+async function updateRoundRosterPoints(
+  cfg: PgConfig,
+  season: string,
+  playoffRound: number
+): Promise<void> {
+  const rosters = await pgSelect<RosterRow>(
+    cfg,
+    'rosters',
+    `select=league_member_id,player_id,team_id&round=eq.${playoffRound}&is_active=eq.true`
   );
-  return resp.ok;
+
+  const playerIds = [
+    ...new Set(
+      rosters
+        .filter((roster) => roster.player_id != null)
+        .map((roster) => roster.player_id as number)
+    ),
+  ];
+  const teamIds = [
+    ...new Set(
+      rosters
+        .filter((roster) => roster.team_id != null)
+        .map((roster) => roster.team_id as number)
+    ),
+  ];
+
+  if (playerIds.length > 0) {
+    const playerStats = await pgSelect<PlayerStatsRow>(
+      cfg,
+      'player_stats_cache',
+      `select=player_id,goals,assists&player_id=in.(${playerIds.join(',')})&nhl_season=eq.${season}&playoff_round=eq.${playoffRound}`
+    );
+
+    const statsByPlayerId = new Map(
+      playerStats.map((row) => [row.player_id, row])
+    );
+
+    for (const playerId of playerIds) {
+      const stats = statsByPlayerId.get(playerId);
+      if (!stats) {
+        continue;
+      }
+
+      await pgUpdate(
+        cfg,
+        'rosters',
+        `player_id=eq.${playerId}&round=eq.${playoffRound}&is_active=eq.true`,
+        {
+          points_earned: (stats.goals ?? 0) + (stats.assists ?? 0),
+        }
+      );
+    }
+  }
+
+  if (teamIds.length > 0) {
+    const teamStats = await pgSelect<TeamStatsRow>(
+      cfg,
+      'team_stats_cache',
+      `select=team_id,wins,shutouts&team_id=in.(${teamIds.join(',')})&nhl_season=eq.${season}&playoff_round=eq.${playoffRound}`
+    );
+
+    const statsByTeamId = new Map(teamStats.map((row) => [row.team_id, row]));
+
+    for (const teamId of teamIds) {
+      const stats = statsByTeamId.get(teamId);
+      if (!stats) {
+        continue;
+      }
+
+      const regularWins = (stats.wins ?? 0) - (stats.shutouts ?? 0);
+
+      await pgUpdate(
+        cfg,
+        'rosters',
+        `team_id=eq.${teamId}&round=eq.${playoffRound}&is_active=eq.true`,
+        {
+          points_earned: regularWins * 2 + (stats.shutouts ?? 0) * 4,
+        }
+      );
+    }
+  }
 }
 
-/** PATCH rows in a PostgREST table matching filters. */
-async function pgUpdate(
-  baseUrl: string,
-  apiKey: string,
-  table: string,
-  filters: string,
-  body: unknown
-): Promise<boolean> {
-  const resp = await fetch(`${baseUrl}/rest/v1/${table}?${filters}`, {
-    method: 'PATCH',
-    headers: pgHeaders(apiKey),
-    body: JSON.stringify(body),
-  });
-  return resp.ok;
-}
+async function refreshActiveLeagueStandings(
+  cfg: PgConfig,
+  activeLeagues: LeagueRow[],
+  playoffRound: number
+): Promise<void> {
+  const leagueIds = activeLeagues
+    .filter(
+      (league) =>
+        league.status === 'active' && league.current_round === playoffRound
+    )
+    .map((league) => league.id);
 
-/** Call a PostgREST RPC function. */
-async function pgRpc(
-  baseUrl: string,
-  apiKey: string,
-  fn: string,
-  body: unknown
-): Promise<boolean> {
-  const resp = await fetch(`${baseUrl}/rest/v1/rpc/${fn}`, {
-    method: 'POST',
-    headers: pgHeaders(apiKey),
-    body: JSON.stringify(body),
-  });
-  return resp.ok;
+  for (const leagueId of leagueIds) {
+    await pgRpc(cfg, 'refresh_league_standings', {
+      p_league_id: leagueId,
+      p_round: playoffRound,
+    });
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -229,370 +573,121 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!supabaseUrl || !supabaseKey) {
-      return new Response(
-        JSON.stringify({
-          error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY',
-        }),
+      return jsonResponse(
         {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        }
+          error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY',
+        },
+        500
       );
     }
+
+    const cfg: PgConfig = {
+      url: supabaseUrl,
+      key: supabaseKey,
+    };
 
     const body = await req.json().catch(() => ({}));
-    const season: string = body.season || '20252026';
-    const playoffRound: number = body.playoff_round || 1;
-    const roundStartDate: string | undefined = body.round_start_date;
-    const roundEndDate: string | undefined = body.round_end_date;
+    const season: string = body.season || DEFAULT_SEASON;
+    const requestedRound = parseRequestedRound(body.playoff_round);
+    const overrideStartDate =
+      typeof body.round_start_date === 'string'
+        ? body.round_start_date
+        : undefined;
+    const overrideEndDate =
+      typeof body.round_end_date === 'string' ? body.round_end_date : undefined;
 
-    // ── Get active rosters ─────────────────────────────────────
-    const rosters = await pgSelect<RosterRow>(
-      supabaseUrl,
-      supabaseKey,
-      'rosters',
-      `select=player_id,team_id,position&round=eq.${playoffRound}&is_active=eq.true`
+    const activeLeagues = await pgSelect<LeagueRow>(
+      cfg,
+      'leagues',
+      'select=id,current_round,status&status=in.(active,drafting)&current_round=gte.1'
     );
 
-    if (rosters.length === 0) {
-      return new Response(
-        JSON.stringify({ message: 'No active rosters to sync' }),
-        { headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+    const roundsToSync =
+      requestedRound != null
+        ? [requestedRound]
+        : derivePlayoffRoundsToSync(activeLeagues);
 
-    const playerIds = [
-      ...new Set(
-        rosters
-          .filter((r) => r.player_id != null)
-          .map((r) => r.player_id as number)
-      ),
-    ];
-    const teamIds = [
-      ...new Set(
-        rosters.filter((r) => r.team_id != null).map((r) => r.team_id as number)
-      ),
-    ];
+    if (roundsToSync.length === 0) {
+      return jsonResponse({
+        message: 'No active or drafting league rounds to sync',
+        syncedRounds: [],
+        playerUpdates: 0,
+        teamUpdates: 0,
+      });
+    }
 
     let playerUpdates = 0;
     let teamUpdates = 0;
+    const syncedRounds: number[] = [];
 
-    // Pull live boxscore deltas once so we can layer in-progress goals/
-    // assists on top of the finalized per-player game-log totals.
-    const liveDeltas = await fetchLivePlayerDeltas(
-      roundStartDate,
-      roundEndDate
-    );
-
-    // ── Pre-fetch player names from regular season cache ───────
-    // The NHL game-log endpoint does not return player names, so
-    // we look them up from the regular_season_stats_cache table
-    // and write them into the playoff cache for widget display.
-    const playerNameById = new Map<number, string>();
-    if (playerIds.length > 0) {
-      const regRows = await pgSelect<{
-        player_id: number;
-        player_name: string | null;
-      }>(
-        supabaseUrl,
-        supabaseKey,
-        'regular_season_stats_cache',
-        `select=player_id,player_name&player_id=in.(${playerIds.join(',')})`
+    for (const playoffRound of roundsToSync) {
+      const roundWindow = getPlayoffRoundWindow(
+        season,
+        playoffRound,
+        requestedRound === playoffRound ? overrideStartDate : undefined,
+        requestedRound === playoffRound ? overrideEndDate : undefined
       );
-      for (const row of regRows) {
-        if (row.player_name) {
-          playerNameById.set(row.player_id, row.player_name);
-        }
-      }
-    }
 
-    // ── Sync player stats from NHL API ─────────────────────────
-    for (const playerId of playerIds) {
-      try {
-        const resp = await fetch(
-          `${NHL_API_BASE}/player/${playerId}/game-log/${season}/3`
-        );
-        if (!resp.ok) continue;
-
-        const data = await resp.json();
-        const allGames: PlayerGameLog[] = data.gameLog ?? [];
-
-        const games =
-          roundStartDate && roundEndDate
-            ? allGames.filter(
-                (g) =>
-                  g.gameDate >= roundStartDate && g.gameDate <= roundEndDate
-              )
-            : allGames;
-
-        const finalizedGoals = games.reduce(
-          (sum: number, g: PlayerGameLog) => sum + (g.goals ?? 0),
-          0
-        );
-        const finalizedAssists = games.reduce(
-          (sum: number, g: PlayerGameLog) => sum + (g.assists ?? 0),
-          0
-        );
-
-        // Layer live in-progress totals on top of finalized totals. The
-        // boxscore reflects only the current game, and the game-log only
-        // includes finalized games, so summing the two cannot double-count.
-        const live = liveDeltas.get(playerId);
-        const totalGoals = finalizedGoals + (live?.goals ?? 0);
-        const totalAssists = finalizedAssists + (live?.assists ?? 0);
-        const totalGamesPlayed = games.length + (live ? 1 : 0);
-
-        // Extract team abbreviation: prefer the live game (most current),
-        // then the most recent finalized game-log entry.
-        const teamAbbrev =
-          live?.teamAbbrev ??
-          (allGames.length > 0
-            ? (allGames[allGames.length - 1].teamAbbrev ?? null)
-            : null);
-
-        const upsertRow: Record<string, unknown> = {
-          player_id: playerId,
-          nhl_season: season,
-          playoff_round: playoffRound,
-          goals: totalGoals,
-          assists: totalAssists,
-          games_played: totalGamesPlayed,
-          last_updated: new Date().toISOString(),
-        };
-        if (teamAbbrev) {
-          upsertRow.team_abbreviation = teamAbbrev;
-        }
-        const cachedName = playerNameById.get(playerId);
-        if (cachedName) {
-          upsertRow.player_name = cachedName;
-        }
-
-        const ok = await pgUpsert(
-          supabaseUrl,
-          supabaseKey,
-          'player_stats_cache',
-          'player_id,nhl_season,playoff_round',
-          upsertRow
-        );
-        if (ok) playerUpdates++;
-      } catch {
-        // Continue on individual player failures
-      }
-    }
-
-    // ── Collect all completed playoff games for the round ─────
-    // We fetch scores for every date in the round window so that wins and
-    // shutouts are cumulative round-to-date totals. Fetching only /score/now
-    // (today's games) and upserting from zero would reset historical totals on
-    // every sync run.
-    // Only completed playoff (gameType=3) games are collected to avoid storing
-    // in-progress or non-playoff games that would be skipped in the team loop.
-    // The NHL API uses 'OFF' (official) for finished games; 'FINAL' is
-    // accepted as a defensive fallback in case the API ever changes.
-    const allRoundFinalGames: NhlScoreGameLite[] = [];
-    if (roundStartDate) {
-      // .toISOString() always returns a UTC timestamp; splitting on 'T' gives
-      // the UTC calendar date, which is consistent with the NHL API's gameDate
-      // field (also UTC-based).
-      const todayStr = new Date().toISOString().split('T')[0];
-      const endStr = roundEndDate ?? todayStr;
-      const effectiveEndStr = endStr <= todayStr ? endStr : todayStr;
-      let currentDateStr = roundStartDate;
-      while (currentDateStr <= effectiveEndStr) {
-        try {
-          const resp = await fetch(`${NHL_API_BASE}/score/${currentDateStr}`);
-          if (resp.ok) {
-            const data = await resp.json();
-            const games = (data.games ?? []) as NhlScoreGameLite[];
-            allRoundFinalGames.push(
-              ...games.filter(
-                (g) =>
-                  g.gameType === 3 &&
-                  (g.gameState === 'OFF' || g.gameState === 'FINAL')
-              )
-            );
-          }
-        } catch {
-          // Continue on individual date fetch failures
-        }
-        // Noon UTC avoids any ambiguity when UTC methods are applied during
-        // the date increment; .setUTCDate()/.toISOString() still produce the
-        // correct next-day string regardless of the server's local timezone.
-        const d = new Date(currentDateStr + 'T12:00:00Z');
-        d.setUTCDate(d.getUTCDate() + 1);
-        currentDateStr = d.toISOString().split('T')[0];
-      }
-    } else {
-      try {
-        const resp = await fetch(`${NHL_API_BASE}/score/now`);
-        if (resp.ok) {
-          const data = await resp.json();
-          const games = (data.games ?? []) as NhlScoreGameLite[];
-          allRoundFinalGames.push(
-            ...games.filter(
-              (g) =>
-                g.gameType === 3 &&
-                (g.gameState === 'OFF' || g.gameState === 'FINAL')
-            )
+      if (!roundWindow) {
+        if (requestedRound === playoffRound) {
+          return jsonResponse(
+            {
+              error: `No configured round window for season ${season} round ${playoffRound}`,
+            },
+            400
           );
         }
-      } catch {
-        // Ignore
+        continue;
       }
-    }
 
-    // ── Sync team stats (wins/shutouts) ────────────────────────
-    // Sync ALL teams that appear in completed games, not just those on
-    // active rosters. The dashboard displays every playoff team's record.
-    const allGameTeamIds = new Set<number>();
-    for (const game of allRoundFinalGames) {
-      if (game.homeTeam?.id != null) allGameTeamIds.add(game.homeTeam.id);
-      if (game.awayTeam?.id != null) allGameTeamIds.add(game.awayTeam.id);
-    }
-    for (const id of teamIds) allGameTeamIds.add(id);
-
-    for (const teamId of allGameTeamIds) {
-      try {
-        let wins = 0;
-        let shutouts = 0;
-
-        for (const game of allRoundFinalGames) {
-          if (roundStartDate && roundEndDate && game.gameDate) {
-            if (game.gameDate < roundStartDate || game.gameDate > roundEndDate)
-              continue;
-          }
-
-          const isHome = game.homeTeam?.id === teamId;
-          const isAway = game.awayTeam?.id === teamId;
-          if (!isHome && !isAway) continue;
-
-          const teamScore = isHome
-            ? (game.homeTeam?.score ?? 0)
-            : (game.awayTeam?.score ?? 0);
-          const opponentScore = isHome
-            ? (game.awayTeam?.score ?? 0)
-            : (game.homeTeam?.score ?? 0);
-
-          if (teamScore > opponentScore) {
-            wins++;
-            if (opponentScore === 0) shutouts++;
-          }
-        }
-
-        const ok = await pgUpsert(
-          supabaseUrl,
-          supabaseKey,
-          'team_stats_cache',
-          'team_id,nhl_season,playoff_round',
-          {
-            team_id: teamId,
-            nhl_season: season,
-            playoff_round: playoffRound,
-            wins,
-            shutouts,
-            last_updated: new Date().toISOString(),
-          }
-        );
-        if (ok) teamUpdates++;
-      } catch {
-        // Continue on individual team failures
+      const eligibleTeams = await fetchEligibleRoundTeams(season, playoffRound);
+      if (eligibleTeams.length === 0) {
+        continue;
       }
-    }
 
-    // ── Update roster points_earned from stats cache ───────────
-    const SCORING_GOAL = 1;
-    const SCORING_ASSIST = 1;
-    const SCORING_WIN = 2;
-    const SCORING_SHUTOUT = 4;
-
-    for (const playerId of playerIds) {
-      const rows = await pgSelect<PlayerStatsRow>(
-        supabaseUrl,
-        supabaseKey,
-        'player_stats_cache',
-        `select=goals,assists&player_id=eq.${playerId}&nhl_season=eq.${season}&playoff_round=eq.${playoffRound}&limit=1`
+      const eligiblePlayers = await fetchEligibleRoundPlayers(
+        season,
+        eligibleTeams
       );
-      if (rows.length > 0) {
-        const stats = rows[0];
-        const pts =
-          (stats.goals ?? 0) * SCORING_GOAL +
-          (stats.assists ?? 0) * SCORING_ASSIST;
-        await pgUpdate(
-          supabaseUrl,
-          supabaseKey,
-          'rosters',
-          `player_id=eq.${playerId}&round=eq.${playoffRound}&is_active=eq.true`,
-          { points_earned: pts }
-        );
-      }
-    }
-
-    for (const teamId of teamIds) {
-      const rows = await pgSelect<TeamStatsRow>(
-        supabaseUrl,
-        supabaseKey,
-        'team_stats_cache',
-        `select=wins,shutouts&team_id=eq.${teamId}&nhl_season=eq.${season}&playoff_round=eq.${playoffRound}&limit=1`
+      const liveDeltas = await fetchLivePlayerDeltas(playoffRound);
+      const effectiveRoundEndDate = getEffectiveRoundEndDate(roundWindow);
+      const roundGames = await fetchRoundGames(
+        playoffRound,
+        roundWindow.startDate,
+        effectiveRoundEndDate
       );
-      if (rows.length > 0) {
-        const stats = rows[0];
-        const regularWins = (stats.wins ?? 0) - (stats.shutouts ?? 0);
-        const pts =
-          regularWins * SCORING_WIN + (stats.shutouts ?? 0) * SCORING_SHUTOUT;
-        await pgUpdate(
-          supabaseUrl,
-          supabaseKey,
-          'rosters',
-          `team_id=eq.${teamId}&round=eq.${playoffRound}&is_active=eq.true`,
-          { points_earned: pts }
-        );
-      }
-    }
+      const finalGames = roundGames.filter(isCompletedGame);
+      const finalizedGameIds = new Set(finalGames.map((game) => game.id));
 
-    // ── Aggregate into league_members standings ────────────────
-    const affectedMembers = await pgSelect<RosterMemberRow>(
-      supabaseUrl,
-      supabaseKey,
-      'rosters',
-      `select=league_member_id&round=eq.${playoffRound}&is_active=eq.true`
-    );
-
-    if (affectedMembers.length > 0) {
-      const memberIds = [
-        ...new Set(affectedMembers.map((r) => r.league_member_id)),
-      ];
-
-      const members = await pgSelect<LeagueMemberRow>(
-        supabaseUrl,
-        supabaseKey,
-        'league_members',
-        `select=id,league_id&id=in.(${memberIds.join(',')})`
+      playerUpdates += await syncRoundPlayerStats(
+        cfg,
+        season,
+        playoffRound,
+        eligiblePlayers,
+        finalizedGameIds,
+        liveDeltas
       );
+      teamUpdates += await syncRoundTeamStats(
+        cfg,
+        season,
+        playoffRound,
+        eligibleTeams,
+        finalGames
+      );
+      await updateRoundRosterPoints(cfg, season, playoffRound);
+      await refreshActiveLeagueStandings(cfg, activeLeagues, playoffRound);
 
-      if (members.length > 0) {
-        const leagueIds = [...new Set(members.map((m) => m.league_id))];
-        for (const leagueId of leagueIds) {
-          await pgRpc(supabaseUrl, supabaseKey, 'refresh_league_standings', {
-            p_league_id: leagueId,
-            p_round: playoffRound,
-          });
-        }
-      }
+      syncedRounds.push(playoffRound);
     }
 
-    return new Response(
-      JSON.stringify({
-        message: 'Stats synced and standings updated',
-        playerUpdates,
-        teamUpdates,
-      }),
-      { headers: { 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({
+      message: 'Stats synced and standings updated',
+      syncedRounds,
+      playerUpdates,
+      teamUpdates,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: message }, 500);
   }
 });

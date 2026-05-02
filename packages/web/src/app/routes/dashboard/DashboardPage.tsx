@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useMockMyLeagues } from '../../../mock/hooks/useMockLeagues';
 import { useMockLiveGamesTeamStats } from '../../../mock/hooks/useMockLiveGames';
+import { CURRENT_SEASON } from '@sportsnot/types';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -44,6 +45,7 @@ interface TeamStatRow {
   wins: number;
   shutouts: number;
   is_eliminated: boolean;
+  playoff_round: number;
 }
 
 function useLiveGames() {
@@ -55,13 +57,23 @@ function useLiveGames() {
       const { data, error } = await supabase
         .from('team_stats_cache')
         .select(
-          'team_id, team_name, team_abbreviation, wins, shutouts, is_eliminated'
+          'team_id, team_name, team_abbreviation, wins, shutouts, is_eliminated, playoff_round'
         )
+        .eq('nhl_season', CURRENT_SEASON)
         .eq('is_eliminated', false)
+        .order('playoff_round', { ascending: false })
         .order('wins', { ascending: false });
 
       if (error) throw error;
-      return data ?? [];
+
+      const latestByTeam = new Map<number, TeamStatRow>();
+      for (const team of (data ?? []) as TeamStatRow[]) {
+        if (!latestByTeam.has(team.team_id)) {
+          latestByTeam.set(team.team_id, team);
+        }
+      }
+
+      return [...latestByTeam.values()];
     },
     enabled: !IS_MOCK,
   });

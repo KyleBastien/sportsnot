@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -39,6 +39,7 @@ import {
   buildTeamNameMap,
   resolvePickName,
 } from '@sportsnot/utils';
+import { getInitialDraftRosterPoints } from './draftUtils';
 import { routes } from '../../utils/routes';
 import {
   useMockDraft,
@@ -252,10 +253,9 @@ function AvailablePlayerBoard({
   const regSeasonMap = new Map(regSeasonStats.map((r) => [r.player_id, r]));
 
   // Round 1 fallback: use regular season data when playoff stats aren't
-  // available yet. The sync-nhl-stats job pre-creates placeholder rows for
-  // already-drafted players (with null names and 0 games) before any playoff
-  // games are played, so we can't rely on `playerStats.length === 0` alone —
-  // we also fall back when none of the cached rows have a played game yet.
+  // available yet. The sync-nhl-stats job seeds the current round draft pool,
+  // but those rows can still be all-zero before any games are played, so we
+  // can't rely on `playerStats.length === 0` alone.
   const useRegSeasonFallback =
     isRound1 &&
     (playerStats.length === 0 ||
@@ -657,6 +657,8 @@ export function DraftPage() {
   const [pickError, setPickError] = useState<string | null>(null);
   const [comparePlayers, setComparePlayers] = useState<ComparePlayer[]>([]);
   const [myTeamOpened, { toggle: toggleMyTeam }] = useDisclosure(false);
+  const draftPoolSyncDraftIdRef = useRef<string | null>(null);
+  const [isDraftPoolSyncing, setIsDraftPoolSyncing] = useState(false);
   const mockMakePick = useMockMakePick();
   const isMobile = useIsMobile();
 
@@ -678,12 +680,12 @@ export function DraftPage() {
   const currentRound = draft?.round ?? 1;
   const mockPlayerResult = useMockPlayoffPlayers(currentSeason, currentRound);
   const supabasePlayerResult = usePlayoffPlayers(currentSeason, currentRound);
-  const { data: playerStats } = IS_MOCK
-    ? mockPlayerResult
-    : supabasePlayerResult;
+  const playerStatsQuery = IS_MOCK ? mockPlayerResult : supabasePlayerResult;
+  const { data: playerStats, refetch: refetchPlayerStats } = playerStatsQuery;
   const mockTeamResult = useMockPlayoffTeams(currentSeason, currentRound);
   const supabaseTeamResult = usePlayoffTeams(currentSeason, currentRound);
-  const { data: teamStats } = IS_MOCK ? mockTeamResult : supabaseTeamResult;
+  const teamStatsQuery = IS_MOCK ? mockTeamResult : supabaseTeamResult;
+  const { data: teamStats, refetch: refetchTeamStats } = teamStatsQuery;
 
   // Fetch regular season stats. Used for Round 1 sorting/fallback display
   // AND as a name/position/team lookup for later rounds when the playoff
@@ -832,6 +834,48 @@ export function DraftPage() {
     };
   }, [leagueId]);
 
+  useEffect(() => {
+    if (IS_MOCK || !draft || draftPoolSyncDraftIdRef.current === draft.id) {
+      return;
+    }
+
+    const needsPlayerPool = (playerStats?.length ?? 0) === 0;
+    const needsTeamPool = (teamStats?.length ?? 0) === 0;
+
+    if (!needsPlayerPool && !needsTeamPool) {
+      return;
+    }
+
+    draftPoolSyncDraftIdRef.current = draft.id;
+
+    const syncDraftPool = async () => {
+      setIsDraftPoolSyncing(true);
+
+      try {
+        await supabase.functions.invoke('sync-nhl-stats', {
+          body: {
+            season: currentSeason,
+            playoff_round: draft.round,
+          },
+        });
+        await Promise.all([refetchPlayerStats(), refetchTeamStats()]);
+      } catch {
+        return;
+      } finally {
+        setIsDraftPoolSyncing(false);
+      }
+    };
+
+    void syncDraftPool();
+  }, [
+    currentSeason,
+    draft,
+    playerStats?.length,
+    refetchPlayerStats,
+    refetchTeamStats,
+    teamStats?.length,
+  ]);
+
   if (draftLoading) {
     return (
       <Center h="50vh">
@@ -913,6 +957,13 @@ export function DraftPage() {
     setSubmitting(true);
 
     const isGoalie = confirmPosition === 'G';
+    const initialPoints = getInitialDraftRosterPoints({
+      playerId: isGoalie ? null : confirmPlayer.id,
+      teamId: isGoalie ? confirmPlayer.teamId : null,
+      playoffRound: draft.round,
+      playerStats: playerStats ?? [],
+      teamStats: teamStats ?? [],
+    });
 
     if (IS_MOCK && mockMakePick) {
       mockMakePick.mutate({
@@ -952,6 +1003,7 @@ export function DraftPage() {
       player_id: isGoalie ? null : confirmPlayer.id,
       team_id: isGoalie ? confirmPlayer.teamId : null,
       position: confirmPosition,
+      points_earned: initialPoints,
     });
 
     const totalExpectedPicks = draftOrder.length; // snake order already expanded
@@ -972,6 +1024,11 @@ export function DraftPage() {
         .from('leagues')
         .update({ status: 'active' })
         .eq('id', draft.league_id);
+
+      await supabase.rpc('refresh_league_standings', {
+        p_league_id: draft.league_id,
+        p_round: draft.round,
+      });
 
       // R3 draft covers both Conference Finals and Stanley Cup Final:
       // duplicate all R3 roster rows into R4 so scoring works immediately.
@@ -1162,9 +1219,14 @@ export function DraftPage() {
           {!playerStats?.length && !teamStats?.length ? (
             <Stack gap="sm">
               <Text size="sm" c="dimmed">
-                No player data available yet. Ensure the NHL stats sync edge
-                function has been run to populate playoff player data.
+                No player data available yet.
               </Text>
+              {isDraftPoolSyncing && (
+                <Alert color="blue" title="Syncing current round data">
+                  Loading the current round draft pool now. This usually takes a
+                  few seconds.
+                </Alert>
+              )}
               {canPick ? (
                 <Alert color="green" title="It's your turn!">
                   Once player data is synced, you'll see a selectable list here.

@@ -59,6 +59,39 @@ export async function pgUpsert(
   return resp.ok;
 }
 
+export async function pgUpdate(
+  cfg: PgConfig,
+  table: string,
+  filters: string,
+  body: unknown
+): Promise<boolean> {
+  const resp = await fetch(`${cfg.url}/rest/v1/${table}?${filters}`, {
+    method: 'PATCH',
+    headers: {
+      ...pgHeaders(cfg.key),
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(body),
+  });
+  return resp.ok;
+}
+
+export async function pgRpc(
+  cfg: PgConfig,
+  fn: string,
+  body: unknown
+): Promise<boolean> {
+  const resp = await fetch(`${cfg.url}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: {
+      ...pgHeaders(cfg.key),
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(body),
+  });
+  return resp.ok;
+}
+
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
