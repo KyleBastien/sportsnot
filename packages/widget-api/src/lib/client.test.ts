@@ -51,6 +51,43 @@ describe('WidgetApiClient', () => {
     );
   });
 
+  it('getSnapshot uses device-local date when date is omitted', async () => {
+    const snap = makeSnapshot();
+    const calls: string[] = [];
+    const realDateTimeFormat = Intl.DateTimeFormat;
+
+    Intl.DateTimeFormat = class FakeDateTimeFormat {
+      constructor(
+        locale?: string | string[],
+        options?: Intl.DateTimeFormatOptions
+      ) {
+        expect(locale).toBe('en-CA');
+        expect(options).toBeUndefined();
+      }
+
+      format(): string {
+        return '2026-04-17';
+      }
+    } as typeof Intl.DateTimeFormat;
+
+    try {
+      const client = new WidgetApiClient({
+        supabaseUrl: 'https://x.supabase.co',
+        anonKey: 'anon',
+        fetch: async (input) => {
+          calls.push(String(input));
+          return new Response(JSON.stringify(snap), { status: 200 });
+        },
+      });
+
+      await client.getSnapshot('SHARE');
+    } finally {
+      Intl.DateTimeFormat = realDateTimeFormat;
+    }
+
+    expect(calls[0]).toContain('date=2026-04-17');
+  });
+
   it('registerLiveActivityToken POSTs the request body', async () => {
     let capturedBody: unknown;
     let capturedMethod: string | undefined;

@@ -15,9 +15,7 @@ type MockDataModule = typeof import('@sportsnot/mock-data');
 let cachedModule: MockDataModule | null = null;
 
 function widgetDateString(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
-  }).format(new Date());
+  return new Intl.DateTimeFormat('en-CA').format(new Date());
 }
 
 async function loadMockData(): Promise<MockDataModule> {

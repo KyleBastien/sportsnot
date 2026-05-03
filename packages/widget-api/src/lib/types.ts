@@ -56,7 +56,7 @@ export interface WidgetSnapshot {
     currentRound: number;
     status: 'setup' | 'drafting' | 'active' | 'completed';
   };
-  date: string; // YYYY-MM-DD (league timezone, default UTC)
+  date: string; // YYYY-MM-DD in requesting device local date
   generatedAt: string; // ISO8601
   games: WidgetGame[];
   players: WidgetDraftedPlayer[];
