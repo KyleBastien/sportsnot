@@ -44,7 +44,7 @@ function useLeague(leagueId: string | undefined) {
           `
           *,
           league_members(
-            id, user_id, team_name, total_points,
+            id, user_id, team_name, total_points, round_points,
             users(display_name, avatar_url)
           )
         `
