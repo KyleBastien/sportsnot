@@ -17,12 +17,10 @@ import {
 import { supabase } from '@sportsnot/supabase';
 import { useIsMobile, MobileCardList, DataRow } from '@sportsnot/ui';
 import { useAuthContext } from '../../context/AuthContext';
+import { useCompletedDrafts } from '../../hooks/useCompletedDrafts';
 import { deriveCurrentRound, deriveNextRound } from '../../utils/roundUtils';
 import { useMockStartReDraft } from '../../../mock/hooks/useMockDraft';
-import {
-  useTransitionLeague,
-  useCompletedDrafts,
-} from './roundTransitionQueries';
+import { useTransitionLeague } from './roundTransitionQueries';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 

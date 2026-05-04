@@ -17,6 +17,9 @@ const transitionState = rs.hoisted(() => ({
 
 rs.mock('./roundTransitionQueries', () => ({
   useTransitionLeague: () => transitionState.league,
+}));
+
+rs.mock('../../hooks/useCompletedDrafts', () => ({
   useCompletedDrafts: () => transitionState.completedDrafts,
 }));
 

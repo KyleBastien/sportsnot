@@ -24,8 +24,10 @@ import { useAuthContext } from '../../context/AuthContext';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import { useMockData } from '../../../mock/MockDataProvider';
 import { useMockLeagueWidgetSnapshot } from '../../../mock/hooks/useMockLeagueWidgetSnapshot';
+import { useCompletedDrafts } from '../../hooks/useCompletedDrafts';
 import { useRoundComplete } from '../../hooks/useRoundComplete';
 import { useWinnerConfetti } from '../../hooks/useWinnerConfetti';
+import { deriveCurrentRound } from '../../utils/roundUtils';
 import { FeatureOnWidgetButton } from '../../components/FeatureOnWidgetButton';
 import { useIsMobile } from '@sportsnot/ui';
 import { LeagueGameCardsSection } from './LeagueGameCardsSection';
@@ -119,6 +121,8 @@ export function LeagueDashboardPage() {
   const { user } = useAuthContext();
   const { dispatch } = useMockData();
   const { data: league, isLoading, error } = useLeague(leagueId!);
+  const { data: completedDrafts, isLoading: completedDraftsLoading } =
+    useCompletedDrafts(leagueId);
   const {
     data: widgetSnapshot,
     isLoading: widgetSnapshotLoading,
@@ -126,12 +130,21 @@ export function LeagueDashboardPage() {
   } = useLeagueWidgetSnapshot(leagueId, league?.share_code, league?.status);
 
   // Must be called unconditionally (rules of hooks)
-  const currentRound = league?.current_round ?? 0;
+  const completedDraftsCount = completedDrafts?.length ?? 0;
+  const currentRound = deriveCurrentRound(
+    league?.current_round,
+    completedDraftsCount
+  );
+  const needsCurrentRoundFallback =
+    !league?.current_round || league.current_round <= 0;
   const {
     roundComplete,
     seasonComplete,
-    isLoading: roundStatusLoading,
+    isLoading: roundCompleteLoading,
   } = useRoundComplete(currentRound);
+  const roundStatusLoading =
+    roundCompleteLoading ||
+    (needsCurrentRoundFallback && completedDraftsLoading);
 
   // Derive winner before early returns so the hook is called unconditionally
   const sortedForWinner = [...(league?.league_members ?? [])].sort(
@@ -205,7 +218,7 @@ export function LeagueDashboardPage() {
               </Badge>
             </Group>
             <Text c="dimmed">
-              Round {league.current_round} · {members.length} /{' '}
+              Round {currentRound} · {members.length} /{' '}
               {league.max_participants} members
             </Text>
           </div>
@@ -257,23 +270,21 @@ export function LeagueDashboardPage() {
                 >
                   Standings
                 </Button>
-                {isCommissioner &&
-                  !seasonComplete &&
-                  league.current_round < 3 && (
-                    <Tooltip
-                      label="All series in the current round must be complete"
-                      disabled={roundComplete}
+                {isCommissioner && !seasonComplete && currentRound < 3 && (
+                  <Tooltip
+                    label="All series in the current round must be complete"
+                    disabled={roundComplete}
+                  >
+                    <Button
+                      color="green"
+                      onClick={handleStartNextDraft}
+                      disabled={!roundComplete || roundStatusLoading}
+                      loading={roundStatusLoading}
                     >
-                      <Button
-                        color="green"
-                        onClick={handleStartNextDraft}
-                        disabled={!roundComplete || roundStatusLoading}
-                        loading={roundStatusLoading}
-                      >
-                        Start Next Draft
-                      </Button>
-                    </Tooltip>
-                  )}
+                      Start Next Draft
+                    </Button>
+                  </Tooltip>
+                )}
               </>
             )}
           </Group>
