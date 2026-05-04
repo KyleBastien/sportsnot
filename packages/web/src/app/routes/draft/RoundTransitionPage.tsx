@@ -15,6 +15,8 @@ import {
   Table,
 } from '@mantine/core';
 import { supabase } from '@sportsnot/supabase';
+import { getRosterComposition } from '@sportsnot/types';
+import { generateSnakeDraftOrder } from '@sportsnot/utils';
 import { useIsMobile, MobileCardList, DataRow } from '@sportsnot/ui';
 import { useAuthContext } from '../../context/AuthContext';
 import { useCompletedDrafts } from '../../hooks/useCompletedDrafts';
@@ -80,16 +82,26 @@ export function RoundTransitionPage() {
     if (!league || sortedMembers.length < 2) return;
     setStarting(true);
 
-    // Re-draft order: worst to best by points (snake pattern)
-    const reDraftOrder = sortedMembers.map(
+    const reDraftSeedOrder = sortedMembers.map(
       (m: TransitionMemberRow) => m.user_id
+    );
+    const rosterComp = getRosterComposition(league.allow_ir_slots ?? true);
+    const picksPerMember =
+      rosterComp.forwards +
+      rosterComp.defensemen +
+      rosterComp.goalies +
+      rosterComp.irForwards +
+      rosterComp.irDefensemen;
+    const reDraftOrder = generateSnakeDraftOrder(
+      reDraftSeedOrder,
+      picksPerMember
     );
 
     if (IS_MOCK) {
       await mockStartReDraft.mutateAsync({
         leagueId: leagueId!,
         nextRound,
-        draftOrder: reDraftOrder,
+        draftOrder: reDraftSeedOrder,
       });
       navigate(`/draft/${leagueId}`);
     } else {
