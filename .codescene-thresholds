@@ -1,0 +1,7 @@
+# CodeScene quality ratchet for SportsNot.
+# Only raise thresholds after code health improves. Never lower them.
+
+CODESCENE_PROJECT_ID=79685
+HOTSPOT_THRESHOLD=7.55
+AVERAGE_THRESHOLD=9.09
+ALLOW_RECOVERY_MODE=true

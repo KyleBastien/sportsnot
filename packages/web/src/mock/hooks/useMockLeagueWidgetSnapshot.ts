@@ -11,7 +11,7 @@ import {
   players,
   teams,
 } from '@sportsnot/mock-data';
-import type { NHLGame, NHLPlayer, NHLTeam, RosterSlot } from '@sportsnot/types';
+import type { RosterSlot } from '@sportsnot/types';
 import type {
   WidgetDraftedPlayer,
   WidgetGame,
@@ -20,15 +20,11 @@ import type {
 import { SCORING } from '@sportsnot/types';
 import { playerGameLogs } from '@sportsnot/mock-data';
 
-const ALL_GAMES: NHLGame[] = [
-  ...(gamesR1 as NHLGame[]),
-  ...(gamesR2 as NHLGame[]),
-  ...(gamesCf as NHLGame[]),
-  ...(gamesScf as NHLGame[]),
-];
-
-const ALL_PLAYERS = players as Record<string, NHLPlayer[]>;
-const ALL_TEAMS = teams as NHLTeam[];
+const ALL_GAMES = [...gamesR1, ...gamesR2, ...gamesCf, ...gamesScf];
+const ALL_PLAYERS = players;
+const ALL_TEAMS = teams;
+type MockGame = (typeof ALL_GAMES)[number];
+type MockTeam = (typeof ALL_TEAMS)[number];
 const PLAYER_GAME_LOGS = playerGameLogs as Record<
   string,
   readonly {
@@ -80,8 +76,8 @@ export function buildMockLeagueWidgetSnapshot(
   const todaysGames = ALL_GAMES.filter(
     (game) => game.gameDate === state.simulationDate
   );
-  const gameByTeamId = new Map<number, NHLGame>();
-  const gameByTeamAbbrev = new Map<string, NHLGame>();
+  const gameByTeamId = new Map<number, MockGame>();
+  const gameByTeamAbbrev = new Map<string, MockGame>();
 
   for (const game of todaysGames) {
     gameByTeamId.set(game.homeTeam.id, game);
@@ -118,7 +114,7 @@ export function buildMockLeagueWidgetSnapshot(
     awayTeamName: game.awayTeam.name,
     awayScore: game.awayTeam.score ?? 0,
     period: game.period ?? null,
-    timeRemaining: game.periodTimeRemaining ?? null,
+    timeRemaining: null,
     hasDraftedPlayers: playersPayload.some(
       (player) => player.gameId === game.id
     ),
@@ -149,8 +145,8 @@ function buildDraftedPlayerPayload(
   slot: RosterSlot,
   ownedByTeamName: string,
   simulationDate: string,
-  gameByTeamId: Map<number, NHLGame>,
-  gameByTeamAbbrev: Map<string, NHLGame>
+  gameByTeamId: Map<number, MockGame>,
+  gameByTeamAbbrev: Map<string, MockGame>
 ): WidgetDraftedPlayer | null {
   const fantasyPoints = calculateSlotPoints(slot, simulationDate);
   const dailyFantasyPoints = calculateSlotDailyPoints(slot, simulationDate);
@@ -279,6 +275,6 @@ function getPlayerInfo(
   return null;
 }
 
-function getTeamInfo(teamId: number): NHLTeam | null {
+function getTeamInfo(teamId: number): MockTeam | null {
   return ALL_TEAMS.find((team) => team.id === teamId) ?? null;
 }

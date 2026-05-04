@@ -81,19 +81,19 @@ export function useLeagueInfo(leagueId: string) {
   });
 }
 
-export function usePlayoffPlayersForDraft(season: number, round: number) {
+export function usePlayoffPlayersForDraft(season: string, round: number) {
   const mockResult = useMockPlayoffPlayers(season, round);
   const supabaseResult = useSupabasePlayoffPlayers(season, round);
   return IS_MOCK ? mockResult : supabaseResult;
 }
 
-export function usePlayoffTeamsForDraft(season: number, round: number) {
+export function usePlayoffTeamsForDraft(season: string, round: number) {
   const mockResult = useMockPlayoffTeams(season, round);
   const supabaseResult = useSupabasePlayoffTeams(season, round);
   return IS_MOCK ? mockResult : supabaseResult;
 }
 
-export function useRegularSeasonPlayersForDraft(season: number) {
+export function useRegularSeasonPlayersForDraft(season: string) {
   const mockResult = useMockRegularSeasonPlayers(season, true);
   const supabaseResult = useSupabaseRegularSeasonPlayers(season, true);
   return IS_MOCK ? mockResult : supabaseResult;

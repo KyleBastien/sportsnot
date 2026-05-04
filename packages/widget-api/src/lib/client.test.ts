@@ -19,6 +19,8 @@ function makeSnapshot(): WidgetSnapshot {
 }
 
 describe('WidgetApiClient', () => {
+  type RequestHeaders = Headers | Record<string, string> | string[][];
+
   it('getSnapshot passes shareCode + optional date as query params', async () => {
     const snap = makeSnapshot();
     const calls: string[] = [];
@@ -91,7 +93,7 @@ describe('WidgetApiClient', () => {
   it('registerLiveActivityToken POSTs the request body', async () => {
     let capturedBody: unknown;
     let capturedMethod: string | undefined;
-    let capturedHeaders: Record<string, string> | Headers | undefined;
+    let capturedHeaders: RequestHeaders | undefined;
     const client = new WidgetApiClient({
       supabaseUrl: 'https://x.supabase.co',
       anonKey: 'anon',

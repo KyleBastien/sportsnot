@@ -100,20 +100,20 @@ export function useLeagueForRoster(leagueId: string | undefined) {
   return IS_MOCK ? mockResult : supabaseResult;
 }
 
-export function usePlayoffPlayersForRoster(season: number, round: number) {
+export function usePlayoffPlayersForRoster(season: string, round: number) {
   const mockResult = useMockPlayoffPlayers(season, round);
   const supabaseResult = useSupabasePlayoffPlayers(season, round);
   return IS_MOCK ? mockResult : supabaseResult;
 }
 
-export function usePlayoffTeamsForRoster(season: number, round: number) {
+export function usePlayoffTeamsForRoster(season: string, round: number) {
   const mockResult = useMockPlayoffTeams(season, round);
   const supabaseResult = useSupabasePlayoffTeams(season, round);
   return IS_MOCK ? mockResult : supabaseResult;
 }
 
 export function useRegularSeasonPlayersForRoster(
-  season: number,
+  season: string,
   enabled: boolean
 ) {
   const mockResult = useMockRegularSeasonPlayers(season, enabled);
