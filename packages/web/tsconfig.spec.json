@@ -1,9 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "paths": {
-      "@sportsnot/ui": ["./src/test-utils/uiStub.tsx"]
-    },
     "outDir": "dist",
     "jsx": "react-jsx",
     "lib": ["dom", "dom.iterable"],

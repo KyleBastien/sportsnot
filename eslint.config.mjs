@@ -40,7 +40,6 @@ export default [
       ],
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
-      'no-undef': 'off',
       'no-unused-vars': 'off',
     },
   },
