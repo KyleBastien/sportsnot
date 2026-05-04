@@ -547,16 +547,13 @@ async function updateRoundRosterPoints(
   }
 }
 
-async function refreshActiveLeagueStandings(
+async function refreshCurrentRoundLeagueStandings(
   cfg: PgConfig,
   activeLeagues: LeagueRow[],
   playoffRound: number
 ): Promise<void> {
   const leagueIds = activeLeagues
-    .filter(
-      (league) =>
-        league.status === 'active' && league.current_round === playoffRound
-    )
+    .filter((league) => league.current_round === playoffRound)
     .map((league) => league.id);
 
   for (const leagueId of leagueIds) {
@@ -675,7 +672,11 @@ Deno.serve(async (req: Request) => {
         finalGames
       );
       await updateRoundRosterPoints(cfg, season, playoffRound);
-      await refreshActiveLeagueStandings(cfg, activeLeagues, playoffRound);
+      await refreshCurrentRoundLeagueStandings(
+        cfg,
+        activeLeagues,
+        playoffRound
+      );
 
       syncedRounds.push(playoffRound);
     }
