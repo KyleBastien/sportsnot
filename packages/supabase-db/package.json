@@ -2,5 +2,9 @@
   "name": "@sportsnot/supabase-db",
   "version": "0.0.0",
   "private": true,
-  "description": "Supabase database migrations and edge functions for SportsNot"
+  "description": "Supabase database migrations and edge functions for SportsNot",
+  "devDependencies": {
+    "@sportsnot/types": "workspace:*",
+    "@sportsnot/utils": "workspace:*"
+  }
 }

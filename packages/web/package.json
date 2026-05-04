@@ -1,5 +1,15 @@
 {
   "name": "@sportsnot/web",
   "version": "0.0.1",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@sportsnot/mock-data": "workspace:*",
+    "@sportsnot/nhl-api": "workspace:*",
+    "@sportsnot/supabase": "workspace:*",
+    "@sportsnot/types": "workspace:*",
+    "@sportsnot/ui": "workspace:*",
+    "@sportsnot/utils": "workspace:*",
+    "@sportsnot/widget-api": "workspace:*",
+    "@sportsnot/widget-bridge": "workspace:*"
+  }
 }

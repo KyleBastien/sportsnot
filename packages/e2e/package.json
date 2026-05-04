@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "devDependencies": {
-    "@playwright/test": "*"
+    "@playwright/test": "*",
+    "@sportsnot/types": "workspace:*"
   }
 }

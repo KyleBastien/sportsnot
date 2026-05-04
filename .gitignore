@@ -61,6 +61,9 @@ playwright-report/
 blob-report/
 .playwright-cli/
 
+# Husky generated internals
+.husky/_
+
 # Ralph working files
 scripts/ralph/prd.json
 scripts/ralph/progress.txt
@@ -79,3 +82,7 @@ ios/App/Secrets.xcconfig
 android/app/secrets.properties
 android/app/google-services.json
 sportsnot-release.keystore
+
+.claude/worktrees
+.nx/polygraph
+.nx/self-healing

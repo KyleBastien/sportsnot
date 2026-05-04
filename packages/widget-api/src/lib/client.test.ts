@@ -54,7 +54,7 @@ describe('WidgetApiClient', () => {
   it('registerLiveActivityToken POSTs the request body', async () => {
     let capturedBody: unknown;
     let capturedMethod: string | undefined;
-    let capturedHeaders: Record<string, string> | Headers | undefined;
+    let capturedHeaders: HeadersInit | undefined;
     const client = new WidgetApiClient({
       supabaseUrl: 'https://x.supabase.co',
       anonKey: 'anon',
