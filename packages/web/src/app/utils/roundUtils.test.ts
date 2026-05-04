@@ -3,6 +3,7 @@ import {
   deriveCurrentRound,
   deriveNextRound,
   isAllSeriesComplete,
+  isRoundCompleteFromTeamStats,
 } from './roundUtils';
 import type { NHLPlayoffSeries } from '@sportsnot/types';
 
@@ -21,6 +22,10 @@ function makeSeries(
     bottomSeedWins: bottomWins,
     isComplete: topWins === 4 || bottomWins === 4,
   };
+}
+
+function makeTeamStats(wins: number): { wins: number } {
+  return { wins };
 }
 
 describe('roundUtils', () => {
@@ -122,6 +127,61 @@ describe('roundUtils', () => {
     it('should return false for round 4 when final is still in progress', () => {
       const series = [makeSeries(4, 3, 3)];
       expect(isAllSeriesComplete(series, 4)).toBe(false);
+    });
+  });
+
+  describe('isRoundCompleteFromTeamStats', () => {
+    it('should return false when there is no cached team data', () => {
+      expect(isRoundCompleteFromTeamStats([])).toBe(false);
+    });
+
+    it('should return false when the round has an invalid team count', () => {
+      expect(
+        isRoundCompleteFromTeamStats([
+          makeTeamStats(4),
+          makeTeamStats(2),
+          makeTeamStats(1),
+        ])
+      ).toBe(false);
+    });
+
+    it('should return true when half the teams in the round have 4 wins', () => {
+      const teams = [
+        makeTeamStats(4),
+        makeTeamStats(4),
+        makeTeamStats(4),
+        makeTeamStats(4),
+        makeTeamStats(0),
+        makeTeamStats(2),
+        makeTeamStats(3),
+        makeTeamStats(1),
+      ];
+
+      expect(isRoundCompleteFromTeamStats(teams)).toBe(true);
+    });
+
+    it('should return false when some series are still in progress', () => {
+      const teams = [
+        makeTeamStats(4),
+        makeTeamStats(4),
+        makeTeamStats(3),
+        makeTeamStats(2),
+        makeTeamStats(2),
+        makeTeamStats(1),
+        makeTeamStats(0),
+        makeTeamStats(0),
+      ];
+
+      expect(isRoundCompleteFromTeamStats(teams)).toBe(false);
+    });
+
+    it('should handle the final with two teams', () => {
+      expect(
+        isRoundCompleteFromTeamStats([makeTeamStats(4), makeTeamStats(2)])
+      ).toBe(true);
+      expect(
+        isRoundCompleteFromTeamStats([makeTeamStats(3), makeTeamStats(2)])
+      ).toBe(false);
     });
   });
 });

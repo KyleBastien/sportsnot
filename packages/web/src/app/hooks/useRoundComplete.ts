@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { getPlayoffBracket } from '@sportsnot/nhl-api';
+import { supabase } from '@sportsnot/supabase';
 import { CURRENT_SEASON } from '@sportsnot/types';
 import { useMockData } from '../../mock/MockDataProvider';
-import { isAllSeriesComplete } from '../utils/roundUtils';
+import { isRoundCompleteFromTeamStats } from '../utils/roundUtils';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 const MAX_ROUND = 4;
@@ -17,17 +17,26 @@ export interface RoundCompleteResult {
  * Hook to determine whether the current playoff round is complete.
  *
  * - Mock mode: reads `roundComplete` / `seasonComplete` from MockDataProvider state.
- * - Production mode: fetches the NHL playoff bracket and checks if all series
- *   in the given round are complete.
+ * - Production mode: reads cached round win totals from `team_stats_cache` and
+ *   checks if exactly half the teams in the round have reached 4 wins.
  */
 export function useRoundComplete(currentRound: number): RoundCompleteResult {
   // Mock mode — always called to satisfy rules-of-hooks
   const { state } = useMockData();
 
-  // Production mode — fetch bracket and derive completion
-  const bracketQuery = useQuery({
-    queryKey: ['playoff-bracket-round-complete', CURRENT_SEASON],
-    queryFn: () => getPlayoffBracket(CURRENT_SEASON),
+  // Production mode — read cached round win totals from Supabase
+  const teamStatsQuery = useQuery({
+    queryKey: ['round-complete-team-stats', CURRENT_SEASON, currentRound],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('team_stats_cache')
+        .select('wins')
+        .eq('nhl_season', CURRENT_SEASON)
+        .eq('playoff_round', currentRound);
+
+      if (error) throw error;
+      return data ?? [];
+    },
     enabled: !IS_MOCK && currentRound >= 1 && currentRound <= MAX_ROUND,
     staleTime: 1000 * 60 * 2, // 2 min cache
     refetchInterval: 1000 * 60 * 5, // re-check every 5 min
@@ -50,14 +59,13 @@ export function useRoundComplete(currentRound: number): RoundCompleteResult {
     };
   }
 
-  const series = bracketQuery.data ?? [];
-  const roundComplete =
-    series.length > 0 && isAllSeriesComplete(series, currentRound);
+  const teams = teamStatsQuery.data ?? [];
+  const roundComplete = isRoundCompleteFromTeamStats(teams);
   const seasonComplete = roundComplete && currentRound >= MAX_ROUND;
 
   return {
     roundComplete,
     seasonComplete,
-    isLoading: bracketQuery.isLoading,
+    isLoading: teamStatsQuery.isLoading,
   };
 }
