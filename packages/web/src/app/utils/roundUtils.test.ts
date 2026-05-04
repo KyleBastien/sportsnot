@@ -34,6 +34,10 @@ describe('roundUtils', () => {
       expect(deriveCurrentRound(2, 1)).toBe(2);
     });
 
+    it('should prefer completed drafts when current_round lags behind', () => {
+      expect(deriveCurrentRound(1, 2)).toBe(2);
+    });
+
     it('should fall back to completedDraftsCount when current_round is 0', () => {
       expect(deriveCurrentRound(0, 1)).toBe(1);
     });

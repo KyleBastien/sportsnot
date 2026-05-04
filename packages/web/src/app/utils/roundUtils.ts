@@ -36,18 +36,18 @@ export function isRoundCompleteFromTeamStats(teams: RoundTeamStats[]): boolean {
 /**
  * Derive the current round number reliably.
  *
- * `league.current_round` can be 0 or null between rounds (e.g. after a round
- * completes but before the next draft starts). In that case we fall back to
- * `completedDraftsCount` which is always accurate.
+ * `league.current_round` can be stale, 0, or null between rounds. Completed
+ * drafts are a stronger source of truth once a new round draft has already
+ * finished, so we use the higher of the two values.
  */
 export function deriveCurrentRound(
   leagueCurrentRound: number | null | undefined,
   completedDraftsCount: number
 ): number {
-  if (leagueCurrentRound && leagueCurrentRound > 0) {
-    return leagueCurrentRound;
-  }
-  return completedDraftsCount;
+  const currentRoundValue =
+    leagueCurrentRound && leagueCurrentRound > 0 ? leagueCurrentRound : 0;
+
+  return Math.max(currentRoundValue, completedDraftsCount);
 }
 
 /**
