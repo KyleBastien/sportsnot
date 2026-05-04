@@ -22,8 +22,9 @@ import {
 } from '@mantine/core';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
+import { buildDraftOrder } from '../../utils/draftOrderUtils';
 import { useAuthContext } from '../../context/AuthContext';
-import { generateInviteCode, shuffleArray } from '@sportsnot/utils';
+import { generateInviteCode } from '@sportsnot/utils';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import { useMockData } from '../../../mock/MockDataProvider';
 import { useIsMobile } from '@sportsnot/ui';
@@ -186,16 +187,19 @@ export function LeagueSettingsPage() {
       return;
     }
 
-    // Randomize draft order for round 1
-    const memberUserIds = members.map((m: SettingsMemberRow) => m.user_id);
-    const shuffled = shuffleArray(memberUserIds);
+    const nextRound = (league.current_round ?? 0) + 1;
+    const draftOrder = buildDraftOrder(
+      members,
+      league.allow_ir_slots ?? true,
+      nextRound
+    );
 
     const { error: draftError } = await supabase.from('drafts').insert({
       league_id: leagueId,
-      round: (league.current_round ?? 0) + 1,
+      round: nextRound,
       status: 'active',
       current_pick: 1,
-      draft_order: shuffled,
+      draft_order: draftOrder,
       started_at: new Date().toISOString(),
     });
 
@@ -208,7 +212,7 @@ export function LeagueSettingsPage() {
       .from('leagues')
       .update({
         status: 'drafting',
-        current_round: (league.current_round ?? 0) + 1,
+        current_round: nextRound,
       })
       .eq('id', leagueId);
 

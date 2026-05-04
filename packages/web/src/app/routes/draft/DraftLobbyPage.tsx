@@ -16,9 +16,9 @@ import {
 } from '@mantine/core';
 import { supabase } from '@sportsnot/supabase';
 import { getRosterComposition } from '@sportsnot/types';
-import { generateSnakeDraftOrder, shuffleArray } from '@sportsnot/utils';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMockStartDraft } from '../../../mock/hooks/useMockDraft';
+import { buildDraftOrder } from '../../utils/draftOrderUtils';
 import { useLeagueForLobby, useActiveDraftCheck } from './draftLobbyQueries';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
@@ -69,9 +69,7 @@ export function DraftLobbyPage() {
       return;
     }
 
-    const memberUserIds: string[] = members.map((m: LobbyMember) => m.user_id);
-    const shuffled = shuffleArray(memberUserIds);
-    const draftOrder = generateSnakeDraftOrder(shuffled, picksPerMember);
+    const draftOrder = buildDraftOrder(members, allowIrSlots, nextRound);
 
     const { error } = await supabase.from('drafts').insert({
       league_id: leagueId,
