@@ -67,6 +67,74 @@ function getRowCellTexts(teamName: string): string[] {
     .map((cell) => cell.textContent?.trim() ?? '');
 }
 
+function expectVisibleHeaders(headers: string[]) {
+  headers.forEach((header) => {
+    expect(screen.getByRole('columnheader', { name: header })).toBeTruthy();
+  });
+}
+
+function expectHiddenHeaders(headers: string[]) {
+  headers.forEach((header) => {
+    expect(screen.queryByRole('columnheader', { name: header })).toBeNull();
+  });
+}
+
+interface StandingsCardScenario {
+  name: string;
+  props: Partial<ComponentProps<typeof LeagueStandingsCard>>;
+  visibleHeaders: string[];
+  hiddenHeaders: string[];
+  expectedRows: Record<string, string[]>;
+}
+
+const standingsCardScenarios: StandingsCardScenario[] = [
+  {
+    name: 'shows cumulative round columns and total points on desktop',
+    props: { currentRound: 3, isMobile: false },
+    visibleHeaders: [
+      'Rank',
+      'Team',
+      'Manager',
+      'Round 1',
+      'Round 2',
+      'Round 3',
+      'Total Points',
+    ],
+    hiddenHeaders: ['Round 4'],
+    expectedRows: {
+      'Ice Dominators': [
+        '1',
+        'Ice Dominators',
+        'Alice',
+        '10',
+        '20',
+        '30',
+        '60',
+      ],
+      'Puck Dynasty': ['2', 'Puck Dynasty', 'Bob', '35', '0', '0', '35'],
+    },
+  },
+  {
+    name: 'shows only total points during round 1',
+    props: { currentRound: 1, isMobile: false },
+    visibleHeaders: ['Rank', 'Team', 'Manager', 'Total Points'],
+    hiddenHeaders: ['Round 1', 'Round 2', 'Round 3', 'Round 4'],
+    expectedRows: {
+      'Ice Dominators': ['1', 'Ice Dominators', 'Alice', '60'],
+    },
+  },
+  {
+    name: 'shows only current round plus total points on mobile',
+    props: { currentRound: 3, isMobile: true },
+    visibleHeaders: ['Rank', 'Team', 'Round 3', 'Total Points'],
+    hiddenHeaders: ['Manager', 'Round 1', 'Round 2', 'Round 4'],
+    expectedRows: {
+      'Ice Dominators': ['1', 'Ice Dominators', '30', '60'],
+      'Puck Dynasty': ['2', 'Puck Dynasty', '0', '35'],
+    },
+  },
+];
+
 afterEach(() => {
   cleanup();
 });
@@ -91,74 +159,18 @@ describe('getVisibleStandingsRounds', () => {
 });
 
 describe('LeagueStandingsCard', () => {
-  it('shows cumulative round columns and total points on desktop', () => {
-    renderStandingsCard({ currentRound: 3, isMobile: false });
+  standingsCardScenarios.forEach((scenario) => {
+    it(scenario.name, () => {
+      renderStandingsCard(scenario.props);
 
-    expect(screen.getByRole('columnheader', { name: 'Round 1' })).toBeTruthy();
-    expect(screen.getByRole('columnheader', { name: 'Round 2' })).toBeTruthy();
-    expect(screen.getByRole('columnheader', { name: 'Round 3' })).toBeTruthy();
-    expect(screen.queryByRole('columnheader', { name: 'Round 4' })).toBeNull();
-    expect(
-      screen.getByRole('columnheader', { name: 'Total Points' })
-    ).toBeTruthy();
+      expectVisibleHeaders(scenario.visibleHeaders);
+      expectHiddenHeaders(scenario.hiddenHeaders);
 
-    expect(getRowCellTexts('Ice Dominators')).toEqual([
-      '1',
-      'Ice Dominators',
-      'Alice',
-      '10',
-      '20',
-      '30',
-      '60',
-    ]);
-    expect(getRowCellTexts('Puck Dynasty')).toEqual([
-      '2',
-      'Puck Dynasty',
-      'Bob',
-      '35',
-      '0',
-      '0',
-      '35',
-    ]);
-  });
-
-  it('shows only total points during round 1', () => {
-    renderStandingsCard({ currentRound: 1, isMobile: false });
-
-    expect(screen.queryByRole('columnheader', { name: 'Round 1' })).toBeNull();
-    expect(
-      screen.getByRole('columnheader', { name: 'Total Points' })
-    ).toBeTruthy();
-    expect(getRowCellTexts('Ice Dominators')).toEqual([
-      '1',
-      'Ice Dominators',
-      'Alice',
-      '60',
-    ]);
-  });
-
-  it('shows only current round plus total points on mobile', () => {
-    renderStandingsCard({ currentRound: 3, isMobile: true });
-
-    expect(screen.queryByRole('columnheader', { name: 'Manager' })).toBeNull();
-    expect(screen.queryByRole('columnheader', { name: 'Round 1' })).toBeNull();
-    expect(screen.queryByRole('columnheader', { name: 'Round 2' })).toBeNull();
-    expect(screen.getByRole('columnheader', { name: 'Round 3' })).toBeTruthy();
-    expect(
-      screen.getByRole('columnheader', { name: 'Total Points' })
-    ).toBeTruthy();
-
-    expect(getRowCellTexts('Ice Dominators')).toEqual([
-      '1',
-      'Ice Dominators',
-      '30',
-      '60',
-    ]);
-    expect(getRowCellTexts('Puck Dynasty')).toEqual([
-      '2',
-      'Puck Dynasty',
-      '0',
-      '35',
-    ]);
+      Object.entries(scenario.expectedRows).forEach(
+        ([teamName, expectedCells]) => {
+          expect(getRowCellTexts(teamName)).toEqual(expectedCells);
+        }
+      );
+    });
   });
 });
