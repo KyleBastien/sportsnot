@@ -18,9 +18,7 @@ export class WidgetApiClient {
   }
 
   private widgetDateString(): string {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/New_York',
-    }).format(new Date());
+    return new Intl.DateTimeFormat('en-CA').format(new Date());
   }
 
   private fnUrl(name: string): string {
