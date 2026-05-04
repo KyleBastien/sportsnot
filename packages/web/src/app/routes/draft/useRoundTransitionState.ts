@@ -124,7 +124,9 @@ export function useRoundTransitionState(
   const isCommissioner = league?.commissioner_id === userId;
 
   const startReDraft = async () => {
-    if (!leagueId || !league || sortedMembers.length < 2) return;
+    if (!leagueId) return;
+    if (!league) return;
+    if (sortedMembers.length < 2) return;
 
     setStarting(true);
 
