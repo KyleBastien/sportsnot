@@ -1,5 +1,9 @@
 import type { NHLPlayoffSeries } from '@sportsnot/types';
 
+interface RoundTeamStats {
+  wins: number;
+}
+
 /**
  * Check whether every series in a given playoff round is complete.
  * A series is complete when one team has 4 wins.
@@ -12,6 +16,21 @@ export function isAllSeriesComplete(
   const roundSeries = allSeries.filter((s) => s.round === round);
   if (roundSeries.length === 0) return false;
   return roundSeries.every((s) => s.isComplete);
+}
+
+/**
+ * Check whether a playoff round is complete from cached team win totals.
+ *
+ * Each round starts with a power-of-two team count. The round is complete when
+ * exactly half of those teams have reached 4 wins.
+ */
+export function isRoundCompleteFromTeamStats(teams: RoundTeamStats[]): boolean {
+  if (teams.length === 0 || teams.length % 2 !== 0) {
+    return false;
+  }
+
+  const completedSeriesCount = teams.filter((team) => team.wins >= 4).length;
+  return completedSeriesCount > 0 && completedSeriesCount * 2 === teams.length;
 }
 
 /**
