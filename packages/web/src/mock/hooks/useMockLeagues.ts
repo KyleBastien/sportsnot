@@ -183,18 +183,23 @@ export function useMockLeague(leagueId: string | undefined) {
         created_at: league.createdAt,
         updated_at: league.updatedAt,
         isMock: league.isMock,
-        league_members: league.members.map((m) => ({
-          id: m.id,
-          user_id: m.userId,
-          team_name: m.teamName,
-          total_points: calculateMemberPoints(state, m.id).totalPoints,
-          users: m.user
-            ? {
-                display_name: m.user.displayName,
-                avatar_url: m.user.avatarUrl ?? '',
-              }
-            : null,
-        })),
+        league_members: league.members.map((m) => {
+          const points = calculateMemberPoints(state, m.id);
+
+          return {
+            id: m.id,
+            user_id: m.userId,
+            team_name: m.teamName,
+            total_points: points.totalPoints,
+            round_points: points.roundPoints,
+            users: m.user
+              ? {
+                  display_name: m.user.displayName,
+                  avatar_url: m.user.avatarUrl ?? '',
+                }
+              : null,
+          };
+        }),
       }
     : null;
 

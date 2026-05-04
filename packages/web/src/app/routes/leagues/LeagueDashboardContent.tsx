@@ -30,6 +30,7 @@ export interface LeagueMemberRow {
   user_id: string;
   team_name: string;
   total_points: number;
+  round_points?: Record<string, number> | null;
   users?: { display_name?: string; avatar_url?: string } | null;
 }
 
@@ -104,11 +105,38 @@ interface LeagueInviteCodeCardProps {
 }
 
 interface LeagueStandingsCardProps {
+  currentRound: number;
   isMobile: boolean;
   leagueId: string | undefined;
   members: LeagueMemberRow[];
   seasonComplete: boolean;
   userId: string | undefined;
+}
+
+const MAX_PLAYOFF_ROUND = 4;
+
+export function getVisibleStandingsRounds(
+  currentRound: number,
+  isMobile: boolean
+): number[] {
+  const cappedRound = Math.min(Math.max(currentRound, 0), MAX_PLAYOFF_ROUND);
+
+  if (cappedRound <= 1) {
+    return [];
+  }
+
+  if (isMobile) {
+    return [cappedRound];
+  }
+
+  return Array.from({ length: cappedRound }, (_, index) => index + 1);
+}
+
+function getRoundPoints(
+  roundPoints: Record<string, number> | null | undefined,
+  round: number
+): number {
+  return roundPoints?.[round] ?? 0;
 }
 
 function getMyTeamName(
@@ -289,7 +317,8 @@ function LeagueInviteCodeCard({ inviteCode }: LeagueInviteCodeCardProps) {
   );
 }
 
-function LeagueStandingsCard({
+export function LeagueStandingsCard({
+  currentRound,
   isMobile,
   leagueId,
   members,
@@ -300,50 +329,64 @@ function LeagueStandingsCard({
     (a: LeagueMemberRow, b: LeagueMemberRow) =>
       (b.total_points ?? 0) - (a.total_points ?? 0)
   );
+  const visibleRounds = getVisibleStandingsRounds(currentRound, isMobile);
+  const tableMinWidth = isMobile ? 0 : 680;
 
   return (
     <Card shadow="sm" padding="md" radius="md" withBorder>
       <Title order={4} mb="md">
         Standings
       </Title>
-      <Table striped highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Rank</Table.Th>
-            <Table.Th>Team</Table.Th>
-            {!isMobile && <Table.Th>Manager</Table.Th>}
-            <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {sortedMembers.map((member: LeagueMemberRow, index: number) => (
-            <Table.Tr
-              key={member.id}
-              style={{
-                fontWeight: member.user_id === userId ? 700 : undefined,
-              }}
-            >
-              <Table.Td>{index + 1}</Table.Td>
-              <Table.Td>
-                <Anchor
-                  component={Link}
-                  to={`/roster/${leagueId}/${member.id}`}
-                  fw={member.user_id === userId ? 700 : undefined}
-                >
-                  {member.team_name}
-                  {seasonComplete && index === 0 && ' 🏆'}
-                </Anchor>
-              </Table.Td>
-              {!isMobile && (
-                <Table.Td>{member.users?.display_name ?? 'Unknown'}</Table.Td>
-              )}
-              <Table.Td style={{ textAlign: 'right' }}>
-                {member.total_points ?? 0}
-              </Table.Td>
+      <Table.ScrollContainer minWidth={tableMinWidth}>
+        <Table striped highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Rank</Table.Th>
+              <Table.Th>Team</Table.Th>
+              {!isMobile && <Table.Th>Manager</Table.Th>}
+              {visibleRounds.map((round) => (
+                <Table.Th key={round} style={{ textAlign: 'right' }}>
+                  Round {round}
+                </Table.Th>
+              ))}
+              <Table.Th style={{ textAlign: 'right' }}>Total Points</Table.Th>
             </Table.Tr>
-          ))}
-        </Table.Tbody>
-      </Table>
+          </Table.Thead>
+          <Table.Tbody>
+            {sortedMembers.map((member: LeagueMemberRow, index: number) => (
+              <Table.Tr
+                key={member.id}
+                style={{
+                  fontWeight: member.user_id === userId ? 700 : undefined,
+                }}
+              >
+                <Table.Td>{index + 1}</Table.Td>
+                <Table.Td>
+                  <Anchor
+                    component={Link}
+                    to={`/roster/${leagueId}/${member.id}`}
+                    fw={member.user_id === userId ? 700 : undefined}
+                  >
+                    {member.team_name}
+                    {seasonComplete && index === 0 && ' 🏆'}
+                  </Anchor>
+                </Table.Td>
+                {!isMobile && (
+                  <Table.Td>{member.users?.display_name ?? 'Unknown'}</Table.Td>
+                )}
+                {visibleRounds.map((round) => (
+                  <Table.Td key={round} style={{ textAlign: 'right' }}>
+                    {getRoundPoints(member.round_points, round)}
+                  </Table.Td>
+                ))}
+                <Table.Td style={{ textAlign: 'right' }}>
+                  {member.total_points ?? 0}
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Table.ScrollContainer>
     </Card>
   );
 }
@@ -392,6 +435,7 @@ export function LeagueDashboardContent({
         <LeagueInviteCodeCard inviteCode={league.invite_code} />
 
         <LeagueStandingsCard
+          currentRound={currentRound}
           isMobile={isMobile}
           leagueId={leagueId}
           members={members}
