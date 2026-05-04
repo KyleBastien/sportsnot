@@ -1,4 +1,5 @@
 import { describe, it, expect } from '@rstest/core';
+import { deriveCurrentRound } from '../../utils/roundUtils';
 
 /**
  * Pure logic tests for LeagueDashboardPage button visibility.
@@ -14,6 +15,13 @@ interface ButtonVisibilityInput {
   currentRound: number;
   roundComplete: boolean;
   leagueStatus: string;
+}
+
+function resolveDashboardRound(
+  leagueCurrentRound: number | null | undefined,
+  completedDraftsCount: number
+): number {
+  return deriveCurrentRound(leagueCurrentRound, completedDraftsCount);
 }
 
 /** Mirrors the JSX condition for "Start Next Draft" */
@@ -66,6 +74,13 @@ describe('LeagueDashboardPage button visibility', () => {
 
     it('shows for commissioner in R2 active league', () => {
       expect(showStartNextDraft(makeInput({ currentRound: 2 }))).toBe(true);
+    });
+
+    it('uses completed draft history when league.current_round resets between rounds', () => {
+      const currentRound = resolveDashboardRound(0, 1);
+      expect(currentRound).toBe(1);
+      expect(showStartNextDraft(makeInput({ currentRound }))).toBe(true);
+      expect(isStartNextDraftDisabled(true, false)).toBe(false);
     });
 
     it('hides when current_round >= 3', () => {
