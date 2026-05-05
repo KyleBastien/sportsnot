@@ -67,12 +67,15 @@ jobs:
       - name: Ensure iOS platform is available
         run: |
           xcodebuild -runFirstLaunch
-          if xcrun --sdk iphoneos --show-sdk-path >/dev/null 2>&1; then
-            echo "iOS SDK already installed"
+          XCODE_VERSION=$(xcodebuild -version | awk '/Xcode/{print $2}')
+          EXPECTED_SDK="iphoneos${XCODE_VERSION}"
+          if xcodebuild -showsdks | grep -q "$EXPECTED_SDK"; then
+            echo "$EXPECTED_SDK already installed"
           else
-            echo "iOS SDK missing, downloading platform"
+            echo "$EXPECTED_SDK missing, downloading iOS platform"
             sudo xcodebuild -downloadPlatform iOS
           fi
+          xcodebuild -showsdks
 
       - name: Install dependencies
         run: yarn install --immutable
