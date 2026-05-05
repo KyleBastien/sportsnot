@@ -73,14 +73,14 @@ gem install --user-install xcodeproj
 All iOS tasks are wrapped as Nx targets on `@sportsnot/ios-app` so the
 CLI matches the rest of the monorepo:
 
-| Command                                   | What it does                                                 |
-| ----------------------------------------- | ------------------------------------------------------------ |
-| `yarn nx sync-web @sportsnot/ios-app`     | `nx build @sportsnot/web` then `cap sync ios`                |
-| `yarn nx build @sportsnot/ios-app`        | `xcodebuild build` for the App scheme (iOS Simulator SDK)    |
-| `yarn nx build-widget @sportsnot/ios-app` | `xcodebuild build` for the Widget scheme (iOS Simulator SDK) |
-| `yarn nx run-ios @sportsnot/ios-app`      | `cap run ios` on the default simulator                       |
-| `yarn nx archive @sportsnot/ios-app`      | `xcodebuild archive` for TestFlight builds                   |
-| `yarn nx pod-install @sportsnot/ios-app`  | `cap update ios` + `pod install`                             |
+| Command                                   | What it does                                  |
+| ----------------------------------------- | --------------------------------------------- |
+| `yarn nx sync-web @sportsnot/ios-app`     | `nx build @sportsnot/web` then `cap sync ios` |
+| `yarn nx build @sportsnot/ios-app`        | `xcodebuild build` for the App scheme         |
+| `yarn nx build-widget @sportsnot/ios-app` | `xcodebuild build` for the Widget scheme      |
+| `yarn nx run-ios @sportsnot/ios-app`      | `cap run ios` on the default simulator        |
+| `yarn nx archive @sportsnot/ios-app`      | `xcodebuild archive` for TestFlight builds    |
+| `yarn nx pod-install @sportsnot/ios-app`  | `cap update ios` + `pod install`              |
 
 These targets are **not** part of `nx affected` for Windows/Linux CI —
 they only run on the dedicated macOS workflow (see `.github/workflows/ios-build.yml`).

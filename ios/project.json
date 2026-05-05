@@ -20,7 +20,7 @@
       "dependsOn": ["sync-web"],
       "options": {
         "commands": [
-          "xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug -destination 'generic/platform=iOS Simulator' -xcconfig ios/App/Secrets.xcconfig CODE_SIGNING_ALLOWED=NO build"
+          "xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug -destination 'generic/platform=iOS' -xcconfig ios/App/Secrets.xcconfig CODE_SIGNING_ALLOWED=NO build"
         ],
         "cwd": "{workspaceRoot}"
       }
@@ -31,7 +31,7 @@
       "dependsOn": ["sync-web"],
       "options": {
         "commands": [
-          "xcodebuild -workspace ios/App/App.xcworkspace -scheme SportsNotWidget -configuration Debug -destination 'generic/platform=iOS Simulator' -xcconfig ios/App/Secrets.xcconfig CODE_SIGNING_ALLOWED=NO build"
+          "xcodebuild -workspace ios/App/App.xcworkspace -scheme SportsNotWidget -configuration Debug -destination 'generic/platform=iOS' -xcconfig ios/App/Secrets.xcconfig CODE_SIGNING_ALLOWED=NO build"
         ],
         "cwd": "{workspaceRoot}"
       }
