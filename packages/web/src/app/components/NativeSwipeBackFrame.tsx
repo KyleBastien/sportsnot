@@ -72,11 +72,7 @@ function isVisibleOverlayElement(
   let currentElement: HTMLElement | null = element;
 
   while (currentElement) {
-    if (
-      currentElement.hidden ||
-      currentElement.getAttribute('aria-hidden') === 'true' ||
-      currentElement.hasAttribute('data-hidden')
-    ) {
+    if (isHiddenOverlayElement(currentElement)) {
       return false;
     }
 
@@ -90,6 +86,14 @@ function isVisibleOverlayElement(
   }
 
   return true;
+}
+
+function isHiddenOverlayElement(element: HTMLElement): boolean {
+  return Boolean(
+    element.hidden ||
+    element.getAttribute('aria-hidden') === 'true' ||
+    element.hasAttribute('data-hidden')
+  );
 }
 
 function hasBlockingOverlay(documentRef: Document): boolean {
@@ -195,11 +199,16 @@ export function NativeSwipeBackFrame({ children }: { children: ReactNode }) {
   };
 
   const applyDragPresentation = (distancePx: number) => {
-    const session = gestureRef.current;
+    const activeSwipeElements = getActiveSwipeElements(
+      gestureRef.current,
+      underlayRef.current,
+      pageRef.current
+    );
 
-    if (!session || !underlayRef.current || !pageRef.current) {
+    if (!activeSwipeElements) {
       return;
     }
+    const { session, underlay, page } = activeSwipeElements;
 
     const clampedDistance = Math.min(
       Math.max(distancePx, 0),
@@ -211,11 +220,11 @@ export function NativeSwipeBackFrame({ children }: { children: ReactNode }) {
       session.viewportWidth * PREVIEW_PARALLAX_RATIO
     );
 
-    pageRef.current.style.transform = `translate3d(${clampedDistance}px, 0, 0)`;
-    underlayRef.current.style.transform = `translate3d(${
+    page.style.transform = `translate3d(${clampedDistance}px, 0, 0)`;
+    underlay.style.transform = `translate3d(${
       -previewOffset * (1 - progress)
     }px, 0, 0)`;
-    underlayRef.current.style.opacity = '1';
+    underlay.style.opacity = '1';
 
     if (scrimRef.current) {
       scrimRef.current.style.opacity = `${0.14 * (1 - progress)}`;
@@ -543,4 +552,16 @@ export function NativeSwipeBackFrame({ children }: { children: ReactNode }) {
       </div>
     </div>
   );
+}
+
+function getActiveSwipeElements(
+  session: GestureSession | null,
+  underlay: HTMLDivElement | null,
+  page: HTMLDivElement | null
+) {
+  if (!session || !underlay || !page) {
+    return null;
+  }
+
+  return { session, underlay, page };
 }

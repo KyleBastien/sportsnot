@@ -43,20 +43,7 @@ export function useRoundComplete(currentRound: number): RoundCompleteResult {
   });
 
   if (IS_MOCK) {
-    // Derive round/season completion by comparing simulation state to the
-    // league's current round:
-    // - sim ahead of league → league's round already completed
-    // - sim matches league  → use the live roundComplete flag
-    // - sim behind league   → league advanced via draft; round not yet complete
-    const roundDone =
-      state.currentRound > currentRound ||
-      (state.currentRound === currentRound && state.roundComplete);
-    return {
-      roundComplete: roundDone,
-      seasonComplete:
-        state.currentRound >= currentRound && state.seasonComplete,
-      isLoading: false,
-    };
+    return buildMockRoundCompleteResult(state, currentRound);
   }
 
   const teams = teamStatsQuery.data ?? [];
@@ -68,4 +55,37 @@ export function useRoundComplete(currentRound: number): RoundCompleteResult {
     seasonComplete,
     isLoading: teamStatsQuery.isLoading,
   };
+}
+
+function buildMockRoundCompleteResult(
+  state: {
+    currentRound: number;
+    roundComplete: boolean;
+    seasonComplete: boolean;
+  },
+  currentRound: number
+): RoundCompleteResult {
+  return {
+    roundComplete: hasCompletedMockRound(state, currentRound),
+    seasonComplete: hasCompletedMockSeason(state, currentRound),
+    isLoading: false,
+  };
+}
+
+function hasCompletedMockRound(
+  state: { currentRound: number; roundComplete: boolean },
+  currentRound: number
+) {
+  if (state.currentRound > currentRound) {
+    return true;
+  }
+
+  return state.currentRound === currentRound && state.roundComplete;
+}
+
+function hasCompletedMockSeason(
+  state: { currentRound: number; seasonComplete: boolean },
+  currentRound: number
+) {
+  return state.currentRound >= currentRound && state.seasonComplete;
 }

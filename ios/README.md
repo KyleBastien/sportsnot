@@ -64,7 +64,9 @@ gem install --user-install xcodeproj
    ```
 
    `Secrets.xcconfig` is gitignored and loaded by Nx xcodebuild targets
-   via `-xcconfig`. CI workflows generate it from GitHub secrets.
+   via `-xcconfig`. Keep the `/$()/` escape used in the example file or
+   `https://...` URLs will be parsed as `https:`. CI workflows generate
+   the escaped file from GitHub secrets.
 
 ## Nx targets
 
