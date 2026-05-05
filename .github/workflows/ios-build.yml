@@ -83,11 +83,21 @@ jobs:
         run: yarn nx pod-install @sportsnot/ios-app
 
       - name: Generate Secrets.xcconfig
+        env:
+          SUPABASE_URL_RAW: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY_RAW: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
+          set -euo pipefail
+          # xcconfig files treat '//' as a comment token, so raw https://
+          # values get truncated to "https:". Break the token with an
+          # empty variable reference that resolves away at build time.
+          ESCAPED_URL=$(printf '%s' "$SUPABASE_URL_RAW" | sed 's|//|/$()/|g')
+          ESCAPED_KEY=$(printf '%s' "$SUPABASE_ANON_KEY_RAW" | sed 's|//|/$()/|g')
           cat > ios/App/Secrets.xcconfig <<EOF
-          SUPABASE_URL = ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_ANON_KEY = ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_URL = ${ESCAPED_URL}
+          SUPABASE_ANON_KEY = ${ESCAPED_KEY}
           EOF
+          echo "xcconfig written. url_length=${#SUPABASE_URL_RAW} key_length=${#SUPABASE_ANON_KEY_RAW}"
 
       - name: Build App target
         run: yarn nx build @sportsnot/ios-app
