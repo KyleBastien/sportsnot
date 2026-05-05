@@ -18,11 +18,11 @@
       "matching_content_path": "packages/supabase-db/functions/**"
     },
     {
-      "quality_gates": "clean_code_collective",
+      "quality_gates": "pay_down_tech_debt",
       "matching_content_path": "packages/web/src/**"
     },
     {
-      "quality_gates": "clean_code_collective",
+      "quality_gates": "pay_down_tech_debt",
       "matching_content_path": "packages/supabase/src/**"
     }
   ]

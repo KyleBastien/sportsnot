@@ -158,48 +158,13 @@ export function buildConfirmPositionOptions(
     return [{ label: 'Goalie', value: 'G' }];
   }
 
-  if (position === 'D') {
-    const options: DraftConfirmPositionOption[] = [
-      {
-        label:
-          mySlotCounts['D'] >= roster.defensemen ? 'Defense (full)' : 'Defense',
-        value: 'D',
-        disabled: mySlotCounts['D'] >= roster.defensemen,
-      },
-    ];
-
-    if (allowIrSlots) {
-      options.push({
-        label:
-          mySlotCounts['IR_D'] >= roster.irDefensemen
-            ? 'IR Defense (full)'
-            : 'IR Defense',
-        value: 'IR_D',
-        disabled: mySlotCounts['IR_D'] >= roster.irDefensemen,
-      });
-    }
-
-    return options;
-  }
-
-  const options: DraftConfirmPositionOption[] = [
-    {
-      label:
-        mySlotCounts['F'] >= roster.forwards ? 'Forward (full)' : 'Forward',
-      value: 'F',
-      disabled: mySlotCounts['F'] >= roster.forwards,
-    },
-  ];
+  const slotType = position === 'D' ? 'D' : 'F';
+  const options = [buildConfirmOption(slotType, mySlotCounts, roster)];
 
   if (allowIrSlots) {
-    options.push({
-      label:
-        mySlotCounts['IR_F'] >= roster.irForwards
-          ? 'IR Forward (full)'
-          : 'IR Forward',
-      value: 'IR_F',
-      disabled: mySlotCounts['IR_F'] >= roster.irForwards,
-    });
+    options.push(
+      buildConfirmOption(`IR_${slotType}` as Position, mySlotCounts, roster)
+    );
   }
 
   return options;
@@ -245,28 +210,22 @@ export function buildDraftTurnState(
   commissionerId: string | null
 ) {
   const draftOrder = draft?.draft_order ?? [];
-  const isDraftComplete =
-    draft?.status === 'completed' ||
-    (draft ? draft.current_pick > draftOrder.length : false);
-  const currentPickIndex =
-    draft && draft.current_pick >= 1 && draft.current_pick <= draftOrder.length
-      ? draft.current_pick - 1
-      : -1;
-  const currentPickerUserId =
-    currentPickIndex >= 0 ? draftOrder[currentPickIndex] : undefined;
+  const isDraftComplete = isDraftDone(draft, draftOrder.length);
+  const currentPickerUserId = getCurrentPickerUserId(draft, draftOrder);
   const isMyTurn = currentPickerUserId === userId;
-  const myMember = members.find((member) => member.user_id === userId);
-  const currentPicker = members.find(
-    (member) => member.user_id === currentPickerUserId
-  );
+  const myMember = findMemberByUserId(members, userId);
+  const currentPicker = findMemberByUserId(members, currentPickerUserId);
   const isCommissioner = Boolean(
     commissionerId && userId && commissionerId === userId
   );
   const canPick = isMyTurn || (isCommissioner && !isDraftComplete);
-  const pickingMember =
-    isCommissioner && !isMyTurn
-      ? members.find((member) => member.user_id === currentPickerUserId)
-      : myMember;
+  const pickingMember = getPickingMember({
+    members,
+    myMember,
+    currentPickerUserId,
+    isCommissioner,
+    isMyTurn,
+  });
 
   return {
     draftOrder,
@@ -278,4 +237,87 @@ export function buildDraftTurnState(
     canPick,
     pickingMember,
   };
+}
+
+function buildConfirmOption(
+  position: Position,
+  mySlotCounts: MySlotCounts,
+  roster: DraftRosterComposition
+): DraftConfirmPositionOption {
+  const config = getConfirmSlotConfig(position, roster);
+  const filled = mySlotCounts[position] >= config.limit;
+  return {
+    label: filled ? `${config.label} (full)` : config.label,
+    value: position,
+    disabled: filled,
+  };
+}
+
+function getConfirmSlotConfig(
+  position: Position,
+  roster: DraftRosterComposition
+): { label: string; limit: number } {
+  switch (position) {
+    case 'D':
+      return { label: 'Defense', limit: roster.defensemen };
+    case 'IR_D':
+      return { label: 'IR Defense', limit: roster.irDefensemen };
+    case 'IR_F':
+      return { label: 'IR Forward', limit: roster.irForwards };
+    case 'F':
+      return { label: 'Forward', limit: roster.forwards };
+    case 'G':
+      return { label: 'Goalie', limit: roster.goalies };
+  }
+}
+
+function isDraftDone(
+  draft: DraftStateRow | null,
+  draftOrderLength: number
+): boolean {
+  return Boolean(
+    draft?.status === 'completed' ||
+    (draft && draft.current_pick > draftOrderLength)
+  );
+}
+
+function getCurrentPickerUserId(
+  draft: DraftStateRow | null,
+  draftOrder: string[]
+): string | undefined {
+  if (!draft || !hasValidCurrentPick(draft.current_pick, draftOrder.length)) {
+    return undefined;
+  }
+
+  return draftOrder[draft.current_pick - 1];
+}
+
+function findMemberByUserId(
+  members: DraftMemberRow[],
+  userId: string | undefined
+): DraftMemberRow | undefined {
+  return members.find((member) => member.user_id === userId);
+}
+
+function getPickingMember(params: {
+  members: DraftMemberRow[];
+  myMember: DraftMemberRow | undefined;
+  currentPickerUserId: string | undefined;
+  isCommissioner: boolean;
+  isMyTurn: boolean;
+}): DraftMemberRow | undefined {
+  const { members, myMember, currentPickerUserId, isCommissioner, isMyTurn } =
+    params;
+  if (!isCommissioner || isMyTurn) {
+    return myMember;
+  }
+
+  return findMemberByUserId(members, currentPickerUserId);
+}
+
+function hasValidCurrentPick(
+  currentPick: number,
+  draftOrderLength: number
+): boolean {
+  return currentPick >= 1 && currentPick <= draftOrderLength;
 }

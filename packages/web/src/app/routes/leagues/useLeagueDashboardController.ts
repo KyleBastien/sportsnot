@@ -6,17 +6,13 @@ import { useMockData } from '../../../mock/MockDataProvider';
 import { useMockLeagueWidgetSnapshot } from '../../../mock/hooks/useMockLeagueWidgetSnapshot';
 import { useRoundComplete } from '../../hooks/useRoundComplete';
 import { useWinnerConfetti } from '../../hooks/useWinnerConfetti';
-import { LeagueMemberRow } from './leagueDashboardTypes';
+import {
+  buildLeagueDashboardState,
+  startNextDraftForLeague,
+} from './leagueDashboardControllerHelpers';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 const WIDGET_SNAPSHOT_STALE_TIME_MS = 5 * 60 * 1000;
-
-const STATUS_COLORS: Record<string, string> = {
-  setup: 'blue',
-  drafting: 'orange',
-  active: 'green',
-  completed: 'gray',
-};
 
 function useLeague(leagueId: string) {
   const mockResult = useMockLeague(leagueId);
@@ -87,12 +83,6 @@ function useLeagueWidgetSnapshot(
   return IS_MOCK ? mockResult : queryResult;
 }
 
-function sortMembersByPoints(members: LeagueMemberRow[]) {
-  return [...members].sort(
-    (a, b) => (b.total_points ?? 0) - (a.total_points ?? 0)
-  );
-}
-
 export function useLeagueDashboardController(
   leagueId: string | undefined,
   userId: string | undefined
@@ -104,66 +94,41 @@ export function useLeagueDashboardController(
     isLoading: widgetSnapshotLoading,
     error: widgetSnapshotError,
   } = useLeagueWidgetSnapshot(leagueId, league?.share_code, league?.status);
-
-  const currentRound = league?.current_round ?? 0;
   const {
     roundComplete,
     seasonComplete,
     isLoading: roundStatusLoading,
-  } = useRoundComplete(currentRound);
-
-  const members = (league?.league_members ?? []) as LeagueMemberRow[];
-  const sortedMembers = sortMembersByPoints(members);
-  const winnerId = seasonComplete ? sortedMembers[0]?.user_id : undefined;
+  } = useRoundComplete(league?.current_round ?? 0);
+  const state = buildLeagueDashboardState({
+    league,
+    userId,
+    widgetSnapshotError:
+      widgetSnapshotError instanceof Error ? widgetSnapshotError : null,
+    seasonComplete,
+  });
 
   useWinnerConfetti({
     seasonComplete,
-    isWinner: !!winnerId && winnerId === userId,
+    isWinner: !!state.winnerId && state.winnerId === userId,
     leagueId,
   });
-
-  const currentUserTeamName =
-    members.find((member) => member.user_id === userId)?.team_name ?? null;
-  const isCommissioner = league?.commissioner_id === userId;
-  const leagueGameCardsError =
-    league?.status === 'active' && !IS_MOCK && !league.share_code
-      ? new Error('League widget share code missing')
-      : widgetSnapshotError instanceof Error
-        ? widgetSnapshotError
-        : null;
-
-  const startNextDraft = async () => {
-    if (!leagueId) {
-      return;
-    }
-
-    if (IS_MOCK) {
-      dispatch({ type: 'START_NEXT_DRAFT', payload: { leagueId } });
-      return;
-    }
-
-    await supabase
-      .from('leagues')
-      .update({ status: 'drafting' })
-      .eq('id', leagueId);
-  };
 
   return {
     league,
     isLoading,
     error,
     isMobile: useIsMobile(),
-    members,
-    sortedMembers,
-    currentUserTeamName,
-    isCommissioner,
-    statusColor: league ? STATUS_COLORS[league.status] : undefined,
+    members: state.members,
+    sortedMembers: state.sortedMembers,
+    currentUserTeamName: state.currentUserTeamName,
+    isCommissioner: state.isCommissioner,
+    statusColor: state.statusColor,
     seasonComplete,
     roundComplete,
     roundStatusLoading,
     widgetSnapshot,
     widgetSnapshotLoading,
-    leagueGameCardsError,
-    startNextDraft,
+    leagueGameCardsError: state.leagueGameCardsError,
+    startNextDraft: async () => startNextDraftForLeague({ leagueId, dispatch }),
   };
 }

@@ -56,11 +56,7 @@ function RosterSlotActionButton({
   injuredCandidates: RosterSlotRow[];
   onOpenIrModal: (slotId: string, candidates: RosterSlotRow[]) => void;
 }) {
-  if (
-    (slot.position !== 'IR_F' && slot.position !== 'IR_D') ||
-    slot.activated_from_ir ||
-    injuredCandidates.length === 0
-  ) {
+  if (!canActivateIr(slot, injuredCandidates)) {
     return null;
   }
 
@@ -74,6 +70,14 @@ function RosterSlotActionButton({
       Activate IR
     </Button>
   );
+}
+
+function canActivateIr(
+  slot: RosterSlotRow,
+  injuredCandidates: RosterSlotRow[]
+): boolean {
+  const isIrSlot = slot.position === 'IR_F' || slot.position === 'IR_D';
+  return isIrSlot && !slot.activated_from_ir && injuredCandidates.length > 0;
 }
 
 function MobileRosterSlotCard({
@@ -143,18 +147,18 @@ function MobileRosterSlotCard({
           mt="xs"
           fullWidth
           onClick={() => onOpenIrModal(slot.id, injuredCandidates)}
-          disabled={injuredCandidates.length === 0 || slot.activated_from_ir}
-          style={
-            slot.position !== 'IR_F' && slot.position !== 'IR_D'
-              ? { display: 'none' }
-              : undefined
-          }
+          disabled={!canActivateIr(slot, injuredCandidates)}
+          style={canShowIrButton(slot) ? undefined : { display: 'none' }}
         >
           Activate IR
         </Button>
       )}
     </Card>
   );
+}
+
+function canShowIrButton(slot: RosterSlotRow): boolean {
+  return slot.position === 'IR_F' || slot.position === 'IR_D';
 }
 
 function DesktopRosterTable({

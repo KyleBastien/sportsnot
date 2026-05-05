@@ -1,19 +1,11 @@
-import {
-  Alert,
-  Button,
-  Card,
-  Container,
-  Group,
-  Modal,
-  Radio,
-  Select,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core';
-import { SCORING } from '@sportsnot/types';
-import { resolvePickName } from '@sportsnot/utils';
+import { Alert, Container, Stack, Text, Title } from '@mantine/core';
 import { RosterGroupSection } from './RosterGroupSection';
+import {
+  IrActivationModal,
+  RosterMemberSelect,
+  RosterScoringText,
+  RosterSummaryHeader,
+} from './RosterPageSections';
 import type {
   IrModalState,
   RosterGroup,
@@ -80,15 +72,11 @@ export function RosterPageEmptyState({
       <Stack gap="lg" align="center">
         <Title order={2}>{rosterTitle}</Title>
         <Text c="dimmed">Round {round}</Text>
-        {memberOptions.length > 1 && (
-          <Select
-            data={memberOptions}
-            value={selectedMemberId}
-            onChange={onMemberChange}
-            w={300}
-            allowDeselect={false}
-          />
-        )}
+        <RosterMemberSelect
+          memberOptions={memberOptions}
+          selectedMemberId={selectedMemberId}
+          onMemberChange={onMemberChange}
+        />
         <Alert color="navy" title="No Roster Yet">
           {isOwnRoster
             ? `Your roster for Round ${round} has not been set yet. Waiting for the draft to begin.`
@@ -128,50 +116,19 @@ export function RosterPageView({
   return (
     <Container size="lg" py="xl">
       <Stack gap="xl">
-        {memberOptions.length > 1 && (
-          <Select
-            label="View roster"
-            data={memberOptions}
-            value={selectedMemberId}
-            onChange={onMemberChange}
-            w={300}
-            allowDeselect={false}
-          />
-        )}
-        <Group justify="space-between">
-          <div>
-            <Title order={2}>{rosterTitle}</Title>
-            <Text c="dimmed">Round {round}</Text>
-          </div>
-          <Group gap="md">
-            <Card padding="md" radius="md" withBorder>
-              <Stack gap={0} align="center">
-                <Text size="sm" c="dimmed">
-                  Round {round} Points
-                </Text>
-                <Text fw={700} size="xl">
-                  {roundPoints}
-                </Text>
-              </Stack>
-            </Card>
-            <Card padding="md" radius="md" withBorder>
-              <Stack gap={0} align="center">
-                <Text size="sm" c="dimmed">
-                  Total Points
-                </Text>
-                <Text fw={700} size="xl">
-                  {totalPoints}
-                </Text>
-              </Stack>
-            </Card>
-          </Group>
-        </Group>
-
-        <Text size="sm" c="dimmed">
-          Scoring: Goal = {SCORING.goal}pt · Assist = {SCORING.assist}pt · Win ={' '}
-          {SCORING.win}pts · Shutout = {SCORING.shutout}pts
-        </Text>
-
+        <RosterMemberSelect
+          label="View roster"
+          memberOptions={memberOptions}
+          selectedMemberId={selectedMemberId}
+          onMemberChange={onMemberChange}
+        />
+        <RosterSummaryHeader
+          rosterTitle={rosterTitle}
+          round={round}
+          roundPoints={roundPoints}
+          totalPoints={totalPoints}
+        />
+        <RosterScoringText />
         {groupedSlots.map((group) => (
           <RosterGroupSection
             key={group.position}
@@ -188,57 +145,16 @@ export function RosterPageView({
             onOpenIrModal={onOpenIrModal}
           />
         ))}
-
-        <Modal
-          opened={!!irModal}
-          onClose={onCloseIrModal}
-          title="Activate IR Player"
-        >
-          {irModal && (
-            <Stack gap="md">
-              <Alert color="orange">
-                Activating an IR player will remove all points from the injured
-                player and retroactively grant the IR player&apos;s points for
-                this round.
-              </Alert>
-              <Text fw={500} size="sm">
-                Select the injured player to replace:
-              </Text>
-              <Radio.Group
-                value={selectedInjuredSlotId ?? ''}
-                onChange={onSelectedInjuredSlotIdChange}
-              >
-                <Stack gap="xs">
-                  {irModal.candidates.map((candidate) => (
-                    <Radio
-                      key={candidate.id}
-                      value={candidate.id}
-                      label={resolvePickName(
-                        candidate.player_id,
-                        candidate.team_id,
-                        playerNameMap,
-                        teamNameMap
-                      )}
-                    />
-                  ))}
-                </Stack>
-              </Radio.Group>
-              <Group justify="flex-end">
-                <Button variant="subtle" onClick={onCloseIrModal}>
-                  Cancel
-                </Button>
-                <Button
-                  color="orange"
-                  onClick={onActivateIr}
-                  loading={activating}
-                  disabled={!selectedInjuredSlotId}
-                >
-                  Activate IR Player
-                </Button>
-              </Group>
-            </Stack>
-          )}
-        </Modal>
+        <IrActivationModal
+          irModal={irModal}
+          onCloseIrModal={onCloseIrModal}
+          selectedInjuredSlotId={selectedInjuredSlotId}
+          onSelectedInjuredSlotIdChange={onSelectedInjuredSlotIdChange}
+          onActivateIr={onActivateIr}
+          activating={activating}
+          playerNameMap={playerNameMap}
+          teamNameMap={teamNameMap}
+        />
       </Stack>
     </Container>
   );

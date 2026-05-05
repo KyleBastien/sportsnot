@@ -185,32 +185,49 @@ function updateLeagues(
   return state.leagues.map(updater);
 }
 
+function updateLeagueById(
+  state: MockState,
+  leagueId: string,
+  updater: (
+    league: MockState['leagues'][number]
+  ) => MockState['leagues'][number]
+): MockState['leagues'] {
+  return updateLeagues(state, (league) =>
+    league.id === leagueId ? updater(league) : league
+  );
+}
+
+function withUpdatedLeague(
+  state: MockState,
+  leagueId: string,
+  updater: (
+    league: MockState['leagues'][number]
+  ) => MockState['leagues'][number]
+): MockState {
+  return {
+    ...state,
+    leagues: updateLeagueById(state, leagueId, updater),
+  };
+}
+
 function handleUpdateLeagueSettings(
   state: MockState,
   action: Extract<MockAction, { type: 'UPDATE_LEAGUE_SETTINGS' }>
 ): MockState {
-  return {
-    ...state,
-    leagues: updateLeagues(state, (league) =>
-      league.id === action.payload.leagueId
-        ? { ...league, allowIrSlots: action.payload.allowIrSlots }
-        : league
-    ),
-  };
+  return withUpdatedLeague(state, action.payload.leagueId, (league) => ({
+    ...league,
+    allowIrSlots: action.payload.allowIrSlots,
+  }));
 }
 
 function handleJoinLeague(
   state: MockState,
   action: Extract<MockAction, { type: 'JOIN_LEAGUE' }>
 ): MockState {
-  return {
-    ...state,
-    leagues: updateLeagues(state, (league) =>
-      league.id === action.payload.leagueId
-        ? { ...league, members: [...league.members, action.payload.member] }
-        : league
-    ),
-  };
+  return withUpdatedLeague(state, action.payload.leagueId, (league) => ({
+    ...league,
+    members: [...league.members, action.payload.member],
+  }));
 }
 
 function handleStartDraft(
@@ -423,9 +440,7 @@ function buildRoundAdvanceRosters(
     return rosters;
   }
 
-  const hasRoundFourRosters = Object.values(rosterHistory).some(
-    (history) => history[4]?.length > 0
-  );
+  const hasRoundFourRosters = hasSavedRoundFourRosters(rosterHistory);
 
   if (hasRoundFourRosters) {
     for (const [memberId, history] of Object.entries(rosterHistory)) {
@@ -447,8 +462,18 @@ function buildRoundAdvanceRosters(
   return rosters;
 }
 
+function hasSavedRoundFourRosters(
+  rosterHistory: MockState['rosterHistory']
+): boolean {
+  return Object.values(rosterHistory).some((history) => history[4]?.length > 0);
+}
+
+function canAdvanceRound(state: MockState): boolean {
+  return state.roundComplete && !state.seasonComplete && state.currentRound < 4;
+}
+
 function handleAdvanceRound(state: MockState): MockState {
-  if (!state.roundComplete || state.seasonComplete || state.currentRound >= 4) {
+  if (!canAdvanceRound(state)) {
     return state;
   }
 
@@ -478,14 +503,10 @@ function handleStartNextDraft(
   state: MockState,
   action: Extract<MockAction, { type: 'START_NEXT_DRAFT' }>
 ): MockState {
-  return {
-    ...state,
-    leagues: updateLeagues(state, (league) =>
-      league.id === action.payload.leagueId
-        ? { ...league, status: 'drafting' as const }
-        : league
-    ),
-  };
+  return withUpdatedLeague(state, action.payload.leagueId, (league) => ({
+    ...league,
+    status: 'drafting' as const,
+  }));
 }
 
 function handleSkipToRoundFour(

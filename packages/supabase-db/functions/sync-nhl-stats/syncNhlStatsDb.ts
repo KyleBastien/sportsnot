@@ -17,6 +17,17 @@ import type {
   TeamStatsRow,
 } from './syncNhlStatsTypes.ts';
 
+interface SyncRoundContext {
+  cfg: PgConfig;
+  season: string;
+  playoffRound: number;
+}
+
+interface TeamGameScore {
+  team: number;
+  opponent: number;
+}
+
 function sumGoals(games: PlayerGameLog[]): number {
   return games.reduce((sum, game) => sum + (game.goals ?? 0), 0);
 }
@@ -25,49 +36,80 @@ function sumAssists(games: PlayerGameLog[]): number {
   return games.reduce((sum, game) => sum + (game.assists ?? 0), 0);
 }
 
-function countTeamWinsAndShutouts(
-  teamId: number,
-  finalGames: NhlScoreGameLite[]
-): { wins: number; shutouts: number } {
+function countTeamWinsAndShutouts(params: {
+  teamId: number;
+  finalGames: NhlScoreGameLite[];
+}): { wins: number; shutouts: number } {
+  const { teamId, finalGames } = params;
   let wins = 0;
   let shutouts = 0;
 
   for (const game of finalGames) {
-    const isHome = game.homeTeam?.id === teamId;
-    const isAway = game.awayTeam?.id === teamId;
-
-    if (!isHome && !isAway) {
+    const score = getTeamGameScore(teamId, game);
+    if (!score || !isWinningScore(score)) {
       continue;
     }
 
-    const teamScore = isHome
-      ? (game.homeTeam?.score ?? 0)
-      : (game.awayTeam?.score ?? 0);
-    const opponentScore = isHome
-      ? (game.awayTeam?.score ?? 0)
-      : (game.homeTeam?.score ?? 0);
-
-    if (teamScore > opponentScore) {
-      wins += 1;
-      if (opponentScore === 0) {
-        shutouts += 1;
-      }
-    }
+    wins += 1;
+    shutouts += Number(isShutoutScore(score));
   }
 
   return { wins, shutouts };
 }
 
+function getTeamGameScore(
+  teamId: number,
+  game: NhlScoreGameLite
+): TeamGameScore | null {
+  return (
+    getTeamSideScore(
+      teamId,
+      game.homeTeam?.id,
+      game.homeTeam?.score,
+      game.awayTeam?.score
+    ) ??
+    getTeamSideScore(
+      teamId,
+      game.awayTeam?.id,
+      game.awayTeam?.score,
+      game.homeTeam?.score
+    )
+  );
+}
+
+function getTeamSideScore(
+  teamId: number,
+  gameTeamId: number | undefined,
+  teamScore: number | undefined,
+  opponentScore: number | undefined
+): TeamGameScore | null {
+  if (gameTeamId !== teamId) {
+    return null;
+  }
+
+  return {
+    team: teamScore ?? 0,
+    opponent: opponentScore ?? 0,
+  };
+}
+
+function isWinningScore(score: TeamGameScore) {
+  return score.team > score.opponent;
+}
+
+function isShutoutScore(score: TeamGameScore) {
+  return score.opponent === 0;
+}
+
 export async function syncRoundPlayerStats(
-  cfg: PgConfig,
-  season: string,
-  playoffRound: number,
+  context: SyncRoundContext,
   players: EligiblePlayer[],
   finalizedGameIds: Set<number>,
   liveDeltas: Map<number, LiveDelta>,
   fetchJson: <T>(url: string) => Promise<T | null>,
   nhlApiBase: string
 ): Promise<number> {
+  const { cfg, season, playoffRound } = context;
   let playerUpdates = 0;
 
   for (const player of players) {
@@ -106,17 +148,20 @@ export async function syncRoundPlayerStats(
   return playerUpdates;
 }
 
-export async function syncRoundTeamStats(
-  cfg: PgConfig,
-  season: string,
-  playoffRound: number,
-  teams: EligibleTeam[],
-  finalGames: NhlScoreGameLite[]
-): Promise<number> {
+export async function syncRoundTeamStats(params: {
+  context: SyncRoundContext;
+  teams: EligibleTeam[];
+  finalGames: NhlScoreGameLite[];
+}): Promise<number> {
   let teamUpdates = 0;
+  const {
+    context: { cfg, season, playoffRound },
+    teams,
+    finalGames,
+  } = params;
 
   for (const team of teams) {
-    const record = countTeamWinsAndShutouts(team.id, finalGames);
+    const record = countTeamWinsAndShutouts({ teamId: team.id, finalGames });
     const ok = await pgUpsert(
       cfg,
       'team_stats_cache',
@@ -162,107 +207,107 @@ function uniqueTeamIds(rosters: RosterRow[]): number[] {
   ];
 }
 
-async function updatePlayerRosterPoints(
-  cfg: PgConfig,
-  season: string,
-  playoffRound: number,
-  playerIds: number[]
-): Promise<void> {
-  if (playerIds.length === 0) {
+async function updateRosterPoints<
+  Row extends { [key: string]: number | null },
+>(params: {
+  cfg: PgConfig;
+  season: string;
+  playoffRound: number;
+  ids: number[];
+  cacheTable: 'player_stats_cache' | 'team_stats_cache';
+  idColumn: 'player_id' | 'team_id';
+  selectColumns: string;
+  toPoints: (row: Row) => number;
+}): Promise<void> {
+  const {
+    cfg,
+    season,
+    playoffRound,
+    ids,
+    cacheTable,
+    idColumn,
+    selectColumns,
+    toPoints,
+  } = params;
+
+  if (ids.length === 0) {
     return;
   }
 
-  const playerStats = await pgSelect<PlayerStatsRow>(
+  const rows = await pgSelect<Row>(
     cfg,
-    'player_stats_cache',
-    `select=player_id,goals,assists&player_id=in.(${playerIds.join(',')})&nhl_season=eq.${season}&playoff_round=eq.${playoffRound}`
+    cacheTable,
+    `select=${selectColumns}&${idColumn}=in.(${ids.join(',')})&nhl_season=eq.${season}&playoff_round=eq.${playoffRound}`
   );
-  const statsByPlayerId = new Map(
-    playerStats.map((row) => [row.player_id, row])
-  );
+  const rowsById = new Map(rows.map((row) => [row[idColumn] as number, row]));
 
-  for (const playerId of playerIds) {
-    const stats = statsByPlayerId.get(playerId);
-    if (!stats) {
+  for (const id of ids) {
+    const row = rowsById.get(id);
+    if (!row) {
       continue;
     }
 
     await pgUpdate(
       cfg,
       'rosters',
-      `player_id=eq.${playerId}&round=eq.${playoffRound}&is_active=eq.true`,
+      `${idColumn}=eq.${id}&round=eq.${playoffRound}&is_active=eq.true`,
       {
-        points_earned: (stats.goals ?? 0) + (stats.assists ?? 0),
+        points_earned: toPoints(row),
       }
     );
   }
+}
+
+async function updatePlayerRosterPoints(
+  context: SyncRoundContext,
+  playerIds: number[]
+): Promise<void> {
+  await updateRosterPoints<PlayerStatsRow>({
+    ...context,
+    ids: playerIds,
+    cacheTable: 'player_stats_cache',
+    idColumn: 'player_id',
+    selectColumns: 'player_id,goals,assists',
+    toPoints: (row) => (row.goals ?? 0) + (row.assists ?? 0),
+  });
 }
 
 async function updateTeamRosterPoints(
-  cfg: PgConfig,
-  season: string,
-  playoffRound: number,
+  context: SyncRoundContext,
   teamIds: number[]
 ): Promise<void> {
-  if (teamIds.length === 0) {
-    return;
-  }
-
-  const teamStats = await pgSelect<TeamStatsRow>(
-    cfg,
-    'team_stats_cache',
-    `select=team_id,wins,shutouts&team_id=in.(${teamIds.join(',')})&nhl_season=eq.${season}&playoff_round=eq.${playoffRound}`
-  );
-  const statsByTeamId = new Map(teamStats.map((row) => [row.team_id, row]));
-
-  for (const teamId of teamIds) {
-    const stats = statsByTeamId.get(teamId);
-    if (!stats) {
-      continue;
-    }
-
-    const regularWins = (stats.wins ?? 0) - (stats.shutouts ?? 0);
-    await pgUpdate(
-      cfg,
-      'rosters',
-      `team_id=eq.${teamId}&round=eq.${playoffRound}&is_active=eq.true`,
-      {
-        points_earned: regularWins * 2 + (stats.shutouts ?? 0) * 4,
-      }
-    );
-  }
+  await updateRosterPoints<TeamStatsRow>({
+    ...context,
+    ids: teamIds,
+    cacheTable: 'team_stats_cache',
+    idColumn: 'team_id',
+    selectColumns: 'team_id,wins,shutouts',
+    toPoints: (row) => {
+      const regularWins = (row.wins ?? 0) - (row.shutouts ?? 0);
+      return regularWins * 2 + (row.shutouts ?? 0) * 4;
+    },
+  });
 }
 
 export async function updateRoundRosterPoints(
-  cfg: PgConfig,
-  season: string,
-  playoffRound: number
+  context: SyncRoundContext
 ): Promise<void> {
+  const { cfg, playoffRound } = context;
   const rosters = await pgSelect<RosterRow>(
     cfg,
     'rosters',
     `select=league_member_id,player_id,team_id&round=eq.${playoffRound}&is_active=eq.true`
   );
 
-  await updatePlayerRosterPoints(
-    cfg,
-    season,
-    playoffRound,
-    uniquePlayerIds(rosters)
-  );
-  await updateTeamRosterPoints(
-    cfg,
-    season,
-    playoffRound,
-    uniqueTeamIds(rosters)
-  );
+  await updatePlayerRosterPoints(context, uniquePlayerIds(rosters));
+  await updateTeamRosterPoints(context, uniqueTeamIds(rosters));
 }
 
 export async function refreshActiveLeagueStandings(
-  cfg: PgConfig,
-  activeLeagues: LeagueRow[],
-  playoffRound: number
+  context: SyncRoundContext,
+  activeLeagues: LeagueRow[]
 ): Promise<void> {
+  const { cfg, playoffRound } = context;
   for (const league of activeLeagues) {
     if (league.status !== 'active' || league.current_round !== playoffRound) {
       continue;

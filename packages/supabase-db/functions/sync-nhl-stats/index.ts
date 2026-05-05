@@ -142,24 +142,23 @@ Deno.serve(async (req: Request) => {
       const finalizedGameIds = new Set(finalGames.map((game) => game.id));
 
       playerUpdates += await syncRoundPlayerStats(
-        cfg,
-        season,
-        playoffRound,
+        { cfg, season, playoffRound },
         eligiblePlayers,
         finalizedGameIds,
         liveDeltas,
         fetchJson,
         NHL_API_BASE
       );
-      teamUpdates += await syncRoundTeamStats(
-        cfg,
-        season,
-        playoffRound,
-        eligibleTeams,
-        finalGames
+      teamUpdates += await syncRoundTeamStats({
+        context: { cfg, season, playoffRound },
+        teams: eligibleTeams,
+        finalGames: finalGames,
+      });
+      await updateRoundRosterPoints({ cfg, season, playoffRound });
+      await refreshActiveLeagueStandings(
+        { cfg, season, playoffRound },
+        activeLeagues
       );
-      await updateRoundRosterPoints(cfg, season, playoffRound);
-      await refreshActiveLeagueStandings(cfg, activeLeagues, playoffRound);
 
       syncedRounds.push(playoffRound);
     }
