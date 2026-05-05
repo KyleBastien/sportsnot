@@ -15,18 +15,6 @@
     "noUnusedLocals": true,
     "skipLibCheck": true,
     "strict": true,
-    "target": "es2022",
-    "customConditions": ["@sportsnot/source"],
-    "baseUrl": ".",
-    "paths": {
-      "@sportsnot/types": ["packages/types/src/index.ts"],
-      "@sportsnot/utils": ["packages/utils/src/index.ts"],
-      "@sportsnot/ui": ["packages/ui/src/index.ts"],
-      "@sportsnot/nhl-api": ["packages/nhl-api/src/index.ts"],
-      "@sportsnot/supabase": ["packages/supabase/src/index.ts"],
-      "@sportsnot/mock-data": ["packages/mock-data/src/index.ts"],
-      "@sportsnot/widget-api": ["packages/widget-api/src/index.ts"],
-      "@sportsnot/widget-bridge": ["packages/widget-bridge/src/index.ts"]
-    }
+    "target": "es2022"
   }
 }

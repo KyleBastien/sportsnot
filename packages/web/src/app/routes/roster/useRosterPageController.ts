@@ -30,8 +30,9 @@ export function useRosterPageController({
   if (data.error || !data.data) {
     return { status: 'error' as const };
   }
+  const rosterData = data.data;
 
-  if (data.data.slots.length === 0) {
+  if (rosterData.slots.length === 0) {
     return {
       status: 'empty' as const,
       emptyProps: data.emptyProps,
@@ -47,7 +48,7 @@ export function useRosterPageController({
 
     if (IS_MOCK) {
       mockActivateIR.mutate({
-        leagueMemberId: data.data.memberId,
+        leagueMemberId: rosterData.memberId,
         slotId: irModal.irSlotId,
       });
       closeIrModal();
@@ -55,8 +56,8 @@ export function useRosterPageController({
     }
 
     const { error } = await supabase.rpc('activate_ir_player', {
-      p_league_member_id: data.data.memberId,
-      p_round: data.data.round,
+      p_league_member_id: rosterData.memberId,
+      p_round: rosterData.round,
       p_injured_roster_id: selectedInjuredSlotId,
       p_ir_roster_id: irModal.irSlotId,
     });
@@ -78,9 +79,9 @@ export function useRosterPageController({
     status: 'ready' as const,
     viewProps: {
       ...data.buildReadyViewProps(
-        data.data.slots,
-        data.data.round,
-        data.data.totalPoints ?? 0
+        rosterData.slots,
+        rosterData.round,
+        rosterData.totalPoints ?? 0
       ),
       onOpenIrModal: (slotId: string, candidates: RosterSlotRow[]) => {
         setIrModal({ irSlotId: slotId, candidates });

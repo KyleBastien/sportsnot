@@ -39,6 +39,9 @@
       "cache": true
     }
   },
+  "sync": {
+    "applyChanges": true
+  },
   "plugins": [
     {
       "plugin": "@nx/js/typescript",

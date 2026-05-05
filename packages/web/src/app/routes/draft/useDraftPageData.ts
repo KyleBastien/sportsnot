@@ -80,7 +80,7 @@ function useDraftLeagueData(leagueId: string) {
     useLeagueInfo(leagueId);
   const mockLeagueResult = useMockLeague(leagueId);
   const members = useMemo(
-    () => ((membersData ?? []) as DraftMemberRow[]) ?? [],
+    () => (membersData ?? []) as DraftMemberRow[],
     [membersData]
   );
   const draft = (draftData ?? null) as DraftStateRow | null;
@@ -157,7 +157,7 @@ function useDraftDerivedState(params: {
     roster,
   } = params;
   const picks = useMemo(
-    () => ((draft?.draft_picks ?? []) as DraftPickRow[]) ?? [],
+    () => (draft?.draft_picks ?? []) as DraftPickRow[],
     [draft?.draft_picks]
   );
   const turnState = useMemo(

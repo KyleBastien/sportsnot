@@ -13,5 +13,9 @@
       "default": "./src/index.ts"
     },
     "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@sportsnot/nhl-api": "workspace:*",
+    "@sportsnot/types": "workspace:*"
   }
 }

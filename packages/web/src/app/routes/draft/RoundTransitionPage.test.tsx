@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, rs } from '@rstest/core';
-import { cleanup, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { User } from '@supabase/supabase-js';
@@ -15,9 +15,49 @@ const transitionState = rs.hoisted(() => ({
   completedDrafts: { data: null, isLoading: true } as MockHookResult,
 }));
 
+const supabaseState = rs.hoisted(() => ({
+  draftInsertPayload: null as Record<string, unknown> | null,
+  leagueUpdatePayload: null as Record<string, unknown> | null,
+  leagueUpdateId: null as string | null,
+}));
+
 rs.mock('./roundTransitionQueries', () => ({
   useTransitionLeague: () => transitionState.league,
+}));
+
+rs.mock('../../hooks/useCompletedDrafts', () => ({
   useCompletedDrafts: () => transitionState.completedDrafts,
+}));
+
+rs.mock('@sportsnot/supabase', () => ({
+  supabase: {
+    from: (table: string) => {
+      if (table === 'drafts') {
+        return {
+          insert: async (payload: Record<string, unknown>) => {
+            supabaseState.draftInsertPayload = payload;
+            return { error: null };
+          },
+        };
+      }
+
+      if (table === 'leagues') {
+        return {
+          update: (payload: Record<string, unknown>) => {
+            supabaseState.leagueUpdatePayload = payload;
+            return {
+              eq: async (_column: string, value: string) => {
+                supabaseState.leagueUpdateId = value;
+                return { error: null };
+              },
+            };
+          },
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    },
+  },
 }));
 
 import { RoundTransitionPage } from './RoundTransitionPage';
@@ -49,6 +89,7 @@ function buildLeague(overrides: Record<string, unknown> = {}) {
         users: { display_name: 'Player Two' },
       },
     ],
+    allow_ir_slots: true,
     ...overrides,
   };
 }
@@ -69,6 +110,9 @@ function renderHarness() {
 beforeEach(() => {
   transitionState.league = { data: null, isLoading: true };
   transitionState.completedDrafts = { data: null, isLoading: true };
+  supabaseState.draftInsertPayload = null;
+  supabaseState.leagueUpdatePayload = null;
+  supabaseState.leagueUpdateId = null;
 });
 
 afterEach(() => {
@@ -116,5 +160,77 @@ describe('RoundTransitionPage', () => {
       name: /Start Round .* Re-Draft/i,
     });
     expect(button.textContent).toContain('Start Round 3 Re-Draft');
+  });
+
+  it('creates a full snake re-draft order based on roster size', async () => {
+    transitionState.league = {
+      data: buildLeague({
+        current_round: 1,
+        league_members: [
+          {
+            id: 'lm-1',
+            user_id: 'user-1',
+            team_name: 'Alpha',
+            total_points: 44,
+            users: { display_name: 'Player One' },
+          },
+          {
+            id: 'lm-2',
+            user_id: 'user-2',
+            team_name: 'Bravo',
+            total_points: 45,
+            users: { display_name: 'Player Two' },
+          },
+          {
+            id: 'lm-3',
+            user_id: 'user-3',
+            team_name: 'Charlie',
+            total_points: 50,
+            users: { display_name: 'Player Three' },
+          },
+          {
+            id: 'lm-4',
+            user_id: 'user-4',
+            team_name: 'Delta',
+            total_points: 59,
+            users: { display_name: 'Player Four' },
+          },
+        ],
+      }),
+      isLoading: false,
+    };
+    transitionState.completedDrafts = {
+      data: [
+        { id: 'd1', round: 1, status: 'completed', completed_at: '2025-04-22' },
+      ],
+      isLoading: false,
+    };
+
+    renderHarness();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Start Round .* Re-Draft/i })
+    );
+
+    await waitFor(() => expect(supabaseState.draftInsertPayload).toBeTruthy());
+
+    const draftOrder = supabaseState.draftInsertPayload
+      ?.draft_order as string[];
+    expect(draftOrder).toHaveLength(44);
+    expect(draftOrder.slice(0, 8)).toEqual([
+      'user-1',
+      'user-2',
+      'user-3',
+      'user-4',
+      'user-4',
+      'user-3',
+      'user-2',
+      'user-1',
+    ]);
+    expect(supabaseState.leagueUpdatePayload).toEqual({
+      status: 'drafting',
+      current_round: 2,
+    });
+    expect(supabaseState.leagueUpdateId).toBe('league-1');
   });
 });

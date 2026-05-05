@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from '@rstest/core';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import React, { useLayoutEffect, type ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { NativeSwipeBackFrame } from './NativeSwipeBackFrame';
@@ -59,6 +65,13 @@ async function waitForFrame() {
   await new Promise<void>((resolve) => {
     requestAnimationFrame(() => resolve());
   });
+}
+
+async function performSuccessfulSwipe(frame: HTMLElement) {
+  dispatchTouch(frame, 'touchstart', [{ clientX: 12, clientY: 80 }]);
+  dispatchTouch(frame, 'touchmove', [{ clientX: 420, clientY: 84 }]);
+  await waitForFrame();
+  dispatchTouch(frame, 'touchend', [{ clientX: 420, clientY: 84 }]);
 }
 
 function renderHarness(
@@ -155,5 +168,54 @@ describe('NativeSwipeBackFrame', () => {
     await waitForFrame();
 
     expect(commitCount).toBe(1);
+  });
+
+  it('ignores hidden listbox overlays when starting swipe back', async () => {
+    setRuntimePlatform('ios');
+    renderHarness(['/profile']);
+
+    const hiddenOverlay = document.createElement('div');
+    hiddenOverlay.setAttribute('data-hidden', 'true');
+    const listbox = document.createElement('div');
+    listbox.setAttribute('role', 'listbox');
+    hiddenOverlay.appendChild(listbox);
+    document.body.appendChild(hiddenOverlay);
+
+    const frame = document.querySelector(
+      '[data-native-swipe-back-frame]'
+    ) as HTMLElement | null;
+
+    if (!frame) {
+      throw new Error('Native swipe frame not found');
+    }
+
+    await performSuccessfulSwipe(frame);
+
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard')).toBeTruthy();
+    });
+  });
+
+  it('still blocks swipe back when a visible listbox overlay is open', async () => {
+    setRuntimePlatform('ios');
+    renderHarness(['/profile']);
+
+    const listbox = document.createElement('div');
+    listbox.setAttribute('role', 'listbox');
+    document.body.appendChild(listbox);
+
+    const frame = document.querySelector(
+      '[data-native-swipe-back-frame]'
+    ) as HTMLElement | null;
+
+    if (!frame) {
+      throw new Error('Native swipe frame not found');
+    }
+
+    await performSuccessfulSwipe(frame);
+
+    await waitFor(() => {
+      expect(screen.getByText('Profile')).toBeTruthy();
+    });
   });
 });

@@ -89,7 +89,16 @@ The `packages/web/src/mock/` directory contains all mock infrastructure. The hoo
 
 - **Never commit or push directly to `main`.** Always create a feature branch and open a pull request.
 - Branch naming: `feat/`, `fix/`, `chore/` prefixes (e.g., `fix/draft-night-blockers`, `feat/commissioner-picks`).
-- **All lint, build, and tests must pass before pushing.** Run `yarn nx affected -t lint`, `yarn nx build @sportsnot/web`, and `yarn nx run-many -t test --all` to verify before every push.
+- **Do not bypass local hooks.** `yarn install` runs `prepare`, which installs Husky. The pre-commit hook runs lint, typecheck, unit tests, and the CodeScene threshold check.
+- **Before pushing:** run `yarn nx affected -t lint`, `yarn nx affected -t typecheck`, `yarn nx build @sportsnot/web`, and `yarn nx run-many -t test --all`. Run `yarn nx e2e @sportsnot/e2e` when a change touches user-facing flows.
+
+## CodeScene Quality Gates
+
+- **Threshold file:** `.codescene-thresholds` stores the SportsNot project ID plus the current Hotspot and Average Code Health ratchets. **Never lower these values.** Only raise them after the repo score improves.
+- **Local auth:** export `CODESCENE_PAT` (preferred) or `CODESCENE_ACCESS_TOKEN` before committing. The local CodeScene check fails fast if no token is available.
+- **Recovery mode:** `.codescene-thresholds` sets `ALLOW_RECOVERY_MODE=true` so an already-red remote baseline warns instead of blocking the refactor commits needed to recover. When a refactor raises the baseline, update the threshold file in the same branch.
+- **Before risky work or hotspot-heavy edits:** use CodeScene MCP to inspect hotspots and touched files. Prefer `codescene-list_technical_debt_hotspots_for_project`, `codescene-code_health_review`, and `codescene-analyze_change_set` before opening a PR.
+- **Boy Scout rule:** if you touch a hotspot or low-health file, leave it healthier than you found it. If the CodeScene gate warns, refactor before adding more feature complexity.
 
 ## Key Conventions
 

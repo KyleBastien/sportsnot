@@ -10,7 +10,18 @@ import {
 } from './draftPageHelpers';
 import { submitDraftPick } from './draftPickActions';
 import { useDraftPageData } from './useDraftPageData';
-import type { ComparePlayer, DraftablePlayer } from './draftPageTypes';
+import type {
+  ComparePlayer,
+  DraftMemberRow,
+  DraftStateRow,
+  DraftablePlayer,
+} from './draftPageTypes';
+
+interface ConfirmPickContext {
+  confirmPlayer: DraftablePlayer;
+  activeMember: DraftMemberRow;
+  draft: DraftStateRow;
+}
 
 interface UseDraftPageControllerParams {
   leagueId: string;
@@ -57,17 +68,23 @@ export function useDraftPageController({
   };
 
   const handleConfirmPick = async () => {
+    const draft = data.draft;
     const activeMember = data.pickingMember ?? data.myMember;
-    if (!canConfirmPick(confirmPlayer, activeMember, data.draft)) {
+    const pickContext = getConfirmPickContext(
+      confirmPlayer,
+      activeMember,
+      draft
+    );
+    if (!pickContext) {
       return;
     }
 
     setSubmitting(true);
     const errorMessage = await submitDraftPick({
-      confirmPlayer,
+      confirmPlayer: pickContext.confirmPlayer,
       confirmPosition,
-      draft: data.draft,
-      activeMember,
+      draft: pickContext.draft,
+      activeMember: pickContext.activeMember,
       members: data.members,
       playerStats: data.playerStats,
       teamStats: data.teamStats,
@@ -163,10 +180,28 @@ function isDraftPageLoading(data: ReturnType<typeof useDraftPageData>) {
   );
 }
 
-function canConfirmPick(
+function getConfirmPickContext(
   confirmPlayer: DraftablePlayer | null,
-  activeMember: unknown,
-  draft: unknown
-): confirmPlayer is DraftablePlayer {
-  return Boolean(confirmPlayer && activeMember && draft);
+  activeMember: DraftMemberRow | undefined,
+  draft: DraftStateRow | null
+): ConfirmPickContext | null {
+  if (!isPresent(confirmPlayer)) {
+    return null;
+  }
+  if (!isPresent(activeMember)) {
+    return null;
+  }
+  if (!isPresent(draft)) {
+    return null;
+  }
+
+  return {
+    confirmPlayer,
+    activeMember,
+    draft,
+  };
+}
+
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value != null;
 }

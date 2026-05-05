@@ -27,16 +27,31 @@
     "src/**/*.spec.jsx",
     "src/**/*.test.jsx"
   ],
-  "include": [
-    "src/**/*.js",
-    "src/**/*.jsx",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "../../packages/types/src/**/*.ts",
-    "../../packages/utils/src/**/*.ts",
-    "../../packages/supabase/src/**/*.ts",
-    "../../packages/nhl-api/src/**/*.ts",
-    "../../packages/ui/src/**/*.ts",
-    "../../packages/ui/src/**/*.tsx"
+  "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    {
+      "path": "../widget-bridge/tsconfig.lib.json"
+    },
+    {
+      "path": "../widget-api/tsconfig.lib.json"
+    },
+    {
+      "path": "../utils/tsconfig.lib.json"
+    },
+    {
+      "path": "../ui/tsconfig.lib.json"
+    },
+    {
+      "path": "../types/tsconfig.lib.json"
+    },
+    {
+      "path": "../supabase/tsconfig.lib.json"
+    },
+    {
+      "path": "../nhl-api/tsconfig.lib.json"
+    },
+    {
+      "path": "../mock-data/tsconfig.lib.json"
+    }
   ]
 }

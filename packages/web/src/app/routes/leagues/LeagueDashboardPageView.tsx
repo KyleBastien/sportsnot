@@ -1,4 +1,5 @@
 import { Container, Stack } from '@mantine/core';
+import type { WidgetSnapshot } from '@sportsnot/widget-api';
 import { LeagueMemberRow } from './leagueDashboardTypes';
 import {
   LeagueActiveGamesSection,
@@ -27,7 +28,7 @@ interface LeagueDashboardPageViewProps {
   seasonComplete: boolean;
   roundComplete: boolean;
   roundStatusLoading: boolean;
-  widgetSnapshot: unknown;
+  widgetSnapshot: WidgetSnapshot | null | undefined;
   widgetSnapshotLoading: boolean;
   leagueGameCardsError: Error | null;
   onOpenSettings: () => void;

@@ -16,16 +16,6 @@ import {
 } from '@mantine/core';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMyLeagues, useLiveGames } from './dashboardPageQueries';
-
-interface TeamStatRow {
-  team_id: number;
-  team_name: string;
-  team_abbreviation: string;
-  wins: number;
-  shutouts: number;
-  is_eliminated: boolean;
-  playoff_round: number;
-}
 const STATUS_COLORS: Record<string, string> = {
   setup: 'blue',
   drafting: 'orange',
@@ -129,7 +119,7 @@ export function DashboardPage() {
               playoffs.
             </Alert>
             <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
-              {liveGames.map((team: TeamStatRow) => (
+              {liveGames.map((team) => (
                 <Card
                   key={team.team_id}
                   shadow="sm"

@@ -12,6 +12,7 @@ import {
   Title,
   Tooltip,
 } from '@mantine/core';
+import type { WidgetSnapshot } from '@sportsnot/widget-api';
 import { FeatureOnWidgetButton } from '../../components/FeatureOnWidgetButton';
 import { LeagueGameCardsSection } from './LeagueGameCardsSection';
 import { LeagueMemberRow } from './leagueDashboardTypes';
@@ -184,7 +185,7 @@ export function LeagueActiveGamesSection({
   leagueGameCardsError,
 }: {
   leagueStatus: string;
-  widgetSnapshot: unknown;
+  widgetSnapshot: WidgetSnapshot | null | undefined;
   widgetSnapshotLoading: boolean;
   leagueGameCardsError: Error | null;
 }) {

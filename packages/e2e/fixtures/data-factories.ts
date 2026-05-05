@@ -105,6 +105,7 @@ export function createMockLeague(overrides?: Partial<League>): League {
     maxParticipants: 8,
     currentRound: 1,
     status: 'active' as LeagueStatus,
+    allowIrSlots: true,
     createdAt: '2026-01-15T00:00:00.000Z',
     updatedAt: isoNow(),
     ...overrides,

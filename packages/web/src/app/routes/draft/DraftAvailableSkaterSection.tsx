@@ -239,7 +239,7 @@ function DraftSkaterActions({
   compareFull,
 }: Omit<
   DraftAvailableSkaterSectionProps,
-  'players' | 'isMobile' | 'isRound1'
+  'players' | 'isMobile' | 'isRound1' | 'comparePlayers'
 > & {
   player: DraftSkaterRow;
   isCompared: boolean;

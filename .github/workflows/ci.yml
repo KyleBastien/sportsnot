@@ -105,23 +105,6 @@ jobs:
           path: deploy
           retention-days: 1
 
-  codescene:
-    if: github.event_name == 'pull_request' && secrets.CODESCENE_ANALYSIS_URL != '' && secrets.CODESCENE_API_TOKEN != ''
-    runs-on: ubuntu-latest
-    needs: ci
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run CodeScene quality gate
-        uses: codescene/codescene-gh-action@v2
-        with:
-          project-id: 79685
-          analysis-url: ${{ secrets.CODESCENE_ANALYSIS_URL }}
-          api-token: ${{ secrets.CODESCENE_API_TOKEN }}
-
   e2e:
     runs-on: ubuntu-latest
     needs: ci

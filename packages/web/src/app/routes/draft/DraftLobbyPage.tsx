@@ -2,10 +2,10 @@ import { Alert, Center, Container, Loader } from '@mantine/core';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@sportsnot/supabase';
 import { getRosterComposition } from '@sportsnot/types';
-import { generateSnakeDraftOrder, shuffleArray } from '@sportsnot/utils';
 import { useState } from 'react';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMockStartDraft } from '../../../mock/hooks/useMockDraft';
+import { buildDraftOrder } from '../../utils/draftOrderUtils';
 import { DraftLobbyPageView } from './DraftLobbyPageView';
 import { useActiveDraftCheck, useLeagueForLobby } from './draftLobbyQueries';
 
@@ -88,13 +88,7 @@ export function DraftLobbyPage() {
       return;
     }
 
-    const shuffledMemberIds = shuffleArray(
-      members.map((member: LobbyMember) => member.user_id)
-    );
-    const draftOrder = generateSnakeDraftOrder(
-      shuffledMemberIds,
-      picksPerMember
-    );
+    const draftOrder = buildDraftOrder(members, allowIrSlots, nextRound);
     const { error } = await supabase.from('drafts').insert({
       league_id: leagueId,
       round: nextRound,

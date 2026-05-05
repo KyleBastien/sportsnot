@@ -59,12 +59,49 @@ function getEventTimeStamp(event: React.TouchEvent<HTMLDivElement>): number {
     : performance.now();
 }
 
-function hasBlockingOverlay(documentRef: Document): boolean {
-  return (
-    documentRef.querySelector(
-      '[role="dialog"], [role="menu"], [role="listbox"]'
-    ) !== null
+function isVisibleOverlayElement(
+  documentRef: Document,
+  element: Element
+): boolean {
+  const runtimeWindow = documentRef.defaultView;
+
+  if (!(element instanceof HTMLElement) || !runtimeWindow) {
+    return false;
+  }
+
+  let currentElement: HTMLElement | null = element;
+
+  while (currentElement) {
+    if (isHiddenOverlayElement(currentElement)) {
+      return false;
+    }
+
+    const styles = runtimeWindow.getComputedStyle(currentElement);
+
+    if (styles.display === 'none' || styles.visibility === 'hidden') {
+      return false;
+    }
+
+    currentElement = currentElement.parentElement;
+  }
+
+  return true;
+}
+
+function isHiddenOverlayElement(element: HTMLElement): boolean {
+  return Boolean(
+    element.hidden ||
+    element.getAttribute('aria-hidden') === 'true' ||
+    element.hasAttribute('data-hidden')
   );
+}
+
+function hasBlockingOverlay(documentRef: Document): boolean {
+  return Array.from(
+    documentRef.querySelectorAll(
+      '[role="dialog"], [role="menu"], [role="listbox"]'
+    )
+  ).some((element) => isVisibleOverlayElement(documentRef, element));
 }
 
 function trimPreviewCache(cache: Map<string, HTMLElement>) {
@@ -162,11 +199,16 @@ export function NativeSwipeBackFrame({ children }: { children: ReactNode }) {
   };
 
   const applyDragPresentation = (distancePx: number) => {
-    const session = gestureRef.current;
+    const activeSwipeElements = getActiveSwipeElements(
+      gestureRef.current,
+      underlayRef.current,
+      pageRef.current
+    );
 
-    if (!session || !underlayRef.current || !pageRef.current) {
+    if (!activeSwipeElements) {
       return;
     }
+    const { session, underlay, page } = activeSwipeElements;
 
     const clampedDistance = Math.min(
       Math.max(distancePx, 0),
@@ -178,11 +220,11 @@ export function NativeSwipeBackFrame({ children }: { children: ReactNode }) {
       session.viewportWidth * PREVIEW_PARALLAX_RATIO
     );
 
-    pageRef.current.style.transform = `translate3d(${clampedDistance}px, 0, 0)`;
-    underlayRef.current.style.transform = `translate3d(${
+    page.style.transform = `translate3d(${clampedDistance}px, 0, 0)`;
+    underlay.style.transform = `translate3d(${
       -previewOffset * (1 - progress)
     }px, 0, 0)`;
-    underlayRef.current.style.opacity = '1';
+    underlay.style.opacity = '1';
 
     if (scrimRef.current) {
       scrimRef.current.style.opacity = `${0.14 * (1 - progress)}`;
@@ -510,4 +552,16 @@ export function NativeSwipeBackFrame({ children }: { children: ReactNode }) {
       </div>
     </div>
   );
+}
+
+function getActiveSwipeElements(
+  session: GestureSession | null,
+  underlay: HTMLDivElement | null,
+  page: HTMLDivElement | null
+) {
+  if (!session || !underlay || !page) {
+    return null;
+  }
+
+  return { session, underlay, page };
 }
