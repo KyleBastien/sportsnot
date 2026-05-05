@@ -191,9 +191,10 @@ Required Supabase function secrets for `push-live-activity-updates`:
 (`sandbox` for TestFlight/simulator, `production` for App Store).
 
 The iOS CI workflow (`.github/workflows/ios-build.yml`) runs on
-`macos-14` and is **not** part of the default `nx affected` lint/test
-gate — it triggers only on PRs touching `ios/`, `packages/widget-*`,
-`packages/web/`, or `capacitor.config.ts`.
+`macos-15` for PR verification, while TestFlight release uses
+`macos-26`, and it is **not** part of the default `nx affected`
+lint/test gate — it triggers only on PRs touching `ios/`,
+`packages/widget-*`, `packages/web/`, or `capacitor.config.ts`.
 
 ## Android App + Widgets
 
