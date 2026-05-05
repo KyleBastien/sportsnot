@@ -23,18 +23,21 @@ export function DraftPage() {
     return <DraftPageLoadingState />;
   }
 
-  if (
-    !leagueId ||
-    status === 'no-draft' ||
-    !completeViewProps ||
-    !readyViewProps
-  ) {
+  if (!leagueId || status === 'no-draft') {
     return <DraftPageNoDraftState />;
   }
 
   if (status === 'completed') {
-    return <DraftPageCompleteView {...completeViewProps} />;
+    return completeViewProps ? (
+      <DraftPageCompleteView {...completeViewProps} />
+    ) : (
+      <DraftPageNoDraftState />
+    );
   }
 
-  return <DraftPageView {...readyViewProps} />;
+  return readyViewProps ? (
+    <DraftPageView {...readyViewProps} />
+  ) : (
+    <DraftPageNoDraftState />
+  );
 }

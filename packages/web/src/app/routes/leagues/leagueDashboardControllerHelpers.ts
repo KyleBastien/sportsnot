@@ -29,11 +29,19 @@ export function getLeagueGameCardsError(params: {
   widgetSnapshotError: Error | null;
 }) {
   const { leagueStatus, shareCode, widgetSnapshotError } = params;
-  if (leagueStatus === 'active' && !IS_MOCK && !shareCode) {
-    return new Error('League widget share code missing');
+  if (leagueStatus !== 'active') {
+    return widgetSnapshotError;
   }
 
-  return widgetSnapshotError;
+  if (IS_MOCK) {
+    return widgetSnapshotError;
+  }
+
+  if (shareCode) {
+    return widgetSnapshotError;
+  }
+
+  return new Error('League widget share code missing');
 }
 
 export async function startNextDraftForLeague(params: {

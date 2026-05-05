@@ -52,8 +52,8 @@ export function DraftAvailablePlayerBoard({
   roster,
 }: AvailablePlayerBoardProps) {
   const isMobile = useIsMobile();
-  const filteredSkaters = filterSkaterRows(
-    buildSkaterRows({
+  const filteredSkaters = filterSkaterRows({
+    skaterRows: buildSkaterRows({
       playerStats,
       regSeasonStats,
       draftedPlayerIds,
@@ -61,13 +61,13 @@ export function DraftAvailablePlayerBoard({
     }),
     positionFilter,
     searchQuery,
-    isRound1
-  );
-  const filteredTeams = filterTeamRows(
-    buildTeamRows(teamStats, draftedTeamIds),
+    isRound1,
+  });
+  const filteredTeams = filterTeamRows({
+    teamRows: buildTeamRows({ teamStats, draftedTeamIds }),
     positionFilter,
-    searchQuery
-  );
+    searchQuery,
+  });
 
   return (
     <Stack gap="md">

@@ -24,10 +24,18 @@ export interface DraftTeamRow {
   shutouts: number;
 }
 
-export function shouldUseRegSeasonFallback(
-  isRound1: boolean,
-  playerStats: PlayerStatRow[]
-): boolean {
+interface DraftSearchFilter {
+  positionFilter: string;
+  query: string;
+}
+
+const SKATER_POSITIONS = new Set(['F', 'D']);
+
+export function shouldUseRegSeasonFallback(params: {
+  isRound1: boolean;
+  playerStats: PlayerStatRow[];
+}): boolean {
+  const { isRound1, playerStats } = params;
   return (
     isRound1 &&
     (playerStats.length === 0 ||
@@ -46,7 +54,7 @@ export function buildSkaterRows(params: {
     regSeasonStats.map((row) => [row.player_id, row])
   );
 
-  if (shouldUseRegSeasonFallback(isRound1, playerStats)) {
+  if (shouldUseRegSeasonFallback({ isRound1, playerStats })) {
     return regSeasonStats
       .filter((player) => isSkaterPosition(player.position))
       .filter((player) => !draftedPlayerIds.has(player.player_id))
@@ -91,10 +99,11 @@ export function buildSkaterRows(params: {
     });
 }
 
-export function buildTeamRows(
-  teamStats: TeamStatRow[],
-  draftedTeamIds: Set<number>
-): DraftTeamRow[] {
+export function buildTeamRows(params: {
+  teamStats: TeamStatRow[];
+  draftedTeamIds: Set<number>;
+}): DraftTeamRow[] {
+  const { teamStats, draftedTeamIds } = params;
   return teamStats
     .filter((team) => !draftedTeamIds.has(team.team_id))
     .filter((team) => !team.is_eliminated)
@@ -108,15 +117,23 @@ export function buildTeamRows(
     }));
 }
 
-export function filterSkaterRows(
-  skaterRows: DraftSkaterRow[],
-  positionFilter: string,
-  searchQuery: string,
-  isRound1: boolean
-): DraftSkaterRow[] {
-  const query = searchQuery.toLowerCase();
+export function filterSkaterRows(params: {
+  skaterRows: DraftSkaterRow[];
+  positionFilter: string;
+  searchQuery: string;
+  isRound1: boolean;
+}): DraftSkaterRow[] {
+  const { skaterRows, positionFilter, searchQuery, isRound1 } = params;
+  const filter = buildDraftSearchFilter(positionFilter, searchQuery);
   return skaterRows
-    .filter((player) => matchesSkaterFilter(player, positionFilter, query))
+    .filter((player) =>
+      matchesDraftRow({
+        fullName: player.fullName,
+        position: player.position,
+        allowedPositions: [player.position],
+        filter,
+      })
+    )
     .sort((left, right) =>
       isRound1
         ? right.regSeasonPts - left.regSeasonPts || right.points - left.points
@@ -124,14 +141,22 @@ export function filterSkaterRows(
     );
 }
 
-export function filterTeamRows(
-  teamRows: DraftTeamRow[],
-  positionFilter: string,
-  searchQuery: string
-): DraftTeamRow[] {
-  const query = searchQuery.toLowerCase();
+export function filterTeamRows(params: {
+  teamRows: DraftTeamRow[];
+  positionFilter: string;
+  searchQuery: string;
+}): DraftTeamRow[] {
+  const { teamRows, positionFilter, searchQuery } = params;
+  const filter = buildDraftSearchFilter(positionFilter, searchQuery);
   return teamRows
-    .filter((team) => matchesTeamFilter(team, positionFilter, query))
+    .filter((team) =>
+      matchesDraftRow({
+        fullName: team.fullName,
+        position: 'G',
+        allowedPositions: ['G'],
+        filter,
+      })
+    )
     .sort((left, right) => right.wins - left.wins);
 }
 
@@ -143,40 +168,52 @@ export function canDraftGoalie(
 }
 
 function isSkaterPosition(position: string | null | undefined): boolean {
-  return position === 'F' || position === 'D';
+  return position != null && SKATER_POSITIONS.has(position);
 }
 
-function matchesSkaterFilter(
-  player: DraftSkaterRow,
+function buildDraftSearchFilter(
   positionFilter: string,
-  query: string
-): boolean {
-  if (!matchesPositionFilter(player.position, positionFilter)) {
+  searchQuery: string
+): DraftSearchFilter {
+  return {
+    positionFilter,
+    query: searchQuery.toLowerCase(),
+  };
+}
+
+function matchesDraftRow(params: {
+  fullName: string;
+  position: string;
+  allowedPositions: string[];
+  filter: DraftSearchFilter;
+}): boolean {
+  const { fullName, position, allowedPositions, filter } = params;
+  if (!matchesPositionFilter({ position, allowedPositions, filter })) {
     return false;
   }
 
-  return query.length === 0 || player.fullName.toLowerCase().includes(query);
+  return (
+    filter.query.length === 0 || fullName.toLowerCase().includes(filter.query)
+  );
 }
 
-function matchesTeamFilter(
-  team: DraftTeamRow,
-  positionFilter: string,
-  query: string
-): boolean {
-  if (positionFilter !== 'ALL' && positionFilter !== 'G') {
-    return false;
-  }
-
-  return query.length === 0 || team.fullName.toLowerCase().includes(query);
-}
-
-function matchesPositionFilter(
-  position: string,
-  positionFilter: string
-): boolean {
+function matchesPositionFilter(params: {
+  position: string;
+  allowedPositions: string[];
+  filter: DraftSearchFilter;
+}): boolean {
+  const {
+    position,
+    allowedPositions,
+    filter: { positionFilter },
+  } = params;
   if (positionFilter === 'ALL') {
     return true;
   }
 
-  return positionFilter === position;
+  if (positionFilter === position) {
+    return true;
+  }
+
+  return allowedPositions.includes(positionFilter);
 }

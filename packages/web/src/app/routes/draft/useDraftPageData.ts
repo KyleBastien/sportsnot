@@ -31,6 +31,48 @@ import type {
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
 export function useDraftPageData(leagueId: string, userId: string | undefined) {
+  const leagueData = useDraftLeagueData(leagueId);
+  const currentRound = leagueData.draft?.round ?? 1;
+  const roster = getRosterComposition(
+    leagueData.allowIrSlots
+  ) as DraftRosterComposition;
+  const statData = useDraftStatData(currentRound);
+  const draftState = useDraftDerivedState({
+    draft: leagueData.draft,
+    members: leagueData.members,
+    userId,
+    commissionerId: leagueData.commissionerId,
+    playerStats: statData.playerStats,
+    teamStats: statData.teamStats,
+    regSeasonStats: statData.regSeasonStats,
+    roster,
+  });
+
+  useDraftRealtimeChannel(leagueId);
+  const isDraftPoolSyncing = useDraftPoolSync({
+    draft: leagueData.draft,
+    currentSeason: CURRENT_SEASON,
+    playerStatsLength: statData.playerStats.length,
+    teamStatsLength: statData.teamStats.length,
+    refetchPlayerStats: statData.refetchPlayerStats,
+    refetchTeamStats: statData.refetchTeamStats,
+  });
+
+  return {
+    ...leagueData,
+    ...statData,
+    roster,
+    isRound1: currentRound === 1,
+    isDraftPoolSyncing,
+    ...draftState,
+  };
+}
+
+function getLeagueSetting<T>(mockValue: T, realValue: T): T {
+  return IS_MOCK ? mockValue : realValue;
+}
+
+function useDraftLeagueData(leagueId: string) {
   const { data: draftData, isLoading: draftLoading } = useDraft(leagueId);
   const { data: membersData, isLoading: membersLoading } =
     useLeagueMembers(leagueId);
@@ -42,16 +84,25 @@ export function useDraftPageData(leagueId: string, userId: string | undefined) {
     [membersData]
   );
   const draft = (draftData ?? null) as DraftStateRow | null;
-  const allowIrSlots = getLeagueSetting(
-    mockLeagueResult.data?.allow_ir_slots ?? true,
-    leagueInfo?.allowIrSlots ?? true
-  );
-  const commissionerId = getLeagueSetting(
-    mockLeagueResult.data?.commissioner_id ?? null,
-    leagueInfo?.commissionerId ?? null
-  );
-  const roster = getRosterComposition(allowIrSlots) as DraftRosterComposition;
-  const currentRound = draft?.round ?? 1;
+
+  return {
+    draft,
+    draftLoading,
+    members,
+    membersLoading,
+    leagueInfoLoading,
+    allowIrSlots: getLeagueSetting(
+      mockLeagueResult.data?.allow_ir_slots ?? true,
+      leagueInfo?.allowIrSlots ?? true
+    ),
+    commissionerId: getLeagueSetting(
+      mockLeagueResult.data?.commissioner_id ?? null,
+      leagueInfo?.commissionerId ?? null
+    ),
+  };
+}
+
+function useDraftStatData(currentRound: number) {
   const {
     data: playerStatsData,
     isLoading: playerStatsLoading,
@@ -64,18 +115,47 @@ export function useDraftPageData(leagueId: string, userId: string | undefined) {
   } = usePlayoffTeamsForDraft(CURRENT_SEASON, currentRound);
   const { data: regSeasonStatsData } =
     useRegularSeasonPlayersForDraft(CURRENT_SEASON);
-  const playerStats = useMemo(
-    () => (playerStatsData ?? []) as PlayerStatRow[],
-    [playerStatsData]
-  );
-  const teamStats = useMemo(
-    () => (teamStatsData ?? []) as TeamStatRow[],
-    [teamStatsData]
-  );
-  const regSeasonStats = useMemo(
-    () => (regSeasonStatsData ?? []) as RegSeasonStatRow[],
-    [regSeasonStatsData]
-  );
+
+  return {
+    playerStats: useMemo(
+      () => (playerStatsData ?? []) as PlayerStatRow[],
+      [playerStatsData]
+    ),
+    playerStatsLoading,
+    teamStats: useMemo(
+      () => (teamStatsData ?? []) as TeamStatRow[],
+      [teamStatsData]
+    ),
+    teamStatsLoading,
+    regSeasonStats: useMemo(
+      () => (regSeasonStatsData ?? []) as RegSeasonStatRow[],
+      [regSeasonStatsData]
+    ),
+    refetchPlayerStats,
+    refetchTeamStats,
+  };
+}
+
+function useDraftDerivedState(params: {
+  draft: DraftStateRow | null;
+  members: DraftMemberRow[];
+  userId: string | undefined;
+  commissionerId: string | null;
+  playerStats: PlayerStatRow[];
+  teamStats: TeamStatRow[];
+  regSeasonStats: RegSeasonStatRow[];
+  roster: DraftRosterComposition;
+}) {
+  const {
+    draft,
+    members,
+    userId,
+    commissionerId,
+    playerStats,
+    teamStats,
+    regSeasonStats,
+    roster,
+  } = params;
   const picks = useMemo(
     () => ((draft?.draft_picks ?? []) as DraftPickRow[]) ?? [],
     [draft?.draft_picks]
@@ -92,13 +172,10 @@ export function useDraftPageData(leagueId: string, userId: string | undefined) {
     () => createDraftedIdSet(picks, 'team_id'),
     [picks]
   );
-  const playerNameMap = useMemo(() => {
-    const map = buildPlayerNameMap(regSeasonStats);
-    for (const [id, name] of buildPlayerNameMap(playerStats)) {
-      map.set(id, name);
-    }
-    return map;
-  }, [playerStats, regSeasonStats]);
+  const playerNameMap = useMemo(
+    () => buildDraftPlayerNameMap(regSeasonStats, playerStats),
+    [playerStats, regSeasonStats]
+  );
   const teamNameMap = useMemo(() => buildTeamNameMap(teamStats), [teamStats]);
   const mySlotCounts = useMemo(
     () =>
@@ -113,30 +190,7 @@ export function useDraftPageData(leagueId: string, userId: string | undefined) {
     [picks, roster, turnState.myMember?.user_id]
   );
 
-  useDraftRealtimeChannel(leagueId);
-  const isDraftPoolSyncing = useDraftPoolSync({
-    draft,
-    currentSeason: CURRENT_SEASON,
-    playerStatsLength: playerStats.length,
-    teamStatsLength: teamStats.length,
-    refetchPlayerStats,
-    refetchTeamStats,
-  });
-
   return {
-    draft,
-    draftLoading,
-    members,
-    membersLoading,
-    leagueInfoLoading,
-    playerStats,
-    playerStatsLoading,
-    teamStats,
-    teamStatsLoading,
-    regSeasonStats,
-    roster,
-    commissionerId,
-    allowIrSlots,
     picks,
     draftedPlayerIds,
     draftedTeamIds,
@@ -144,12 +198,17 @@ export function useDraftPageData(leagueId: string, userId: string | undefined) {
     teamNameMap,
     mySlotCounts,
     myRosterSlots,
-    isRound1: currentRound === 1,
-    isDraftPoolSyncing,
     ...turnState,
   };
 }
 
-function getLeagueSetting<T>(mockValue: T, realValue: T): T {
-  return IS_MOCK ? mockValue : realValue;
+function buildDraftPlayerNameMap(
+  regSeasonStats: RegSeasonStatRow[],
+  playerStats: PlayerStatRow[]
+) {
+  const map = buildPlayerNameMap(regSeasonStats);
+  for (const [id, name] of buildPlayerNameMap(playerStats)) {
+    map.set(id, name);
+  }
+  return map;
 }
