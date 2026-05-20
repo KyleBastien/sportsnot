@@ -22,6 +22,12 @@ import {
   groupRosterSlots,
   resolveRosterNavigation,
 } from './rosterUtils';
+import {
+  buildPlayerTeamIdMap,
+  computeAliveTeamIds,
+  decorateSlotsWithElimination,
+  type EliminationMaps,
+} from './eliminationUtils';
 
 export function useRosterPageData(leagueId: string, leagueMemberId?: string) {
   const navigate = useNavigate();
@@ -133,6 +139,7 @@ function useRosterViewState(params: {
         teamNameMap: rosterEntityMaps.teamNameMap,
         playerTeamAbbreviationMap: rosterEntityMaps.playerTeamAbbreviationMap,
         teamAbbreviationMap: rosterEntityMaps.teamAbbreviationMap,
+        eliminationMaps: rosterEntityMaps.eliminationMaps,
         isMobile,
         positionOrder,
       }),
@@ -170,6 +177,27 @@ function useRosterEntityMaps(
     () => buildInjuredPlayerIds(rosterStats.playerStats),
     [rosterStats.playerStats]
   );
+  const eliminationMaps = useMemo<EliminationMaps>(() => {
+    const { aliveTeamIds, hasEliminationData } = computeAliveTeamIds({
+      round: rosterStats.currentRound,
+      currentRoundTeamStats: rosterStats.currentRoundTeamStats,
+      nextRoundTeamStats: rosterStats.nextRoundTeamStats,
+    });
+    const playerTeamIdByPlayerId = buildPlayerTeamIdMap(
+      [...rosterStats.playerStats, ...rosterStats.regSeasonStats],
+      rosterStats.teamStats,
+      rosterStats.currentRoundTeamStats,
+      rosterStats.nextRoundTeamStats
+    );
+    return { aliveTeamIds, playerTeamIdByPlayerId, hasEliminationData };
+  }, [
+    rosterStats.currentRound,
+    rosterStats.currentRoundTeamStats,
+    rosterStats.nextRoundTeamStats,
+    rosterStats.playerStats,
+    rosterStats.regSeasonStats,
+    rosterStats.teamStats,
+  ]);
 
   return {
     injuredPlayerIds,
@@ -177,6 +205,7 @@ function useRosterEntityMaps(
     teamNameMap,
     playerTeamAbbreviationMap,
     teamAbbreviationMap,
+    eliminationMaps,
   };
 }
 
@@ -202,6 +231,14 @@ function useRosterStatsData(currentRound: number) {
     CURRENT_SEASON,
     nameResolutionRound
   );
+  const { data: currentRoundTeamStats } = usePlayoffTeamsForRoster(
+    CURRENT_SEASON,
+    currentRound
+  );
+  const { data: nextRoundTeamStats } = usePlayoffTeamsForRoster(
+    CURRENT_SEASON,
+    currentRound + 1
+  );
   const { data: regSeasonStats } = useRegularSeasonPlayersForRoster(
     CURRENT_SEASON,
     currentRound === 1
@@ -211,7 +248,10 @@ function useRosterStatsData(currentRound: number) {
     playerStats: playerStats ?? [],
     playerStatsLoading,
     teamStats: teamStats ?? [],
+    currentRoundTeamStats: currentRoundTeamStats ?? [],
+    nextRoundTeamStats: nextRoundTeamStats ?? [],
     regSeasonStats: regSeasonStats ?? [],
+    currentRound,
   };
 }
 
@@ -256,6 +296,7 @@ function createReadyViewProps(params: {
   teamNameMap: Map<number, string>;
   playerTeamAbbreviationMap: Map<number, string>;
   teamAbbreviationMap: Map<number, string>;
+  eliminationMaps: EliminationMaps;
   isMobile: boolean;
   positionOrder: string[];
 }) {
@@ -274,9 +315,12 @@ function createReadyViewProps(params: {
     teamNameMap,
     playerTeamAbbreviationMap,
     teamAbbreviationMap,
+    eliminationMaps,
     isMobile,
     positionOrder,
   } = params;
+
+  const decoratedSlots = decorateSlotsWithElimination(slots, eliminationMaps);
 
   return {
     memberOptions,
@@ -284,10 +328,13 @@ function createReadyViewProps(params: {
     onMemberChange,
     rosterTitle,
     round,
-    roundPoints: getRoundPoints(slots),
+    roundPoints: getRoundPoints(decoratedSlots),
     totalPoints,
-    groupedSlots: groupRosterSlots<RosterSlotRow>(slots, positionOrder),
-    slots,
+    groupedSlots: groupRosterSlots<RosterSlotRow>(
+      decoratedSlots,
+      positionOrder
+    ),
+    slots: decoratedSlots,
     isOwnRoster,
     playerStatsLoading,
     injuredPlayerIds,
