@@ -16,9 +16,16 @@ import {
   TextInput,
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@sportsnot/supabase';
+import {
+  supabase,
+  useLeague as useSupabaseLeague,
+  usePlayoffTeams as useSupabasePlayoffTeams,
+} from '@sportsnot/supabase';
+import { CURRENT_SEASON } from '@sportsnot/types';
 import { useIsMobile, MobileCardList, DataRow } from '@sportsnot/ui';
 import { useMockScoringHistory } from '../../../mock/hooks/useMockScoringHistory';
+import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
+import { useMockPlayoffTeams } from '../../../mock/hooks/useMockNhlApi';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -53,6 +60,59 @@ function useScoringHistory(leagueId: string) {
   return IS_MOCK ? mockResult : queryResult;
 }
 
+function useEliminatedTeamAbbrs(leagueId: string): Set<string> {
+  const mockLeague = useMockLeague(leagueId);
+  const supabaseLeague = useSupabaseLeague(leagueId);
+  const leagueQuery = IS_MOCK ? mockLeague : supabaseLeague;
+  const currentRound =
+    (leagueQuery.data as { current_round?: number } | null | undefined)
+      ?.current_round ?? 1;
+
+  const round1MockTeams = useMockPlayoffTeams(CURRENT_SEASON, 1);
+  const round1SupabaseTeams = useSupabasePlayoffTeams(CURRENT_SEASON, 1);
+  const aliveCurrentMockTeams = useMockPlayoffTeams(
+    CURRENT_SEASON,
+    currentRound
+  );
+  const aliveCurrentSupabaseTeams = useSupabasePlayoffTeams(
+    CURRENT_SEASON,
+    currentRound
+  );
+  const aliveNextMockTeams = useMockPlayoffTeams(
+    CURRENT_SEASON,
+    currentRound + 1
+  );
+  const aliveNextSupabaseTeams = useSupabasePlayoffTeams(
+    CURRENT_SEASON,
+    currentRound + 1
+  );
+
+  const round1Teams =
+    (IS_MOCK ? round1MockTeams.data : round1SupabaseTeams.data) ?? [];
+  const aliveCurrent =
+    (IS_MOCK ? aliveCurrentMockTeams.data : aliveCurrentSupabaseTeams.data) ??
+    [];
+  const aliveNext =
+    (IS_MOCK ? aliveNextMockTeams.data : aliveNextSupabaseTeams.data) ?? [];
+
+  const aliveAbbrs = new Set<string>();
+  const aliveSource =
+    currentRound < 4 && aliveNext.length > 0 ? aliveNext : aliveCurrent;
+  for (const team of aliveSource) {
+    if (team.team_abbreviation && !team.is_eliminated) {
+      aliveAbbrs.add(team.team_abbreviation);
+    }
+  }
+
+  const eliminated = new Set<string>();
+  for (const team of round1Teams) {
+    if (team.team_abbreviation && !aliveAbbrs.has(team.team_abbreviation)) {
+      eliminated.add(team.team_abbreviation);
+    }
+  }
+  return eliminated;
+}
+
 const EVENT_COLORS: Record<string, string> = {
   goal: 'red',
   assist: 'blue',
@@ -63,6 +123,7 @@ const EVENT_COLORS: Record<string, string> = {
 export function ScoringHistoryPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const { data: events, isLoading, error } = useScoringHistory(leagueId!);
+  const eliminatedAbbrs = useEliminatedTeamAbbrs(leagueId!);
   const [playerFilter, setPlayerFilter] = useState('');
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState('');
@@ -150,7 +211,20 @@ export function ScoringHistoryPage() {
                   withBorder
                 >
                   <Group justify="space-between" mb={4}>
-                    <Text fw={500} size="sm">
+                    <Text
+                      fw={500}
+                      size="sm"
+                      td={
+                        eliminatedAbbrs.has(event.team_abbreviation)
+                          ? 'line-through'
+                          : undefined
+                      }
+                      c={
+                        eliminatedAbbrs.has(event.team_abbreviation)
+                          ? 'dimmed'
+                          : undefined
+                      }
+                    >
                       {event.player_name}
                     </Text>
                     <Badge
@@ -208,7 +282,18 @@ export function ScoringHistoryPage() {
                   ) : (
                     filtered.map((event, index) => (
                       <Table.Tr key={event.id ?? index}>
-                        <Table.Td>{event.player_name}</Table.Td>
+                        <Table.Td
+                          style={
+                            eliminatedAbbrs.has(event.team_abbreviation)
+                              ? {
+                                  textDecoration: 'line-through',
+                                  color: 'var(--mantine-color-dimmed)',
+                                }
+                              : undefined
+                          }
+                        >
+                          {event.player_name}
+                        </Table.Td>
                         <Table.Td>
                           <Badge variant="light" color="gray">
                             {event.team_abbreviation}

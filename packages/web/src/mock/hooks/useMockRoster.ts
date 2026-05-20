@@ -115,16 +115,14 @@ export function useMockRoster(
 
   const memberSlots = state.rosters[member.id] ?? [];
 
-  // For Round 4, determine which slots are eliminated
-  const eliminatedAbbrs =
-    state.currentRound === 4
-      ? getEliminatedAbbreviations(4)
-      : new Set<string>();
+  // Players whose NHL team is out by the start of the next round are crossed
+  // out. For the round 3 + 4 combined draft this naturally covers viewing the
+  // round 4 roster while round 3 is in progress.
+  const eliminatedAbbrs = getEliminatedAbbreviations(state.currentRound + 1);
 
   // Map to Supabase snake_case and compute points_earned through simulationDate
   const slots = memberSlots.map((slot) => {
-    const eliminated =
-      state.currentRound === 4 && isSlotEliminated(slot, eliminatedAbbrs);
+    const eliminated = isSlotEliminated(slot, eliminatedAbbrs);
 
     return {
       id: slot.id,
@@ -166,16 +164,12 @@ export function useMockLeagueRosters(leagueId: string | undefined) {
     return makeMockQuery([]);
   }
 
-  const eliminatedAbbrs =
-    state.currentRound === 4
-      ? getEliminatedAbbreviations(4)
-      : new Set<string>();
+  const eliminatedAbbrs = getEliminatedAbbreviations(state.currentRound + 1);
 
   const allRosters = league.members.flatMap((member) => {
     const memberSlots = state.rosters[member.id] ?? [];
     return memberSlots.map((slot) => {
-      const eliminated =
-        state.currentRound === 4 && isSlotEliminated(slot, eliminatedAbbrs);
+      const eliminated = isSlotEliminated(slot, eliminatedAbbrs);
 
       return {
         id: slot.id,
