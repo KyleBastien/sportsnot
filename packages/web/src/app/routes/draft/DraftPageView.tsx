@@ -56,6 +56,8 @@ interface DraftPageViewProps {
   picks: DraftPickRow[];
   playerNameMap: Map<number, string>;
   teamNameMap: Map<number, string>;
+  playerTeamAbbreviationMap: Map<number, string>;
+  teamAbbreviationMap: Map<number, string>;
   myTeamOpened: boolean;
   onToggleMyTeam: () => void;
   myRosterSlots: MyRosterGroup[];
@@ -160,6 +162,8 @@ export function DraftPageView(props: DraftPageViewProps) {
           myRosterSlots={props.myRosterSlots}
           playerNameMap={props.playerNameMap}
           teamNameMap={props.teamNameMap}
+          playerTeamAbbreviationMap={props.playerTeamAbbreviationMap}
+          teamAbbreviationMap={props.teamAbbreviationMap}
         />
         <DraftAvailablePlayersCard
           playerStats={props.playerStats}

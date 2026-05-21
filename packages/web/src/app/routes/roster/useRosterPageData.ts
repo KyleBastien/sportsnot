@@ -6,6 +6,10 @@ import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@sportsnot/ui';
 import { useAuthContext } from '../../context/AuthContext';
 import {
+  buildPlayerTeamAbbreviationMap,
+  buildTeamAbbreviationMap,
+} from '../../utils/teamLookupMaps';
+import {
   useLeagueForRoster,
   useMemberRoster,
   usePlayoffPlayersForRoster,
@@ -353,45 +357,6 @@ function buildMergedPlayerNameMap(
   const map = buildPlayerNameMap(regSeasonStats);
   for (const [id, name] of buildPlayerNameMap(playerStats)) {
     map.set(id, name);
-  }
-  return map;
-}
-
-function buildPlayerTeamAbbreviationMap(
-  regSeasonStats: Array<{
-    player_id: number;
-    team_abbreviation?: string | null;
-  }>,
-  playerStats: Array<{ player_id: number; team_abbreviation?: string | null }>
-) {
-  const map = new Map<number, string>();
-  setPlayerTeamAbbreviations(map, regSeasonStats);
-  setPlayerTeamAbbreviations(map, playerStats);
-  return map;
-}
-
-function setPlayerTeamAbbreviations(
-  map: Map<number, string>,
-  players: Array<{ player_id: number; team_abbreviation?: string | null }>
-) {
-  for (const player of players) {
-    const abbreviation = player.team_abbreviation;
-    if (!abbreviation) {
-      continue;
-    }
-
-    map.set(player.player_id, abbreviation);
-  }
-}
-
-function buildTeamAbbreviationMap(
-  teamStats: Array<{ team_id: number; team_abbreviation?: string | null }>
-) {
-  const map = new Map<number, string>();
-  for (const team of teamStats) {
-    if (team.team_abbreviation) {
-      map.set(team.team_id, team.team_abbreviation);
-    }
   }
   return map;
 }
