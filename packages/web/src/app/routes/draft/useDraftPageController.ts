@@ -128,6 +128,8 @@ export function useDraftPageController({
           picks: data.picks,
           playerNameMap: data.playerNameMap,
           teamNameMap: data.teamNameMap,
+          playerTeamAbbreviationMap: data.playerTeamAbbreviationMap,
+          teamAbbreviationMap: data.teamAbbreviationMap,
           myTeamOpened,
           onToggleMyTeam: toggleMyTeam,
           myRosterSlots: data.myRosterSlots,

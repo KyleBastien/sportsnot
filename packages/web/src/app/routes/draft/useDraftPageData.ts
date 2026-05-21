@@ -1,6 +1,10 @@
 import { CURRENT_SEASON, getRosterComposition } from '@sportsnot/types';
 import { buildPlayerNameMap, buildTeamNameMap } from '@sportsnot/utils';
 import { useMemo } from 'react';
+import {
+  buildPlayerTeamAbbreviationMap,
+  buildTeamAbbreviationMap,
+} from '../../utils/teamLookupMaps';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import {
   useCumulativePlayoffPlayersForDraft,
@@ -46,6 +50,8 @@ export function useDraftPageData(leagueId: string, userId: string | undefined) {
     commissionerId: leagueData.commissionerId,
     playerStats: statData.playerStats,
     teamStats: statData.teamStats,
+    cumulativePlayerStats: statData.cumulativePlayerStats,
+    cumulativeTeamStats: statData.cumulativeTeamStats,
     regSeasonStats: statData.regSeasonStats,
     roster,
   });
@@ -175,6 +181,8 @@ function useDraftDerivedState(params: {
   commissionerId: string | null;
   playerStats: PlayerStatRow[];
   teamStats: TeamStatRow[];
+  cumulativePlayerStats: PlayerStatRow[];
+  cumulativeTeamStats: TeamStatRow[];
   regSeasonStats: RegSeasonStatRow[];
   roster: DraftRosterComposition;
 }) {
@@ -185,6 +193,8 @@ function useDraftDerivedState(params: {
     commissionerId,
     playerStats,
     teamStats,
+    cumulativePlayerStats,
+    cumulativeTeamStats,
     regSeasonStats,
     roster,
   } = params;
@@ -205,10 +215,31 @@ function useDraftDerivedState(params: {
     [picks]
   );
   const playerNameMap = useMemo(
-    () => buildDraftPlayerNameMap(regSeasonStats, playerStats),
-    [playerStats, regSeasonStats]
+    () =>
+      buildDraftPlayerNameMap(
+        regSeasonStats,
+        cumulativePlayerStats,
+        playerStats
+      ),
+    [cumulativePlayerStats, playerStats, regSeasonStats]
   );
-  const teamNameMap = useMemo(() => buildTeamNameMap(teamStats), [teamStats]);
+  const teamNameMap = useMemo(
+    () => buildDraftTeamNameMap(cumulativeTeamStats, teamStats),
+    [cumulativeTeamStats, teamStats]
+  );
+  const playerTeamAbbreviationMap = useMemo(
+    () =>
+      buildPlayerTeamAbbreviationMap(
+        regSeasonStats,
+        cumulativePlayerStats,
+        playerStats
+      ),
+    [cumulativePlayerStats, playerStats, regSeasonStats]
+  );
+  const teamAbbreviationMap = useMemo(
+    () => buildTeamAbbreviationMap(cumulativeTeamStats, teamStats),
+    [cumulativeTeamStats, teamStats]
+  );
   const mySlotCounts = useMemo(
     () =>
       countMemberSlots(
@@ -228,6 +259,8 @@ function useDraftDerivedState(params: {
     draftedTeamIds,
     playerNameMap,
     teamNameMap,
+    playerTeamAbbreviationMap,
+    teamAbbreviationMap,
     mySlotCounts,
     myRosterSlots,
     ...turnState,
@@ -235,12 +268,29 @@ function useDraftDerivedState(params: {
 }
 
 function buildDraftPlayerNameMap(
-  regSeasonStats: RegSeasonStatRow[],
-  playerStats: PlayerStatRow[]
+  ...playerSources: Array<
+    Array<{ player_id: number; player_name?: string | null }>
+  >
 ) {
-  const map = buildPlayerNameMap(regSeasonStats);
-  for (const [id, name] of buildPlayerNameMap(playerStats)) {
-    map.set(id, name);
+  const map = new Map<number, string>();
+
+  for (const players of playerSources) {
+    for (const [id, name] of buildPlayerNameMap(players)) {
+      map.set(id, name);
+    }
   }
+
+  return map;
+}
+
+function buildDraftTeamNameMap(...teamSources: TeamStatRow[][]) {
+  const map = new Map<number, string>();
+
+  for (const teams of teamSources) {
+    for (const [id, name] of buildTeamNameMap(teams)) {
+      map.set(id, name);
+    }
+  }
+
   return map;
 }

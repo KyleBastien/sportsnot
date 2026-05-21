@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, rs } from '@rstest/core';
-import { cleanup, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { User } from '@supabase/supabase-js';
@@ -132,6 +132,19 @@ function buildCumulativePlayerStats() {
   ];
 }
 
+function buildTeamStats() {
+  return [
+    {
+      team_id: 1,
+      team_name: 'Edmonton Oilers',
+      team_abbreviation: 'EDM',
+      is_eliminated: false,
+      wins: 5,
+      shutouts: 1,
+    },
+  ];
+}
+
 function renderHarness(authUser: User = mockUser) {
   return renderWithAuth(<DraftPage />, {
     auth: { user: authUser },
@@ -161,7 +174,7 @@ beforeEach(() => {
     isLoading: false,
   };
   draftState.teamStats = { data: [], isLoading: false };
-  draftState.cumulativeTeamStats = { data: [], isLoading: false };
+  draftState.cumulativeTeamStats = { data: buildTeamStats(), isLoading: false };
   draftState.regSeasonStats = { data: [], isLoading: false };
 });
 
@@ -266,6 +279,95 @@ describe('DraftPage', () => {
     expect(screen.getByText('Connor McDavid')).toBeTruthy();
     expect(screen.getByText('15')).toBeTruthy();
     expect(screen.getByText('12')).toBeTruthy();
+  });
+
+  it('shows a skater team badge in My Team', () => {
+    draftState.draft = {
+      data: buildDraft({
+        draft_picks: [
+          {
+            id: 'pick-1',
+            pick_number: 1,
+            player_id: 100,
+            team_id: null,
+            position: 'F',
+            league_members: { team_name: 'Alpha', user_id: 'user-1' },
+          },
+        ],
+      }),
+      isLoading: false,
+    };
+
+    renderHarness();
+    fireEvent.click(screen.getByRole('button', { name: /My Team/i }));
+
+    expect(screen.getByText('Connor McDavid')).toBeTruthy();
+    expect(screen.getByLabelText('Team EDM')).toBeTruthy();
+  });
+
+  it('shows a goalie team badge in My Team', () => {
+    draftState.draft = {
+      data: buildDraft({
+        draft_picks: [
+          {
+            id: 'pick-1',
+            pick_number: 1,
+            player_id: null,
+            team_id: 1,
+            position: 'G',
+            league_members: { team_name: 'Alpha', user_id: 'user-1' },
+          },
+        ],
+      }),
+      isLoading: false,
+    };
+
+    renderHarness();
+    fireEvent.click(screen.getByRole('button', { name: /My Team/i }));
+
+    expect(screen.getByText('Edmonton Oilers')).toBeTruthy();
+    expect(screen.getByLabelText('Team EDM')).toBeTruthy();
+  });
+
+  it('falls back to regular season team abbreviation in My Team', () => {
+    draftState.playerStats = { data: [], isLoading: false };
+    draftState.cumulativePlayerStats = { data: [], isLoading: false };
+    draftState.regSeasonStats = {
+      data: [
+        {
+          player_id: 200,
+          player_name: 'Auston Matthews',
+          team_abbreviation: 'TOR',
+          position: 'F',
+          goals: 69,
+          assists: 38,
+          points: 107,
+          games_played: 81,
+        },
+      ],
+      isLoading: false,
+    };
+    draftState.draft = {
+      data: buildDraft({
+        draft_picks: [
+          {
+            id: 'pick-1',
+            pick_number: 1,
+            player_id: 200,
+            team_id: null,
+            position: 'F',
+            league_members: { team_name: 'Alpha', user_id: 'user-1' },
+          },
+        ],
+      }),
+      isLoading: false,
+    };
+
+    renderHarness();
+    fireEvent.click(screen.getByRole('button', { name: /My Team/i }));
+
+    expect(screen.getByText('Auston Matthews')).toBeTruthy();
+    expect(screen.getByLabelText('Team TOR')).toBeTruthy();
   });
 
   it('shows Picking-for badge and Draft buttons when commissioner views another players pick', () => {

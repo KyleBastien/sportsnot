@@ -169,12 +169,16 @@ export function DraftMyTeamCard({
   myRosterSlots,
   playerNameMap,
   teamNameMap,
+  playerTeamAbbreviationMap,
+  teamAbbreviationMap,
 }: {
   myTeamOpened: boolean;
   onToggleMyTeam: () => void;
   myRosterSlots: MyRosterGroup[];
   playerNameMap: Map<number, string>;
   teamNameMap: Map<number, string>;
+  playerTeamAbbreviationMap: Map<number, string>;
+  teamAbbreviationMap: Map<number, string>;
 }) {
   return (
     <Card shadow="sm" padding="md" radius="md" withBorder>
@@ -194,6 +198,8 @@ export function DraftMyTeamCard({
               group={group}
               playerNameMap={playerNameMap}
               teamNameMap={teamNameMap}
+              playerTeamAbbreviationMap={playerTeamAbbreviationMap}
+              teamAbbreviationMap={teamAbbreviationMap}
             />
           ))}
         </Stack>
@@ -401,10 +407,14 @@ function DraftRosterGroupBlock({
   group,
   playerNameMap,
   teamNameMap,
+  playerTeamAbbreviationMap,
+  teamAbbreviationMap,
 }: {
   group: MyRosterGroup;
   playerNameMap: Map<number, string>;
   teamNameMap: Map<number, string>;
+  playerTeamAbbreviationMap: Map<number, string>;
+  teamAbbreviationMap: Map<number, string>;
 }) {
   return (
     <div>
@@ -413,21 +423,38 @@ function DraftRosterGroupBlock({
         {group.filled.length + group.emptyCount})
       </Text>
       <Stack gap={4}>
-        {group.filled.map((pick) => (
-          <Group key={pick.id} gap="xs">
-            <Badge variant="light" size="sm">
-              {pick.position}
-            </Badge>
-            <Text size="sm">
-              {resolvePickName(
-                pick.player_id,
-                pick.team_id,
-                playerNameMap,
-                teamNameMap
+        {group.filled.map((pick) => {
+          const teamAbbreviation = resolvePickTeamAbbreviation(
+            pick,
+            playerTeamAbbreviationMap,
+            teamAbbreviationMap
+          );
+
+          return (
+            <Group key={pick.id} gap="xs">
+              <Badge variant="light" size="sm">
+                {pick.position}
+              </Badge>
+              <Text size="sm">
+                {resolvePickName(
+                  pick.player_id,
+                  pick.team_id,
+                  playerNameMap,
+                  teamNameMap
+                )}
+              </Text>
+              {teamAbbreviation && (
+                <Badge
+                  aria-label={`Team ${teamAbbreviation}`}
+                  variant="outline"
+                  size="sm"
+                >
+                  {teamAbbreviation}
+                </Badge>
               )}
-            </Text>
-          </Group>
-        ))}
+            </Group>
+          );
+        })}
         {Array.from({ length: group.emptyCount }).map((_, index) => (
           <Text key={`empty-${group.position}-${index}`} size="sm" c="dimmed">
             Empty {group.label} slot
@@ -436,6 +463,22 @@ function DraftRosterGroupBlock({
       </Stack>
     </div>
   );
+}
+
+function resolvePickTeamAbbreviation(
+  pick: DraftPickRow,
+  playerTeamAbbreviationMap: Map<number, string>,
+  teamAbbreviationMap: Map<number, string>
+) {
+  if (pick.player_id != null) {
+    return playerTeamAbbreviationMap.get(pick.player_id);
+  }
+
+  if (pick.team_id != null) {
+    return teamAbbreviationMap.get(pick.team_id);
+  }
+
+  return undefined;
 }
 
 function DraftPoolEmptyState({
