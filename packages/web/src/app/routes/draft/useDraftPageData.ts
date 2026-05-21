@@ -186,18 +186,7 @@ function useDraftDerivedState(params: {
   regSeasonStats: RegSeasonStatRow[];
   roster: DraftRosterComposition;
 }) {
-  const {
-    draft,
-    members,
-    userId,
-    commissionerId,
-    playerStats,
-    teamStats,
-    cumulativePlayerStats,
-    cumulativeTeamStats,
-    regSeasonStats,
-    roster,
-  } = params;
+  const { draft, members, userId, commissionerId, roster } = params;
   const picks = useMemo(
     () => (draft?.draft_picks ?? []) as DraftPickRow[],
     [draft?.draft_picks]
@@ -214,6 +203,34 @@ function useDraftDerivedState(params: {
     () => createDraftedIdSet(picks, 'team_id'),
     [picks]
   );
+  const lookupMaps = useDraftLookupMaps(params);
+  const myRosterState = useDraftRosterState(picks, turnState, roster);
+
+  return {
+    picks,
+    draftedPlayerIds,
+    draftedTeamIds,
+    ...lookupMaps,
+    ...myRosterState,
+    ...turnState,
+  };
+}
+
+function useDraftLookupMaps(params: {
+  playerStats: PlayerStatRow[];
+  teamStats: TeamStatRow[];
+  cumulativePlayerStats: PlayerStatRow[];
+  cumulativeTeamStats: TeamStatRow[];
+  regSeasonStats: RegSeasonStatRow[];
+}) {
+  const {
+    playerStats,
+    teamStats,
+    cumulativePlayerStats,
+    cumulativeTeamStats,
+    regSeasonStats,
+  } = params;
+
   const playerNameMap = useMemo(
     () =>
       buildDraftPlayerNameMap(
@@ -240,13 +257,24 @@ function useDraftDerivedState(params: {
     () => buildTeamAbbreviationMap(cumulativeTeamStats, teamStats),
     [cumulativeTeamStats, teamStats]
   );
+
+  return {
+    playerNameMap,
+    teamNameMap,
+    playerTeamAbbreviationMap,
+    teamAbbreviationMap,
+  };
+}
+
+function useDraftRosterState(
+  picks: DraftPickRow[],
+  turnState: ReturnType<typeof buildDraftTurnState>,
+  roster: DraftRosterComposition
+) {
+  const memberUserId = (turnState.pickingMember ?? turnState.myMember)?.user_id;
   const mySlotCounts = useMemo(
-    () =>
-      countMemberSlots(
-        picks,
-        (turnState.pickingMember ?? turnState.myMember)?.user_id
-      ),
-    [picks, turnState.myMember, turnState.pickingMember]
+    () => countMemberSlots(picks, memberUserId),
+    [memberUserId, picks]
   );
   const myRosterSlots = useMemo(
     () => buildMyRosterSlots(picks, turnState.myMember?.user_id, roster),
@@ -254,16 +282,8 @@ function useDraftDerivedState(params: {
   );
 
   return {
-    picks,
-    draftedPlayerIds,
-    draftedTeamIds,
-    playerNameMap,
-    teamNameMap,
-    playerTeamAbbreviationMap,
-    teamAbbreviationMap,
     mySlotCounts,
     myRosterSlots,
-    ...turnState,
   };
 }
 

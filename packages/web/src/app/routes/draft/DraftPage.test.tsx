@@ -3,6 +3,11 @@ import { cleanup, fireEvent, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { User } from '@supabase/supabase-js';
+import type {
+  DraftPickRow,
+  PlayerStatRow,
+  RegSeasonStatRow,
+} from './draftPageTypes';
 import { renderWithAuth } from '../../../test-utils/renderWithAuth';
 
 interface MockHookResult<T> {
@@ -145,6 +150,74 @@ function buildTeamStats() {
   ];
 }
 
+function buildMyPick(
+  overrides: Partial<{
+    id: string;
+    pick_number: number;
+    player_id: number | null;
+    team_id: number | null;
+    position: string;
+  }> = {}
+): DraftPickRow {
+  return {
+    id: 'pick-1',
+    pick_number: 1,
+    player_id: 100,
+    team_id: null,
+    position: 'F',
+    league_members: { team_name: 'Alpha', user_id: 'user-1' },
+    ...overrides,
+  };
+}
+
+function openMyTeam() {
+  fireEvent.click(screen.getByRole('button', { name: /My Team/i }));
+}
+
+function renderMyTeamBadgeScenario(params: {
+  picks: DraftPickRow[];
+  expectedName: string;
+  expectedBadge: string;
+  playerStats?: PlayerStatRow[];
+  cumulativePlayerStats?: PlayerStatRow[];
+  regSeasonStats?: RegSeasonStatRow[];
+}) {
+  const {
+    picks,
+    expectedName,
+    expectedBadge,
+    playerStats,
+    cumulativePlayerStats,
+    regSeasonStats,
+  } = params;
+
+  if (playerStats) {
+    draftState.playerStats = { data: playerStats, isLoading: false };
+  }
+
+  if (cumulativePlayerStats) {
+    draftState.cumulativePlayerStats = {
+      data: cumulativePlayerStats,
+      isLoading: false,
+    };
+  }
+
+  if (regSeasonStats) {
+    draftState.regSeasonStats = { data: regSeasonStats, isLoading: false };
+  }
+
+  draftState.draft = {
+    data: buildDraft({ draft_picks: picks }),
+    isLoading: false,
+  };
+
+  renderHarness();
+  openMyTeam();
+
+  expect(screen.getByText(expectedName)).toBeTruthy();
+  expect(screen.getByLabelText(`Team ${expectedBadge}`)).toBeTruthy();
+}
+
 function renderHarness(authUser: User = mockUser) {
   return renderWithAuth(<DraftPage />, {
     auth: { user: authUser },
@@ -282,58 +355,29 @@ describe('DraftPage', () => {
   });
 
   it('shows a skater team badge in My Team', () => {
-    draftState.draft = {
-      data: buildDraft({
-        draft_picks: [
-          {
-            id: 'pick-1',
-            pick_number: 1,
-            player_id: 100,
-            team_id: null,
-            position: 'F',
-            league_members: { team_name: 'Alpha', user_id: 'user-1' },
-          },
-        ],
-      }),
-      isLoading: false,
-    };
-
-    renderHarness();
-    fireEvent.click(screen.getByRole('button', { name: /My Team/i }));
-
-    expect(screen.getByText('Connor McDavid')).toBeTruthy();
-    expect(screen.getByLabelText('Team EDM')).toBeTruthy();
+    renderMyTeamBadgeScenario({
+      picks: [buildMyPick()],
+      expectedName: 'Connor McDavid',
+      expectedBadge: 'EDM',
+    });
   });
 
   it('shows a goalie team badge in My Team', () => {
-    draftState.draft = {
-      data: buildDraft({
-        draft_picks: [
-          {
-            id: 'pick-1',
-            pick_number: 1,
-            player_id: null,
-            team_id: 1,
-            position: 'G',
-            league_members: { team_name: 'Alpha', user_id: 'user-1' },
-          },
-        ],
-      }),
-      isLoading: false,
-    };
-
-    renderHarness();
-    fireEvent.click(screen.getByRole('button', { name: /My Team/i }));
-
-    expect(screen.getByText('Edmonton Oilers')).toBeTruthy();
-    expect(screen.getByLabelText('Team EDM')).toBeTruthy();
+    renderMyTeamBadgeScenario({
+      picks: [buildMyPick({ player_id: null, team_id: 1, position: 'G' })],
+      expectedName: 'Edmonton Oilers',
+      expectedBadge: 'EDM',
+    });
   });
 
   it('falls back to regular season team abbreviation in My Team', () => {
-    draftState.playerStats = { data: [], isLoading: false };
-    draftState.cumulativePlayerStats = { data: [], isLoading: false };
-    draftState.regSeasonStats = {
-      data: [
+    renderMyTeamBadgeScenario({
+      picks: [buildMyPick({ player_id: 200 })],
+      expectedName: 'Auston Matthews',
+      expectedBadge: 'TOR',
+      playerStats: [],
+      cumulativePlayerStats: [],
+      regSeasonStats: [
         {
           player_id: 200,
           player_name: 'Auston Matthews',
@@ -345,29 +389,7 @@ describe('DraftPage', () => {
           games_played: 81,
         },
       ],
-      isLoading: false,
-    };
-    draftState.draft = {
-      data: buildDraft({
-        draft_picks: [
-          {
-            id: 'pick-1',
-            pick_number: 1,
-            player_id: 200,
-            team_id: null,
-            position: 'F',
-            league_members: { team_name: 'Alpha', user_id: 'user-1' },
-          },
-        ],
-      }),
-      isLoading: false,
-    };
-
-    renderHarness();
-    fireEvent.click(screen.getByRole('button', { name: /My Team/i }));
-
-    expect(screen.getByText('Auston Matthews')).toBeTruthy();
-    expect(screen.getByLabelText('Team TOR')).toBeTruthy();
+    });
   });
 
   it('shows Picking-for badge and Draft buttons when commissioner views another players pick', () => {
