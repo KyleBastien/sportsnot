@@ -75,11 +75,13 @@ function getLeagueSetting<T>(mockValue: T, realValue: T): T {
 }
 
 function useDraftLeagueData(leagueId: string) {
-  const { data: draftData, isLoading: draftLoading } = useDraft(leagueId);
-  const { data: membersData, isLoading: membersLoading } =
-    useLeagueMembers(leagueId);
-  const { data: leagueInfo, isLoading: leagueInfoLoading } =
-    useLeagueInfo(leagueId);
+  const { data: draftData, isLoading: draftLoading } = useDraft({ leagueId });
+  const { data: membersData, isLoading: membersLoading } = useLeagueMembers({
+    leagueId,
+  });
+  const { data: leagueInfo, isLoading: leagueInfoLoading } = useLeagueInfo({
+    leagueId,
+  });
   const mockLeagueResult = useMockLeague(leagueId);
   const members = useMemo(
     () => (membersData ?? []) as DraftMemberRow[],
@@ -109,22 +111,32 @@ function useDraftStatData(currentRound: number) {
     data: playerStatsData,
     isLoading: playerStatsLoading,
     refetch: refetchPlayerStats,
-  } = usePlayoffPlayersForDraft(CURRENT_SEASON, currentRound);
+  } = usePlayoffPlayersForDraft({
+    season: CURRENT_SEASON,
+    round: currentRound,
+  });
   const {
     data: cumulativePlayerStatsData,
     isLoading: cumulativePlayerStatsLoading,
-  } = useCumulativePlayoffPlayersForDraft(CURRENT_SEASON, currentRound);
+  } = useCumulativePlayoffPlayersForDraft({
+    season: CURRENT_SEASON,
+    round: currentRound,
+  });
   const {
     data: teamStatsData,
     isLoading: teamStatsLoading,
     refetch: refetchTeamStats,
-  } = usePlayoffTeamsForDraft(CURRENT_SEASON, currentRound);
+  } = usePlayoffTeamsForDraft({ season: CURRENT_SEASON, round: currentRound });
   const {
     data: cumulativeTeamStatsData,
     isLoading: cumulativeTeamStatsLoading,
-  } = useCumulativePlayoffTeamsForDraft(CURRENT_SEASON, currentRound);
-  const { data: regSeasonStatsData } =
-    useRegularSeasonPlayersForDraft(CURRENT_SEASON);
+  } = useCumulativePlayoffTeamsForDraft({
+    season: CURRENT_SEASON,
+    round: currentRound,
+  });
+  const { data: regSeasonStatsData } = useRegularSeasonPlayersForDraft({
+    season: CURRENT_SEASON,
+  });
 
   return {
     playerStats: useMemo(

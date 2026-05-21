@@ -43,6 +43,15 @@ interface PlayoffStatsConfig {
   orderField: string;
 }
 
+interface PlayoffStatsFetchConfig {
+  cacheTable: CacheTable;
+  season: string;
+  round: number;
+  roundFilter: 'eq' | 'lte';
+  orderField: string;
+  ascending: boolean;
+}
+
 const PLAYER_PLAYOFF_STATS_CONFIG: PlayoffStatsConfig = {
   queryKey: 'playoff-players',
   cacheTable: 'player_stats_cache',
@@ -134,7 +143,9 @@ function usePlayoffStatsQuery(params: {
         cacheTable: statConfig.cacheTable,
         season,
         round,
+        roundFilter: 'eq',
         orderField: statConfig.orderField,
+        ascending: false,
       }),
     staleTime: PLAYOFF_STATS_STALE_TIME_MS,
   });
@@ -152,10 +163,13 @@ function useCumulativePlayoffStats<
   return useQuery({
     queryKey: [statConfig.queryKey, season, round],
     queryFn: async () => {
-      const rows = await fetchCumulativePlayoffStats<TRow>({
+      const rows = await fetchPlayoffStatsRows<TRow>({
         cacheTable: statConfig.cacheTable,
         season,
         round,
+        roundFilter: 'lte',
+        orderField: 'playoff_round',
+        ascending: true,
       });
       return aggregateCumulativeRows(rows, statConfig);
     },
@@ -163,39 +177,21 @@ function useCumulativePlayoffStats<
   });
 }
 
-async function fetchCumulativePlayoffStats<TRow>(params: {
-  cacheTable: CacheTable;
-  season: string;
-  round: number;
-}) {
-  const { cacheTable, season, round } = params;
-  const { data, error } = await supabase
+async function fetchPlayoffStatsRows<TRow>(params: PlayoffStatsFetchConfig) {
+  const { ascending, cacheTable, orderField, round, roundFilter, season } =
+    params;
+  const roundQuery = supabase
     .from(cacheTable)
     .select('*')
-    .eq('nhl_season', season)
-    .lte('playoff_round', round)
-    .order('playoff_round', { ascending: true });
+    .eq('nhl_season', season);
+  const scopedQuery =
+    roundFilter === 'eq'
+      ? roundQuery.eq('playoff_round', round)
+      : roundQuery.lte('playoff_round', round);
+  const { data, error } = await scopedQuery.order(orderField, { ascending });
 
   if (error) throw error;
   return (data ?? []) as TRow[];
-}
-
-async function fetchPlayoffStatsRows(params: {
-  cacheTable: CacheTable;
-  season: string;
-  round: number;
-  orderField: string;
-}) {
-  const { cacheTable, season, round, orderField } = params;
-  const { data, error } = await supabase
-    .from(cacheTable)
-    .select('*')
-    .eq('nhl_season', season)
-    .eq('playoff_round', round)
-    .order(orderField, { ascending: false });
-
-  if (error) throw error;
-  return data ?? [];
 }
 
 function aggregateCumulativeRows<

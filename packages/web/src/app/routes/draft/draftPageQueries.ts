@@ -21,7 +21,21 @@ import {
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
-export function useDraft(leagueId: string) {
+interface LeagueQueryParams {
+  leagueId: string;
+}
+
+interface DraftStatQueryParams {
+  season: string;
+  round: number;
+}
+
+interface SeasonQueryParams {
+  season: string;
+}
+
+export function useDraft(params: LeagueQueryParams) {
+  const { leagueId } = params;
   const mockResult = useMockDraft(leagueId);
 
   const queryResult = useQuery({
@@ -45,7 +59,8 @@ export function useDraft(leagueId: string) {
   return IS_MOCK ? mockResult : queryResult;
 }
 
-export function useLeagueMembers(leagueId: string) {
+export function useLeagueMembers(params: LeagueQueryParams) {
+  const { leagueId } = params;
   const mockResult = useMockLeagueMembers(leagueId);
 
   const queryResult = useQuery({
@@ -65,7 +80,8 @@ export function useLeagueMembers(leagueId: string) {
   return IS_MOCK ? mockResult : queryResult;
 }
 
-export function useLeagueInfo(leagueId: string) {
+export function useLeagueInfo(params: LeagueQueryParams) {
+  const { leagueId } = params;
   return useQuery({
     queryKey: ['league-info', leagueId],
     queryFn: async () => {
@@ -85,37 +101,40 @@ export function useLeagueInfo(leagueId: string) {
   });
 }
 
-export function usePlayoffPlayersForDraft(season: string, round: number) {
+export function usePlayoffPlayersForDraft(params: DraftStatQueryParams) {
+  const { season, round } = params;
   const mockResult = useMockPlayoffPlayers(season, round);
   const supabaseResult = useSupabasePlayoffPlayers(season, round);
   return selectDraftQuerySource(mockResult, supabaseResult);
 }
 
 export function useCumulativePlayoffPlayersForDraft(
-  season: string,
-  round: number
+  params: DraftStatQueryParams
 ) {
+  const { season, round } = params;
   const mockResult = useMockCumulativePlayoffPlayers(season, round);
   const queryResult = useSupabaseCumulativePlayoffPlayers(season, round);
   return selectDraftQuerySource(mockResult, queryResult);
 }
 
-export function usePlayoffTeamsForDraft(season: string, round: number) {
+export function usePlayoffTeamsForDraft(params: DraftStatQueryParams) {
+  const { season, round } = params;
   const mockResult = useMockPlayoffTeams(season, round);
   const supabaseResult = useSupabasePlayoffTeams(season, round);
   return selectDraftQuerySource(mockResult, supabaseResult);
 }
 
 export function useCumulativePlayoffTeamsForDraft(
-  season: string,
-  round: number
+  params: DraftStatQueryParams
 ) {
+  const { season, round } = params;
   const mockResult = useMockCumulativePlayoffTeams(season, round);
   const queryResult = useSupabaseCumulativePlayoffTeams(season, round);
   return selectDraftQuerySource(mockResult, queryResult);
 }
 
-export function useRegularSeasonPlayersForDraft(season: string) {
+export function useRegularSeasonPlayersForDraft(params: SeasonQueryParams) {
+  const { season } = params;
   const mockResult = useMockRegularSeasonPlayers(season, true);
   const supabaseResult = useSupabaseRegularSeasonPlayers(season, true);
   return selectDraftQuerySource(mockResult, supabaseResult);
