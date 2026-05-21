@@ -10,6 +10,8 @@ import {
   useMockLeagueMembers,
 } from '../../../mock/hooks/useMockDraft';
 import {
+  useMockCumulativePlayoffPlayers,
+  useMockCumulativePlayoffTeams,
   useMockPlayoffPlayers,
   useMockPlayoffTeams,
   useMockRegularSeasonPlayers,
@@ -87,14 +89,141 @@ export function usePlayoffPlayersForDraft(season: string, round: number) {
   return IS_MOCK ? mockResult : supabaseResult;
 }
 
+export function useCumulativePlayoffPlayersForDraft(
+  season: string,
+  round: number
+) {
+  const mockResult = useMockCumulativePlayoffPlayers(season, round);
+  const queryResult = useQuery({
+    queryKey: ['draft-cumulative-playoff-players', season, round],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('player_stats_cache')
+        .select('*')
+        .eq('nhl_season', season)
+        .lte('playoff_round', round)
+        .order('playoff_round', { ascending: true });
+
+      if (error) throw error;
+      return aggregatePlayerStats(data ?? []);
+    },
+    enabled: !IS_MOCK,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  return IS_MOCK ? mockResult : queryResult;
+}
+
 export function usePlayoffTeamsForDraft(season: string, round: number) {
   const mockResult = useMockPlayoffTeams(season, round);
   const supabaseResult = useSupabasePlayoffTeams(season, round);
   return IS_MOCK ? mockResult : supabaseResult;
 }
 
+export function useCumulativePlayoffTeamsForDraft(
+  season: string,
+  round: number
+) {
+  const mockResult = useMockCumulativePlayoffTeams(season, round);
+  const queryResult = useQuery({
+    queryKey: ['draft-cumulative-playoff-teams', season, round],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('team_stats_cache')
+        .select('*')
+        .eq('nhl_season', season)
+        .lte('playoff_round', round)
+        .order('playoff_round', { ascending: true });
+
+      if (error) throw error;
+      return aggregateTeamStats(data ?? []);
+    },
+    enabled: !IS_MOCK,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  return IS_MOCK ? mockResult : queryResult;
+}
+
 export function useRegularSeasonPlayersForDraft(season: string) {
   const mockResult = useMockRegularSeasonPlayers(season, true);
   const supabaseResult = useSupabaseRegularSeasonPlayers(season, true);
   return IS_MOCK ? mockResult : supabaseResult;
+}
+
+interface CachedPlayerStatsRow {
+  player_id: number;
+  player_name: string | null;
+  position: string | null;
+  team_abbreviation: string | null;
+  is_injured: boolean | null;
+  goals: number | null;
+  assists: number | null;
+  games_played: number | null;
+}
+
+interface CachedTeamStatsRow {
+  team_id: number;
+  team_name: string | null;
+  team_abbreviation: string | null;
+  is_eliminated: boolean | null;
+  wins: number | null;
+  shutouts: number | null;
+}
+
+function aggregatePlayerStats(rows: CachedPlayerStatsRow[]) {
+  const rowsByPlayerId = new Map<number, CachedPlayerStatsRow>();
+
+  for (const row of rows) {
+    const existing = rowsByPlayerId.get(row.player_id);
+    if (!existing) {
+      rowsByPlayerId.set(row.player_id, {
+        ...row,
+        goals: row.goals ?? 0,
+        assists: row.assists ?? 0,
+        games_played: row.games_played ?? 0,
+      });
+      continue;
+    }
+
+    rowsByPlayerId.set(row.player_id, {
+      ...existing,
+      player_name: row.player_name ?? existing.player_name,
+      position: row.position ?? existing.position,
+      team_abbreviation: row.team_abbreviation ?? existing.team_abbreviation,
+      is_injured: row.is_injured ?? existing.is_injured,
+      goals: (existing.goals ?? 0) + (row.goals ?? 0),
+      assists: (existing.assists ?? 0) + (row.assists ?? 0),
+      games_played: (existing.games_played ?? 0) + (row.games_played ?? 0),
+    });
+  }
+
+  return [...rowsByPlayerId.values()];
+}
+
+function aggregateTeamStats(rows: CachedTeamStatsRow[]) {
+  const rowsByTeamId = new Map<number, CachedTeamStatsRow>();
+
+  for (const row of rows) {
+    const existing = rowsByTeamId.get(row.team_id);
+    if (!existing) {
+      rowsByTeamId.set(row.team_id, {
+        ...row,
+        wins: row.wins ?? 0,
+        shutouts: row.shutouts ?? 0,
+      });
+      continue;
+    }
+
+    rowsByTeamId.set(row.team_id, {
+      ...existing,
+      team_name: row.team_name ?? existing.team_name,
+      team_abbreviation: row.team_abbreviation ?? existing.team_abbreviation,
+      is_eliminated: row.is_eliminated ?? existing.is_eliminated,
+      wins: (existing.wins ?? 0) + (row.wins ?? 0),
+      shutouts: (existing.shutouts ?? 0) + (row.shutouts ?? 0),
+    });
+  }
+
+  return [...rowsByTeamId.values()];
 }

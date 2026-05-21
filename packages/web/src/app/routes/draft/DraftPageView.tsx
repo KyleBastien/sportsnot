@@ -60,7 +60,9 @@ interface DraftPageViewProps {
   onToggleMyTeam: () => void;
   myRosterSlots: MyRosterGroup[];
   playerStats: PlayerStatRow[];
+  cumulativePlayerStats: PlayerStatRow[];
   teamStats: TeamStatRow[];
+  cumulativeTeamStats: TeamStatRow[];
   isDraftPoolSyncing: boolean;
   onSelectPlayer: (player: DraftablePlayer) => void;
   comparePlayers: ComparePlayer[];
@@ -161,7 +163,9 @@ export function DraftPageView(props: DraftPageViewProps) {
         />
         <DraftAvailablePlayersCard
           playerStats={props.playerStats}
+          cumulativePlayerStats={props.cumulativePlayerStats}
           teamStats={props.teamStats}
+          cumulativeTeamStats={props.cumulativeTeamStats}
           isDraftPoolSyncing={props.isDraftPoolSyncing}
           canPick={props.canPick}
           currentPicker={props.currentPicker}

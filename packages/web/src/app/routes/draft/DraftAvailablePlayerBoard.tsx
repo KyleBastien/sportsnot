@@ -20,7 +20,9 @@ import type {
 
 interface AvailablePlayerBoardProps {
   playerStats: PlayerStatRow[];
+  cumulativePlayerStats: PlayerStatRow[];
   teamStats: TeamStatRow[];
+  cumulativeTeamStats: TeamStatRow[];
   draftedPlayerIds: Set<number>;
   draftedTeamIds: Set<number>;
   positionFilter: string;
@@ -37,7 +39,9 @@ interface AvailablePlayerBoardProps {
 
 export function DraftAvailablePlayerBoard({
   playerStats,
+  cumulativePlayerStats,
   teamStats,
+  cumulativeTeamStats,
   draftedPlayerIds,
   draftedTeamIds,
   positionFilter,
@@ -55,6 +59,7 @@ export function DraftAvailablePlayerBoard({
   const filteredSkaters = filterSkaterRows({
     skaterRows: buildSkaterRows({
       playerStats,
+      cumulativePlayerStats,
       regSeasonStats,
       draftedPlayerIds,
       isRound1,
@@ -64,7 +69,11 @@ export function DraftAvailablePlayerBoard({
     isRound1,
   });
   const filteredTeams = filterTeamRows({
-    teamRows: buildTeamRows({ teamStats, draftedTeamIds }),
+    teamRows: buildTeamRows({
+      teamStats,
+      cumulativeTeamStats,
+      draftedTeamIds,
+    }),
     positionFilter,
     searchQuery,
   });

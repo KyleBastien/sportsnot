@@ -132,7 +132,9 @@ export function useDraftPageController({
           onToggleMyTeam: toggleMyTeam,
           myRosterSlots: data.myRosterSlots,
           playerStats: data.playerStats,
+          cumulativePlayerStats: data.cumulativePlayerStats,
           teamStats: data.teamStats,
+          cumulativeTeamStats: data.cumulativeTeamStats,
           isDraftPoolSyncing: data.isDraftPoolSyncing,
           onSelectPlayer: handleSelectPlayer,
           comparePlayers,
@@ -176,7 +178,9 @@ function isDraftPageLoading(data: ReturnType<typeof useDraftPageData>) {
     data.membersLoading ||
     data.leagueInfoLoading ||
     data.playerStatsLoading ||
-    data.teamStatsLoading
+    data.cumulativePlayerStatsLoading ||
+    data.teamStatsLoading ||
+    data.cumulativeTeamStatsLoading
   );
 }
 
