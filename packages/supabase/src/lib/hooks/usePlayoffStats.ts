@@ -37,6 +37,24 @@ interface AggregateStatsConfig<
   inheritedFields: Array<keyof TRow>;
 }
 
+interface PlayoffStatsConfig {
+  queryKey: string;
+  cacheTable: CacheTable;
+  orderField: string;
+}
+
+const PLAYER_PLAYOFF_STATS_CONFIG: PlayoffStatsConfig = {
+  queryKey: 'playoff-players',
+  cacheTable: 'player_stats_cache',
+  orderField: 'goals',
+};
+
+const TEAM_PLAYOFF_STATS_CONFIG: PlayoffStatsConfig = {
+  queryKey: 'playoff-teams',
+  cacheTable: 'team_stats_cache',
+  orderField: 'wins',
+};
+
 const PLAYER_CUMULATIVE_STAT_CONFIG: AggregateStatsConfig<
   CachedPlayerStatsRow,
   'player_id'
@@ -69,20 +87,10 @@ const TEAM_CUMULATIVE_STAT_CONFIG: AggregateStatsConfig<
  * The sync-nhl-stats edge function populates this data.
  */
 export function usePlayoffPlayers(season: string, round: number) {
-  return useQuery({
-    queryKey: ['playoff-players', season, round],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('player_stats_cache')
-        .select('*')
-        .eq('nhl_season', season)
-        .eq('playoff_round', round)
-        .order('goals', { ascending: false });
-
-      if (error) throw error;
-      return data ?? [];
-    },
-    staleTime: PLAYOFF_STATS_STALE_TIME_MS,
+  return usePlayoffStatsQuery({
+    season,
+    round,
+    statConfig: PLAYER_PLAYOFF_STATS_CONFIG,
   });
 }
 
@@ -98,20 +106,10 @@ export function useCumulativePlayoffPlayers(season: string, round: number) {
  * Fetches cached playoff team stats from Supabase.
  */
 export function usePlayoffTeams(season: string, round: number) {
-  return useQuery({
-    queryKey: ['playoff-teams', season, round],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('team_stats_cache')
-        .select('*')
-        .eq('nhl_season', season)
-        .eq('playoff_round', round)
-        .order('wins', { ascending: false });
-
-      if (error) throw error;
-      return data ?? [];
-    },
-    staleTime: PLAYOFF_STATS_STALE_TIME_MS,
+  return usePlayoffStatsQuery({
+    season,
+    round,
+    statConfig: TEAM_PLAYOFF_STATS_CONFIG,
   });
 }
 
@@ -120,6 +118,25 @@ export function useCumulativePlayoffTeams(season: string, round: number) {
     season,
     round,
     statConfig: TEAM_CUMULATIVE_STAT_CONFIG,
+  });
+}
+
+function usePlayoffStatsQuery(params: {
+  season: string;
+  round: number;
+  statConfig: PlayoffStatsConfig;
+}) {
+  const { season, round, statConfig } = params;
+  return useQuery({
+    queryKey: [statConfig.queryKey, season, round],
+    queryFn: async () =>
+      fetchPlayoffStatsRows({
+        cacheTable: statConfig.cacheTable,
+        season,
+        round,
+        orderField: statConfig.orderField,
+      }),
+    staleTime: PLAYOFF_STATS_STALE_TIME_MS,
   });
 }
 
@@ -161,6 +178,24 @@ async function fetchCumulativePlayoffStats<TRow>(params: {
 
   if (error) throw error;
   return (data ?? []) as TRow[];
+}
+
+async function fetchPlayoffStatsRows(params: {
+  cacheTable: CacheTable;
+  season: string;
+  round: number;
+  orderField: string;
+}) {
+  const { cacheTable, season, round, orderField } = params;
+  const { data, error } = await supabase
+    .from(cacheTable)
+    .select('*')
+    .eq('nhl_season', season)
+    .eq('playoff_round', round)
+    .order(orderField, { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
 }
 
 function aggregateCumulativeRows<
