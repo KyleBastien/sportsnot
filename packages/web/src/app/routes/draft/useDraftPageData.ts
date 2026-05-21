@@ -3,6 +3,8 @@ import { buildPlayerNameMap, buildTeamNameMap } from '@sportsnot/utils';
 import { useMemo } from 'react';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
 import {
+  useCumulativePlayoffPlayersForDraft,
+  useCumulativePlayoffTeamsForDraft,
   useDraft,
   useLeagueInfo,
   useLeagueMembers,
@@ -73,11 +75,13 @@ function getLeagueSetting<T>(mockValue: T, realValue: T): T {
 }
 
 function useDraftLeagueData(leagueId: string) {
-  const { data: draftData, isLoading: draftLoading } = useDraft(leagueId);
-  const { data: membersData, isLoading: membersLoading } =
-    useLeagueMembers(leagueId);
-  const { data: leagueInfo, isLoading: leagueInfoLoading } =
-    useLeagueInfo(leagueId);
+  const { data: draftData, isLoading: draftLoading } = useDraft({ leagueId });
+  const { data: membersData, isLoading: membersLoading } = useLeagueMembers({
+    leagueId,
+  });
+  const { data: leagueInfo, isLoading: leagueInfoLoading } = useLeagueInfo({
+    leagueId,
+  });
   const mockLeagueResult = useMockLeague(leagueId);
   const members = useMemo(
     () => (membersData ?? []) as DraftMemberRow[],
@@ -107,14 +111,32 @@ function useDraftStatData(currentRound: number) {
     data: playerStatsData,
     isLoading: playerStatsLoading,
     refetch: refetchPlayerStats,
-  } = usePlayoffPlayersForDraft(CURRENT_SEASON, currentRound);
+  } = usePlayoffPlayersForDraft({
+    season: CURRENT_SEASON,
+    round: currentRound,
+  });
+  const {
+    data: cumulativePlayerStatsData,
+    isLoading: cumulativePlayerStatsLoading,
+  } = useCumulativePlayoffPlayersForDraft({
+    season: CURRENT_SEASON,
+    round: currentRound,
+  });
   const {
     data: teamStatsData,
     isLoading: teamStatsLoading,
     refetch: refetchTeamStats,
-  } = usePlayoffTeamsForDraft(CURRENT_SEASON, currentRound);
-  const { data: regSeasonStatsData } =
-    useRegularSeasonPlayersForDraft(CURRENT_SEASON);
+  } = usePlayoffTeamsForDraft({ season: CURRENT_SEASON, round: currentRound });
+  const {
+    data: cumulativeTeamStatsData,
+    isLoading: cumulativeTeamStatsLoading,
+  } = useCumulativePlayoffTeamsForDraft({
+    season: CURRENT_SEASON,
+    round: currentRound,
+  });
+  const { data: regSeasonStatsData } = useRegularSeasonPlayersForDraft({
+    season: CURRENT_SEASON,
+  });
 
   return {
     playerStats: useMemo(
@@ -122,11 +144,21 @@ function useDraftStatData(currentRound: number) {
       [playerStatsData]
     ),
     playerStatsLoading,
+    cumulativePlayerStats: useMemo(
+      () => (cumulativePlayerStatsData ?? []) as PlayerStatRow[],
+      [cumulativePlayerStatsData]
+    ),
+    cumulativePlayerStatsLoading,
     teamStats: useMemo(
       () => (teamStatsData ?? []) as TeamStatRow[],
       [teamStatsData]
     ),
     teamStatsLoading,
+    cumulativeTeamStats: useMemo(
+      () => (cumulativeTeamStatsData ?? []) as TeamStatRow[],
+      [cumulativeTeamStatsData]
+    ),
+    cumulativeTeamStatsLoading,
     regSeasonStats: useMemo(
       () => (regSeasonStatsData ?? []) as RegSeasonStatRow[],
       [regSeasonStatsData]

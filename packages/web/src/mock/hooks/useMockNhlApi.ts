@@ -3,6 +3,7 @@ import type {
   NHLTeam,
   NHLGame,
   NHLPlayoffSeries,
+  NHLPlayerStats,
 } from '@sportsnot/types';
 import {
   teams,
@@ -12,6 +13,7 @@ import {
   gamesR2,
   gamesCf,
   gamesScf,
+  playerGameLogs,
   regularSeasonStats,
 } from '@sportsnot/mock-data';
 
@@ -35,6 +37,20 @@ export function getEliminatedAbbreviations(beforeRound: number): Set<string> {
   }
   return eliminated;
 }
+
+const ALL_GAMES: NHLGame[] = [
+  ...(gamesR1 as unknown as NHLGame[]),
+  ...(gamesR2 as unknown as NHLGame[]),
+  ...(gamesCf as unknown as NHLGame[]),
+  ...(gamesScf as unknown as NHLGame[]),
+];
+
+const ROUND_GAMES: Record<number, NHLGame[]> = {
+  1: gamesR1 as unknown as NHLGame[],
+  2: gamesR2 as unknown as NHLGame[],
+  3: gamesCf as unknown as NHLGame[],
+  4: gamesScf as unknown as NHLGame[],
+};
 
 // ── Mock NHL API functions ─────────────────────────────────────────────
 // These mirror the signatures in @sportsnot/nhl-api but return fixture data.
@@ -137,6 +153,35 @@ export function useMockPlayoffPlayers(_season: string, round: number) {
   return makeMockQuery(allPlayers);
 }
 
+export function useMockCumulativePlayoffPlayers(
+  _season: string,
+  round: number
+) {
+  const throughDate = getRoundLastDate(round);
+  const cumulativeStats = getCumulativePlayerStats(throughDate);
+  const allPlayers = Object.entries(players).flatMap(([teamAbbr, roster]) =>
+    roster
+      .filter((player) => player.primaryPosition.type !== 'Goalie')
+      .map((player) => {
+        const stats = cumulativeStats.get(player.id);
+        return {
+          player_id: player.id,
+          player_name: player.fullName,
+          position: player.primaryPosition.type === 'Forward' ? 'F' : 'D',
+          team_abbreviation: teamAbbr,
+          is_injured: false,
+          goals: stats?.goals ?? 0,
+          assists: stats?.assists ?? 0,
+          games_played: stats?.games_played ?? 0,
+          nhl_season: _season,
+          playoff_round: round,
+        };
+      })
+  );
+
+  return makeMockQuery(allPlayers);
+}
+
 /**
  * Mock replacement for usePlayoffTeams from @sportsnot/supabase.
  * Returns team stats in the same shape as the team_stats_cache table.
@@ -156,6 +201,26 @@ export function useMockPlayoffTeams(_season: string, round: number) {
       nhl_season: _season,
       playoff_round: round,
     }));
+
+  return makeMockQuery(allTeams);
+}
+
+export function useMockCumulativePlayoffTeams(_season: string, round: number) {
+  const throughDate = getRoundLastDate(round);
+  const cumulativeStats = getCumulativeTeamStats(throughDate);
+  const allTeams = teams.map((team) => {
+    const stats = cumulativeStats.get(team.id);
+    return {
+      team_id: team.id,
+      team_name: team.name,
+      team_abbreviation: team.abbreviation,
+      is_eliminated: false,
+      wins: stats?.wins ?? 0,
+      shutouts: stats?.shutouts ?? 0,
+      nhl_season: _season,
+      playoff_round: round,
+    };
+  });
 
   return makeMockQuery(allTeams);
 }
@@ -202,4 +267,113 @@ export function useMockRegularSeasonPlayers(_season: string, enabled: boolean) {
   );
 
   return makeMockQuery(allPlayers);
+}
+
+function getRoundLastDate(round: number): string | null {
+  const games = ROUND_GAMES[round] ?? [];
+  if (games.length === 0) {
+    return null;
+  }
+
+  return (
+    [...games]
+      .map((game) => game.gameDate)
+      .sort()
+      .at(-1) ?? null
+  );
+}
+
+function getCumulativePlayerStats(throughDate: string | null) {
+  const totals = new Map<
+    number,
+    { goals: number; assists: number; games_played: number }
+  >();
+
+  if (!throughDate) {
+    return totals;
+  }
+
+  for (const [playerId, entries] of Object.entries(
+    playerGameLogs as Record<string, NHLPlayerStats[]>
+  )) {
+    for (const entry of entries) {
+      if (entry.gameDate > throughDate) {
+        continue;
+      }
+
+      const numericPlayerId = Number(playerId);
+      const current = totals.get(numericPlayerId) ?? {
+        goals: 0,
+        assists: 0,
+        games_played: 0,
+      };
+      current.goals += entry.goals;
+      current.assists += entry.assists;
+      current.games_played += 1;
+      totals.set(numericPlayerId, current);
+    }
+  }
+
+  return totals;
+}
+
+function getCumulativeTeamStats(throughDate: string | null) {
+  const totals = new Map<number, { wins: number; shutouts: number }>();
+
+  if (!throughDate) {
+    return totals;
+  }
+
+  for (const game of ALL_GAMES) {
+    applyTeamGameTotals(totals, game, throughDate);
+  }
+
+  return totals;
+}
+
+function applyTeamGameTotals(
+  totals: Map<number, { wins: number; shutouts: number }>,
+  game: NHLGame,
+  throughDate: string
+) {
+  if (game.gameDate > throughDate) {
+    return;
+  }
+
+  seedTeamTotals(totals, game.homeTeam.id);
+  seedTeamTotals(totals, game.awayTeam.id);
+
+  const winner = getWinningTeamResult(game);
+  if (!winner) {
+    return;
+  }
+
+  const winningTotals = totals.get(winner.teamId);
+  if (!winningTotals) {
+    return;
+  }
+
+  winningTotals.wins += 1;
+  winningTotals.shutouts += Number(winner.isShutout);
+}
+
+function getWinningTeamResult(game: NHLGame) {
+  const homeScore = game.homeTeam.score ?? 0;
+  const awayScore = game.awayTeam.score ?? 0;
+  if (homeScore === awayScore) {
+    return null;
+  }
+
+  return homeScore > awayScore
+    ? { teamId: game.homeTeam.id, isShutout: awayScore === 0 }
+    : { teamId: game.awayTeam.id, isShutout: homeScore === 0 };
+}
+
+function seedTeamTotals(
+  totals: Map<number, { wins: number; shutouts: number }>,
+  teamId: number
+) {
+  if (!totals.has(teamId)) {
+    totals.set(teamId, { wins: 0, shutouts: 0 });
+  }
 }

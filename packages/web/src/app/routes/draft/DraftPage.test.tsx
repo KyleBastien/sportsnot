@@ -24,7 +24,15 @@ const draftState = rs.hoisted(() => ({
     data: null as unknown,
     isLoading: true,
   } as MockHookResult<unknown>,
+  cumulativePlayerStats: {
+    data: null as unknown,
+    isLoading: true,
+  } as MockHookResult<unknown>,
   teamStats: {
+    data: null as unknown,
+    isLoading: true,
+  } as MockHookResult<unknown>,
+  cumulativeTeamStats: {
     data: null as unknown,
     isLoading: true,
   } as MockHookResult<unknown>,
@@ -36,7 +44,9 @@ rs.mock('./draftPageQueries', () => ({
   useLeagueMembers: () => draftState.members,
   useLeagueInfo: () => draftState.leagueInfo,
   usePlayoffPlayersForDraft: () => draftState.playerStats,
+  useCumulativePlayoffPlayersForDraft: () => draftState.cumulativePlayerStats,
   usePlayoffTeamsForDraft: () => draftState.teamStats,
+  useCumulativePlayoffTeamsForDraft: () => draftState.cumulativeTeamStats,
   useRegularSeasonPlayersForDraft: () => draftState.regSeasonStats,
 }));
 
@@ -107,6 +117,21 @@ function buildPlayerStats() {
   ];
 }
 
+function buildCumulativePlayerStats() {
+  return [
+    {
+      player_id: 100,
+      player_name: 'Connor McDavid',
+      position: 'F',
+      team_abbreviation: 'EDM',
+      is_injured: false,
+      goals: 8,
+      assists: 7,
+      games_played: 12,
+    },
+  ];
+}
+
 function renderHarness(authUser: User = mockUser) {
   return renderWithAuth(<DraftPage />, {
     auth: { user: authUser },
@@ -131,7 +156,12 @@ beforeEach(() => {
     isLoading: false,
   };
   draftState.playerStats = { data: buildPlayerStats(), isLoading: false };
+  draftState.cumulativePlayerStats = {
+    data: buildCumulativePlayerStats(),
+    isLoading: false,
+  };
   draftState.teamStats = { data: [], isLoading: false };
+  draftState.cumulativeTeamStats = { data: [], isLoading: false };
   draftState.regSeasonStats = { data: [], isLoading: false };
 });
 
@@ -167,8 +197,26 @@ describe('DraftPage', () => {
     expect(screen.queryByText(/No player data available yet/i)).toBeNull();
   });
 
+  it('shows page loader while cumulative player stats query is loading', () => {
+    draftState.cumulativePlayerStats = { data: null, isLoading: true };
+
+    renderHarness();
+
+    expect(screen.queryByRole('button', { name: /^Draft$/ })).toBeNull();
+    expect(screen.queryByText(/No player data available yet/i)).toBeNull();
+  });
+
   it('shows page loader while teamStats query is loading', () => {
     draftState.teamStats = { data: null, isLoading: true };
+
+    renderHarness();
+
+    expect(screen.queryByRole('button', { name: /^Draft$/ })).toBeNull();
+    expect(screen.queryByText(/No player data available yet/i)).toBeNull();
+  });
+
+  it('shows page loader while cumulative team stats query is loading', () => {
+    draftState.cumulativeTeamStats = { data: null, isLoading: true };
 
     renderHarness();
 
@@ -190,6 +238,34 @@ describe('DraftPage', () => {
 
     const draftButtons = screen.getAllByRole('button', { name: /^Draft$/ });
     expect(draftButtons.length).toBeGreaterThan(0);
+  });
+
+  it('shows cumulative playoff totals on later-round skater rows', () => {
+    draftState.draft = {
+      data: buildDraft({ round: 2 }),
+      isLoading: false,
+    };
+    draftState.playerStats = {
+      data: [
+        {
+          player_id: 100,
+          player_name: 'Connor McDavid',
+          position: 'F',
+          team_abbreviation: 'EDM',
+          is_injured: false,
+          goals: 0,
+          assists: 0,
+          games_played: 1,
+        },
+      ],
+      isLoading: false,
+    };
+
+    renderHarness();
+
+    expect(screen.getByText('Connor McDavid')).toBeTruthy();
+    expect(screen.getByText('15')).toBeTruthy();
+    expect(screen.getByText('12')).toBeTruthy();
   });
 
   it('shows Picking-for badge and Draft buttons when commissioner views another players pick', () => {

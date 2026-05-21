@@ -40,7 +40,9 @@ export const useMockStartReDraft = noopMutation;
 
 // mock/hooks/useMockNhlApi
 export const useMockPlayoffPlayers = noopQuery;
+export const useMockCumulativePlayoffPlayers = noopQuery;
 export const useMockPlayoffTeams = noopQuery;
+export const useMockCumulativePlayoffTeams = noopQuery;
 export const useMockRegularSeasonPlayers = noopQuery;
 
 // mock/hooks/useMockRoster

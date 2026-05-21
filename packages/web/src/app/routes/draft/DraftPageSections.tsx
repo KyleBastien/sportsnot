@@ -204,7 +204,9 @@ export function DraftMyTeamCard({
 
 export function DraftAvailablePlayersCard(props: {
   playerStats: PlayerStatRow[];
+  cumulativePlayerStats: PlayerStatRow[];
   teamStats: TeamStatRow[];
+  cumulativeTeamStats: TeamStatRow[];
   isDraftPoolSyncing: boolean;
   canPick: boolean;
   currentPicker: DraftMemberRow | undefined;
@@ -222,7 +224,9 @@ export function DraftAvailablePlayersCard(props: {
 }) {
   const {
     playerStats,
+    cumulativePlayerStats,
     teamStats,
+    cumulativeTeamStats,
     isDraftPoolSyncing,
     canPick,
     currentPicker,
@@ -243,7 +247,9 @@ export function DraftAvailablePlayersCard(props: {
       ) : (
         <DraftAvailablePlayerBoard
           playerStats={playerStats}
+          cumulativePlayerStats={cumulativePlayerStats}
           teamStats={teamStats}
+          cumulativeTeamStats={cumulativeTeamStats}
           canPick={canPick}
           {...boardProps}
         />
