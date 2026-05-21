@@ -60,56 +60,23 @@ export function buildSkaterRows(params: {
   const regSeasonMap = new Map(
     regSeasonStats.map((row) => [row.player_id, row])
   );
+
+  if (shouldUseRegSeasonFallback({ isRound1, playerStats })) {
+    return buildRegSeasonSkaterRows(regSeasonStats, draftedPlayerIds);
+  }
+
   const cumulativeStatsMap = new Map(
     cumulativePlayerStats.map((row) => [row.player_id, row])
   );
-
-  if (shouldUseRegSeasonFallback({ isRound1, playerStats })) {
-    return regSeasonStats
-      .filter((player) => isSkaterPosition(player.position))
-      .filter((player) => !draftedPlayerIds.has(player.player_id))
-      .map((player) => ({
-        id: player.player_id,
-        fullName: player.player_name ?? `Player #${player.player_id}`,
-        firstName: '',
-        lastName: '',
-        position: player.position ?? 'F',
-        team: player.team_abbreviation ?? 'NHL',
-        teamId: 0,
-        goals: player.goals ?? 0,
-        assists: player.assists ?? 0,
-        points: player.points ?? 0,
-        gamesPlayed: player.games_played ?? 0,
-        regSeasonPts: player.points ?? 0,
-      }));
-  }
-
   return playerStats
     .filter((player) => !draftedPlayerIds.has(player.player_id))
     .filter((player) => !player.is_injured)
-    .map((player) => {
-      const regSeason = regSeasonMap.get(player.player_id);
-      const cumulativeStats = cumulativeStatsMap.get(player.player_id);
-      const goals = cumulativeStats?.goals ?? player.goals ?? 0;
-      const assists = cumulativeStats?.assists ?? player.assists ?? 0;
-      return {
-        id: player.player_id,
-        fullName:
-          player.player_name ??
-          regSeason?.player_name ??
-          `Player #${player.player_id}`,
-        firstName: '',
-        lastName: '',
-        position: player.position ?? regSeason?.position ?? 'F',
-        team: player.team_abbreviation ?? regSeason?.team_abbreviation ?? 'NHL',
-        teamId: 0,
-        goals,
-        assists,
-        points: goals + assists,
-        gamesPlayed: cumulativeStats?.games_played ?? player.games_played ?? 0,
-        regSeasonPts: regSeason?.points ?? 0,
-      };
-    });
+    .map((player) =>
+      buildPlayoffSkaterRow(player, {
+        regSeason: regSeasonMap.get(player.player_id),
+        cumulativeStats: cumulativeStatsMap.get(player.player_id),
+      })
+    );
 }
 
 export function buildTeamRows(params: {
@@ -238,4 +205,61 @@ function matchesPositionFilter(params: {
   }
 
   return allowedPositions.includes(positionFilter);
+}
+
+function buildRegSeasonSkaterRows(
+  regSeasonStats: RegSeasonStatRow[],
+  draftedPlayerIds: Set<number>
+) {
+  return regSeasonStats
+    .filter((player) => isSkaterPosition(player.position))
+    .filter((player) => !draftedPlayerIds.has(player.player_id))
+    .map(buildRegSeasonSkaterRow);
+}
+
+function buildRegSeasonSkaterRow(player: RegSeasonStatRow): DraftSkaterRow {
+  return {
+    id: player.player_id,
+    fullName: player.player_name ?? `Player #${player.player_id}`,
+    firstName: '',
+    lastName: '',
+    position: player.position ?? 'F',
+    team: player.team_abbreviation ?? 'NHL',
+    teamId: 0,
+    goals: player.goals ?? 0,
+    assists: player.assists ?? 0,
+    points: player.points ?? 0,
+    gamesPlayed: player.games_played ?? 0,
+    regSeasonPts: player.points ?? 0,
+  };
+}
+
+function buildPlayoffSkaterRow(
+  player: PlayerStatRow,
+  context: {
+    regSeason: RegSeasonStatRow | undefined;
+    cumulativeStats: PlayerStatRow | undefined;
+  }
+): DraftSkaterRow {
+  const { regSeason, cumulativeStats } = context;
+  const goals = cumulativeStats?.goals ?? player.goals ?? 0;
+  const assists = cumulativeStats?.assists ?? player.assists ?? 0;
+
+  return {
+    id: player.player_id,
+    fullName:
+      player.player_name ??
+      regSeason?.player_name ??
+      `Player #${player.player_id}`,
+    firstName: '',
+    lastName: '',
+    position: player.position ?? regSeason?.position ?? 'F',
+    team: player.team_abbreviation ?? regSeason?.team_abbreviation ?? 'NHL',
+    teamId: 0,
+    goals,
+    assists,
+    points: goals + assists,
+    gamesPlayed: cumulativeStats?.games_played ?? player.games_played ?? 0,
+    regSeasonPts: regSeason?.points ?? 0,
+  };
 }

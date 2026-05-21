@@ -94,21 +94,12 @@ export function useCumulativePlayoffPlayersForDraft(
   round: number
 ) {
   const mockResult = useMockCumulativePlayoffPlayers(season, round);
-  const queryResult = useQuery({
-    queryKey: ['draft-cumulative-playoff-players', season, round],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('player_stats_cache')
-        .select('*')
-        .eq('nhl_season', season)
-        .lte('playoff_round', round)
-        .order('playoff_round', { ascending: true });
-
-      if (error) throw error;
-      return aggregatePlayerStats(data ?? []);
-    },
-    enabled: !IS_MOCK,
-    staleTime: 1000 * 60 * 2,
+  const queryResult = useCumulativeDraftStats({
+    queryKeyPrefix: 'draft-cumulative-playoff-players',
+    cacheTable: 'player_stats_cache',
+    season,
+    round,
+    aggregateRows: aggregatePlayerStats,
   });
 
   return IS_MOCK ? mockResult : queryResult;
@@ -125,21 +116,12 @@ export function useCumulativePlayoffTeamsForDraft(
   round: number
 ) {
   const mockResult = useMockCumulativePlayoffTeams(season, round);
-  const queryResult = useQuery({
-    queryKey: ['draft-cumulative-playoff-teams', season, round],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('team_stats_cache')
-        .select('*')
-        .eq('nhl_season', season)
-        .lte('playoff_round', round)
-        .order('playoff_round', { ascending: true });
-
-      if (error) throw error;
-      return aggregateTeamStats(data ?? []);
-    },
-    enabled: !IS_MOCK,
-    staleTime: 1000 * 60 * 2,
+  const queryResult = useCumulativeDraftStats({
+    queryKeyPrefix: 'draft-cumulative-playoff-teams',
+    cacheTable: 'team_stats_cache',
+    season,
+    round,
+    aggregateRows: aggregateTeamStats,
   });
 
   return IS_MOCK ? mockResult : queryResult;
@@ -171,59 +153,135 @@ interface CachedTeamStatsRow {
   shutouts: number | null;
 }
 
-function aggregatePlayerStats(rows: CachedPlayerStatsRow[]) {
-  const rowsByPlayerId = new Map<number, CachedPlayerStatsRow>();
+interface UseCumulativeDraftStatsParams<TRow, TResult> {
+  queryKeyPrefix: string;
+  cacheTable: 'player_stats_cache' | 'team_stats_cache';
+  season: string;
+  round: number;
+  aggregateRows: (rows: TRow[]) => TResult[];
+}
 
-  for (const row of rows) {
-    const existing = rowsByPlayerId.get(row.player_id);
-    if (!existing) {
-      rowsByPlayerId.set(row.player_id, {
-        ...row,
-        goals: row.goals ?? 0,
-        assists: row.assists ?? 0,
-        games_played: row.games_played ?? 0,
+interface AggregateRowsConfig<TRow, TKey> {
+  getKey: (row: TRow) => TKey;
+  initialize: (row: TRow) => TRow;
+  merge: (existing: TRow, next: TRow) => TRow;
+}
+
+function useCumulativeDraftStats<TRow, TResult>(
+  params: UseCumulativeDraftStatsParams<TRow, TResult>
+) {
+  const { queryKeyPrefix, cacheTable, season, round, aggregateRows } = params;
+  return useQuery({
+    queryKey: [queryKeyPrefix, season, round],
+    queryFn: async () => {
+      const rows = await fetchCumulativeDraftStats<TRow>({
+        cacheTable,
+        season,
+        round,
       });
-      continue;
-    }
+      return aggregateRows(rows);
+    },
+    enabled: !IS_MOCK,
+    staleTime: 1000 * 60 * 2,
+  });
+}
 
-    rowsByPlayerId.set(row.player_id, {
-      ...existing,
-      player_name: row.player_name ?? existing.player_name,
-      position: row.position ?? existing.position,
-      team_abbreviation: row.team_abbreviation ?? existing.team_abbreviation,
-      is_injured: row.is_injured ?? existing.is_injured,
-      goals: (existing.goals ?? 0) + (row.goals ?? 0),
-      assists: (existing.assists ?? 0) + (row.assists ?? 0),
-      games_played: (existing.games_played ?? 0) + (row.games_played ?? 0),
-    });
-  }
+async function fetchCumulativeDraftStats<TRow>(params: {
+  cacheTable: 'player_stats_cache' | 'team_stats_cache';
+  season: string;
+  round: number;
+}) {
+  const { cacheTable, season, round } = params;
+  const { data, error } = await supabase
+    .from(cacheTable)
+    .select('*')
+    .eq('nhl_season', season)
+    .lte('playoff_round', round)
+    .order('playoff_round', { ascending: true });
 
-  return [...rowsByPlayerId.values()];
+  if (error) throw error;
+  return (data ?? []) as TRow[];
+}
+
+function aggregatePlayerStats(rows: CachedPlayerStatsRow[]) {
+  return aggregateRows(rows, {
+    getKey: (row) => row.player_id,
+    initialize: initializePlayerStatsRow,
+    merge: mergePlayerStatsRow,
+  });
 }
 
 function aggregateTeamStats(rows: CachedTeamStatsRow[]) {
-  const rowsByTeamId = new Map<number, CachedTeamStatsRow>();
+  return aggregateRows(rows, {
+    getKey: (row) => row.team_id,
+    initialize: initializeTeamStatsRow,
+    merge: mergeTeamStatsRow,
+  });
+}
+
+function aggregateRows<TRow, TKey>(
+  rows: TRow[],
+  config: AggregateRowsConfig<TRow, TKey>
+) {
+  const rowsById = new Map<TKey, TRow>();
 
   for (const row of rows) {
-    const existing = rowsByTeamId.get(row.team_id);
-    if (!existing) {
-      rowsByTeamId.set(row.team_id, {
-        ...row,
-        wins: row.wins ?? 0,
-        shutouts: row.shutouts ?? 0,
-      });
-      continue;
-    }
-
-    rowsByTeamId.set(row.team_id, {
-      ...existing,
-      team_name: row.team_name ?? existing.team_name,
-      team_abbreviation: row.team_abbreviation ?? existing.team_abbreviation,
-      is_eliminated: row.is_eliminated ?? existing.is_eliminated,
-      wins: (existing.wins ?? 0) + (row.wins ?? 0),
-      shutouts: (existing.shutouts ?? 0) + (row.shutouts ?? 0),
-    });
+    const key = config.getKey(row);
+    const existing = rowsById.get(key);
+    rowsById.set(
+      key,
+      existing ? config.merge(existing, row) : config.initialize(row)
+    );
   }
 
-  return [...rowsByTeamId.values()];
+  return [...rowsById.values()];
+}
+
+function initializePlayerStatsRow(
+  row: CachedPlayerStatsRow
+): CachedPlayerStatsRow {
+  return {
+    ...row,
+    goals: row.goals ?? 0,
+    assists: row.assists ?? 0,
+    games_played: row.games_played ?? 0,
+  };
+}
+
+function mergePlayerStatsRow(
+  existing: CachedPlayerStatsRow,
+  next: CachedPlayerStatsRow
+): CachedPlayerStatsRow {
+  return {
+    ...existing,
+    player_name: next.player_name ?? existing.player_name,
+    position: next.position ?? existing.position,
+    team_abbreviation: next.team_abbreviation ?? existing.team_abbreviation,
+    is_injured: next.is_injured ?? existing.is_injured,
+    goals: (existing.goals ?? 0) + (next.goals ?? 0),
+    assists: (existing.assists ?? 0) + (next.assists ?? 0),
+    games_played: (existing.games_played ?? 0) + (next.games_played ?? 0),
+  };
+}
+
+function initializeTeamStatsRow(row: CachedTeamStatsRow): CachedTeamStatsRow {
+  return {
+    ...row,
+    wins: row.wins ?? 0,
+    shutouts: row.shutouts ?? 0,
+  };
+}
+
+function mergeTeamStatsRow(
+  existing: CachedTeamStatsRow,
+  next: CachedTeamStatsRow
+): CachedTeamStatsRow {
+  return {
+    ...existing,
+    team_name: next.team_name ?? existing.team_name,
+    team_abbreviation: next.team_abbreviation ?? existing.team_abbreviation,
+    is_eliminated: next.is_eliminated ?? existing.is_eliminated,
+    wins: (existing.wins ?? 0) + (next.wins ?? 0),
+    shutouts: (existing.shutouts ?? 0) + (next.shutouts ?? 0),
+  };
 }

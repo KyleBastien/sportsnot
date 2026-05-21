@@ -325,32 +325,48 @@ function getCumulativeTeamStats(throughDate: string | null) {
   }
 
   for (const game of ALL_GAMES) {
-    if (game.gameDate > throughDate) {
-      continue;
-    }
-
-    const homeScore = game.homeTeam.score ?? 0;
-    const awayScore = game.awayTeam.score ?? 0;
-
-    seedTeamTotals(totals, game.homeTeam.id);
-    seedTeamTotals(totals, game.awayTeam.id);
-
-    if (homeScore > awayScore) {
-      const homeTotals = totals.get(game.homeTeam.id);
-      if (homeTotals) {
-        homeTotals.wins += 1;
-        homeTotals.shutouts += Number(awayScore === 0);
-      }
-    } else if (awayScore > homeScore) {
-      const awayTotals = totals.get(game.awayTeam.id);
-      if (awayTotals) {
-        awayTotals.wins += 1;
-        awayTotals.shutouts += Number(homeScore === 0);
-      }
-    }
+    applyTeamGameTotals(totals, game, throughDate);
   }
 
   return totals;
+}
+
+function applyTeamGameTotals(
+  totals: Map<number, { wins: number; shutouts: number }>,
+  game: NHLGame,
+  throughDate: string
+) {
+  if (game.gameDate > throughDate) {
+    return;
+  }
+
+  seedTeamTotals(totals, game.homeTeam.id);
+  seedTeamTotals(totals, game.awayTeam.id);
+
+  const winner = getWinningTeamResult(game);
+  if (!winner) {
+    return;
+  }
+
+  const winningTotals = totals.get(winner.teamId);
+  if (!winningTotals) {
+    return;
+  }
+
+  winningTotals.wins += 1;
+  winningTotals.shutouts += Number(winner.isShutout);
+}
+
+function getWinningTeamResult(game: NHLGame) {
+  const homeScore = game.homeTeam.score ?? 0;
+  const awayScore = game.awayTeam.score ?? 0;
+  if (homeScore === awayScore) {
+    return null;
+  }
+
+  return homeScore > awayScore
+    ? { teamId: game.homeTeam.id, isShutout: awayScore === 0 }
+    : { teamId: game.awayTeam.id, isShutout: homeScore === 0 };
 }
 
 function seedTeamTotals(
