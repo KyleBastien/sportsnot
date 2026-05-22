@@ -272,79 +272,131 @@ function DesktopStandingsTable({
   return (
     <Table.ScrollContainer minWidth={600}>
       <Table striped highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th style={{ width: 60 }}>Rank</Table.Th>
-            <Table.Th>Team</Table.Th>
-            <Table.Th>Manager</Table.Th>
-            {showBreakdown && (
-              <>
-                <Table.Th style={{ textAlign: 'right' }}>Player Pts</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Goalie Pts</Table.Th>
-              </>
-            )}
-            {visibleRoundNumbers.map((round) => (
-              <Table.Th key={round} style={{ textAlign: 'right' }}>
-                R{round}
-              </Table.Th>
-            ))}
-            <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
+        <DesktopStandingsHeader
+          showBreakdown={showBreakdown}
+          visibleRoundNumbers={visibleRoundNumbers}
+        />
         <Table.Tbody>
-          {displayedMembers.map((member, index) => {
-            const isMe = isCurrentUser(member.user_id);
-            return (
-              <Table.Tr
-                key={member.id}
-                style={{
-                  fontWeight: isMe ? 700 : undefined,
-                  backgroundColor: isMe
-                    ? 'var(--mantine-color-blue-light)'
-                    : undefined,
-                }}
-              >
-                <Table.Td>
-                  <RankBadge rank={index} />
-                </Table.Td>
-                <Table.Td>
-                  <Anchor
-                    component={Link}
-                    to={`${rosterBasePath}/${member.id}${rosterRoundSearch}`}
-                    fw={isMe ? 700 : undefined}
-                  >
-                    {member.team_name}
-                    {showSeasonWinner && index === 0 && ' 🏆'}
-                  </Anchor>
-                </Table.Td>
-                <Table.Td>
-                  {member.users?.display_name ?? 'Unknown'}
-                  {member.user_id === userId && (
-                    <Badge size="xs" ml="xs" variant="light">
-                      You
-                    </Badge>
-                  )}
-                </Table.Td>
-                {showBreakdown && (
-                  <>
-                    <NumericStandingsCell value={member.player_points ?? 0} />
-                    <NumericStandingsCell value={member.goalie_points ?? 0} />
-                  </>
-                )}
-                {visibleRoundNumbers.map((round) => (
-                  <NumericStandingsCell
-                    key={round}
-                    value={getRoundPoints(member.round_points, round)}
-                  />
-                ))}
-                <NumericStandingsCell value={member.selected_total_points} />
-              </Table.Tr>
-            );
-          })}
+          {displayedMembers.map((member, index) => (
+            <DesktopStandingsRow
+              key={member.id}
+              index={index}
+              isCurrentUser={isCurrentUser}
+              member={member}
+              rosterBasePath={rosterBasePath}
+              rosterRoundSearch={rosterRoundSearch}
+              showBreakdown={showBreakdown}
+              showSeasonWinner={showSeasonWinner}
+              userId={userId}
+              visibleRoundNumbers={visibleRoundNumbers}
+            />
+          ))}
         </Table.Tbody>
       </Table>
     </Table.ScrollContainer>
   );
+}
+
+function DesktopStandingsHeader({
+  showBreakdown,
+  visibleRoundNumbers,
+}: {
+  showBreakdown: boolean;
+  visibleRoundNumbers: number[];
+}) {
+  return (
+    <Table.Thead>
+      <Table.Tr>
+        <Table.Th style={{ width: 60 }}>Rank</Table.Th>
+        <Table.Th>Team</Table.Th>
+        <Table.Th>Manager</Table.Th>
+        {showBreakdown && (
+          <>
+            <Table.Th style={{ textAlign: 'right' }}>Player Pts</Table.Th>
+            <Table.Th style={{ textAlign: 'right' }}>Goalie Pts</Table.Th>
+          </>
+        )}
+        {visibleRoundNumbers.map((round) => (
+          <Table.Th key={round} style={{ textAlign: 'right' }}>
+            R{round}
+          </Table.Th>
+        ))}
+        <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
+      </Table.Tr>
+    </Table.Thead>
+  );
+}
+
+function DesktopStandingsRow({
+  index,
+  isCurrentUser,
+  member,
+  rosterBasePath,
+  rosterRoundSearch,
+  showBreakdown,
+  showSeasonWinner,
+  userId,
+  visibleRoundNumbers,
+}: {
+  index: number;
+  isCurrentUser: (userId: string) => boolean;
+  member: DisplayStandingsMemberRow;
+  rosterBasePath: string;
+  rosterRoundSearch: string;
+  showBreakdown: boolean;
+  showSeasonWinner: boolean;
+  userId: string | undefined;
+  visibleRoundNumbers: number[];
+}) {
+  const isMe = isCurrentUser(member.user_id);
+
+  return (
+    <Table.Tr key={member.id} style={buildStandingsRowStyle(isMe)}>
+      <Table.Td>
+        <RankBadge rank={index} />
+      </Table.Td>
+      <Table.Td>
+        <Anchor
+          component={Link}
+          to={`${rosterBasePath}/${member.id}${rosterRoundSearch}`}
+          fw={isMe ? 700 : undefined}
+        >
+          {member.team_name}
+          {showSeasonWinner && index === 0 && ' 🏆'}
+        </Anchor>
+      </Table.Td>
+      <Table.Td>
+        {member.users?.display_name ?? 'Unknown'}
+        {member.user_id === userId && (
+          <Badge size="xs" ml="xs" variant="light">
+            You
+          </Badge>
+        )}
+      </Table.Td>
+      {showBreakdown && (
+        <>
+          <NumericStandingsCell value={member.player_points ?? 0} />
+          <NumericStandingsCell value={member.goalie_points ?? 0} />
+        </>
+      )}
+      {visibleRoundNumbers.map((round) => (
+        <NumericStandingsCell
+          key={round}
+          value={getRoundPoints(member.round_points, round)}
+        />
+      ))}
+      <NumericStandingsCell value={member.selected_total_points} />
+    </Table.Tr>
+  );
+}
+
+function buildStandingsRowStyle(isCurrentUser: boolean) {
+  return {
+    fontWeight: isCurrentUser ? 700 : undefined,
+    backgroundColor: isCurrentUser
+      ? 'var(--mantine-color-blue-light)'
+      : undefined,
+  };
 }
 
 function RankBadge({ rank }: { rank: number }) {

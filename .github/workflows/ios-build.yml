@@ -53,7 +53,13 @@ jobs:
       - name: Install iOS platform
         run: |
           xcodebuild -runFirstLaunch
-          sudo xcodebuild -downloadPlatform iOS
+          if xcrun --sdk iphoneos --show-sdk-path >/dev/null 2>&1; then
+            echo "iPhoneOS SDK already available"
+          else
+            echo "iPhoneOS SDK missing, downloading iOS platform"
+            sudo xcodebuild -downloadPlatform iOS
+          fi
+          xcodebuild -showsdks
 
       - name: Install dependencies
         run: yarn install --immutable

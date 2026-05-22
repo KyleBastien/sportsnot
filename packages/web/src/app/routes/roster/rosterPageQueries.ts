@@ -20,8 +20,17 @@ import {
 } from '../../../mock/hooks/useMockNhlApi';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
+const ID_COLUMN = 'id';
+const LEAGUE_ID_COLUMN = 'league_id';
 const LEAGUE_MEMBER_POINTS_SELECT = 'id, total_points, round_points';
 const LEAGUE_CURRENT_ROUND_SELECT = 'current_round';
+const LEAGUES_TABLE = 'leagues';
+const LEAGUE_MEMBERS_TABLE = 'league_members';
+const LEAGUE_MEMBER_ID_COLUMN = 'league_member_id';
+const ROSTERS_SELECT = '*';
+const ROSTERS_TABLE = 'rosters';
+const ROUND_COLUMN = 'round';
+const USER_ID_COLUMN = 'user_id';
 
 interface RosterSlotRow {
   id: string;
@@ -83,12 +92,15 @@ async function fetchRosterMember(
   userId: string | undefined
 ) {
   const query = supabase
-    .from('league_members')
+    .from(LEAGUE_MEMBERS_TABLE)
     .select(LEAGUE_MEMBER_POINTS_SELECT);
 
   const { data: member } = leagueMemberId
-    ? await query.eq('id', leagueMemberId).single()
-    : await query.eq('league_id', leagueId).eq('user_id', userId!).single();
+    ? await query.eq(ID_COLUMN, leagueMemberId).single()
+    : await query
+        .eq(LEAGUE_ID_COLUMN, leagueId)
+        .eq(USER_ID_COLUMN, userId!)
+        .single();
 
   if (!member) {
     throw new Error(
@@ -101,9 +113,9 @@ async function fetchRosterMember(
 
 async function fetchLeagueCurrentRound(leagueId: string) {
   const { data: league } = await supabase
-    .from('leagues')
+    .from(LEAGUES_TABLE)
     .select(LEAGUE_CURRENT_ROUND_SELECT)
-    .eq('id', leagueId)
+    .eq(ID_COLUMN, leagueId)
     .single();
 
   if (!league) {
@@ -115,10 +127,10 @@ async function fetchLeagueCurrentRound(leagueId: string) {
 
 async function fetchRosterSlots(leagueMemberId: string, round: number) {
   const { data: roster, error } = await supabase
-    .from('rosters')
-    .select('*')
-    .eq('league_member_id', leagueMemberId)
-    .eq('round', round);
+    .from(ROSTERS_TABLE)
+    .select(ROSTERS_SELECT)
+    .eq(LEAGUE_MEMBER_ID_COLUMN, leagueMemberId)
+    .eq(ROUND_COLUMN, round);
 
   if (error) {
     throw error;
