@@ -10,9 +10,10 @@ struct SnapshotEntry: TimelineEntry {
     /// The current user's `team_name` within the featured league, used to
     /// compute "your team" totals against the league-wide snapshot.
     let myTeamName: String?
-    // Index into the paginated player list for rotating widget views.
+    // Index into the paginated widget pages for rotating widget views.
     // Provider emits multiple entries with increasing pageIndex so the
-    // system cycles through pages without re-fetching the snapshot.
+    // system cycles through game pages and medium overflow pages without
+    // re-fetching the snapshot.
     let pageIndex: Int
     let totalPages: Int
 

@@ -29,7 +29,14 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
     // sub-minute timeline reloads, but pre-built entries spaced N seconds
     // apart are honored by the system when rendering the timeline that the
     // provider returned.
-    private static let pageDurationSeconds: TimeInterval = 30
+    private static func pageDurationSeconds(for family: WidgetFamily) -> TimeInterval {
+        switch family {
+        case .systemMedium:
+            return 15
+        default:
+            return 30
+        }
+    }
 
     private func paginatedEntries(
         base: SnapshotEntry,
@@ -57,15 +64,16 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
         // Fill the time until the next data refresh with rotating page
         // entries, cycling page indices if there is room for more rotations
         // than there are pages.
+        let pageDurationSeconds = Self.pageDurationSeconds(for: family)
         let availableSeconds = max(
-            Self.pageDurationSeconds,
+            pageDurationSeconds,
             nextRefresh.timeIntervalSince(base.date)
         )
-        let slots = max(1, Int(floor(availableSeconds / Self.pageDurationSeconds)))
+        let slots = max(1, Int(floor(availableSeconds / pageDurationSeconds)))
 
         return (0..<slots).map { i in
             SnapshotEntry(
-                date: base.date.addingTimeInterval(Self.pageDurationSeconds * Double(i)),
+                date: base.date.addingTimeInterval(pageDurationSeconds * Double(i)),
                 snapshot: base.snapshot,
                 staleFromCache: base.staleFromCache,
                 shareCode: base.shareCode,
@@ -208,6 +216,10 @@ struct SnapshotTimelineProvider: AppIntentTimelineProvider {
 
 @available(iOS 17.0, *)
 enum WidgetScheduleLayout {
+    struct Page {
+        let sections: [GameSection]
+    }
+
     struct AssetEntry: Hashable {
         let name: String
         let fantasyPoints: Double
@@ -221,6 +233,7 @@ enum WidgetScheduleLayout {
         let maxNhlGroupsPerFantasyTeam: Int
         let maxNamesPerLine: Int
         let compactRows: Bool
+        let maxRenderedLinesPerFantasyTeam: Int
         let bodyLineLimit: Int
     }
 
@@ -230,16 +243,24 @@ enum WidgetScheduleLayout {
     }
 
     struct FantasyTeamGroup: Hashable, Identifiable {
-        var id: String { name }
+        var id: String { "\(name)-\(linePageIndex)" }
         let name: String
         let totalFantasyPoints: Double
         let teamLines: [TeamAssetLine]
+        let displayedLines: [String]?
+        let linePageIndex: Int
+        let totalLinePages: Int
     }
 
     struct GameSection: Identifiable {
-        var id: Int { game.id }
+        var id: String {
+            "\(game.id)-\(fantasyTeamPageIndex)"
+        }
         let game: WidgetSnapshot.Game
         let fantasyTeams: [FantasyTeamGroup]
+        let totalFantasyTeamCount: Int
+        let fantasyTeamPageIndex: Int
+        let totalFantasyTeamPages: Int
     }
 
     private static let isoFormatter: ISO8601DateFormatter = {
@@ -264,17 +285,19 @@ enum WidgetScheduleLayout {
                 maxNhlGroupsPerFantasyTeam: 1,
                 maxNamesPerLine: 1,
                 compactRows: true,
+                maxRenderedLinesPerFantasyTeam: Int.max,
                 bodyLineLimit: 3
             )
         case .systemMedium:
             return FamilyConfig(
                 gamesPerPage: 1,
-                maxFantasyTeamsPerGame: 4,
+                maxFantasyTeamsPerGame: 2,
                 fantasyTeamColumns: 2,
-                maxNhlGroupsPerFantasyTeam: 2,
+                maxNhlGroupsPerFantasyTeam: Int.max,
                 maxNamesPerLine: 1,
                 compactRows: false,
-                bodyLineLimit: 10
+                maxRenderedLinesPerFantasyTeam: 3,
+                bodyLineLimit: 8
             )
         case .systemLarge:
             return FamilyConfig(
@@ -284,6 +307,7 @@ enum WidgetScheduleLayout {
                 maxNhlGroupsPerFantasyTeam: 2,
                 maxNamesPerLine: 1,
                 compactRows: false,
+                maxRenderedLinesPerFantasyTeam: Int.max,
                 bodyLineLimit: 12
             )
         default:
@@ -294,6 +318,7 @@ enum WidgetScheduleLayout {
                 maxNhlGroupsPerFantasyTeam: 1,
                 maxNamesPerLine: 1,
                 compactRows: true,
+                maxRenderedLinesPerFantasyTeam: Int.max,
                 bodyLineLimit: 2
             )
         }
@@ -305,9 +330,7 @@ enum WidgetScheduleLayout {
     ) -> Int {
         guard supportsPagination(for: family) else { return 1 }
         guard let snapshot else { return 1 }
-        let sections = sections(for: snapshot, family: family)
-        let gamesPerPage = max(1, config(for: family).gamesPerPage)
-        return max(1, Int(ceil(Double(sections.count) / Double(gamesPerPage))))
+        return max(1, pages(for: snapshot, family: family).count)
     }
 
     static func pageSections(
@@ -316,11 +339,10 @@ enum WidgetScheduleLayout {
         pageIndex: Int
     ) -> [GameSection] {
         guard let snapshot else { return [] }
-        let sections = sections(for: snapshot, family: family)
-        let gamesPerPage = max(1, config(for: family).gamesPerPage)
-        let start = min(pageIndex * gamesPerPage, sections.count)
-        let end = min(start + gamesPerPage, sections.count)
-        return Array(sections[start..<end])
+        let pages = pages(for: snapshot, family: family)
+        guard !pages.isEmpty else { return [] }
+        let safeIndex = max(0, min(pageIndex, pages.count - 1))
+        return pages[safeIndex].sections
     }
 
     static func headerText(for game: WidgetSnapshot.Game) -> String {
@@ -375,16 +397,28 @@ enum WidgetScheduleLayout {
         for section: GameSection,
         family: WidgetFamily
     ) -> Int {
-        max(0, section.fantasyTeams.count - visibleFantasyTeams(
+        max(0, section.totalFantasyTeamCount - visibleFantasyTeams(
             for: section,
             family: family
         ).count)
+    }
+
+    static func fantasyTeamPointsText(for team: FantasyTeamGroup) -> String {
+        "\(pointsText(for: team.totalFantasyPoints)) pts"
+    }
+
+    static func fantasyTeamPageText(for team: FantasyTeamGroup) -> String? {
+        guard team.totalLinePages > 1 else { return nil }
+        return "\(team.linePageIndex + 1)/\(team.totalLinePages)"
     }
 
     static func teamLines(
         for team: FantasyTeamGroup,
         family: WidgetFamily
     ) -> [String] {
+        if let displayedLines = team.displayedLines {
+            return displayedLines
+        }
         let cfg = config(for: family)
         let visibleGroups = Array(team.teamLines.prefix(cfg.maxNhlGroupsPerFantasyTeam))
         var lines: [String] = []
@@ -416,20 +450,32 @@ enum WidgetScheduleLayout {
         family: WidgetFamily
     ) -> [GameSection] {
         let groupedGames = snapshot.games.map { game in
-            GameSection(
+            let fantasyTeams = groupedFantasyTeams(
+                snapshot.players.filter { $0.gameId == game.id }
+            )
+            return GameSection(
                 game: game,
-                fantasyTeams: groupedFantasyTeams(
-                    snapshot.players.filter { $0.gameId == game.id }
-                )
+                fantasyTeams: fantasyTeams,
+                totalFantasyTeamCount: fantasyTeams.count,
+                fantasyTeamPageIndex: 0,
+                totalFantasyTeamPages: 1
             )
         }
 
+        let sortedSections: [GameSection]
         switch family {
         case .systemSmall:
-            return groupedGames.sorted(by: smallPrioritySort)
+            sortedSections = groupedGames.sorted(by: smallPrioritySort)
         default:
-            return groupedGames.sorted(by: chronologicalSort)
+            sortedSections = groupedGames.sorted(by: chronologicalSort)
         }
+
+        if family == .systemMedium {
+            return sortedSections.flatMap {
+                paginateFantasyTeams(in: $0, family: family)
+            }
+        }
+        return sortedSections
     }
 
     private static func supportsPagination(for family: WidgetFamily) -> Bool {
@@ -468,7 +514,10 @@ enum WidgetScheduleLayout {
                 return FantasyTeamGroup(
                     name: teamName,
                     totalFantasyPoints: total,
-                    teamLines: teamLines
+                    teamLines: teamLines,
+                    displayedLines: nil,
+                    linePageIndex: 0,
+                    totalLinePages: 1
                 )
             }
             .sorted {
@@ -499,6 +548,163 @@ enum WidgetScheduleLayout {
             row += " • +\(hiddenGroups) more"
         }
         return row
+    }
+
+    private static func paginateFantasyTeams(
+        in section: GameSection,
+        family: WidgetFamily
+    ) -> [GameSection] {
+        let teamsPerPage = max(1, config(for: family).maxFantasyTeamsPerGame)
+        let cfg = config(for: family)
+        let pagedTeams = section.fantasyTeams.map {
+            paginateTeamLines(for: $0, family: family, cfg: cfg)
+        }
+        guard !pagedTeams.isEmpty else { return [section] }
+
+        let pagedSections = buildPaginatedSections(
+            from: pagedTeams,
+            in: section,
+            teamsPerPage: teamsPerPage
+        )
+
+        return pagedSections.enumerated().map { index, pagedSection in
+            GameSection(
+                game: pagedSection.game,
+                fantasyTeams: pagedSection.fantasyTeams,
+                totalFantasyTeamCount: pagedSection.totalFantasyTeamCount,
+                fantasyTeamPageIndex: index,
+                totalFantasyTeamPages: pagedSections.count
+            )
+        }
+    }
+
+    private static func buildPaginatedSections(
+        from pagedTeams: [[FantasyTeamGroup]],
+        in section: GameSection,
+        teamsPerPage: Int
+    ) -> [GameSection] {
+        var pagedSections: [GameSection] = []
+        var state = PaginationState(
+            pagedTeams: pagedTeams,
+            pendingContinuations: [],
+            nextTeamIndex: 0
+        )
+
+        while let pageTeams = nextPageTeams(
+            state: &state,
+            teamsPerPage: teamsPerPage
+        ) {
+            pagedSections.append(
+                GameSection(
+                    game: section.game,
+                    fantasyTeams: pageTeams,
+                    totalFantasyTeamCount: section.totalFantasyTeamCount,
+                    fantasyTeamPageIndex: 0,
+                    totalFantasyTeamPages: 1
+                )
+            )
+        }
+
+        return pagedSections
+    }
+
+    private static func pages(
+        for snapshot: WidgetSnapshot,
+        family: WidgetFamily
+    ) -> [Page] {
+        let sections = sections(for: snapshot, family: family)
+        guard !sections.isEmpty else { return [] }
+
+        let gamesPerPage = max(1, config(for: family).gamesPerPage)
+        return stride(from: 0, to: sections.count, by: gamesPerPage).map { start in
+            let end = min(start + gamesPerPage, sections.count)
+            return Page(sections: Array(sections[start..<end]))
+        }
+    }
+
+    private static func paginateTeamLines(
+        for team: FantasyTeamGroup,
+        family: WidgetFamily,
+        cfg: FamilyConfig
+    ) -> [FantasyTeamGroup] {
+        let maxLinesPerPage = max(1, cfg.maxRenderedLinesPerFantasyTeam)
+        let allLines = teamLines(for: team, family: family)
+        let linePages = stride(from: 0, to: max(allLines.count, 1), by: maxLinesPerPage)
+            .map { start -> [String] in
+                guard !allLines.isEmpty else { return [] }
+                let end = min(start + maxLinesPerPage, allLines.count)
+                return Array(allLines[start..<end])
+            }
+
+        return linePages.enumerated().map { index, lines in
+            FantasyTeamGroup(
+                name: team.name,
+                totalFantasyPoints: team.totalFantasyPoints,
+                teamLines: team.teamLines,
+                displayedLines: lines,
+                linePageIndex: index,
+                totalLinePages: linePages.count
+            )
+        }
+    }
+
+    private struct TeamCursor {
+        let teamIndex: Int
+        let pageIndex: Int
+    }
+
+    private struct PaginationState {
+        let pagedTeams: [[FantasyTeamGroup]]
+        var pendingContinuations: [TeamCursor]
+        var nextTeamIndex: Int
+    }
+
+    private static func nextPageTeams(
+        state: inout PaginationState,
+        teamsPerPage: Int
+    ) -> [FantasyTeamGroup]? {
+        var pageTeams: [FantasyTeamGroup] = []
+        var newContinuations: [TeamCursor] = []
+
+        while pageTeams.count < teamsPerPage {
+            guard let cursor = nextCursor(state: &state) else { break }
+            pageTeams.append(teamPage(for: cursor, in: state.pagedTeams))
+            if let continuation = continuationCursor(for: cursor, in: state.pagedTeams) {
+                newContinuations.append(continuation)
+            }
+        }
+
+        guard !pageTeams.isEmpty else { return nil }
+        state.pendingContinuations.append(contentsOf: newContinuations)
+        return pageTeams
+    }
+
+    private static func nextCursor(state: inout PaginationState) -> TeamCursor? {
+        if let pending = state.pendingContinuations.first {
+            state.pendingContinuations.removeFirst()
+            return pending
+        }
+
+        guard state.nextTeamIndex < state.pagedTeams.count else { return nil }
+        let cursor = TeamCursor(teamIndex: state.nextTeamIndex, pageIndex: 0)
+        state.nextTeamIndex += 1
+        return cursor
+    }
+
+    private static func teamPage(
+        for cursor: TeamCursor,
+        in pagedTeams: [[FantasyTeamGroup]]
+    ) -> FantasyTeamGroup {
+        pagedTeams[cursor.teamIndex][cursor.pageIndex]
+    }
+
+    private static func continuationCursor(
+        for cursor: TeamCursor,
+        in pagedTeams: [[FantasyTeamGroup]]
+    ) -> TeamCursor? {
+        let nextPageIndex = cursor.pageIndex + 1
+        guard nextPageIndex < pagedTeams[cursor.teamIndex].count else { return nil }
+        return TeamCursor(teamIndex: cursor.teamIndex, pageIndex: nextPageIndex)
     }
 
     private static func wrappedTeamAssetLines(

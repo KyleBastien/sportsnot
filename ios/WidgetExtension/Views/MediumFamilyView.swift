@@ -5,10 +5,12 @@ import WidgetKit
 struct MediumFamilyView: View {
     let entry: SnapshotEntry
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 8, alignment: .topLeading),
-        GridItem(.flexible(), spacing: 8, alignment: .topLeading),
-    ]
+    private var columns: [GridItem] {
+        Array(
+            repeating: GridItem(.flexible(), spacing: 8, alignment: .topLeading),
+            count: WidgetScheduleLayout.config(for: .systemMedium).fantasyTeamColumns
+        )
+    }
 
     var body: some View {
         let sections = WidgetScheduleLayout.pageSections(
@@ -58,11 +60,26 @@ struct MediumFamilyView: View {
                         } else {
                             LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
                                 ForEach(visibleTeams) { team in
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(team.name)
-                                            .font(.system(size: 10, weight: .semibold))
-                                            .lineLimit(1)
-                                            .minimumScaleFactor(0.75)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                            Text(team.name)
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.75)
+
+                                            if let pageText = WidgetScheduleLayout.fantasyTeamPageText(for: team) {
+                                                Text(pageText)
+                                                    .font(.system(size: 8).monospacedDigit())
+                                                    .foregroundStyle(.tertiary)
+                                            }
+
+                                            Spacer(minLength: 2)
+
+                                            Text(WidgetScheduleLayout.fantasyTeamPointsText(for: team))
+                                                .font(.system(size: 9, weight: .medium))
+                                                .foregroundStyle(.tertiary)
+                                                .lineLimit(1)
+                                        }
 
                                         ForEach(
                                             WidgetScheduleLayout.teamLines(
@@ -81,15 +98,6 @@ struct MediumFamilyView: View {
                                 }
                             }
 
-                            let hiddenTeams = WidgetScheduleLayout.hiddenFantasyTeamCount(
-                                for: section,
-                                family: .systemMedium
-                            )
-                            if hiddenTeams > 0 {
-                                Text("+\(hiddenTeams) more teams")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                            }
                         }
                     }
 
