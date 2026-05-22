@@ -554,8 +554,6 @@ enum WidgetScheduleLayout {
         in section: GameSection,
         family: WidgetFamily
     ) -> [GameSection] {
-        typealias TeamCursor = (teamIndex: Int, pageIndex: Int)
-
         let teamsPerPage = max(1, config(for: family).maxFantasyTeamsPerGame)
         let cfg = config(for: family)
         let pagedTeams = section.fantasyTeams.map {
@@ -563,50 +561,11 @@ enum WidgetScheduleLayout {
         }
         guard !pagedTeams.isEmpty else { return [section] }
 
-        var pagedSections: [GameSection] = []
-        var pendingContinuations: [TeamCursor] = []
-        var nextTeamIndex = 0
-
-        while nextTeamIndex < pagedTeams.count || !pendingContinuations.isEmpty {
-            var pageTeams: [FantasyTeamGroup] = []
-            var newContinuations: [TeamCursor] = []
-
-            while pageTeams.count < teamsPerPage {
-                let cursor: TeamCursor
-                if let pending = pendingContinuations.first {
-                    pendingContinuations.removeFirst()
-                    cursor = pending
-                } else if nextTeamIndex < pagedTeams.count {
-                    cursor = (teamIndex: nextTeamIndex, pageIndex: 0)
-                    nextTeamIndex += 1
-                } else {
-                    break
-                }
-
-                let teamPage = pagedTeams[cursor.teamIndex][cursor.pageIndex]
-                pageTeams.append(teamPage)
-
-                let nextPageIndex = cursor.pageIndex + 1
-                if nextPageIndex < pagedTeams[cursor.teamIndex].count {
-                    newContinuations.append(
-                        (teamIndex: cursor.teamIndex, pageIndex: nextPageIndex)
-                    )
-                }
-            }
-
-            guard !pageTeams.isEmpty else { break }
-
-            pagedSections.append(
-                GameSection(
-                    game: section.game,
-                    fantasyTeams: pageTeams,
-                    totalFantasyTeamCount: section.totalFantasyTeamCount,
-                    fantasyTeamPageIndex: 0,
-                    totalFantasyTeamPages: 1
-                )
-            )
-            pendingContinuations.append(contentsOf: newContinuations)
-        }
+        let pagedSections = buildPaginatedSections(
+            from: pagedTeams,
+            in: section,
+            teamsPerPage: teamsPerPage
+        )
 
         return pagedSections.enumerated().map { index, pagedSection in
             GameSection(
@@ -617,6 +576,36 @@ enum WidgetScheduleLayout {
                 totalFantasyTeamPages: pagedSections.count
             )
         }
+    }
+
+    private static func buildPaginatedSections(
+        from pagedTeams: [[FantasyTeamGroup]],
+        in section: GameSection,
+        teamsPerPage: Int
+    ) -> [GameSection] {
+        var pagedSections: [GameSection] = []
+        var state = PaginationState(
+            pagedTeams: pagedTeams,
+            pendingContinuations: [],
+            nextTeamIndex: 0
+        )
+
+        while let pageTeams = nextPageTeams(
+            state: &state,
+            teamsPerPage: teamsPerPage
+        ) {
+            pagedSections.append(
+                GameSection(
+                    game: section.game,
+                    fantasyTeams: pageTeams,
+                    totalFantasyTeamCount: section.totalFantasyTeamCount,
+                    fantasyTeamPageIndex: 0,
+                    totalFantasyTeamPages: 1
+                )
+            )
+        }
+
+        return pagedSections
     }
 
     private static func pages(
@@ -657,6 +646,65 @@ enum WidgetScheduleLayout {
                 totalLinePages: linePages.count
             )
         }
+    }
+
+    private struct TeamCursor {
+        let teamIndex: Int
+        let pageIndex: Int
+    }
+
+    private struct PaginationState {
+        let pagedTeams: [[FantasyTeamGroup]]
+        var pendingContinuations: [TeamCursor]
+        var nextTeamIndex: Int
+    }
+
+    private static func nextPageTeams(
+        state: inout PaginationState,
+        teamsPerPage: Int
+    ) -> [FantasyTeamGroup]? {
+        var pageTeams: [FantasyTeamGroup] = []
+        var newContinuations: [TeamCursor] = []
+
+        while pageTeams.count < teamsPerPage {
+            guard let cursor = nextCursor(state: &state) else { break }
+            pageTeams.append(teamPage(for: cursor, in: state.pagedTeams))
+            if let continuation = continuationCursor(for: cursor, in: state.pagedTeams) {
+                newContinuations.append(continuation)
+            }
+        }
+
+        guard !pageTeams.isEmpty else { return nil }
+        state.pendingContinuations.append(contentsOf: newContinuations)
+        return pageTeams
+    }
+
+    private static func nextCursor(state: inout PaginationState) -> TeamCursor? {
+        if let pending = state.pendingContinuations.first {
+            state.pendingContinuations.removeFirst()
+            return pending
+        }
+
+        guard state.nextTeamIndex < state.pagedTeams.count else { return nil }
+        let cursor = TeamCursor(teamIndex: state.nextTeamIndex, pageIndex: 0)
+        state.nextTeamIndex += 1
+        return cursor
+    }
+
+    private static func teamPage(
+        for cursor: TeamCursor,
+        in pagedTeams: [[FantasyTeamGroup]]
+    ) -> FantasyTeamGroup {
+        pagedTeams[cursor.teamIndex][cursor.pageIndex]
+    }
+
+    private static func continuationCursor(
+        for cursor: TeamCursor,
+        in pagedTeams: [[FantasyTeamGroup]]
+    ) -> TeamCursor? {
+        let nextPageIndex = cursor.pageIndex + 1
+        guard nextPageIndex < pagedTeams[cursor.teamIndex].count else { return nil }
+        return TeamCursor(teamIndex: cursor.teamIndex, pageIndex: nextPageIndex)
     }
 
     private static func wrappedTeamAssetLines(
