@@ -10,16 +10,29 @@ export type DisplayStandingsMember<T extends StandingsMemberLike> = T & {
   selected_total_points: number;
 };
 
+function hasRoundPoints(
+  roundPoints: Record<string, number> | null | undefined
+): boolean {
+  return Object.keys(roundPoints ?? {}).length > 0;
+}
+
+function usesCurrentTotalPoints(
+  selectedRound: number,
+  currentRound: number,
+  roundPoints: Record<string, number> | null | undefined
+): boolean {
+  return selectedRound === currentRound && !hasRoundPoints(roundPoints);
+}
+
 export function getSelectedTotalPoints(
   member: StandingsMemberLike,
   selectedRound: number,
   currentRound: number
 ): number {
   if (
-    selectedRound === currentRound &&
-    (!member.round_points || Object.keys(member.round_points).length === 0)
+    usesCurrentTotalPoints(selectedRound, currentRound, member.round_points)
   ) {
-    return member.total_points ?? 0;
+    return member.total_points;
   }
 
   return sumRoundPointsThroughRound(member.round_points, selectedRound);

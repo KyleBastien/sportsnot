@@ -393,8 +393,7 @@ function createReadyViewProps(params: {
   } = params;
 
   const decoratedSlots = decorateSlotsWithElimination(slots, eliminationMaps);
-
-  return {
+  const rosterSelectionProps = {
     memberOptions,
     selectedMemberId,
     onMemberChange,
@@ -402,16 +401,11 @@ function createReadyViewProps(params: {
     round,
     currentRound,
     onRoundChange,
-    roundPoints: getRoundPoints(decoratedSlots),
     totalPoints,
-    groupedSlots: groupRosterSlots<RosterSlotRow>(
-      decoratedSlots,
-      positionOrder
-    ),
-    slots: decoratedSlots,
     isOwnRoster,
-    canManageRoster: isOwnRoster && !isHistorical,
     isHistorical,
+  };
+  const rosterEntityProps = {
     playerStatsLoading,
     injuredPlayerIds,
     playerNameMap,
@@ -419,6 +413,18 @@ function createReadyViewProps(params: {
     playerTeamAbbreviationMap,
     teamAbbreviationMap,
     isMobile,
+  };
+
+  return {
+    ...rosterSelectionProps,
+    roundPoints: getRoundPoints(decoratedSlots),
+    groupedSlots: groupRosterSlots<RosterSlotRow>(
+      decoratedSlots,
+      positionOrder
+    ),
+    slots: decoratedSlots,
+    canManageRoster: isOwnRoster && !isHistorical,
+    ...rosterEntityProps,
   };
 }
 

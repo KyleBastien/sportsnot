@@ -40,26 +40,25 @@ export function useRosterPageController({
   }
 
   const handleActivateIR = async () => {
-    if (rosterData.isHistorical || !irModal || !selectedInjuredSlotId) {
+    if (
+      !canActivateIr(rosterData.isHistorical, irModal, selectedInjuredSlotId)
+    ) {
       return;
     }
 
     setActivating(true);
 
     if (IS_MOCK) {
-      mockActivateIR.mutate({
-        leagueMemberId: rosterData.memberId,
-        slotId: irModal.irSlotId,
-      });
+      activateMockIr(mockActivateIR, rosterData.memberId, irModal.irSlotId);
       closeIrModal();
       return;
     }
 
-    const { error } = await supabase.rpc('activate_ir_player', {
-      p_league_member_id: rosterData.memberId,
-      p_round: rosterData.round,
-      p_injured_roster_id: selectedInjuredSlotId,
-      p_ir_roster_id: irModal.irSlotId,
+    const error = await activateSupabaseIr({
+      leagueMemberId: rosterData.memberId,
+      round: rosterData.round,
+      injuredSlotId: selectedInjuredSlotId,
+      irSlotId: irModal.irSlotId,
     });
 
     if (!error) {
@@ -95,4 +94,39 @@ export function useRosterPageController({
       activating,
     },
   };
+}
+
+function canActivateIr(
+  isHistorical: boolean,
+  irModal: IrModalState | null,
+  selectedInjuredSlotId: string | null
+) {
+  return !isHistorical && irModal !== null && selectedInjuredSlotId !== null;
+}
+
+function activateMockIr(
+  mockActivateIR: ReturnType<typeof useMockActivateIR>,
+  leagueMemberId: string,
+  irSlotId: string
+) {
+  mockActivateIR.mutate({
+    leagueMemberId,
+    slotId: irSlotId,
+  });
+}
+
+async function activateSupabaseIr(params: {
+  leagueMemberId: string;
+  round: number;
+  injuredSlotId: string;
+  irSlotId: string;
+}) {
+  const { error } = await supabase.rpc('activate_ir_player', {
+    p_league_member_id: params.leagueMemberId,
+    p_round: params.round,
+    p_injured_roster_id: params.injuredSlotId,
+    p_ir_roster_id: params.irSlotId,
+  });
+
+  return error;
 }

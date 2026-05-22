@@ -45,67 +45,27 @@ export function useMemberRoster(
   const queryResult = useQuery({
     queryKey: ['roster', leagueId, leagueMemberId ?? user?.id, requestedRound],
     queryFn: async () => {
-      let memberId = leagueMemberId;
-      let memberTotalPoints = 0;
-      let memberRoundPoints: Record<string, number> | null = null;
-
-      if (memberId) {
-        const { data: member } = await supabase
-          .from('league_members')
-          .select('id, total_points, round_points')
-          .eq('id', memberId)
-          .single();
-
-        if (!member) throw new Error('Member not found');
-        memberTotalPoints = member.total_points ?? 0;
-        memberRoundPoints = member.round_points;
-      } else {
-        const { data: member } = await supabase
-          .from('league_members')
-          .select('id, total_points, round_points')
-          .eq('league_id', leagueId)
-          .eq('user_id', user!.id)
-          .single();
-
-        if (!member) throw new Error('Not a member of this league');
-        memberId = member.id;
-        memberTotalPoints = member.total_points ?? 0;
-        memberRoundPoints = member.round_points;
-      }
-
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('current_round')
-        .eq('id', leagueId)
-        .single();
-
-      if (!league) throw new Error('League not found');
-      const currentRound = Math.max(league.current_round ?? 1, 1);
+      const member = await fetchRosterMember(
+        leagueId,
+        leagueMemberId,
+        user?.id
+      );
+      const currentRound = await fetchLeagueCurrentRound(leagueId);
       const selectedRound = clampRoundSelection(
         requestedRound ?? currentRound,
         currentRound
       );
-
-      const { data: roster, error } = await supabase
-        .from('rosters')
-        .select('*')
-        .eq('league_member_id', memberId)
-        .eq('round', selectedRound);
-
-      if (error) throw error;
+      const roster = await fetchRosterSlots(member.id, selectedRound);
 
       return {
-        memberId: memberId as string,
+        memberId: member.id,
         currentRound,
         round: selectedRound,
-        slots: (roster ?? []).map((s: RosterSlotRow) => ({
-          ...s,
-          is_eliminated: s.is_eliminated ?? false,
-        })),
+        slots: normalizeRosterSlots(roster),
         totalPoints:
           selectedRound === currentRound
-            ? memberTotalPoints
-            : sumRoundPointsThroughRound(memberRoundPoints, selectedRound),
+            ? (member.total_points ?? 0)
+            : sumRoundPointsThroughRound(member.round_points, selectedRound),
         isHistorical: selectedRound !== currentRound,
       };
     },
@@ -113,6 +73,63 @@ export function useMemberRoster(
   });
 
   return IS_MOCK ? mockResult : queryResult;
+}
+
+async function fetchRosterMember(
+  leagueId: string,
+  leagueMemberId: string | undefined,
+  userId: string | undefined
+) {
+  const query = supabase
+    .from('league_members')
+    .select('id, total_points, round_points');
+
+  const { data: member } = leagueMemberId
+    ? await query.eq('id', leagueMemberId).single()
+    : await query.eq('league_id', leagueId).eq('user_id', userId!).single();
+
+  if (!member) {
+    throw new Error(
+      leagueMemberId ? 'Member not found' : 'Not a member of this league'
+    );
+  }
+
+  return member;
+}
+
+async function fetchLeagueCurrentRound(leagueId: string) {
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('current_round')
+    .eq('id', leagueId)
+    .single();
+
+  if (!league) {
+    throw new Error('League not found');
+  }
+
+  return Math.max(league.current_round ?? 1, 1);
+}
+
+async function fetchRosterSlots(leagueMemberId: string, round: number) {
+  const { data: roster, error } = await supabase
+    .from('rosters')
+    .select('*')
+    .eq('league_member_id', leagueMemberId)
+    .eq('round', round);
+
+  if (error) {
+    throw error;
+  }
+
+  return roster ?? [];
+}
+
+function normalizeRosterSlots(roster: RosterSlotRow[]) {
+  return roster.map((slot) => ({
+    ...slot,
+    is_eliminated: slot.is_eliminated ?? false,
+  }));
 }
 
 export function useLeagueForRoster(leagueId: string | undefined) {
