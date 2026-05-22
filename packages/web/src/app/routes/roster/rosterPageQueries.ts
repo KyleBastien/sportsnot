@@ -6,6 +6,10 @@ import {
   usePlayoffTeams as useSupabasePlayoffTeams,
   useRegularSeasonPlayers as useSupabaseRegularSeasonPlayers,
 } from '@sportsnot/supabase';
+import {
+  clampRoundSelection,
+  sumRoundPointsThroughRound,
+} from '../../utils/roundUtils';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMockRoster } from '../../../mock/hooks/useMockRoster';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
@@ -15,7 +19,23 @@ import {
   useMockRegularSeasonPlayers,
 } from '../../../mock/hooks/useMockNhlApi';
 
-const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
+const ID_COLUMN = 'id';
+const LEAGUE_ID_COLUMN = 'league_id';
+const LEAGUE_MEMBER_POINTS_SELECT = 'id, total_points, round_points';
+const LEAGUE_CURRENT_ROUND_SELECT = 'current_round';
+const LEAGUES_TABLE = 'leagues';
+const LEAGUE_MEMBERS_TABLE = 'league_members';
+const LEAGUE_MEMBER_ID_COLUMN = 'league_member_id';
+const LEAGUE_NOT_FOUND_ERROR = 'League not found';
+const MEMBER_NOT_FOUND_ERROR = 'Member not found';
+const MOCK_MODE_ENABLED = 'true';
+const NOT_LEAGUE_MEMBER_ERROR = 'Not a member of this league';
+const ROSTERS_SELECT = '*';
+const ROSTERS_TABLE = 'rosters';
+const ROSTER_QUERY_KEY = 'roster';
+const ROUND_COLUMN = 'round';
+const USER_ID_COLUMN = 'user_id';
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === MOCK_MODE_ENABLED;
 
 interface RosterSlotRow {
   id: string;
@@ -30,68 +50,120 @@ interface RosterSlotRow {
   is_eliminated?: boolean;
 }
 
-export function useMemberRoster(leagueId: string, leagueMemberId?: string) {
-  const mockResult = useMockRoster(leagueId, leagueMemberId);
+export function useMemberRoster(params: {
+  leagueId: string;
+  leagueMemberId?: string;
+  requestedRound?: number;
+}) {
+  const { leagueId, leagueMemberId, requestedRound } = params;
+  const mockResult = useMockRoster(leagueId, leagueMemberId, requestedRound);
   const { user } = useAuthContext();
 
   const queryResult = useQuery({
-    queryKey: ['roster', leagueId, leagueMemberId ?? user?.id],
+    queryKey: [
+      ROSTER_QUERY_KEY,
+      leagueId,
+      leagueMemberId ?? user?.id,
+      requestedRound,
+    ],
     queryFn: async () => {
-      let memberId = leagueMemberId;
-      let memberTotalPoints = 0;
-
-      if (memberId) {
-        const { data: member } = await supabase
-          .from('league_members')
-          .select('id, total_points')
-          .eq('id', memberId)
-          .single();
-
-        if (!member) throw new Error('Member not found');
-        memberTotalPoints = member.total_points ?? 0;
-      } else {
-        const { data: member } = await supabase
-          .from('league_members')
-          .select('id, total_points')
-          .eq('league_id', leagueId)
-          .eq('user_id', user!.id)
-          .single();
-
-        if (!member) throw new Error('Not a member of this league');
-        memberId = member.id;
-        memberTotalPoints = member.total_points ?? 0;
-      }
-
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('current_round')
-        .eq('id', leagueId)
-        .single();
-
-      if (!league) throw new Error('League not found');
-
-      const { data: roster, error } = await supabase
-        .from('rosters')
-        .select('*')
-        .eq('league_member_id', memberId)
-        .eq('round', league.current_round);
-
-      if (error) throw error;
+      const member = await fetchRosterMember({
+        leagueId,
+        leagueMemberId,
+        userId: user?.id,
+      });
+      const currentRound = await fetchLeagueCurrentRound({ leagueId });
+      const selectedRound = clampRoundSelection(
+        requestedRound ?? currentRound,
+        currentRound
+      );
+      const roster = await fetchRosterSlots({
+        leagueMemberId: member.id,
+        round: selectedRound,
+      });
 
       return {
-        memberId: memberId as string,
-        round: league.current_round,
-        slots: (roster ?? []).map((s: RosterSlotRow) => ({
-          ...s,
-          is_eliminated: s.is_eliminated ?? false,
-        })),
-        totalPoints: memberTotalPoints,
+        memberId: member.id,
+        currentRound,
+        round: selectedRound,
+        slots: normalizeRosterSlots(roster),
+        totalPoints:
+          selectedRound === currentRound
+            ? (member.total_points ?? 0)
+            : sumRoundPointsThroughRound(member.round_points, selectedRound),
+        isHistorical: selectedRound !== currentRound,
       };
     },
     enabled: !IS_MOCK && !!user,
   });
 
   return IS_MOCK ? mockResult : queryResult;
+}
+
+async function fetchRosterMember(params: {
+  leagueId: string;
+  leagueMemberId: string | undefined;
+  userId: string | undefined;
+}) {
+  const { leagueId, leagueMemberId, userId } = params;
+  const query = supabase
+    .from(LEAGUE_MEMBERS_TABLE)
+    .select(LEAGUE_MEMBER_POINTS_SELECT);
+
+  const { data: member } = leagueMemberId
+    ? await query.eq(ID_COLUMN, leagueMemberId).single()
+    : await query
+        .eq(LEAGUE_ID_COLUMN, leagueId)
+        .eq(USER_ID_COLUMN, userId!)
+        .single();
+
+  if (!member) {
+    throw new Error(
+      leagueMemberId ? MEMBER_NOT_FOUND_ERROR : NOT_LEAGUE_MEMBER_ERROR
+    );
+  }
+
+  return member;
+}
+
+async function fetchLeagueCurrentRound(params: { leagueId: string }) {
+  const { leagueId } = params;
+  const { data: league } = await supabase
+    .from(LEAGUES_TABLE)
+    .select(LEAGUE_CURRENT_ROUND_SELECT)
+    .eq(ID_COLUMN, leagueId)
+    .single();
+
+  if (!league) {
+    throw new Error(LEAGUE_NOT_FOUND_ERROR);
+  }
+
+  return Math.max(league.current_round ?? 1, 1);
+}
+
+async function fetchRosterSlots(params: {
+  leagueMemberId: string;
+  round: number;
+}) {
+  const { leagueMemberId, round } = params;
+  const { data: roster, error } = await supabase
+    .from(ROSTERS_TABLE)
+    .select(ROSTERS_SELECT)
+    .eq(LEAGUE_MEMBER_ID_COLUMN, leagueMemberId)
+    .eq(ROUND_COLUMN, round);
+
+  if (error) {
+    throw error;
+  }
+
+  return roster ?? [];
+}
+
+function normalizeRosterSlots(roster: RosterSlotRow[]) {
+  return roster.map((slot) => ({
+    ...slot,
+    is_eliminated: slot.is_eliminated ?? false,
+  }));
 }
 
 export function useLeagueForRoster(leagueId: string | undefined) {

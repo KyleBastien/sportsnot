@@ -46,8 +46,10 @@ const mockUser = {
 function buildRosterData() {
   return {
     memberId: 'lm-1',
+    currentRound: 2,
     round: 2,
     totalPoints: 100,
+    isHistorical: false,
     slots: [
       {
         id: 'slot-f-1',
@@ -117,11 +119,11 @@ function buildPlayerStatsWithInjured() {
   ];
 }
 
-function renderHarness() {
+function renderHarness(initialEntry = '/roster/league-1') {
   return renderWithAuth(<RosterPage />, {
     auth: { user: mockUser },
     routerWrapper: (children: ReactNode) => (
-      <MemoryRouter initialEntries={['/roster/league-1']}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route path="/roster/:leagueId" element={children} />
         </Routes>
@@ -158,5 +160,23 @@ describe('RosterPage', () => {
     renderHarness();
 
     expect(screen.getByRole('button', { name: /Activate IR/i })).toBeTruthy();
+  });
+
+  it('hides Activate IR actions for historical rounds', () => {
+    rosterState.roster = {
+      data: {
+        ...buildRosterData(),
+        currentRound: 3,
+        round: 1,
+        totalPoints: 40,
+        isHistorical: true,
+      },
+      isLoading: false,
+    };
+
+    renderHarness('/roster/league-1?round=1');
+
+    expect(screen.queryByRole('button', { name: /Activate IR/i })).toBeNull();
+    expect(screen.getByText(/Historical snapshot/i)).toBeTruthy();
   });
 });

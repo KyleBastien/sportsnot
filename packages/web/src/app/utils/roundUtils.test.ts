@@ -1,9 +1,14 @@
 import { describe, it, expect } from '@rstest/core';
 import {
+  buildRoundSearch,
+  clampRoundSelection,
   deriveCurrentRound,
   deriveNextRound,
+  getAvailableRounds,
+  getRoundPoints,
   isAllSeriesComplete,
   isRoundCompleteFromTeamStats,
+  sumRoundPointsThroughRound,
 } from './roundUtils';
 import type { NHLPlayoffSeries } from '@sportsnot/types';
 
@@ -77,6 +82,70 @@ describe('roundUtils', () => {
 
     it('should return 1 when no drafts have been completed (initial state)', () => {
       expect(deriveNextRound(0, 0)).toBe(1);
+    });
+  });
+
+  describe('clampRoundSelection', () => {
+    it('returns current round when selected round is missing', () => {
+      expect(clampRoundSelection(undefined, 3)).toBe(3);
+    });
+
+    it('clamps values below round 1 up to 1', () => {
+      expect(clampRoundSelection(0, 3)).toBe(1);
+    });
+
+    it('clamps values above current round down to current round', () => {
+      expect(clampRoundSelection(4, 2)).toBe(2);
+    });
+
+    it('caps current round at the playoff max', () => {
+      expect(clampRoundSelection(undefined, 8)).toBe(4);
+    });
+  });
+
+  describe('getAvailableRounds', () => {
+    it('returns rounds from 1 through current round', () => {
+      expect(getAvailableRounds(3)).toEqual([1, 2, 3]);
+    });
+
+    it('caps available rounds at round 4', () => {
+      expect(getAvailableRounds(8)).toEqual([1, 2, 3, 4]);
+    });
+  });
+
+  describe('getRoundPoints', () => {
+    it('reads numeric round keys', () => {
+      expect(getRoundPoints({ 2: 7 }, 2)).toBe(7);
+    });
+
+    it('reads string round keys', () => {
+      expect(getRoundPoints({ '3': 9 }, 3)).toBe(9);
+    });
+
+    it('defaults missing rounds to 0', () => {
+      expect(getRoundPoints({}, 1)).toBe(0);
+    });
+  });
+
+  describe('sumRoundPointsThroughRound', () => {
+    it('sums all rounds through the selected round', () => {
+      expect(sumRoundPointsThroughRound({ '1': 4, '2': 6, '3': 3 }, 2)).toBe(
+        10
+      );
+    });
+
+    it('treats missing rounds as 0', () => {
+      expect(sumRoundPointsThroughRound({ '2': 6 }, 3)).toBe(6);
+    });
+  });
+
+  describe('buildRoundSearch', () => {
+    it('omits the search string for the current round', () => {
+      expect(buildRoundSearch(3, 3)).toBe('');
+    });
+
+    it('includes the round query for historical rounds', () => {
+      expect(buildRoundSearch(2, 3)).toBe('?round=2');
     });
   });
 

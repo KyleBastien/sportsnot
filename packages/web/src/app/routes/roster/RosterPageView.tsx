@@ -1,8 +1,10 @@
 import { Alert, Container, Stack, Text, Title } from '@mantine/core';
 import { RosterGroupSection } from './RosterGroupSection';
 import {
+  HistoricalRosterNotice,
   IrActivationModal,
   RosterMemberSelect,
+  RosterRoundSelect,
   RosterScoringText,
   RosterSummaryHeader,
 } from './RosterPageSections';
@@ -17,13 +19,16 @@ interface RosterPageViewProps {
   memberOptions: RosterMemberOption[];
   selectedMemberId: string;
   onMemberChange: (value: string | null) => void;
+  onRoundChange: (value: string) => void;
   rosterTitle: string;
   round: number;
+  currentRound: number;
   roundPoints: number;
   totalPoints: number;
   groupedSlots: RosterGroup[];
   slots: RosterSlotRow[];
-  isOwnRoster: boolean;
+  canManageRoster: boolean;
+  isHistorical: boolean;
   playerStatsLoading: boolean;
   injuredPlayerIds: Set<number>;
   playerNameMap: Map<number, string>;
@@ -43,10 +48,13 @@ interface RosterPageViewProps {
 interface EmptyRosterStateProps {
   rosterTitle: string;
   round: number;
+  currentRound: number;
   memberOptions: RosterMemberOption[];
   selectedMemberId: string;
   onMemberChange: (value: string | null) => void;
+  onRoundChange: (value: string) => void;
   isOwnRoster: boolean;
+  isHistorical: boolean;
 }
 
 export function RosterPageErrorState() {
@@ -62,20 +70,32 @@ export function RosterPageErrorState() {
 export function RosterPageEmptyState({
   rosterTitle,
   round,
+  currentRound,
   memberOptions,
   selectedMemberId,
   onMemberChange,
+  onRoundChange,
   isOwnRoster,
+  isHistorical,
 }: EmptyRosterStateProps) {
   return (
     <Container size="md" py="xl">
       <Stack gap="lg" align="center">
         <Title order={2}>{rosterTitle}</Title>
-        <Text c="dimmed">Round {round}</Text>
+        <Text c="dimmed">
+          {isHistorical
+            ? `Viewing Round ${round} snapshot · League is in Round ${currentRound}`
+            : `Round ${round}`}
+        </Text>
         <RosterMemberSelect
           memberOptions={memberOptions}
           selectedMemberId={selectedMemberId}
           onMemberChange={onMemberChange}
+        />
+        <RosterRoundSelect
+          currentRound={currentRound}
+          selectedRound={String(round)}
+          onRoundChange={onRoundChange}
         />
         <Alert color="navy" title="No Roster Yet">
           {isOwnRoster
@@ -91,13 +111,16 @@ export function RosterPageView({
   memberOptions,
   selectedMemberId,
   onMemberChange,
+  onRoundChange,
   rosterTitle,
   round,
+  currentRound,
   roundPoints,
   totalPoints,
   groupedSlots,
   slots,
-  isOwnRoster,
+  canManageRoster,
+  isHistorical,
   playerStatsLoading,
   injuredPlayerIds,
   playerNameMap,
@@ -116,25 +139,37 @@ export function RosterPageView({
   return (
     <Container size="lg" py="xl">
       <Stack gap="xl">
-        <RosterMemberSelect
-          label="View roster"
-          memberOptions={memberOptions}
-          selectedMemberId={selectedMemberId}
-          onMemberChange={onMemberChange}
-        />
+        <Stack gap="md">
+          <RosterMemberSelect
+            label="View roster"
+            memberOptions={memberOptions}
+            selectedMemberId={selectedMemberId}
+            onMemberChange={onMemberChange}
+          />
+          <RosterRoundSelect
+            currentRound={currentRound}
+            selectedRound={String(round)}
+            onRoundChange={onRoundChange}
+          />
+        </Stack>
         <RosterSummaryHeader
           rosterTitle={rosterTitle}
           round={round}
+          currentRound={currentRound}
           roundPoints={roundPoints}
           totalPoints={totalPoints}
+          isHistorical={isHistorical}
         />
+        {isHistorical && (
+          <HistoricalRosterNotice round={round} currentRound={currentRound} />
+        )}
         <RosterScoringText />
         {groupedSlots.map((group) => (
           <RosterGroupSection
             key={group.position}
             group={group}
             slots={slots}
-            isOwnRoster={isOwnRoster}
+            canManageRoster={canManageRoster}
             playerStatsLoading={playerStatsLoading}
             injuredPlayerIds={injuredPlayerIds}
             playerNameMap={playerNameMap}

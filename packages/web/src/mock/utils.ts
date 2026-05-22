@@ -154,13 +154,15 @@ export function calculateMemberPoints(
     MockState,
     'currentRound' | 'simulationDate' | 'rosters' | 'rosterHistory'
   >,
-  memberId: string
+  memberId: string,
+  throughRound = state.currentRound
 ): MemberPointsResult {
   let totalPlayerPts = 0;
   let totalGoaliePts = 0;
   const roundPts: Record<number, number> = {};
+  const maxRound = Math.min(state.currentRound, throughRound);
 
-  for (let r = 1; r <= state.currentRound; r++) {
+  for (let r = 1; r <= maxRound; r++) {
     const bounds = getRoundDateBounds(r);
     if (!bounds) continue;
 

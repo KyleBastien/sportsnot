@@ -1,5 +1,6 @@
 import { useMockData, getRoundDateBounds } from '../MockDataProvider';
 import { getEliminatedAbbreviations } from './useMockNhlApi';
+import { clampRoundSelection } from '../../app/utils/roundUtils';
 import {
   isSlotEliminated,
   calculateRoundMemberPoints,
@@ -93,7 +94,8 @@ export function calculateSlotPoints(
 // otherwise falls back to the mock user's roster.
 export function useMockRoster(
   leagueId: string | undefined,
-  leagueMemberId?: string
+  leagueMemberId?: string,
+  requestedRound?: number
 ) {
   const { state } = useMockData();
 
@@ -106,48 +108,109 @@ export function useMockRoster(
     return makeMockQuery(null);
   }
 
-  const member = leagueMemberId
-    ? league.members.find((m) => m.id === leagueMemberId)
-    : league.members.find((m) => m.userId === state.mockUser.id);
+  const member = findMockRosterMember(
+    league.members,
+    leagueMemberId,
+    state.mockUser.id
+  );
   if (!member) {
     return makeMockQuery(null);
   }
 
-  const memberSlots = state.rosters[member.id] ?? [];
+  const selectedRound = getSelectedMockRound(
+    requestedRound,
+    state.currentRound
+  );
+  const slots = buildMockRosterSlots(state, member.id, selectedRound);
 
-  // Players whose NHL team is out by the start of the next round are crossed
-  // out. For the round 3 + 4 combined draft this naturally covers viewing the
-  // round 4 roster while round 3 is in progress.
-  const eliminatedAbbrs = getEliminatedAbbreviations(state.currentRound + 1);
-
-  // Map to Supabase snake_case and compute points_earned through simulationDate
-  const slots = memberSlots.map((slot) => {
-    const eliminated = isSlotEliminated(slot, eliminatedAbbrs);
-
-    return {
-      id: slot.id,
-      league_member_id: slot.leagueMemberId,
-      round: slot.round,
-      player_id: slot.playerId ?? null,
-      team_id: slot.teamId ?? null,
-      position: slot.position,
-      is_active: slot.isActive,
-      points_earned: eliminated
-        ? 0
-        : calculateSlotPoints(slot, state.simulationDate),
-      activated_from_ir: slot.activatedFromIr,
-      is_eliminated: eliminated,
-    };
-  });
-
-  const pts = calculateMemberPoints(state, member.id);
+  const pts = calculateMemberPoints(state, member.id, selectedRound);
 
   return makeMockQuery({
     memberId: member.id,
-    round: state.currentRound,
+    currentRound: state.currentRound,
+    round: selectedRound,
     slots,
     totalPoints: pts.totalPoints,
+    isHistorical: selectedRound !== state.currentRound,
   });
+}
+
+function findMockRosterMember(
+  members: Array<{ id: string; userId: string }>,
+  leagueMemberId: string | undefined,
+  mockUserId: string
+) {
+  if (leagueMemberId) {
+    return members.find((member) => member.id === leagueMemberId);
+  }
+
+  return members.find((member) => member.userId === mockUserId);
+}
+
+function getSelectedMockRound(
+  requestedRound: number | undefined,
+  currentRound: number
+) {
+  return clampRoundSelection(requestedRound ?? currentRound, currentRound);
+}
+
+function resolveMockRoundSlots(
+  state: ReturnType<typeof useMockData>['state'],
+  memberId: string,
+  selectedRound: number
+) {
+  const memberSlots = state.rosters[memberId] ?? [];
+  const rosterMatchesRound =
+    memberSlots.length === 0 || memberSlots[0].round === selectedRound;
+
+  if (selectedRound === state.currentRound && rosterMatchesRound) {
+    return memberSlots;
+  }
+
+  return state.rosterHistory[memberId]?.[selectedRound] ?? [];
+}
+
+function buildMockRosterSlots(
+  state: ReturnType<typeof useMockData>['state'],
+  memberId: string,
+  selectedRound: number
+) {
+  const eliminatedAbbrs = getEliminatedAbbreviations(selectedRound + 1);
+  const selectedSlots = resolveMockRoundSlots(state, memberId, selectedRound);
+
+  return selectedSlots.map((slot) =>
+    buildMockRosterSlot(slot, eliminatedAbbrs, state.simulationDate)
+  );
+}
+
+function buildMockRosterSlot(
+  slot: {
+    id: string;
+    leagueMemberId: string;
+    round: number;
+    playerId?: number | null;
+    teamId?: number | null;
+    position: string;
+    isActive: boolean;
+    activatedFromIr: boolean;
+  },
+  eliminatedAbbrs: Set<string>,
+  simulationDate: string
+) {
+  const eliminated = isSlotEliminated(slot, eliminatedAbbrs);
+
+  return {
+    id: slot.id,
+    league_member_id: slot.leagueMemberId,
+    round: slot.round,
+    player_id: slot.playerId ?? null,
+    team_id: slot.teamId ?? null,
+    position: slot.position,
+    is_active: slot.isActive,
+    points_earned: eliminated ? 0 : calculateSlotPoints(slot, simulationDate),
+    activated_from_ir: slot.activatedFromIr,
+    is_eliminated: eliminated,
+  };
 }
 
 // ── useLeagueRosters (mock) ────────────────────────────────────────────

@@ -1,39 +1,28 @@
-import { useParams, Link } from 'react-router-dom';
-import {
-  Container,
-  Title,
-  Text,
-  Stack,
-  Card,
-  Table,
-  Badge,
-  Loader,
-  Center,
-  Alert,
-  Button,
-  Group,
-  Anchor,
-} from '@mantine/core';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { Container, Stack, Loader, Center, Alert } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { useAuthContext } from '../../context/AuthContext';
 import { useMockStandings } from '../../../mock/hooks/useMockStandings';
 import { useRoundComplete } from '../../hooks/useRoundComplete';
 import { useWinnerConfetti } from '../../hooks/useWinnerConfetti';
-import { useIsMobile, MobileCardList, DataRow } from '@sportsnot/ui';
+import { useIsMobile } from '@sportsnot/ui';
+import { buildRoundSearch, clampRoundSelection } from '../../utils/roundUtils';
+import {
+  buildStandingsMembers,
+  getVisibleRoundNumbers,
+} from './standingsUtils';
+import {
+  buildNextSearchParams,
+  collectRoundNumbers,
+  hasBreakdownData,
+  StandingsContent,
+  StandingsHeader,
+  type StandingsMemberRow,
+  StandingsRoundSelector,
+} from './StandingsPageSections';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
-
-interface StandingsMemberRow {
-  id: string;
-  user_id: string;
-  team_name: string;
-  total_points: number;
-  player_points?: number | null;
-  goalie_points?: number | null;
-  round_points?: Record<string, number> | null;
-  users?: { display_name?: string } | null;
-}
 
 function useStandings(leagueId: string) {
   const mockResult = useMockStandings(leagueId);
@@ -68,34 +57,27 @@ function useStandings(leagueId: string) {
   return IS_MOCK ? mockResult : queryResult;
 }
 
-function downloadCSV(members: StandingsMemberRow[], leagueName: string) {
-  const header = 'Rank,Team,Manager,Points\n';
-  const rows = members
-    .map(
-      (m, i: number) =>
-        `${i + 1},"${m.team_name}","${m.users?.display_name ?? 'Unknown'}",${m.total_points ?? 0}`
-    )
-    .join('\n');
-
-  const blob = new Blob([header + rows], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${leagueName?.replace(/[^a-z0-9]/gi, '_') ?? 'standings'}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 export function StandingsPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuthContext();
   const { data, isLoading, error } = useStandings(leagueId!);
 
-  const currentRound = data?.league?.current_round ?? 0;
+  const currentRound = Math.max(data?.league?.current_round ?? 1, 1);
+  const selectedRound = clampRoundSelection(
+    searchParams.get('round'),
+    currentRound
+  );
   const { seasonComplete } = useRoundComplete(currentRound);
 
   const typedMembers = (data?.members ?? []) as StandingsMemberRow[];
   const winnerId = seasonComplete ? typedMembers[0]?.user_id : undefined;
+  const displayedMembers = buildStandingsMembers(
+    typedMembers,
+    selectedRound,
+    currentRound
+  );
+  const rosterRoundSearch = buildRoundSearch(selectedRound, currentRound);
 
   useWinnerConfetti({
     seasonComplete,
@@ -104,6 +86,7 @@ export function StandingsPage() {
   });
 
   const isMobile = useIsMobile();
+  const isCurrentUser = (memberUserId: string) => memberUserId === user?.id;
 
   if (isLoading) {
     return (
@@ -124,255 +107,46 @@ export function StandingsPage() {
   }
 
   const { league } = data;
-
-  // Check if breakdown data exists
-  const hasBreakdown = typedMembers.some(
-    (m) => m.player_points != null || m.goalie_points != null
+  const hasBreakdown = hasBreakdownData(typedMembers);
+  const showBreakdown = hasBreakdown && selectedRound === currentRound;
+  const visibleRoundNumbers = getVisibleRoundNumbers(
+    collectRoundNumbers(typedMembers),
+    selectedRound
   );
-
-  // Check if round-by-round data exists
-  const hasRoundPoints = typedMembers.some(
-    (m) => m.round_points && Object.keys(m.round_points).length > 0
-  );
-
-  // Collect all round numbers across all members
-  const roundNumbers = hasRoundPoints
-    ? [
-        ...new Set(
-          typedMembers.flatMap((m) =>
-            m.round_points ? Object.keys(m.round_points).map(Number) : []
-          )
-        ),
-      ].sort((a, b) => a - b)
-    : [];
+  const showSeasonWinner = seasonComplete && selectedRound === currentRound;
+  const handleRoundChange = (value: string) => {
+    const nextRound = clampRoundSelection(value, currentRound);
+    setSearchParams(
+      buildNextSearchParams(searchParams, nextRound, currentRound),
+      { replace: true }
+    );
+  };
 
   return (
     <Container size="lg" py="xl">
       <Stack gap="xl">
-        <Group justify="space-between" align="flex-end">
-          <div>
-            <Title order={2}>Standings</Title>
-            <Text c="dimmed">
-              {league?.name} · Round {currentRound}
-            </Text>
-          </div>
-          <Button
-            variant="light"
-            onClick={() => downloadCSV(typedMembers, league?.name)}
-          >
-            Export CSV
-          </Button>
-        </Group>
-
-        <Card shadow="sm" padding="md" radius="md" withBorder>
-          {isMobile ? (
-            <MobileCardList emptyMessage="No standings data">
-              {typedMembers.map((member, index) => {
-                const isMe = member.user_id === user?.id;
-                return (
-                  <Card
-                    key={member.id}
-                    padding="sm"
-                    radius="sm"
-                    withBorder
-                    style={{
-                      fontWeight: isMe ? 700 : undefined,
-                      backgroundColor: isMe
-                        ? 'var(--mantine-color-blue-light)'
-                        : undefined,
-                    }}
-                  >
-                    <Group justify="space-between" mb={4}>
-                      <Group gap="xs">
-                        {index === 0 ? (
-                          <Badge color="gold" variant="filled" size="sm">
-                            1st
-                          </Badge>
-                        ) : index === 1 ? (
-                          <Badge color="gray" variant="filled" size="sm">
-                            2nd
-                          </Badge>
-                        ) : index === 2 ? (
-                          <Badge color="orange" variant="filled" size="sm">
-                            3rd
-                          </Badge>
-                        ) : (
-                          <Badge variant="light" size="sm">
-                            {index + 1}
-                          </Badge>
-                        )}
-                        <Anchor
-                          component={Link}
-                          to={`/roster/${leagueId}/${member.id}`}
-                          fw={isMe ? 700 : undefined}
-                        >
-                          {member.team_name}
-                          {seasonComplete && index === 0 && ' 🏆'}
-                        </Anchor>
-                      </Group>
-                      <Badge size="lg" variant="filled" color="blue">
-                        {member.total_points ?? 0}
-                      </Badge>
-                    </Group>
-                    <DataRow
-                      label="Manager"
-                      value={
-                        <Group gap={4}>
-                          <Text size="sm" fw={500}>
-                            {member.users?.display_name ?? 'Unknown'}
-                          </Text>
-                          {isMe && (
-                            <Badge size="xs" variant="light">
-                              You
-                            </Badge>
-                          )}
-                        </Group>
-                      }
-                    />
-                    {hasBreakdown && (
-                      <Group gap="xs" mt={4}>
-                        <Badge size="sm" variant="light">
-                          Player: {member.player_points ?? 0}
-                        </Badge>
-                        <Badge size="sm" variant="light">
-                          Goalie: {member.goalie_points ?? 0}
-                        </Badge>
-                      </Group>
-                    )}
-                    {roundNumbers.length > 0 && (
-                      <Group gap="xs" mt={4}>
-                        {roundNumbers.map((r) => (
-                          <Badge key={r} size="sm" variant="outline">
-                            R{r}: {member.round_points?.[r] ?? 0}
-                          </Badge>
-                        ))}
-                      </Group>
-                    )}
-                  </Card>
-                );
-              })}
-            </MobileCardList>
-          ) : (
-            <Table.ScrollContainer minWidth={600}>
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th style={{ width: 60 }}>Rank</Table.Th>
-                    <Table.Th>Team</Table.Th>
-                    <Table.Th>Manager</Table.Th>
-                    {hasBreakdown && (
-                      <>
-                        <Table.Th style={{ textAlign: 'right' }}>
-                          Player Pts
-                        </Table.Th>
-                        <Table.Th style={{ textAlign: 'right' }}>
-                          Goalie Pts
-                        </Table.Th>
-                      </>
-                    )}
-                    {roundNumbers.map((r) => (
-                      <Table.Th key={r} style={{ textAlign: 'right' }}>
-                        R{r}
-                      </Table.Th>
-                    ))}
-                    <Table.Th style={{ textAlign: 'right' }}>Points</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {typedMembers.map((member, index) => {
-                    const isMe = member.user_id === user?.id;
-                    return (
-                      <Table.Tr
-                        key={member.id}
-                        style={{
-                          fontWeight: isMe ? 700 : undefined,
-                          backgroundColor: isMe
-                            ? 'var(--mantine-color-blue-light)'
-                            : undefined,
-                        }}
-                      >
-                        <Table.Td>
-                          {index === 0 ? (
-                            <Badge color="gold" variant="filled">
-                              1st
-                            </Badge>
-                          ) : index === 1 ? (
-                            <Badge color="gray" variant="filled">
-                              2nd
-                            </Badge>
-                          ) : index === 2 ? (
-                            <Badge color="orange" variant="filled">
-                              3rd
-                            </Badge>
-                          ) : (
-                            index + 1
-                          )}
-                        </Table.Td>
-                        <Table.Td>
-                          <Anchor
-                            component={Link}
-                            to={`/roster/${leagueId}/${member.id}`}
-                            fw={isMe ? 700 : undefined}
-                          >
-                            {member.team_name}
-                            {seasonComplete && index === 0 && ' 🏆'}
-                          </Anchor>
-                        </Table.Td>
-                        <Table.Td>
-                          {member.users?.display_name ?? 'Unknown'}
-                          {isMe && (
-                            <Badge size="xs" ml="xs" variant="light">
-                              You
-                            </Badge>
-                          )}
-                        </Table.Td>
-                        {hasBreakdown && (
-                          <>
-                            <Table.Td
-                              style={{
-                                textAlign: 'right',
-                                fontVariantNumeric: 'tabular-nums',
-                              }}
-                            >
-                              {member.player_points ?? 0}
-                            </Table.Td>
-                            <Table.Td
-                              style={{
-                                textAlign: 'right',
-                                fontVariantNumeric: 'tabular-nums',
-                              }}
-                            >
-                              {member.goalie_points ?? 0}
-                            </Table.Td>
-                          </>
-                        )}
-                        {roundNumbers.map((r) => (
-                          <Table.Td
-                            key={r}
-                            style={{
-                              textAlign: 'right',
-                              fontVariantNumeric: 'tabular-nums',
-                            }}
-                          >
-                            {member.round_points?.[r] ?? 0}
-                          </Table.Td>
-                        ))}
-                        <Table.Td
-                          style={{
-                            textAlign: 'right',
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          {member.total_points ?? 0}
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
-                </Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
-          )}
-        </Card>
+        <StandingsHeader
+          currentRound={currentRound}
+          displayedMembers={displayedMembers}
+          leagueName={league?.name}
+          selectedRound={selectedRound}
+        />
+        <StandingsRoundSelector
+          currentRound={currentRound}
+          selectedRound={selectedRound}
+          onRoundChange={handleRoundChange}
+        />
+        <StandingsContent
+          displayedMembers={displayedMembers}
+          isCurrentUser={isCurrentUser}
+          isMobile={isMobile}
+          leagueId={leagueId!}
+          rosterRoundSearch={rosterRoundSearch}
+          showBreakdown={showBreakdown}
+          showSeasonWinner={showSeasonWinner}
+          userId={user?.id}
+          visibleRoundNumbers={visibleRoundNumbers}
+        />
       </Stack>
     </Container>
   );
