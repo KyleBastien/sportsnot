@@ -20,6 +20,8 @@ import {
 } from '../../../mock/hooks/useMockNhlApi';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
+const LEAGUE_MEMBER_POINTS_SELECT = 'id, total_points, round_points';
+const LEAGUE_CURRENT_ROUND_SELECT = 'current_round';
 
 interface RosterSlotRow {
   id: string;
@@ -82,7 +84,7 @@ async function fetchRosterMember(
 ) {
   const query = supabase
     .from('league_members')
-    .select('id, total_points, round_points');
+    .select(LEAGUE_MEMBER_POINTS_SELECT);
 
   const { data: member } = leagueMemberId
     ? await query.eq('id', leagueMemberId).single()
@@ -100,7 +102,7 @@ async function fetchRosterMember(
 async function fetchLeagueCurrentRound(leagueId: string) {
   const { data: league } = await supabase
     .from('leagues')
-    .select('current_round')
+    .select(LEAGUE_CURRENT_ROUND_SELECT)
     .eq('id', leagueId)
     .single();
 

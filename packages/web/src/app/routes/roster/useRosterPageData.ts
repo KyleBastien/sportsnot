@@ -369,62 +369,72 @@ function createReadyViewProps(params: {
   isMobile: boolean;
   positionOrder: string[];
 }) {
-  const {
-    slots,
-    round,
-    currentRound,
-    totalPoints,
-    memberOptions,
-    selectedMemberId,
-    onMemberChange,
-    onRoundChange,
-    rosterTitle,
-    isOwnRoster,
-    isHistorical,
-    playerStatsLoading,
-    injuredPlayerIds,
-    playerNameMap,
-    teamNameMap,
-    playerTeamAbbreviationMap,
-    teamAbbreviationMap,
-    eliminationMaps,
-    isMobile,
-    positionOrder,
-  } = params;
-
-  const decoratedSlots = decorateSlotsWithElimination(slots, eliminationMaps);
-  const rosterSelectionProps = {
-    memberOptions,
-    selectedMemberId,
-    onMemberChange,
-    rosterTitle,
-    round,
-    currentRound,
-    onRoundChange,
-    totalPoints,
-    isOwnRoster,
-    isHistorical,
-  };
-  const rosterEntityProps = {
-    playerStatsLoading,
-    injuredPlayerIds,
-    playerNameMap,
-    teamNameMap,
-    playerTeamAbbreviationMap,
-    teamAbbreviationMap,
-    isMobile,
-  };
+  const { isHistorical, isOwnRoster } = params;
+  const decoratedSlots = buildDecoratedRosterSlots(params);
 
   return {
-    ...rosterSelectionProps,
+    ...buildRosterSelectionProps(params),
     roundPoints: getRoundPoints(decoratedSlots),
     groupedSlots: groupRosterSlots<RosterSlotRow>(
       decoratedSlots,
-      positionOrder
+      params.positionOrder
     ),
     slots: decoratedSlots,
     canManageRoster: isOwnRoster && !isHistorical,
-    ...rosterEntityProps,
+    ...buildRosterEntityProps(params),
+  };
+}
+
+function buildDecoratedRosterSlots(params: {
+  slots: RosterSlotRow[];
+  eliminationMaps: EliminationMaps;
+}) {
+  return decorateSlotsWithElimination(params.slots, params.eliminationMaps);
+}
+
+function buildRosterSelectionProps(params: {
+  memberOptions: ReturnType<typeof buildMemberOptions>;
+  selectedMemberId: string;
+  onMemberChange: (value: string | null) => void;
+  onRoundChange: (value: string) => void;
+  rosterTitle: string;
+  round: number;
+  currentRound: number;
+  totalPoints: number;
+  isOwnRoster: boolean;
+  isHistorical: boolean;
+}) {
+  return {
+    memberOptions: params.memberOptions,
+    selectedMemberId: params.selectedMemberId,
+    onMemberChange: params.onMemberChange,
+    rosterTitle: params.rosterTitle,
+    round: params.round,
+    currentRound: params.currentRound,
+    onRoundChange: params.onRoundChange,
+    totalPoints: params.totalPoints,
+    isOwnRoster: params.isOwnRoster,
+    isHistorical: params.isHistorical,
+  };
+}
+
+function buildRosterEntityProps(params: {
+  playerStatsLoading: boolean;
+  injuredPlayerIds: Set<number>;
+  playerNameMap: Map<number, string>;
+  teamNameMap: Map<number, string>;
+  playerTeamAbbreviationMap: Map<number, string>;
+  teamAbbreviationMap: Map<number, string>;
+  isMobile: boolean;
+}) {
+  return {
+    playerStatsLoading: params.playerStatsLoading,
+    injuredPlayerIds: params.injuredPlayerIds,
+    playerNameMap: params.playerNameMap,
+    teamNameMap: params.teamNameMap,
+    playerTeamAbbreviationMap: params.playerTeamAbbreviationMap,
+    teamAbbreviationMap: params.teamAbbreviationMap,
+    isMobile: params.isMobile,
   };
 }
 
