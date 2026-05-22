@@ -4,6 +4,14 @@ interface RoundTeamStats {
   wins: number;
 }
 
+type RoundPointsLike =
+  | Record<string, number>
+  | Record<number, number>
+  | null
+  | undefined;
+
+export const MAX_PLAYOFF_ROUND = 4;
+
 /**
  * Check whether every series in a given playoff round is complete.
  * A series is complete when one team has 4 wins.
@@ -58,4 +66,73 @@ export function deriveNextRound(
   completedDraftsCount: number
 ): number {
   return deriveCurrentRound(leagueCurrentRound, completedDraftsCount) + 1;
+}
+
+export function clampRoundSelection(
+  selectedRound: number | string | null | undefined,
+  currentRound: number
+): number {
+  const cappedCurrentRound = Math.min(
+    Math.max(currentRound, 1),
+    MAX_PLAYOFF_ROUND
+  );
+  const parsedRound =
+    typeof selectedRound === 'number'
+      ? selectedRound
+      : Number.parseInt(selectedRound ?? '', 10);
+
+  if (!Number.isInteger(parsedRound)) {
+    return cappedCurrentRound;
+  }
+
+  return Math.min(Math.max(parsedRound, 1), cappedCurrentRound);
+}
+
+export function getAvailableRounds(currentRound: number): number[] {
+  const cappedCurrentRound = Math.min(
+    Math.max(currentRound, 1),
+    MAX_PLAYOFF_ROUND
+  );
+
+  return Array.from({ length: cappedCurrentRound }, (_, index) => index + 1);
+}
+
+export function getRoundPoints(
+  roundPoints: RoundPointsLike,
+  round: number
+): number {
+  return roundPoints?.[round] ?? roundPoints?.[String(round)] ?? 0;
+}
+
+export function sumRoundPointsThroughRound(
+  roundPoints: RoundPointsLike,
+  round: number
+): number {
+  let total = 0;
+
+  for (let currentRound = 1; currentRound <= round; currentRound += 1) {
+    total += getRoundPoints(roundPoints, currentRound);
+  }
+
+  return total;
+}
+
+export function buildRoundSearch(
+  selectedRound: number,
+  currentRound: number
+): string {
+  const normalizedCurrentRound = clampRoundSelection(
+    currentRound,
+    currentRound
+  );
+  const normalizedSelectedRound = clampRoundSelection(
+    selectedRound,
+    currentRound
+  );
+
+  if (normalizedSelectedRound === normalizedCurrentRound) {
+    return '';
+  }
+
+  return `?round=${normalizedSelectedRound}`;
 }

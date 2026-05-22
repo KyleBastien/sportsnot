@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -13,6 +13,7 @@ import {
   Button,
   Group,
   Anchor,
+  SegmentedControl,
 } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
@@ -21,6 +22,16 @@ import { useMockStandings } from '../../../mock/hooks/useMockStandings';
 import { useRoundComplete } from '../../hooks/useRoundComplete';
 import { useWinnerConfetti } from '../../hooks/useWinnerConfetti';
 import { useIsMobile, MobileCardList, DataRow } from '@sportsnot/ui';
+import {
+  buildRoundSearch,
+  clampRoundSelection,
+  getAvailableRounds,
+  getRoundPoints,
+} from '../../utils/roundUtils';
+import {
+  buildStandingsMembers,
+  getVisibleRoundNumbers,
+} from './standingsUtils';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -68,12 +79,17 @@ function useStandings(leagueId: string) {
   return IS_MOCK ? mockResult : queryResult;
 }
 
-function downloadCSV(members: StandingsMemberRow[], leagueName: string) {
+function downloadCSV(
+  members: Array<StandingsMemberRow & { selected_total_points: number }>,
+  leagueName: string | undefined,
+  selectedRound: number,
+  currentRound: number
+) {
   const header = 'Rank,Team,Manager,Points\n';
   const rows = members
     .map(
       (m, i: number) =>
-        `${i + 1},"${m.team_name}","${m.users?.display_name ?? 'Unknown'}",${m.total_points ?? 0}`
+        `${i + 1},"${m.team_name}","${m.users?.display_name ?? 'Unknown'}",${m.selected_total_points}`
     )
     .join('\n');
 
@@ -81,21 +97,36 @@ function downloadCSV(members: StandingsMemberRow[], leagueName: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${leagueName?.replace(/[^a-z0-9]/gi, '_') ?? 'standings'}.csv`;
+  const suffix =
+    selectedRound === currentRound ? '' : `_through_round_${selectedRound}`;
+  a.download = `${
+    leagueName?.replace(/[^a-z0-9]/gi, '_') ?? 'standings'
+  }${suffix}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 export function StandingsPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuthContext();
   const { data, isLoading, error } = useStandings(leagueId!);
 
-  const currentRound = data?.league?.current_round ?? 0;
+  const currentRound = Math.max(data?.league?.current_round ?? 1, 1);
+  const selectedRound = clampRoundSelection(
+    searchParams.get('round'),
+    currentRound
+  );
   const { seasonComplete } = useRoundComplete(currentRound);
 
   const typedMembers = (data?.members ?? []) as StandingsMemberRow[];
   const winnerId = seasonComplete ? typedMembers[0]?.user_id : undefined;
+  const displayedMembers = buildStandingsMembers(
+    typedMembers,
+    selectedRound,
+    currentRound
+  );
+  const rosterRoundSearch = buildRoundSearch(selectedRound, currentRound);
 
   useWinnerConfetti({
     seasonComplete,
@@ -129,6 +160,7 @@ export function StandingsPage() {
   const hasBreakdown = typedMembers.some(
     (m) => m.player_points != null || m.goalie_points != null
   );
+  const showBreakdown = hasBreakdown && selectedRound === currentRound;
 
   // Check if round-by-round data exists
   const hasRoundPoints = typedMembers.some(
@@ -145,6 +177,23 @@ export function StandingsPage() {
         ),
       ].sort((a, b) => a - b)
     : [];
+  const visibleRoundNumbers = getVisibleRoundNumbers(
+    roundNumbers,
+    selectedRound
+  );
+  const showSeasonWinner = seasonComplete && selectedRound === currentRound;
+  const handleRoundChange = (value: string) => {
+    const nextRound = clampRoundSelection(value, currentRound);
+    const nextSearchParams = new URLSearchParams(searchParams);
+
+    if (nextRound === currentRound) {
+      nextSearchParams.delete('round');
+    } else {
+      nextSearchParams.set('round', String(nextRound));
+    }
+
+    setSearchParams(nextSearchParams, { replace: true });
+  };
 
   return (
     <Container size="lg" py="xl">
@@ -153,21 +202,42 @@ export function StandingsPage() {
           <div>
             <Title order={2}>Standings</Title>
             <Text c="dimmed">
-              {league?.name} · Round {currentRound}
+              {selectedRound === currentRound
+                ? `${league?.name} · Round ${currentRound}`
+                : `${league?.name} · Viewing Round ${selectedRound} snapshot · Current Round ${currentRound}`}
             </Text>
           </div>
           <Button
             variant="light"
-            onClick={() => downloadCSV(typedMembers, league?.name)}
+            onClick={() =>
+              downloadCSV(
+                displayedMembers,
+                league?.name,
+                selectedRound,
+                currentRound
+              )
+            }
           >
             Export CSV
           </Button>
         </Group>
 
+        {currentRound > 1 && (
+          <SegmentedControl
+            fullWidth
+            value={String(selectedRound)}
+            onChange={handleRoundChange}
+            data={getAvailableRounds(currentRound).map((round) => ({
+              label: `Round ${round}`,
+              value: String(round),
+            }))}
+          />
+        )}
+
         <Card shadow="sm" padding="md" radius="md" withBorder>
           {isMobile ? (
             <MobileCardList emptyMessage="No standings data">
-              {typedMembers.map((member, index) => {
+              {displayedMembers.map((member, index) => {
                 const isMe = member.user_id === user?.id;
                 return (
                   <Card
@@ -203,15 +273,15 @@ export function StandingsPage() {
                         )}
                         <Anchor
                           component={Link}
-                          to={`/roster/${leagueId}/${member.id}`}
+                          to={`/roster/${leagueId}/${member.id}${rosterRoundSearch}`}
                           fw={isMe ? 700 : undefined}
                         >
                           {member.team_name}
-                          {seasonComplete && index === 0 && ' 🏆'}
+                          {showSeasonWinner && index === 0 && ' 🏆'}
                         </Anchor>
                       </Group>
                       <Badge size="lg" variant="filled" color="blue">
-                        {member.total_points ?? 0}
+                        {member.selected_total_points}
                       </Badge>
                     </Group>
                     <DataRow
@@ -229,7 +299,7 @@ export function StandingsPage() {
                         </Group>
                       }
                     />
-                    {hasBreakdown && (
+                    {showBreakdown && (
                       <Group gap="xs" mt={4}>
                         <Badge size="sm" variant="light">
                           Player: {member.player_points ?? 0}
@@ -239,11 +309,11 @@ export function StandingsPage() {
                         </Badge>
                       </Group>
                     )}
-                    {roundNumbers.length > 0 && (
+                    {visibleRoundNumbers.length > 0 && (
                       <Group gap="xs" mt={4}>
-                        {roundNumbers.map((r) => (
+                        {visibleRoundNumbers.map((r) => (
                           <Badge key={r} size="sm" variant="outline">
-                            R{r}: {member.round_points?.[r] ?? 0}
+                            R{r}: {getRoundPoints(member.round_points, r)}
                           </Badge>
                         ))}
                       </Group>
@@ -260,7 +330,7 @@ export function StandingsPage() {
                     <Table.Th style={{ width: 60 }}>Rank</Table.Th>
                     <Table.Th>Team</Table.Th>
                     <Table.Th>Manager</Table.Th>
-                    {hasBreakdown && (
+                    {showBreakdown && (
                       <>
                         <Table.Th style={{ textAlign: 'right' }}>
                           Player Pts
@@ -270,7 +340,7 @@ export function StandingsPage() {
                         </Table.Th>
                       </>
                     )}
-                    {roundNumbers.map((r) => (
+                    {visibleRoundNumbers.map((r) => (
                       <Table.Th key={r} style={{ textAlign: 'right' }}>
                         R{r}
                       </Table.Th>
@@ -279,7 +349,7 @@ export function StandingsPage() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {typedMembers.map((member, index) => {
+                  {displayedMembers.map((member, index) => {
                     const isMe = member.user_id === user?.id;
                     return (
                       <Table.Tr
@@ -311,11 +381,11 @@ export function StandingsPage() {
                         <Table.Td>
                           <Anchor
                             component={Link}
-                            to={`/roster/${leagueId}/${member.id}`}
+                            to={`/roster/${leagueId}/${member.id}${rosterRoundSearch}`}
                             fw={isMe ? 700 : undefined}
                           >
                             {member.team_name}
-                            {seasonComplete && index === 0 && ' 🏆'}
+                            {showSeasonWinner && index === 0 && ' 🏆'}
                           </Anchor>
                         </Table.Td>
                         <Table.Td>
@@ -326,7 +396,7 @@ export function StandingsPage() {
                             </Badge>
                           )}
                         </Table.Td>
-                        {hasBreakdown && (
+                        {showBreakdown && (
                           <>
                             <Table.Td
                               style={{
@@ -346,7 +416,7 @@ export function StandingsPage() {
                             </Table.Td>
                           </>
                         )}
-                        {roundNumbers.map((r) => (
+                        {visibleRoundNumbers.map((r) => (
                           <Table.Td
                             key={r}
                             style={{
@@ -354,7 +424,7 @@ export function StandingsPage() {
                               fontVariantNumeric: 'tabular-nums',
                             }}
                           >
-                            {member.round_points?.[r] ?? 0}
+                            {getRoundPoints(member.round_points, r)}
                           </Table.Td>
                         ))}
                         <Table.Td
@@ -363,7 +433,7 @@ export function StandingsPage() {
                             fontVariantNumeric: 'tabular-nums',
                           }}
                         >
-                          {member.total_points ?? 0}
+                          {member.selected_total_points}
                         </Table.Td>
                       </Table.Tr>
                     );

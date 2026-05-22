@@ -40,7 +40,7 @@ export function useRosterPageController({
   }
 
   const handleActivateIR = async () => {
-    if (!irModal || !selectedInjuredSlotId) {
+    if (rosterData.isHistorical || !irModal || !selectedInjuredSlotId) {
       return;
     }
 

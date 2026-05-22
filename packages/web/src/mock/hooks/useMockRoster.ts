@@ -1,5 +1,6 @@
 import { useMockData, getRoundDateBounds } from '../MockDataProvider';
 import { getEliminatedAbbreviations } from './useMockNhlApi';
+import { clampRoundSelection } from '../../app/utils/roundUtils';
 import {
   isSlotEliminated,
   calculateRoundMemberPoints,
@@ -93,7 +94,8 @@ export function calculateSlotPoints(
 // otherwise falls back to the mock user's roster.
 export function useMockRoster(
   leagueId: string | undefined,
-  leagueMemberId?: string
+  leagueMemberId?: string,
+  requestedRound?: number
 ) {
   const { state } = useMockData();
 
@@ -114,14 +116,24 @@ export function useMockRoster(
   }
 
   const memberSlots = state.rosters[member.id] ?? [];
+  const selectedRound = clampRoundSelection(
+    requestedRound ?? state.currentRound,
+    state.currentRound
+  );
+  const rosterMatchesRound =
+    memberSlots.length > 0 ? memberSlots[0].round === selectedRound : true;
+  const selectedSlots =
+    selectedRound === state.currentRound && rosterMatchesRound
+      ? memberSlots
+      : (state.rosterHistory[member.id]?.[selectedRound] ?? []);
 
   // Players whose NHL team is out by the start of the next round are crossed
   // out. For the round 3 + 4 combined draft this naturally covers viewing the
   // round 4 roster while round 3 is in progress.
-  const eliminatedAbbrs = getEliminatedAbbreviations(state.currentRound + 1);
+  const eliminatedAbbrs = getEliminatedAbbreviations(selectedRound + 1);
 
   // Map to Supabase snake_case and compute points_earned through simulationDate
-  const slots = memberSlots.map((slot) => {
+  const slots = selectedSlots.map((slot) => {
     const eliminated = isSlotEliminated(slot, eliminatedAbbrs);
 
     return {
@@ -140,13 +152,15 @@ export function useMockRoster(
     };
   });
 
-  const pts = calculateMemberPoints(state, member.id);
+  const pts = calculateMemberPoints(state, member.id, selectedRound);
 
   return makeMockQuery({
     memberId: member.id,
-    round: state.currentRound,
+    currentRound: state.currentRound,
+    round: selectedRound,
     slots,
     totalPoints: pts.totalPoints,
+    isHistorical: selectedRound !== state.currentRound,
   });
 }
 

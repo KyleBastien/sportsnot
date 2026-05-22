@@ -2,9 +2,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CURRENT_SEASON } from '@sportsnot/types';
 import { buildPlayerNameMap, buildTeamNameMap } from '@sportsnot/utils';
 import { useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useIsMobile } from '@sportsnot/ui';
 import { useAuthContext } from '../../context/AuthContext';
+import { buildRoundSearch, clampRoundSelection } from '../../utils/roundUtils';
 import {
   buildPlayerTeamAbbreviationMap,
   buildTeamAbbreviationMap,
@@ -35,22 +36,42 @@ import {
 
 export function useRosterPageData(leagueId: string, leagueMemberId?: string) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
-  const { data, isLoading, error } = useMemberRoster(leagueId, leagueMemberId);
-  const currentRound = data?.round ?? 1;
+  const requestedRoundParam = searchParams.get('round');
+  const requestedRound = requestedRoundParam
+    ? Number.parseInt(requestedRoundParam, 10)
+    : undefined;
+  const { data, isLoading, error } = useMemberRoster(
+    leagueId,
+    leagueMemberId,
+    requestedRound
+  );
+  const currentRound = data?.currentRound ?? 1;
+  const selectedRound =
+    data?.round ?? clampRoundSelection(requestedRound, currentRound);
+  const roundSelection = useRosterRoundSelection({
+    currentRound,
+    selectedRound,
+    navigate,
+    pathname: location.pathname,
+  });
   const memberSelection = useRosterMemberSelection({
     leagueId,
     leagueMemberId,
     navigate,
+    roundSearch: roundSelection.roundSearch,
     userId: user?.id,
   });
-  const rosterStats = useRosterStatsData(currentRound);
+  const rosterStats = useRosterStatsData(selectedRound);
   const rosterViewState = useRosterViewState({
     currentRound,
     isMobile,
     memberSelection,
+    roundSelection,
     rosterStats,
   });
 
@@ -67,9 +88,10 @@ function useRosterMemberSelection(params: {
   leagueId: string;
   leagueMemberId: string | undefined;
   navigate: ReturnType<typeof useNavigate>;
+  roundSearch: string;
   userId: string | undefined;
 }) {
-  const { leagueId, leagueMemberId, navigate, userId } = params;
+  const { leagueId, leagueMemberId, navigate, roundSearch, userId } = params;
   const leagueData = useLeagueForRoster(leagueId).data;
   const allowIrSlots = (leagueData?.allow_ir_slots ?? true) as boolean;
   const leagueMembers = getLeagueMembers(leagueData?.league_members);
@@ -90,9 +112,9 @@ function useRosterMemberSelection(params: {
   const onMemberChange = useCallback(
     (value: string | null) =>
       navigate(
-        resolveRosterNavigation(leagueId, value, memberState.myMemberId)
+        `${resolveRosterNavigation(leagueId, value, memberState.myMemberId)}${roundSearch}`
       ),
-    [leagueId, memberState.myMemberId, navigate]
+    [leagueId, memberState.myMemberId, navigate, roundSearch]
   );
 
   return {
@@ -105,13 +127,47 @@ function useRosterMemberSelection(params: {
   };
 }
 
+function useRosterRoundSelection(params: {
+  currentRound: number;
+  selectedRound: number;
+  navigate: ReturnType<typeof useNavigate>;
+  pathname: string;
+}) {
+  const { currentRound, selectedRound, navigate, pathname } = params;
+  const roundSearch = buildRoundSearch(selectedRound, currentRound);
+  const onRoundChange = useCallback(
+    (value: string) => {
+      const nextRound = clampRoundSelection(value, currentRound);
+      navigate(`${pathname}${buildRoundSearch(nextRound, currentRound)}`, {
+        replace: true,
+      });
+    },
+    [currentRound, navigate, pathname]
+  );
+
+  return {
+    currentRound,
+    selectedRound,
+    roundSearch,
+    onRoundChange,
+    isHistorical: selectedRound !== currentRound,
+  };
+}
+
 function useRosterViewState(params: {
   currentRound: number;
   isMobile: boolean;
   memberSelection: ReturnType<typeof useRosterMemberSelection>;
+  roundSelection: ReturnType<typeof useRosterRoundSelection>;
   rosterStats: ReturnType<typeof useRosterStatsData>;
 }) {
-  const { currentRound, isMobile, memberSelection, rosterStats } = params;
+  const {
+    currentRound,
+    isMobile,
+    memberSelection,
+    roundSelection,
+    rosterStats,
+  } = params;
   const rosterEntityMaps = useRosterEntityMaps(rosterStats);
   const positionOrder = buildPositionOrder(memberSelection.allowIrSlots);
 
@@ -122,7 +178,7 @@ function useRosterViewState(params: {
     isOwnRoster: memberSelection.isOwnRoster,
     rosterTitle: memberSelection.rosterTitle,
     positionOrder,
-    emptyProps: buildEmptyViewProps(currentRound, memberSelection),
+    emptyProps: buildEmptyViewProps(roundSelection, memberSelection),
     buildReadyViewProps: (
       slots: RosterSlotRow[],
       round: number,
@@ -131,12 +187,15 @@ function useRosterViewState(params: {
       createReadyViewProps({
         slots,
         round,
+        currentRound,
         totalPoints,
         memberOptions: memberSelection.memberOptions,
         selectedMemberId: memberSelection.selectedMemberId,
         onMemberChange: memberSelection.onMemberChange,
+        onRoundChange: roundSelection.onRoundChange,
         rosterTitle: memberSelection.rosterTitle,
         isOwnRoster: memberSelection.isOwnRoster,
+        isHistorical: roundSelection.isHistorical,
         playerStatsLoading: rosterStats.playerStatsLoading,
         injuredPlayerIds: rosterEntityMaps.injuredPlayerIds,
         playerNameMap: rosterEntityMaps.playerNameMap,
@@ -214,16 +273,19 @@ function useRosterEntityMaps(
 }
 
 function buildEmptyViewProps(
-  currentRound: number,
+  roundSelection: ReturnType<typeof useRosterRoundSelection>,
   memberSelection: ReturnType<typeof useRosterMemberSelection>
 ) {
   return {
     rosterTitle: memberSelection.rosterTitle,
-    round: currentRound,
+    round: roundSelection.selectedRound,
+    currentRound: roundSelection.currentRound,
     memberOptions: memberSelection.memberOptions,
     selectedMemberId: memberSelection.selectedMemberId,
     onMemberChange: memberSelection.onMemberChange,
     isOwnRoster: memberSelection.isOwnRoster,
+    onRoundChange: roundSelection.onRoundChange,
+    isHistorical: roundSelection.isHistorical,
   };
 }
 
@@ -288,12 +350,15 @@ function buildRosterMemberState(params: {
 function createReadyViewProps(params: {
   slots: RosterSlotRow[];
   round: number;
+  currentRound: number;
   totalPoints: number;
   memberOptions: ReturnType<typeof buildMemberOptions>;
   selectedMemberId: string;
   onMemberChange: (value: string | null) => void;
+  onRoundChange: (value: string) => void;
   rosterTitle: string;
   isOwnRoster: boolean;
+  isHistorical: boolean;
   playerStatsLoading: boolean;
   injuredPlayerIds: Set<number>;
   playerNameMap: Map<number, string>;
@@ -307,12 +372,15 @@ function createReadyViewProps(params: {
   const {
     slots,
     round,
+    currentRound,
     totalPoints,
     memberOptions,
     selectedMemberId,
     onMemberChange,
+    onRoundChange,
     rosterTitle,
     isOwnRoster,
+    isHistorical,
     playerStatsLoading,
     injuredPlayerIds,
     playerNameMap,
@@ -332,6 +400,8 @@ function createReadyViewProps(params: {
     onMemberChange,
     rosterTitle,
     round,
+    currentRound,
+    onRoundChange,
     roundPoints: getRoundPoints(decoratedSlots),
     totalPoints,
     groupedSlots: groupRosterSlots<RosterSlotRow>(
@@ -340,6 +410,8 @@ function createReadyViewProps(params: {
     ),
     slots: decoratedSlots,
     isOwnRoster,
+    canManageRoster: isOwnRoster && !isHistorical,
+    isHistorical,
     playerStatsLoading,
     injuredPlayerIds,
     playerNameMap,

@@ -11,7 +11,7 @@ import type { RosterGroup, RosterSlotRow } from './rosterTypes';
 interface RosterGroupSectionProps {
   group: RosterGroup;
   slots: RosterSlotRow[];
-  isOwnRoster: boolean;
+  canManageRoster: boolean;
   playerStatsLoading: boolean;
   injuredPlayerIds: Set<number>;
   playerNameMap: Map<number, string>;
@@ -89,7 +89,7 @@ function MobileRosterSlotCard({
   playerTeamAbbreviationMap,
   teamAbbreviationMap,
   playerStatsLoading,
-  isOwnRoster,
+  canManageRoster,
   onOpenIrModal,
 }: {
   slot: RosterSlotRow;
@@ -100,7 +100,7 @@ function MobileRosterSlotCard({
   playerTeamAbbreviationMap: Map<number, string>;
   teamAbbreviationMap: Map<number, string>;
   playerStatsLoading: boolean;
-  isOwnRoster: boolean;
+  canManageRoster: boolean;
   onOpenIrModal: (slotId: string, candidates: RosterSlotRow[]) => void;
 }) {
   const injuredCandidates = getInjuredReplacementCandidates(
@@ -139,7 +139,7 @@ function MobileRosterSlotCard({
         )}
       />
       <DataRow label="Status" value={<RosterStatusBadges slot={slot} />} />
-      {!playerStatsLoading && isOwnRoster && (
+      {!playerStatsLoading && canManageRoster && (
         <Button
           size="xs"
           variant="outline"
@@ -170,7 +170,7 @@ function DesktopRosterTable({
   playerTeamAbbreviationMap,
   teamAbbreviationMap,
   playerStatsLoading,
-  isOwnRoster,
+  canManageRoster,
   onOpenIrModal,
 }: {
   group: RosterGroup;
@@ -181,11 +181,11 @@ function DesktopRosterTable({
   playerTeamAbbreviationMap: Map<number, string>;
   teamAbbreviationMap: Map<number, string>;
   playerStatsLoading: boolean;
-  isOwnRoster: boolean;
+  canManageRoster: boolean;
   onOpenIrModal: (slotId: string, candidates: RosterSlotRow[]) => void;
 }) {
   const hasAnyActions =
-    isOwnRoster &&
+    canManageRoster &&
     !playerStatsLoading &&
     groupHasActions(group.position, group.players, slots, injuredPlayerIds);
 
@@ -261,7 +261,7 @@ function DesktopRosterTable({
 export function RosterGroupSection({
   group,
   slots,
-  isOwnRoster,
+  canManageRoster,
   playerStatsLoading,
   injuredPlayerIds,
   playerNameMap,
@@ -298,7 +298,7 @@ export function RosterGroupSection({
               playerTeamAbbreviationMap={playerTeamAbbreviationMap}
               teamAbbreviationMap={teamAbbreviationMap}
               playerStatsLoading={playerStatsLoading}
-              isOwnRoster={isOwnRoster}
+              canManageRoster={canManageRoster}
               onOpenIrModal={onOpenIrModal}
             />
           ))}
@@ -313,7 +313,7 @@ export function RosterGroupSection({
           playerTeamAbbreviationMap={playerTeamAbbreviationMap}
           teamAbbreviationMap={teamAbbreviationMap}
           playerStatsLoading={playerStatsLoading}
-          isOwnRoster={isOwnRoster}
+          canManageRoster={canManageRoster}
           onOpenIrModal={onOpenIrModal}
         />
       )}
