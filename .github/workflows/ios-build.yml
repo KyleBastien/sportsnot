@@ -103,7 +103,18 @@ jobs:
           echo "xcconfig written. url_length=${#SUPABASE_URL_RAW} key_length=${#SUPABASE_ANON_KEY_RAW}"
 
       - name: Build App target
-        run: yarn nx build @sportsnot/ios-app
+        run: |
+          set -o pipefail
+          if yarn nx build @sportsnot/ios-app 2>&1 | tee /tmp/ios-app-build.log; then
+            exit 0
+          fi
+          if grep -Eq 'iOS [0-9.]+ (Platform Not Installed|is not installed)' /tmp/ios-app-build.log; then
+            echo "Retrying after forcing iOS platform download"
+            sudo xcodebuild -downloadPlatform iOS
+            yarn nx build @sportsnot/ios-app
+            exit 0
+          fi
+          exit 1
 
       - name: Build SportsNotWidget extension
         run: yarn nx build-widget @sportsnot/ios-app
