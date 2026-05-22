@@ -53,10 +53,12 @@ jobs:
       - name: Install iOS platform
         run: |
           xcodebuild -runFirstLaunch
-          if xcrun --sdk iphoneos --show-sdk-path >/dev/null 2>&1; then
-            echo "iPhoneOS SDK already available"
+          XCODE_VERSION=$(xcodebuild -version | awk '/Xcode/{print $2}')
+          EXPECTED_SDK="iphoneos${XCODE_VERSION}"
+          if xcodebuild -showsdks | grep -q "$EXPECTED_SDK"; then
+            echo "$EXPECTED_SDK already installed"
           else
-            echo "iPhoneOS SDK missing, downloading iOS platform"
+            echo "$EXPECTED_SDK missing, downloading iOS platform"
             sudo xcodebuild -downloadPlatform iOS
           fi
           xcodebuild -showsdks
