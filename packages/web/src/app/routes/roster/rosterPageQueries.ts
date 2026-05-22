@@ -50,11 +50,12 @@ interface RosterSlotRow {
   is_eliminated?: boolean;
 }
 
-export function useMemberRoster(
-  leagueId: string,
-  leagueMemberId?: string,
-  requestedRound?: number
-) {
+export function useMemberRoster(params: {
+  leagueId: string;
+  leagueMemberId?: string;
+  requestedRound?: number;
+}) {
+  const { leagueId, leagueMemberId, requestedRound } = params;
   const mockResult = useMockRoster(leagueId, leagueMemberId, requestedRound);
   const { user } = useAuthContext();
 
@@ -66,17 +67,20 @@ export function useMemberRoster(
       requestedRound,
     ],
     queryFn: async () => {
-      const member = await fetchRosterMember(
+      const member = await fetchRosterMember({
         leagueId,
         leagueMemberId,
-        user?.id
-      );
-      const currentRound = await fetchLeagueCurrentRound(leagueId);
+        userId: user?.id,
+      });
+      const currentRound = await fetchLeagueCurrentRound({ leagueId });
       const selectedRound = clampRoundSelection(
         requestedRound ?? currentRound,
         currentRound
       );
-      const roster = await fetchRosterSlots(member.id, selectedRound);
+      const roster = await fetchRosterSlots({
+        leagueMemberId: member.id,
+        round: selectedRound,
+      });
 
       return {
         memberId: member.id,
@@ -96,11 +100,12 @@ export function useMemberRoster(
   return IS_MOCK ? mockResult : queryResult;
 }
 
-async function fetchRosterMember(
-  leagueId: string,
-  leagueMemberId: string | undefined,
-  userId: string | undefined
-) {
+async function fetchRosterMember(params: {
+  leagueId: string;
+  leagueMemberId: string | undefined;
+  userId: string | undefined;
+}) {
+  const { leagueId, leagueMemberId, userId } = params;
   const query = supabase
     .from(LEAGUE_MEMBERS_TABLE)
     .select(LEAGUE_MEMBER_POINTS_SELECT);
@@ -121,7 +126,8 @@ async function fetchRosterMember(
   return member;
 }
 
-async function fetchLeagueCurrentRound(leagueId: string) {
+async function fetchLeagueCurrentRound(params: { leagueId: string }) {
+  const { leagueId } = params;
   const { data: league } = await supabase
     .from(LEAGUES_TABLE)
     .select(LEAGUE_CURRENT_ROUND_SELECT)
@@ -135,7 +141,11 @@ async function fetchLeagueCurrentRound(leagueId: string) {
   return Math.max(league.current_round ?? 1, 1);
 }
 
-async function fetchRosterSlots(leagueMemberId: string, round: number) {
+async function fetchRosterSlots(params: {
+  leagueMemberId: string;
+  round: number;
+}) {
+  const { leagueMemberId, round } = params;
   const { data: roster, error } = await supabase
     .from(ROSTERS_TABLE)
     .select(ROSTERS_SELECT)

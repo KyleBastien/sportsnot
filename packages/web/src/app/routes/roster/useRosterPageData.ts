@@ -45,11 +45,11 @@ export function useRosterPageData(leagueId: string, leagueMemberId?: string) {
   const requestedRound = requestedRoundParam
     ? Number.parseInt(requestedRoundParam, 10)
     : undefined;
-  const { data, isLoading, error } = useMemberRoster(
+  const { data, isLoading, error } = useMemberRoster({
     leagueId,
     leagueMemberId,
-    requestedRound
-  );
+    requestedRound,
+  });
   const currentRound = data?.currentRound ?? 1;
   const selectedRound =
     data?.round ?? clampRoundSelection(requestedRound, currentRound);
