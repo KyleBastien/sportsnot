@@ -178,75 +178,151 @@ function MobileStandingsCards({
 }) {
   return (
     <MobileCardList emptyMessage="No standings data">
-      {displayedMembers.map((member, index) => {
-        const isMe = isCurrentUser(member.user_id);
-        return (
-          <Card
-            key={member.id}
-            padding="sm"
-            radius="sm"
-            withBorder
-            style={{
-              fontWeight: isMe ? 700 : undefined,
-              backgroundColor: isMe
-                ? 'var(--mantine-color-blue-light)'
-                : undefined,
-            }}
-          >
-            <Group justify="space-between" mb={4}>
-              <Group gap="xs">
-                <RankBadge rank={index} />
-                <Anchor
-                  component={Link}
-                  to={`${rosterBasePath}/${member.id}${rosterRoundSearch}`}
-                  fw={isMe ? 700 : undefined}
-                >
-                  {member.team_name}
-                  {showSeasonWinner && index === 0 && ' 🏆'}
-                </Anchor>
-              </Group>
-              <Badge size="lg" variant="filled" color="blue">
-                {member.selected_total_points}
-              </Badge>
-            </Group>
-            <DataRow
-              label="Manager"
-              value={
-                <Group gap={4}>
-                  <Text size="sm" fw={500}>
-                    {member.users?.display_name ?? 'Unknown'}
-                  </Text>
-                  {member.user_id === userId && (
-                    <Badge size="xs" variant="light">
-                      You
-                    </Badge>
-                  )}
-                </Group>
-              }
-            />
-            {showBreakdown && (
-              <Group gap="xs" mt={4}>
-                <Badge size="sm" variant="light">
-                  Player: {member.player_points ?? 0}
-                </Badge>
-                <Badge size="sm" variant="light">
-                  Goalie: {member.goalie_points ?? 0}
-                </Badge>
-              </Group>
-            )}
-            {visibleRoundNumbers.length > 0 && (
-              <Group gap="xs" mt={4}>
-                {visibleRoundNumbers.map((round) => (
-                  <Badge key={round} size="sm" variant="outline">
-                    R{round}: {getRoundPoints(member.round_points, round)}
-                  </Badge>
-                ))}
-              </Group>
-            )}
-          </Card>
-        );
-      })}
+      {displayedMembers.map((member, index) => (
+        <MobileStandingsCard
+          key={member.id}
+          index={index}
+          isCurrentUser={isCurrentUser}
+          member={member}
+          rosterBasePath={rosterBasePath}
+          rosterRoundSearch={rosterRoundSearch}
+          showBreakdown={showBreakdown}
+          showSeasonWinner={showSeasonWinner}
+          userId={userId}
+          visibleRoundNumbers={visibleRoundNumbers}
+        />
+      ))}
     </MobileCardList>
+  );
+}
+
+function MobileStandingsCard({
+  index,
+  isCurrentUser,
+  member,
+  rosterBasePath,
+  rosterRoundSearch,
+  showBreakdown,
+  showSeasonWinner,
+  userId,
+  visibleRoundNumbers,
+}: {
+  index: number;
+  isCurrentUser: (userId: string) => boolean;
+  member: DisplayStandingsMemberRow;
+  rosterBasePath: string;
+  rosterRoundSearch: string;
+  showBreakdown: boolean;
+  showSeasonWinner: boolean;
+  userId: string | undefined;
+  visibleRoundNumbers: number[];
+}) {
+  const isMe = isCurrentUser(member.user_id);
+
+  return (
+    <Card
+      padding="sm"
+      radius="sm"
+      withBorder
+      style={buildStandingsRowStyle(isMe)}
+    >
+      <Group justify="space-between" mb={4}>
+        <Group gap="xs">
+          <RankBadge rank={index} />
+          <Anchor
+            component={Link}
+            to={`${rosterBasePath}/${member.id}${rosterRoundSearch}`}
+            fw={isMe ? 700 : undefined}
+          >
+            {member.team_name}
+            {showSeasonWinner && index === 0 && ' 🏆'}
+          </Anchor>
+        </Group>
+        <Badge size="lg" variant="filled" color="blue">
+          {member.selected_total_points}
+        </Badge>
+      </Group>
+      <DataRow
+        label="Manager"
+        value={
+          <MobileManagerValue
+            displayName={member.users?.display_name}
+            isCurrentUser={member.user_id === userId}
+          />
+        }
+      />
+      <MobileBreakdownBadges member={member} showBreakdown={showBreakdown} />
+      <MobileRoundBadges
+        roundPoints={member.round_points}
+        visibleRoundNumbers={visibleRoundNumbers}
+      />
+    </Card>
+  );
+}
+
+function MobileManagerValue({
+  displayName,
+  isCurrentUser,
+}: {
+  displayName: string | undefined;
+  isCurrentUser: boolean;
+}) {
+  return (
+    <Group gap={4}>
+      <Text size="sm" fw={500}>
+        {displayName ?? 'Unknown'}
+      </Text>
+      {isCurrentUser && (
+        <Badge size="xs" variant="light">
+          You
+        </Badge>
+      )}
+    </Group>
+  );
+}
+
+function MobileBreakdownBadges({
+  member,
+  showBreakdown,
+}: {
+  member: DisplayStandingsMemberRow;
+  showBreakdown: boolean;
+}) {
+  if (!showBreakdown) {
+    return null;
+  }
+
+  return (
+    <Group gap="xs" mt={4}>
+      <Badge size="sm" variant="light">
+        Player: {member.player_points ?? 0}
+      </Badge>
+      <Badge size="sm" variant="light">
+        Goalie: {member.goalie_points ?? 0}
+      </Badge>
+    </Group>
+  );
+}
+
+function MobileRoundBadges({
+  roundPoints,
+  visibleRoundNumbers,
+}: {
+  roundPoints: Record<string, number> | null | undefined;
+  visibleRoundNumbers: number[];
+}) {
+  if (visibleRoundNumbers.length === 0) {
+    return null;
+  }
+
+  return (
+    <Group gap="xs" mt={4}>
+      {visibleRoundNumbers.map((round) => (
+        <Badge key={round} size="sm" variant="outline">
+          R{round}: {getRoundPoints(roundPoints, round)}
+        </Badge>
+      ))}
+    </Group>
   );
 }
 

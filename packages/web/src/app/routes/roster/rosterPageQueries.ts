@@ -19,7 +19,6 @@ import {
   useMockRegularSeasonPlayers,
 } from '../../../mock/hooks/useMockNhlApi';
 
-const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
 const ID_COLUMN = 'id';
 const LEAGUE_ID_COLUMN = 'league_id';
 const LEAGUE_MEMBER_POINTS_SELECT = 'id, total_points, round_points';
@@ -27,10 +26,16 @@ const LEAGUE_CURRENT_ROUND_SELECT = 'current_round';
 const LEAGUES_TABLE = 'leagues';
 const LEAGUE_MEMBERS_TABLE = 'league_members';
 const LEAGUE_MEMBER_ID_COLUMN = 'league_member_id';
+const LEAGUE_NOT_FOUND_ERROR = 'League not found';
+const MEMBER_NOT_FOUND_ERROR = 'Member not found';
+const MOCK_MODE_ENABLED = 'true';
+const NOT_LEAGUE_MEMBER_ERROR = 'Not a member of this league';
 const ROSTERS_SELECT = '*';
 const ROSTERS_TABLE = 'rosters';
+const ROSTER_QUERY_KEY = 'roster';
 const ROUND_COLUMN = 'round';
 const USER_ID_COLUMN = 'user_id';
+const IS_MOCK = import.meta.env.VITE_MOCK_MODE === MOCK_MODE_ENABLED;
 
 interface RosterSlotRow {
   id: string;
@@ -54,7 +59,12 @@ export function useMemberRoster(
   const { user } = useAuthContext();
 
   const queryResult = useQuery({
-    queryKey: ['roster', leagueId, leagueMemberId ?? user?.id, requestedRound],
+    queryKey: [
+      ROSTER_QUERY_KEY,
+      leagueId,
+      leagueMemberId ?? user?.id,
+      requestedRound,
+    ],
     queryFn: async () => {
       const member = await fetchRosterMember(
         leagueId,
@@ -104,7 +114,7 @@ async function fetchRosterMember(
 
   if (!member) {
     throw new Error(
-      leagueMemberId ? 'Member not found' : 'Not a member of this league'
+      leagueMemberId ? MEMBER_NOT_FOUND_ERROR : NOT_LEAGUE_MEMBER_ERROR
     );
   }
 
@@ -119,7 +129,7 @@ async function fetchLeagueCurrentRound(leagueId: string) {
     .single();
 
   if (!league) {
-    throw new Error('League not found');
+    throw new Error(LEAGUE_NOT_FOUND_ERROR);
   }
 
   return Math.max(league.current_round ?? 1, 1);
