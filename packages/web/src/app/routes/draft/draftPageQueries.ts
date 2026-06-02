@@ -140,6 +140,9 @@ export function useRegularSeasonPlayersForDraft(params: SeasonQueryParams) {
   return selectDraftQuerySource(mockResult, supabaseResult);
 }
 
-function selectDraftQuerySource<T>(mockResult: T, queryResult: T) {
+function selectDraftQuerySource<TMock, TReal>(
+  mockResult: TMock,
+  queryResult: TReal
+): TMock | TReal {
   return IS_MOCK ? mockResult : queryResult;
 }

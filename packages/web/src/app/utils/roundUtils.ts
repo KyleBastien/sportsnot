@@ -101,7 +101,18 @@ export function getRoundPoints(
   roundPoints: RoundPointsLike,
   round: number
 ): number {
-  return roundPoints?.[round] ?? roundPoints?.[String(round)] ?? 0;
+  if (!roundPoints) {
+    return 0;
+  }
+
+  const numericKeyed = roundPoints as Record<number, number>;
+  const numericValue = numericKeyed[round];
+  if (typeof numericValue === 'number') {
+    return numericValue;
+  }
+
+  const stringKeyed = roundPoints as Record<string, number>;
+  return stringKeyed[String(round)] ?? 0;
 }
 
 export function sumRoundPointsThroughRound(

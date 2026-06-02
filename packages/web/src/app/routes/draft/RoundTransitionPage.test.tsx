@@ -55,6 +55,23 @@ rs.mock('@sportsnot/supabase', () => ({
         };
       }
 
+      if (table === 'rosters') {
+        return {
+          select: () => ({
+            eq: () => ({
+              in: async () => ({
+                data: [
+                  { league_member_id: 'lm-1' },
+                  { league_member_id: 'lm-2' },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+          insert: async () => ({ error: null }),
+        };
+      }
+
       throw new Error(`Unexpected table: ${table}`);
     },
   },
@@ -160,6 +177,27 @@ describe('RoundTransitionPage', () => {
       name: /Start Round .* Re-Draft/i,
     });
     expect(button.textContent).toContain('Start Round 3 Re-Draft');
+  });
+
+  it('renders Advance to Round 4 button when next round is 4', () => {
+    transitionState.league = {
+      data: buildLeague({ current_round: 3 }),
+      isLoading: false,
+    };
+    transitionState.completedDrafts = {
+      data: [
+        { id: 'd1', round: 1, status: 'completed', completed_at: '2025-04-22' },
+        { id: 'd2', round: 2, status: 'completed', completed_at: '2025-04-22' },
+        { id: 'd3', round: 3, status: 'completed', completed_at: '2025-04-22' },
+      ],
+      isLoading: false,
+    };
+
+    renderHarness();
+
+    expect(
+      screen.getByRole('button', { name: /Advance to Round 4/i })
+    ).toBeTruthy();
   });
 
   it('creates a full snake re-draft order based on roster size', async () => {
