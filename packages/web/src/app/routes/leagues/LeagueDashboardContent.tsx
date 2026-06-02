@@ -61,6 +61,7 @@ interface LeagueDashboardContentProps {
   onOpenSettings: () => void;
   onOpenStandings: () => void;
   onStartNextDraft: () => void;
+  onOpenTransition: () => void;
 }
 
 interface LeagueHeaderSectionProps {
@@ -78,6 +79,7 @@ interface LeagueHeaderSectionProps {
   onOpenSettings: () => void;
   onOpenStandings: () => void;
   onStartNextDraft: () => void;
+  onOpenTransition: () => void;
 }
 
 interface LeagueStatusActionProps {
@@ -98,6 +100,7 @@ interface LeagueActiveActionsProps {
   onOpenRoster: () => void;
   onOpenStandings: () => void;
   onStartNextDraft: () => void;
+  onOpenTransition: () => void;
 }
 
 interface LeagueInviteCodeCardProps {
@@ -182,6 +185,7 @@ function LeagueActiveActions({
   onOpenRoster,
   onOpenStandings,
   onStartNextDraft,
+  onOpenTransition,
 }: LeagueActiveActionsProps) {
   if (leagueStatus !== 'active') {
     return null;
@@ -189,6 +193,8 @@ function LeagueActiveActions({
 
   const canStartNextDraft =
     isCommissioner && !seasonComplete && currentRound < 3;
+  const canAdvanceToFinals =
+    isCommissioner && !seasonComplete && currentRound === 3 && roundComplete;
 
   return (
     <>
@@ -213,6 +219,21 @@ function LeagueActiveActions({
           </Button>
         </Tooltip>
       )}
+      {canAdvanceToFinals && (
+        <Tooltip
+          label="All series in the current round must be complete"
+          disabled={roundComplete}
+        >
+          <Button
+            color="green"
+            onClick={onOpenTransition}
+            disabled={!roundComplete || roundStatusLoading}
+            loading={roundStatusLoading}
+          >
+            Advance to Finals
+          </Button>
+        </Tooltip>
+      )}
     </>
   );
 }
@@ -232,6 +253,7 @@ function LeagueHeaderSection({
   onOpenSettings,
   onOpenStandings,
   onStartNextDraft,
+  onOpenTransition,
 }: LeagueHeaderSectionProps) {
   return (
     <Group justify="space-between" align="flex-start">
@@ -276,6 +298,7 @@ function LeagueHeaderSection({
           onOpenRoster={onOpenRoster}
           onOpenStandings={onOpenStandings}
           onStartNextDraft={onStartNextDraft}
+          onOpenTransition={onOpenTransition}
         />
       </Group>
     </Group>
@@ -411,6 +434,7 @@ export function LeagueDashboardContent({
   onOpenSettings,
   onOpenStandings,
   onStartNextDraft,
+  onOpenTransition,
 }: LeagueDashboardContentProps) {
   return (
     <Container size="lg" py="xl">
@@ -430,6 +454,7 @@ export function LeagueDashboardContent({
           onOpenSettings={onOpenSettings}
           onOpenStandings={onOpenStandings}
           onStartNextDraft={onStartNextDraft}
+          onOpenTransition={onOpenTransition}
         />
 
         <LeagueInviteCodeCard inviteCode={league.invite_code} />

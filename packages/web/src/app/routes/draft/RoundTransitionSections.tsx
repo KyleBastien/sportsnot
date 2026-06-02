@@ -42,13 +42,25 @@ export function RoundTransitionSummary({
         <Text c="dimmed">{leagueName}</Text>
       </Stack>
 
-      <Alert color="navy" title="Full Re-Draft">
-        All players return to the pool. A new draft will be conducted for Round{' '}
-        {nextRound}.
-        {nextRound === 3 &&
-          ' This draft covers both Conference Finals and Stanley Cup Final — your Round 3 picks carry into Round 4.'}{' '}
-        Draft order is based on current standings — worst to best, snake
-        pattern.
+      <Alert
+        color="navy"
+        title={nextRound === 4 ? 'No Re-Draft' : 'Full Re-Draft'}
+      >
+        {nextRound === 4 ? (
+          <>
+            Round 3 picks carry into Round 4. No new draft will be conducted.
+            The commissioner must advance the league to Round 4 (Finals).
+          </>
+        ) : (
+          <>
+            All players return to the pool. A new draft will be conducted for
+            Round {nextRound}.
+            {nextRound === 3 &&
+              ' This draft covers both Conference Finals and Stanley Cup Final — your Round 3 picks carry into Round 4.'}{' '}
+            Draft order is based on current standings — worst to best, snake
+            pattern.
+          </>
+        )}
       </Alert>
     </>
   );
@@ -154,8 +166,9 @@ export function RoundTransitionAction({
   if (!isCommissioner) {
     return (
       <Alert color="navy" title="Waiting for Commissioner">
-        The commissioner will start the re-draft for Round {nextRound} when
-        ready.
+        {nextRound === 4
+          ? 'The commissioner will advance the league to Round 4 (Finals) when ready.'
+          : `The commissioner will start the re-draft for Round ${nextRound} when ready.`}
       </Alert>
     );
   }
@@ -168,7 +181,9 @@ export function RoundTransitionAction({
       loading={starting}
       fullWidth
     >
-      Start Round {nextRound} Re-Draft
+      {nextRound === 4
+        ? 'Advance to Round 4 (Finals)'
+        : `Start Round ${nextRound} Re-Draft`}
     </Button>
   );
 }
