@@ -67,52 +67,80 @@ async function insertReDraft(
   }
 }
 
+async function loadRosterMemberIdsForRound(
+  round: number,
+  leagueMemberIds: string[]
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('rosters')
+    .select('league_member_id')
+    .eq('round', round)
+    .in('league_member_id', leagueMemberIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return new Set((data ?? []).map((row) => row.league_member_id as string));
+}
+
+async function loadRosterRowsForRound(
+  round: number,
+  leagueMemberIds: string[]
+): Promise<Record<string, unknown>[]> {
+  const { data, error } = await supabase
+    .from('rosters')
+    .select('*')
+    .eq('round', round)
+    .in('league_member_id', leagueMemberIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as unknown as Record<string, unknown>[];
+}
+
+function buildRoundFourSlots(
+  roundThreeRows: Record<string, unknown>[]
+): Record<string, unknown>[] {
+  return roundThreeRows.map(({ id: _id, ...slot }) => ({
+    ...slot,
+    round: 4,
+    points_earned: 0,
+  }));
+}
+
+async function insertRosterSlots(
+  slots: Record<string, unknown>[]
+): Promise<void> {
+  if (slots.length === 0) return;
+
+  const { error } = await supabase.from('rosters').insert(slots);
+
+  if (error) {
+    throw error;
+  }
+}
+
 async function ensureRoundFourRosters(
   leagueMemberIds: string[]
 ): Promise<void> {
   if (leagueMemberIds.length === 0) return;
 
-  const { data: roundFourRows, error: roundFourError } = await supabase
-    .from('rosters')
-    .select('league_member_id')
-    .eq('round', 4)
-    .in('league_member_id', leagueMemberIds);
-
-  if (roundFourError) {
-    throw roundFourError;
-  }
-
-  const existing = new Set(
-    (roundFourRows ?? []).map((row) => row.league_member_id as string)
+  const roundFourExisting = await loadRosterMemberIdsForRound(
+    4,
+    leagueMemberIds
   );
-  const missingMemberIds = leagueMemberIds.filter((id) => !existing.has(id));
+  const missingMemberIds = leagueMemberIds.filter(
+    (id) => !roundFourExisting.has(id)
+  );
   if (missingMemberIds.length === 0) return;
 
-  const { data: roundThreeRows, error: roundThreeError } = await supabase
-    .from('rosters')
-    .select('*')
-    .eq('round', 3)
-    .in('league_member_id', missingMemberIds);
+  const roundThreeRows = await loadRosterRowsForRound(3, missingMemberIds);
+  if (roundThreeRows.length === 0) return;
 
-  if (roundThreeError) {
-    throw roundThreeError;
-  }
-
-  if (!roundThreeRows || roundThreeRows.length === 0) return;
-
-  const roundFourSlots = roundThreeRows.map(({ id: _id, ...slot }) => ({
-    ...slot,
-    round: 4,
-    points_earned: 0,
-  }));
-
-  const { error: insertError } = await supabase
-    .from('rosters')
-    .insert(roundFourSlots as unknown as Record<string, unknown>[]);
-
-  if (insertError) {
-    throw insertError;
-  }
+  await insertRosterSlots(buildRoundFourSlots(roundThreeRows));
 }
 
 async function advanceToRound4(leagueId: string): Promise<void> {
