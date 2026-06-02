@@ -109,22 +109,33 @@ function resolveTeamStatsRoundToSync(params: {
     nextRoundTeamStatsLength,
   } = params;
 
-  if (
-    selectedRound === 4 &&
-    currentRoundTeamStatsFetched &&
-    currentRoundTeamStatsLength === 0
-  ) {
+  if (selectedRound === 4) {
+    if (!currentRoundTeamStatsFetched) {
+      return null;
+    }
+
+    if (currentRoundTeamStatsLength !== 0) {
+      return null;
+    }
+
     return selectedRound;
   }
 
-  if (
-    selectedRound < 4 &&
-    nextRoundTeamStatsFetched &&
-    currentRoundTeamStatsLength > 0 &&
-    nextRoundTeamStatsLength === 0
-  ) {
-    return selectedRound + 1;
+  if (selectedRound >= 4) {
+    return null;
   }
 
-  return null;
+  if (!nextRoundTeamStatsFetched) {
+    return null;
+  }
+
+  if (currentRoundTeamStatsLength === 0) {
+    return null;
+  }
+
+  if (nextRoundTeamStatsLength !== 0) {
+    return null;
+  }
+
+  return selectedRound + 1;
 }
