@@ -56,6 +56,7 @@ export function LeagueDashboardPage() {
       onOpenSettings={dashboardState.openSettings}
       onOpenStandings={dashboardState.openStandings}
       onStartNextDraft={dashboardState.startNextDraft}
+      onOpenTransition={dashboardState.openTransition}
     />
   );
 }

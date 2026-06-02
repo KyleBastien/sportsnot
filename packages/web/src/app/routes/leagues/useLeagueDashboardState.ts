@@ -172,6 +172,7 @@ function useLeagueDashboardActions(leagueId: string | undefined) {
     openRoster: () => navigate(`/roster/${leagueId}`),
     openSettings: () => navigate(`/leagues/${leagueId}/settings`),
     openStandings: () => navigate(`/standings/${leagueId}`),
+    openTransition: () => navigate(`/draft/${leagueId}/transition`),
     startNextDraft: () =>
       startNextDraftTransition(leagueId, dispatch, navigate),
   };

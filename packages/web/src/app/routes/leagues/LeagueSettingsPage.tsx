@@ -23,6 +23,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@sportsnot/supabase';
 import { buildDraftOrder } from '../../utils/draftOrderUtils';
+import { advanceLeagueToRound4 } from '../draft/roundFourAdvance';
 import { useAuthContext } from '../../context/AuthContext';
 import { generateInviteCode } from '@sportsnot/utils';
 import { useMockLeague } from '../../../mock/hooks/useMockLeagues';
@@ -177,17 +178,52 @@ export function LeagueSettingsPage() {
 
   const handleStartDraft = async () => {
     if (!league) return;
-    if (IS_MOCK) {
-      navigate(`/draft/${leagueId}`);
+
+    const resolvedLeagueId = leagueId ?? league.id;
+    const members = league.league_members ?? [];
+    const nextRound = (league.current_round ?? 0) + 1;
+
+    if (nextRound === 4) {
+      try {
+        if (IS_MOCK) {
+          mockDispatch({
+            type: 'SKIP_TO_ROUND4',
+            payload: { leagueId: league.id },
+          });
+        } else {
+          await advanceLeagueToRound4({
+            leagueId: league.id,
+            leagueMemberIds: members.map(
+              (member: SettingsMemberRow) => member.id
+            ),
+          });
+
+          queryClient.invalidateQueries({ queryKey: ['league', league.id] });
+          queryClient.invalidateQueries({
+            queryKey: ['league-settings', league.id],
+          });
+        }
+
+        navigate(`/leagues/${resolvedLeagueId}`);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Failed to advance to Round 4';
+        setError(message);
+      }
+
       return;
     }
-    const members = league.league_members ?? [];
+
+    if (IS_MOCK) {
+      navigate(`/draft/${resolvedLeagueId}`);
+      return;
+    }
+
     if (members.length < 2) {
       setError('Need at least 2 members to start a draft');
       return;
     }
 
-    const nextRound = (league.current_round ?? 0) + 1;
     const draftOrder = buildDraftOrder(
       members,
       league.allow_ir_slots ?? true,
@@ -195,7 +231,7 @@ export function LeagueSettingsPage() {
     );
 
     const { error: draftError } = await supabase.from('drafts').insert({
-      league_id: leagueId,
+      league_id: resolvedLeagueId,
       round: nextRound,
       status: 'active',
       current_pick: 1,
@@ -214,9 +250,9 @@ export function LeagueSettingsPage() {
         status: 'drafting',
         current_round: nextRound,
       })
-      .eq('id', leagueId);
+      .eq('id', resolvedLeagueId);
 
-    navigate(`/draft/${leagueId}`);
+    navigate(`/draft/${resolvedLeagueId}`);
   };
 
   if (isLoading) {
@@ -390,9 +426,11 @@ export function LeagueSettingsPage() {
                 Start Round 1 Draft
               </Button>
             )}
-            {league.status === 'active' && (
+            {league.status === 'active' && (league.current_round ?? 0) < 4 && (
               <Button color="green" onClick={handleStartDraft}>
-                Start Round {(league.current_round ?? 0) + 1} Re-Draft
+                {(league.current_round ?? 0) + 1 === 4
+                  ? 'Advance to Round 4 (Finals)'
+                  : `Start Round ${(league.current_round ?? 0) + 1} Re-Draft`}
               </Button>
             )}
           </Stack>

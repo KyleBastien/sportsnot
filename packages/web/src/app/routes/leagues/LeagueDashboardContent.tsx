@@ -61,6 +61,7 @@ interface LeagueDashboardContentProps {
   onOpenSettings: () => void;
   onOpenStandings: () => void;
   onStartNextDraft: () => void;
+  onOpenTransition: () => void;
 }
 
 interface LeagueHeaderSectionProps {
@@ -78,6 +79,7 @@ interface LeagueHeaderSectionProps {
   onOpenSettings: () => void;
   onOpenStandings: () => void;
   onStartNextDraft: () => void;
+  onOpenTransition: () => void;
 }
 
 interface LeagueStatusActionProps {
@@ -98,6 +100,7 @@ interface LeagueActiveActionsProps {
   onOpenRoster: () => void;
   onOpenStandings: () => void;
   onStartNextDraft: () => void;
+  onOpenTransition: () => void;
 }
 
 interface LeagueInviteCodeCardProps {
@@ -172,6 +175,36 @@ function LeagueStatusAction({
   return null;
 }
 
+const ROUND_COMPLETE_TOOLTIP =
+  'All series in the current round must be complete';
+
+interface RoundCompleteGateButtonProps {
+  label: string;
+  onClick: () => void;
+  roundComplete: boolean;
+  roundStatusLoading: boolean;
+}
+
+function RoundCompleteGateButton({
+  label,
+  onClick,
+  roundComplete,
+  roundStatusLoading,
+}: RoundCompleteGateButtonProps) {
+  return (
+    <Tooltip label={ROUND_COMPLETE_TOOLTIP} disabled={roundComplete}>
+      <Button
+        color="green"
+        onClick={onClick}
+        disabled={!roundComplete || roundStatusLoading}
+        loading={roundStatusLoading}
+      >
+        {label}
+      </Button>
+    </Tooltip>
+  );
+}
+
 function LeagueActiveActions({
   currentRound,
   isCommissioner,
@@ -182,13 +215,17 @@ function LeagueActiveActions({
   onOpenRoster,
   onOpenStandings,
   onStartNextDraft,
+  onOpenTransition,
 }: LeagueActiveActionsProps) {
   if (leagueStatus !== 'active') {
     return null;
   }
 
-  const canStartNextDraft =
+  const showStartNextDraft =
     isCommissioner && !seasonComplete && currentRound < 3;
+
+  const showAdvanceToFinals =
+    isCommissioner && !seasonComplete && currentRound === 3 && roundComplete;
 
   return (
     <>
@@ -198,20 +235,21 @@ function LeagueActiveActions({
       <Button variant="outline" onClick={onOpenStandings}>
         Standings
       </Button>
-      {canStartNextDraft && (
-        <Tooltip
-          label="All series in the current round must be complete"
-          disabled={roundComplete}
-        >
-          <Button
-            color="green"
-            onClick={onStartNextDraft}
-            disabled={!roundComplete || roundStatusLoading}
-            loading={roundStatusLoading}
-          >
-            Start Next Draft
-          </Button>
-        </Tooltip>
+      {showStartNextDraft && (
+        <RoundCompleteGateButton
+          label="Start Next Draft"
+          onClick={onStartNextDraft}
+          roundComplete={roundComplete}
+          roundStatusLoading={roundStatusLoading}
+        />
+      )}
+      {showAdvanceToFinals && (
+        <RoundCompleteGateButton
+          label="Advance to Finals"
+          onClick={onOpenTransition}
+          roundComplete={roundComplete}
+          roundStatusLoading={roundStatusLoading}
+        />
       )}
     </>
   );
@@ -232,6 +270,7 @@ function LeagueHeaderSection({
   onOpenSettings,
   onOpenStandings,
   onStartNextDraft,
+  onOpenTransition,
 }: LeagueHeaderSectionProps) {
   return (
     <Group justify="space-between" align="flex-start">
@@ -276,6 +315,7 @@ function LeagueHeaderSection({
           onOpenRoster={onOpenRoster}
           onOpenStandings={onOpenStandings}
           onStartNextDraft={onStartNextDraft}
+          onOpenTransition={onOpenTransition}
         />
       </Group>
     </Group>
@@ -411,6 +451,7 @@ export function LeagueDashboardContent({
   onOpenSettings,
   onOpenStandings,
   onStartNextDraft,
+  onOpenTransition,
 }: LeagueDashboardContentProps) {
   return (
     <Container size="lg" py="xl">
@@ -430,6 +471,7 @@ export function LeagueDashboardContent({
           onOpenSettings={onOpenSettings}
           onOpenStandings={onOpenStandings}
           onStartNextDraft={onStartNextDraft}
+          onOpenTransition={onOpenTransition}
         />
 
         <LeagueInviteCodeCard inviteCode={league.invite_code} />
