@@ -175,6 +175,36 @@ function LeagueStatusAction({
   return null;
 }
 
+const ROUND_COMPLETE_TOOLTIP =
+  'All series in the current round must be complete';
+
+interface RoundCompleteGateButtonProps {
+  label: string;
+  onClick: () => void;
+  roundComplete: boolean;
+  roundStatusLoading: boolean;
+}
+
+function RoundCompleteGateButton({
+  label,
+  onClick,
+  roundComplete,
+  roundStatusLoading,
+}: RoundCompleteGateButtonProps) {
+  return (
+    <Tooltip label={ROUND_COMPLETE_TOOLTIP} disabled={roundComplete}>
+      <Button
+        color="green"
+        onClick={onClick}
+        disabled={!roundComplete || roundStatusLoading}
+        loading={roundStatusLoading}
+      >
+        {label}
+      </Button>
+    </Tooltip>
+  );
+}
+
 function LeagueActiveActions({
   currentRound,
   isCommissioner,
@@ -191,9 +221,10 @@ function LeagueActiveActions({
     return null;
   }
 
-  const canStartNextDraft =
+  const showStartNextDraft =
     isCommissioner && !seasonComplete && currentRound < 3;
-  const canAdvanceToFinals =
+
+  const showAdvanceToFinals =
     isCommissioner && !seasonComplete && currentRound === 3 && roundComplete;
 
   return (
@@ -204,35 +235,21 @@ function LeagueActiveActions({
       <Button variant="outline" onClick={onOpenStandings}>
         Standings
       </Button>
-      {canStartNextDraft && (
-        <Tooltip
-          label="All series in the current round must be complete"
-          disabled={roundComplete}
-        >
-          <Button
-            color="green"
-            onClick={onStartNextDraft}
-            disabled={!roundComplete || roundStatusLoading}
-            loading={roundStatusLoading}
-          >
-            Start Next Draft
-          </Button>
-        </Tooltip>
+      {showStartNextDraft && (
+        <RoundCompleteGateButton
+          label="Start Next Draft"
+          onClick={onStartNextDraft}
+          roundComplete={roundComplete}
+          roundStatusLoading={roundStatusLoading}
+        />
       )}
-      {canAdvanceToFinals && (
-        <Tooltip
-          label="All series in the current round must be complete"
-          disabled={roundComplete}
-        >
-          <Button
-            color="green"
-            onClick={onOpenTransition}
-            disabled={!roundComplete || roundStatusLoading}
-            loading={roundStatusLoading}
-          >
-            Advance to Finals
-          </Button>
-        </Tooltip>
+      {showAdvanceToFinals && (
+        <RoundCompleteGateButton
+          label="Advance to Finals"
+          onClick={onOpenTransition}
+          roundComplete={roundComplete}
+          roundStatusLoading={roundStatusLoading}
+        />
       )}
     </>
   );
