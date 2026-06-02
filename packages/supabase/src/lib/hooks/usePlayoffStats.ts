@@ -6,7 +6,7 @@ type CacheTable = 'player_stats_cache' | 'team_stats_cache';
 type CachedScalar = number | string | boolean | null;
 type CachedStatsRow = Record<string, CachedScalar>;
 
-interface CachedPlayerStatsRow {
+interface CachedPlayerStatsRow extends CachedStatsRow {
   player_id: number;
   player_name: string | null;
   position: string | null;
@@ -17,7 +17,7 @@ interface CachedPlayerStatsRow {
   games_played: number | null;
 }
 
-interface CachedTeamStatsRow {
+interface CachedTeamStatsRow extends CachedStatsRow {
   team_id: number;
   team_name: string | null;
   team_abbreviation: string | null;
@@ -96,7 +96,7 @@ const TEAM_CUMULATIVE_STAT_CONFIG: AggregateStatsConfig<
  * The sync-nhl-stats edge function populates this data.
  */
 export function usePlayoffPlayers(season: string, round: number) {
-  return usePlayoffStatsQuery({
+  return usePlayoffStatsQuery<CachedPlayerStatsRow>({
     season,
     round,
     statConfig: PLAYER_PLAYOFF_STATS_CONFIG,
@@ -115,7 +115,7 @@ export function useCumulativePlayoffPlayers(season: string, round: number) {
  * Fetches cached playoff team stats from Supabase.
  */
 export function usePlayoffTeams(season: string, round: number) {
-  return usePlayoffStatsQuery({
+  return usePlayoffStatsQuery<CachedTeamStatsRow>({
     season,
     round,
     statConfig: TEAM_PLAYOFF_STATS_CONFIG,
@@ -130,7 +130,7 @@ export function useCumulativePlayoffTeams(season: string, round: number) {
   });
 }
 
-function usePlayoffStatsQuery(params: {
+function usePlayoffStatsQuery<TRow extends CachedStatsRow>(params: {
   season: string;
   round: number;
   statConfig: PlayoffStatsConfig;
@@ -139,7 +139,7 @@ function usePlayoffStatsQuery(params: {
   return useQuery({
     queryKey: [statConfig.queryKey, season, round],
     queryFn: async () =>
-      fetchPlayoffStatsRows({
+      fetchPlayoffStatsRows<TRow>({
         cacheTable: statConfig.cacheTable,
         season,
         round,
@@ -177,7 +177,9 @@ function useCumulativePlayoffStats<
   });
 }
 
-async function fetchPlayoffStatsRows<TRow>(params: PlayoffStatsFetchConfig) {
+async function fetchPlayoffStatsRows<TRow extends CachedStatsRow>(
+  params: PlayoffStatsFetchConfig
+) {
   const { ascending, cacheTable, orderField, round, roundFilter, season } =
     params;
   const roundQuery = supabase

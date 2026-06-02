@@ -197,7 +197,13 @@ function buildMockRosterSlot(
   eliminatedAbbrs: Set<string>,
   simulationDate: string
 ) {
-  const eliminated = isSlotEliminated(slot, eliminatedAbbrs);
+  const eliminated = isSlotEliminated(
+    {
+      playerId: slot.playerId ?? undefined,
+      teamId: slot.teamId ?? undefined,
+    },
+    eliminatedAbbrs
+  );
 
   return {
     id: slot.id,

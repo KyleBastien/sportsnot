@@ -8,7 +8,10 @@ import {
   sortMembersForReDraft,
 } from '../../utils/draftOrderUtils';
 import { deriveCurrentRound, deriveNextRound } from '../../utils/roundUtils';
-import { useMockStartReDraft } from '../../../mock/hooks/useMockDraft';
+import {
+  useMockSkipToRound4,
+  useMockStartReDraft,
+} from '../../../mock/hooks/useMockDraft';
 import { useTransitionLeague } from './roundTransitionQueries';
 
 const IS_MOCK = import.meta.env.VITE_MOCK_MODE === 'true';
@@ -64,6 +67,65 @@ async function insertReDraft(
   }
 }
 
+async function ensureRoundFourRosters(
+  leagueMemberIds: string[]
+): Promise<void> {
+  if (leagueMemberIds.length === 0) return;
+
+  const { data: roundFourRows, error: roundFourError } = await supabase
+    .from('rosters')
+    .select('league_member_id')
+    .eq('round', 4)
+    .in('league_member_id', leagueMemberIds);
+
+  if (roundFourError) {
+    throw roundFourError;
+  }
+
+  const existing = new Set(
+    (roundFourRows ?? []).map((row) => row.league_member_id as string)
+  );
+  const missingMemberIds = leagueMemberIds.filter((id) => !existing.has(id));
+  if (missingMemberIds.length === 0) return;
+
+  const { data: roundThreeRows, error: roundThreeError } = await supabase
+    .from('rosters')
+    .select('*')
+    .eq('round', 3)
+    .in('league_member_id', missingMemberIds);
+
+  if (roundThreeError) {
+    throw roundThreeError;
+  }
+
+  if (!roundThreeRows || roundThreeRows.length === 0) return;
+
+  const roundFourSlots = roundThreeRows.map(({ id: _id, ...slot }) => ({
+    ...slot,
+    round: 4,
+    points_earned: 0,
+  }));
+
+  const { error: insertError } = await supabase
+    .from('rosters')
+    .insert(roundFourSlots as unknown as Record<string, unknown>[]);
+
+  if (insertError) {
+    throw insertError;
+  }
+}
+
+async function advanceToRound4(leagueId: string): Promise<void> {
+  const { error: leagueError } = await supabase
+    .from('leagues')
+    .update({ status: 'active', current_round: 4 })
+    .eq('id', leagueId);
+
+  if (leagueError) {
+    throw leagueError;
+  }
+}
+
 export function useRoundTransitionState(
   leagueId: string | undefined,
   userId: string | undefined
@@ -78,6 +140,7 @@ export function useRoundTransitionState(
   const { data: completedDraftsData, isLoading: completedDraftsLoading } =
     useCompletedDrafts(leagueId);
   const mockStartReDraft = useMockStartReDraft();
+  const mockSkipToRound4 = useMockSkipToRound4();
   const isMobile = useIsMobile();
 
   const league = leagueData as RoundTransitionLeague | null | undefined;
@@ -101,6 +164,21 @@ export function useRoundTransitionState(
     setStarting(true);
 
     try {
+      const isRoundFourAdvance = nextRound === 4;
+
+      if (isRoundFourAdvance) {
+        if (IS_MOCK) {
+          await mockSkipToRound4.mutateAsync({ leagueId });
+        } else {
+          const leagueMemberIds = sortedMembers.map((member) => member.id);
+          await ensureRoundFourRosters(leagueMemberIds);
+          await advanceToRound4(leagueId);
+        }
+
+        navigate(`/leagues/${leagueId}`);
+        return;
+      }
+
       const reDraftSeedOrder = sortedMembers.map((member) => member.user_id);
 
       if (IS_MOCK) {

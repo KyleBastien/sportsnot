@@ -49,13 +49,34 @@ function renderUserBadge(memberUserId: string, userId: string | undefined) {
 }
 
 function RoundCompletionAlert({ nextRound }: { nextRound: number }) {
+  const isRoundFourAdvance = nextRound === 4;
+
   return (
-    <Alert color="navy" title="Full Re-Draft">
-      All players return to the pool. A new draft will be conducted for Round{' '}
-      {nextRound}.
-      {nextRound === 3 &&
-        ' This draft covers both Conference Finals and Stanley Cup Final — your Round 3 picks carry into Round 4.'}{' '}
-      Draft order is based on current standings — worst to best, snake pattern.
+    <Alert
+      color="navy"
+      title={isRoundFourAdvance ? 'No Re-Draft' : 'Full Re-Draft'}
+    >
+      {isRoundFourAdvance ? (
+        <>
+          Round 3 draft covers both Conference Finals and Stanley Cup Final.
+          There is no Round 4 re-draft. Commissioner must advance league to
+          Round 4 to start Finals scoring.
+        </>
+      ) : (
+        <>
+          All players return to the pool. A new draft will be conducted for
+          Round {nextRound}.
+          {nextRound === 3 && (
+            <>
+              {' '}
+              This draft covers both Conference Finals and Stanley Cup Final —
+              your Round 3 picks carry into Round 4.
+            </>
+          )}{' '}
+          Draft order is based on current standings — worst to best, snake
+          pattern.
+        </>
+      )}
     </Alert>
   );
 }
@@ -219,24 +240,30 @@ function RoundTransitionAction({
   starting: boolean;
   onStartReDraft: () => void;
 }) {
-  if (isCommissioner) {
+  const isRoundFourAdvance = nextRound === 4;
+
+  if (!isCommissioner) {
     return (
-      <Button
-        size="lg"
-        color="green"
-        onClick={onStartReDraft}
-        loading={starting}
-        fullWidth
-      >
-        Start Round {nextRound} Re-Draft
-      </Button>
+      <Alert color="navy" title="Waiting for Commissioner">
+        {isRoundFourAdvance
+          ? 'The commissioner will advance the league to Round 4 when ready.'
+          : `The commissioner will start the re-draft for Round ${nextRound} when ready.`}
+      </Alert>
     );
   }
 
   return (
-    <Alert color="navy" title="Waiting for Commissioner">
-      The commissioner will start the re-draft for Round {nextRound} when ready.
-    </Alert>
+    <Button
+      size="lg"
+      color="green"
+      onClick={onStartReDraft}
+      loading={starting}
+      fullWidth
+    >
+      {isRoundFourAdvance
+        ? 'Advance to Round 4 (Finals)'
+        : `Start Round ${nextRound} Re-Draft`}
+    </Button>
   );
 }
 

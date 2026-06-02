@@ -37,6 +37,7 @@ export const useMockMakePick = noopMutation;
 export const useMockLeagueMembers = noopQuery;
 export const useMockCompletedDrafts = noopQuery;
 export const useMockStartReDraft = noopMutation;
+export const useMockSkipToRound4 = noopMutation;
 
 // mock/hooks/useMockNhlApi
 export const useMockPlayoffPlayers = noopQuery;

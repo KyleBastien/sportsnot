@@ -296,3 +296,14 @@ export function useMockStartReDraft() {
     }
   );
 }
+
+export function useMockSkipToRound4() {
+  const { dispatch } = useMockData();
+
+  return makeMockMutation((params: { leagueId: string }) => {
+    dispatch({
+      type: 'SKIP_TO_ROUND4',
+      payload: { leagueId: params.leagueId },
+    });
+  });
+}

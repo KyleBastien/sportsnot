@@ -46,6 +46,12 @@ export function useRosterPageController({
       return;
     }
 
+    if (!irModal || !selectedInjuredSlotId) {
+      return;
+    }
+
+    const injuredSlotId = selectedInjuredSlotId;
+
     setActivating(true);
 
     if (IS_MOCK) {
@@ -57,7 +63,7 @@ export function useRosterPageController({
     const error = await activateSupabaseIr({
       leagueMemberId: rosterData.memberId,
       round: rosterData.round,
-      injuredSlotId: selectedInjuredSlotId,
+      injuredSlotId,
       irSlotId: irModal.irSlotId,
     });
 
