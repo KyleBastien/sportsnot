@@ -17,6 +17,7 @@ import {
   usePlayoffTeamsForRoster,
   useRegularSeasonPlayersForRoster,
 } from './rosterPageQueries';
+import { useRosterTeamStatsSync } from './useRosterTeamStatsSync';
 import type { LeagueMemberRow, RosterSlotRow } from './rosterTypes';
 import {
   buildMemberOptions,
@@ -66,7 +67,10 @@ export function useRosterPageData(leagueId: string, leagueMemberId?: string) {
     roundSearch: roundSelection.roundSearch,
     userId: user?.id,
   });
-  const rosterStats = useRosterStatsData(selectedRound);
+  const rosterStats = useRosterStatsData({
+    selectedRound,
+    leagueCurrentRound: currentRound,
+  });
   const rosterViewState = useRosterViewState({
     currentRound,
     isMobile,
@@ -289,26 +293,45 @@ function buildEmptyViewProps(
   };
 }
 
-function useRosterStatsData(currentRound: number) {
-  const nameResolutionRound = currentRound >= 4 ? 3 : currentRound;
+function useRosterStatsData(params: {
+  selectedRound: number;
+  leagueCurrentRound: number;
+}) {
+  const { selectedRound, leagueCurrentRound } = params;
+  const nameResolutionRound = selectedRound >= 4 ? 3 : selectedRound;
+
   const { data: playerStats, isLoading: playerStatsLoading } =
     usePlayoffPlayersForRoster(CURRENT_SEASON, nameResolutionRound);
   const { data: teamStats } = usePlayoffTeamsForRoster(
     CURRENT_SEASON,
     nameResolutionRound
   );
-  const { data: currentRoundTeamStats } = usePlayoffTeamsForRoster(
-    CURRENT_SEASON,
-    currentRound
-  );
-  const { data: nextRoundTeamStats } = usePlayoffTeamsForRoster(
-    CURRENT_SEASON,
-    currentRound + 1
-  );
+  const {
+    data: currentRoundTeamStats,
+    isFetched: currentRoundTeamStatsFetched,
+    refetch: refetchCurrentRoundTeamStats,
+  } = usePlayoffTeamsForRoster(CURRENT_SEASON, selectedRound);
+  const {
+    data: nextRoundTeamStats,
+    isFetched: nextRoundTeamStatsFetched,
+    refetch: refetchNextRoundTeamStats,
+  } = usePlayoffTeamsForRoster(CURRENT_SEASON, selectedRound + 1);
   const { data: regSeasonStats } = useRegularSeasonPlayersForRoster(
     CURRENT_SEASON,
-    currentRound === 1
+    selectedRound === 1
   );
+
+  const isRosterTeamStatsSyncing = useRosterTeamStatsSync({
+    season: CURRENT_SEASON,
+    selectedRound,
+    leagueCurrentRound,
+    currentRoundTeamStatsFetched,
+    nextRoundTeamStatsFetched,
+    currentRoundTeamStatsLength: (currentRoundTeamStats ?? []).length,
+    nextRoundTeamStatsLength: (nextRoundTeamStats ?? []).length,
+    refetchCurrentRoundTeamStats,
+    refetchNextRoundTeamStats,
+  });
 
   return {
     playerStats: playerStats ?? [],
@@ -317,7 +340,8 @@ function useRosterStatsData(currentRound: number) {
     currentRoundTeamStats: currentRoundTeamStats ?? [],
     nextRoundTeamStats: nextRoundTeamStats ?? [],
     regSeasonStats: regSeasonStats ?? [],
-    currentRound,
+    currentRound: selectedRound,
+    isRosterTeamStatsSyncing,
   };
 }
 
