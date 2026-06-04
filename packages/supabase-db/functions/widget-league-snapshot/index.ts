@@ -15,6 +15,7 @@ import {
 import { jsonResponse, pgSelect } from '../_shared/pg.ts';
 
 const NHL_API_BASE = 'https://api-web.nhle.com/v1';
+const DEFAULT_SEASON = '20252026';
 
 interface LeagueRow {
   id: string;
@@ -48,6 +49,7 @@ interface PlayerStatsRow {
 
 interface TeamStatsRow {
   team_id: number;
+  nhl_season: string;
   team_name: string | null;
   team_abbreviation: string | null;
   wins: number;
@@ -164,6 +166,37 @@ Deno.serve(async (req: Request) => {
           .map((r) => r.player_id as number)
       ),
     ];
+    const currentRoundTeamStats = await pgSelect<TeamStatsRow>(
+      cfg,
+      'team_stats_cache',
+      `select=team_id,nhl_season,team_name,team_abbreviation,wins,shutouts,is_eliminated&playoff_round=eq.${league.current_round}`
+    );
+    const nextRoundTeamStats =
+      league.current_round >= 4
+        ? []
+        : await pgSelect<TeamStatsRow>(
+            cfg,
+            'team_stats_cache',
+            `select=team_id,nhl_season,team_name,team_abbreviation,wins,shutouts,is_eliminated&playoff_round=eq.${league.current_round + 1}`
+          );
+    const currentSeason =
+      currentRoundTeamStats[0]?.nhl_season ??
+      nextRoundTeamStats[0]?.nhl_season ??
+      DEFAULT_SEASON;
+    const mappingRound =
+      league.current_round > 1 ? league.current_round - 1 : 1;
+    const mappingRoundTeamStats =
+      mappingRound === league.current_round
+        ? currentRoundTeamStats
+        : await pgSelect<TeamStatsRow>(
+            cfg,
+            'team_stats_cache',
+            `select=team_id,nhl_season,team_name,team_abbreviation,wins,shutouts,is_eliminated&playoff_round=eq.${mappingRound}`
+          );
+    const teamStatsById = new Map(
+      currentRoundTeamStats.map((t) => [t.team_id, t])
+    );
+
     // ── Player stats ────────────────────────────────────────
     const playerStats =
       playerIds.length === 0
@@ -171,7 +204,7 @@ Deno.serve(async (req: Request) => {
         : await pgSelect<PlayerStatsRow>(
             cfg,
             'player_stats_cache',
-            `select=player_id,player_name,team_abbreviation,goals,assists&player_id=in.(${playerIds.join(',')})&playoff_round=eq.${league.current_round}`
+            `select=player_id,player_name,team_abbreviation,goals,assists&player_id=in.(${playerIds.join(',')})&nhl_season=eq.${currentSeason}&playoff_round=eq.${league.current_round}`
           );
     const playerStatsById = new Map(playerStats.map((p) => [p.player_id, p]));
 
@@ -194,37 +227,10 @@ Deno.serve(async (req: Request) => {
           }>(
             cfg,
             'regular_season_stats_cache',
-            `select=player_id,player_name,team_abbreviation&player_id=in.(${missingTeamInfoIds.join(',')})`
+            `select=player_id,player_name,team_abbreviation&player_id=in.(${missingTeamInfoIds.join(',')})&nhl_season=eq.${currentSeason}`
           );
     const regularSeasonStatsById = new Map(
       regularSeasonStats.map((p) => [p.player_id, p])
-    );
-
-    const currentRoundTeamStats = await pgSelect<TeamStatsRow>(
-      cfg,
-      'team_stats_cache',
-      `select=team_id,team_name,team_abbreviation,wins,shutouts,is_eliminated&playoff_round=eq.${league.current_round}`
-    );
-    const nextRoundTeamStats =
-      league.current_round >= 4
-        ? []
-        : await pgSelect<TeamStatsRow>(
-            cfg,
-            'team_stats_cache',
-            `select=team_id,team_name,team_abbreviation,wins,shutouts,is_eliminated&playoff_round=eq.${league.current_round + 1}`
-          );
-    const mappingRound =
-      league.current_round > 1 ? league.current_round - 1 : 1;
-    const mappingRoundTeamStats =
-      mappingRound === league.current_round
-        ? currentRoundTeamStats
-        : await pgSelect<TeamStatsRow>(
-            cfg,
-            'team_stats_cache',
-            `select=team_id,team_name,team_abbreviation,wins,shutouts,is_eliminated&playoff_round=eq.${mappingRound}`
-          );
-    const teamStatsById = new Map(
-      currentRoundTeamStats.map((t) => [t.team_id, t])
     );
 
     const eliminationMaps = buildEliminationMaps({
@@ -406,7 +412,9 @@ async function fetchBoxscoresForGames(
 
 interface EliminationMaps {
   aliveTeamIds: Set<number>;
+  aliveTeamAbbrevs: Set<string>;
   playerTeamIdByPlayerId: Map<number, number>;
+  playerTeamAbbrevByPlayerId: Map<number, string>;
   hasEliminationData: boolean;
 }
 
@@ -425,11 +433,12 @@ function buildEliminationMaps(params: {
     }
   >;
 }): EliminationMaps {
-  const { aliveTeamIds, hasEliminationData } = computeAliveTeamIds({
-    round: params.round,
-    currentRoundTeamStats: params.currentRoundTeamStats,
-    nextRoundTeamStats: params.nextRoundTeamStats,
-  });
+  const { aliveTeamIds, aliveTeamAbbrevs, hasEliminationData } =
+    computeAliveTeamIds({
+      round: params.round,
+      currentRoundTeamStats: params.currentRoundTeamStats,
+      nextRoundTeamStats: params.nextRoundTeamStats,
+    });
   const teamIdByAbbreviation = buildTeamIdByAbbreviationMap(
     params.mappingRoundTeamStats,
     params.currentRoundTeamStats,
@@ -440,7 +449,17 @@ function buildEliminationMaps(params: {
     regularSeasonStatsById: params.regularSeasonStatsById,
     teamIdByAbbreviation,
   });
-  return { aliveTeamIds, playerTeamIdByPlayerId, hasEliminationData };
+  const playerTeamAbbrevByPlayerId = buildPlayerTeamAbbrevMap({
+    playerStatsById: params.playerStatsById,
+    regularSeasonStatsById: params.regularSeasonStatsById,
+  });
+  return {
+    aliveTeamIds,
+    aliveTeamAbbrevs,
+    playerTeamIdByPlayerId,
+    playerTeamAbbrevByPlayerId,
+    hasEliminationData,
+  };
 }
 
 function filterEliminatedRosters(
@@ -453,11 +472,50 @@ function filterEliminatedRosters(
 
   return rosters.filter((slot) => {
     const teamId = resolveSlotTeamId(slot, maps.playerTeamIdByPlayerId);
-    if (teamId == null) {
-      return true;
+    if (teamId != null) {
+      return maps.aliveTeamIds.has(teamId);
     }
-    return maps.aliveTeamIds.has(teamId);
+
+    if (slot.player_id != null) {
+      const teamAbbrev = maps.playerTeamAbbrevByPlayerId.get(slot.player_id);
+      if (teamAbbrev) {
+        return maps.aliveTeamAbbrevs.has(teamAbbrev);
+      }
+    }
+
+    return true;
   });
+}
+
+function buildPlayerTeamAbbrevMap(params: {
+  playerStatsById: Map<number, PlayerStatsRow>;
+  regularSeasonStatsById: Map<
+    number,
+    {
+      player_id: number;
+      player_name: string | null;
+      team_abbreviation: string | null;
+    }
+  >;
+}): Map<number, string> {
+  const playerTeamAbbrevByPlayerId = new Map<number, string>();
+
+  for (const [playerId, stats] of params.playerStatsById.entries()) {
+    if (stats.team_abbreviation) {
+      playerTeamAbbrevByPlayerId.set(playerId, stats.team_abbreviation);
+    }
+  }
+
+  for (const [playerId, regStats] of params.regularSeasonStatsById.entries()) {
+    if (playerTeamAbbrevByPlayerId.has(playerId)) {
+      continue;
+    }
+    if (regStats.team_abbreviation) {
+      playerTeamAbbrevByPlayerId.set(playerId, regStats.team_abbreviation);
+    }
+  }
+
+  return playerTeamAbbrevByPlayerId;
 }
 
 function buildPlayerTeamIdMap(params: {
@@ -525,6 +583,7 @@ function computeAliveTeamIds(params: {
   nextRoundTeamStats: TeamStatsRow[];
 }): {
   aliveTeamIds: Set<number>;
+  aliveTeamAbbrevs: Set<string>;
   hasEliminationData: boolean;
 } {
   const useNextRound = params.round < 4 && params.nextRoundTeamStats.length > 0;
@@ -532,17 +591,25 @@ function computeAliveTeamIds(params: {
     ? params.nextRoundTeamStats
     : params.currentRoundTeamStats;
   if (aliveTeamStats.length === 0) {
-    return { aliveTeamIds: new Set<number>(), hasEliminationData: false };
+    return {
+      aliveTeamIds: new Set<number>(),
+      aliveTeamAbbrevs: new Set<string>(),
+      hasEliminationData: false,
+    };
   }
 
   const aliveTeamIds = new Set<number>();
+  const aliveTeamAbbrevs = new Set<string>();
   for (const team of aliveTeamStats) {
     if (!team.is_eliminated) {
       aliveTeamIds.add(team.team_id);
+      if (team.team_abbreviation) {
+        aliveTeamAbbrevs.add(team.team_abbreviation);
+      }
     }
   }
 
-  return { aliveTeamIds, hasEliminationData: true };
+  return { aliveTeamIds, aliveTeamAbbrevs, hasEliminationData: true };
 }
 
 function resolveSlotTeamId(
