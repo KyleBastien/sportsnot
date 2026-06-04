@@ -52,6 +52,7 @@ interface TeamStatsRow {
   team_abbreviation: string | null;
   wins: number;
   shutouts: number;
+  is_eliminated?: boolean | null;
 }
 
 interface NhlScoreGame {
@@ -163,12 +164,6 @@ Deno.serve(async (req: Request) => {
           .map((r) => r.player_id as number)
       ),
     ];
-    const teamIds = [
-      ...new Set(
-        rosters.filter((r) => r.team_id != null).map((r) => r.team_id as number)
-      ),
-    ];
-
     // ── Player stats ────────────────────────────────────────
     const playerStats =
       playerIds.length === 0
@@ -205,15 +200,42 @@ Deno.serve(async (req: Request) => {
       regularSeasonStats.map((p) => [p.player_id, p])
     );
 
-    const teamStats =
-      teamIds.length === 0
+    const currentRoundTeamStats = await pgSelect<TeamStatsRow>(
+      cfg,
+      'team_stats_cache',
+      `select=team_id,team_name,team_abbreviation,wins,shutouts,is_eliminated&playoff_round=eq.${league.current_round}`
+    );
+    const nextRoundTeamStats =
+      league.current_round >= 4
         ? []
         : await pgSelect<TeamStatsRow>(
             cfg,
             'team_stats_cache',
-            `select=team_id,team_name,team_abbreviation,wins,shutouts&team_id=in.(${teamIds.join(',')})&playoff_round=eq.${league.current_round}`
+            `select=team_id,team_name,team_abbreviation,wins,shutouts,is_eliminated&playoff_round=eq.${league.current_round + 1}`
           );
-    const teamStatsById = new Map(teamStats.map((t) => [t.team_id, t]));
+    const mappingRound =
+      league.current_round > 1 ? league.current_round - 1 : 1;
+    const mappingRoundTeamStats =
+      mappingRound === league.current_round
+        ? currentRoundTeamStats
+        : await pgSelect<TeamStatsRow>(
+            cfg,
+            'team_stats_cache',
+            `select=team_id,team_name,team_abbreviation,wins,shutouts,is_eliminated&playoff_round=eq.${mappingRound}`
+          );
+    const teamStatsById = new Map(
+      currentRoundTeamStats.map((t) => [t.team_id, t])
+    );
+
+    const eliminationMaps = buildEliminationMaps({
+      round: league.current_round,
+      currentRoundTeamStats,
+      nextRoundTeamStats,
+      mappingRoundTeamStats,
+      playerStatsById,
+      regularSeasonStatsById,
+    });
+    const filteredRosters = filterEliminatedRosters(rosters, eliminationMaps);
 
     // ── Today's NHL playoff games ───────────────────────────
     const games = await fetchGamesForDate(date);
@@ -252,7 +274,7 @@ Deno.serve(async (req: Request) => {
       dailyFantasyPoints: number;
       ownedByTeamName: string;
     }>;
-    for (const r of rosters) {
+    for (const r of filteredRosters) {
       const teamName = memberById.get(r.league_member_id)?.team_name ?? '';
       if (r.player_id != null) {
         const stats = playerStatsById.get(r.player_id);
@@ -380,4 +402,155 @@ async function fetchBoxscoresForGames(
         entry != null
     )
   );
+}
+
+interface EliminationMaps {
+  aliveTeamIds: Set<number>;
+  playerTeamIdByPlayerId: Map<number, number>;
+  hasEliminationData: boolean;
+}
+
+function buildEliminationMaps(params: {
+  round: number;
+  currentRoundTeamStats: TeamStatsRow[];
+  nextRoundTeamStats: TeamStatsRow[];
+  mappingRoundTeamStats: TeamStatsRow[];
+  playerStatsById: Map<number, PlayerStatsRow>;
+  regularSeasonStatsById: Map<
+    number,
+    {
+      player_id: number;
+      player_name: string | null;
+      team_abbreviation: string | null;
+    }
+  >;
+}): EliminationMaps {
+  const { aliveTeamIds, hasEliminationData } = computeAliveTeamIds({
+    round: params.round,
+    currentRoundTeamStats: params.currentRoundTeamStats,
+    nextRoundTeamStats: params.nextRoundTeamStats,
+  });
+  const teamIdByAbbreviation = buildTeamIdByAbbreviationMap(
+    params.mappingRoundTeamStats,
+    params.currentRoundTeamStats,
+    params.nextRoundTeamStats
+  );
+  const playerTeamIdByPlayerId = buildPlayerTeamIdMap({
+    playerStatsById: params.playerStatsById,
+    regularSeasonStatsById: params.regularSeasonStatsById,
+    teamIdByAbbreviation,
+  });
+  return { aliveTeamIds, playerTeamIdByPlayerId, hasEliminationData };
+}
+
+function filterEliminatedRosters(
+  rosters: RosterRow[],
+  maps: EliminationMaps
+): RosterRow[] {
+  if (!maps.hasEliminationData) {
+    return rosters;
+  }
+
+  return rosters.filter((slot) => {
+    const teamId = resolveSlotTeamId(slot, maps.playerTeamIdByPlayerId);
+    if (teamId == null) {
+      return true;
+    }
+    return maps.aliveTeamIds.has(teamId);
+  });
+}
+
+function buildPlayerTeamIdMap(params: {
+  playerStatsById: Map<number, PlayerStatsRow>;
+  regularSeasonStatsById: Map<
+    number,
+    {
+      player_id: number;
+      player_name: string | null;
+      team_abbreviation: string | null;
+    }
+  >;
+  teamIdByAbbreviation: Map<string, number>;
+}): Map<number, number> {
+  const playerTeamIdByPlayerId = new Map<number, number>();
+
+  for (const [playerId, stats] of params.playerStatsById.entries()) {
+    const teamAbbrev =
+      stats.team_abbreviation ??
+      params.regularSeasonStatsById.get(playerId)?.team_abbreviation ??
+      null;
+    if (!teamAbbrev) {
+      continue;
+    }
+    const teamId = params.teamIdByAbbreviation.get(teamAbbrev);
+    if (teamId != null) {
+      playerTeamIdByPlayerId.set(playerId, teamId);
+    }
+  }
+
+  for (const [playerId, regStats] of params.regularSeasonStatsById.entries()) {
+    if (playerTeamIdByPlayerId.has(playerId)) {
+      continue;
+    }
+    const teamAbbrev = regStats.team_abbreviation;
+    if (!teamAbbrev) {
+      continue;
+    }
+    const teamId = params.teamIdByAbbreviation.get(teamAbbrev);
+    if (teamId != null) {
+      playerTeamIdByPlayerId.set(playerId, teamId);
+    }
+  }
+
+  return playerTeamIdByPlayerId;
+}
+
+function buildTeamIdByAbbreviationMap(
+  ...sources: TeamStatsRow[][]
+): Map<string, number> {
+  const teamIdByAbbreviation = new Map<string, number>();
+  for (const teamStats of sources) {
+    for (const team of teamStats) {
+      if (team.team_abbreviation) {
+        teamIdByAbbreviation.set(team.team_abbreviation, team.team_id);
+      }
+    }
+  }
+  return teamIdByAbbreviation;
+}
+
+function computeAliveTeamIds(params: {
+  round: number;
+  currentRoundTeamStats: TeamStatsRow[];
+  nextRoundTeamStats: TeamStatsRow[];
+}): {
+  aliveTeamIds: Set<number>;
+  hasEliminationData: boolean;
+} {
+  const useNextRound = params.round < 4 && params.nextRoundTeamStats.length > 0;
+  const aliveTeamStats = useNextRound
+    ? params.nextRoundTeamStats
+    : params.currentRoundTeamStats;
+  if (aliveTeamStats.length === 0) {
+    return { aliveTeamIds: new Set<number>(), hasEliminationData: false };
+  }
+
+  const aliveTeamIds = new Set<number>();
+  for (const team of aliveTeamStats) {
+    if (!team.is_eliminated) {
+      aliveTeamIds.add(team.team_id);
+    }
+  }
+
+  return { aliveTeamIds, hasEliminationData: true };
+}
+
+function resolveSlotTeamId(
+  slot: RosterRow,
+  playerTeamIdByPlayerId: Map<number, number>
+): number | null {
+  if (slot.player_id != null) {
+    return playerTeamIdByPlayerId.get(slot.player_id) ?? null;
+  }
+  return slot.team_id ?? null;
 }
