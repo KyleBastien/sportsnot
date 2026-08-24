@@ -1,17 +1,20 @@
 {
   "project": "SportsNot",
-  "branchName": "ralph/otp-email-login",
-  "description": "Add OTP email code login alongside existing magic link — checkbox toggle, 6-digit PinInput verification screen, resend cooldown timer, mock mode support, and E2E tests",
+  "branchName": "ralph/ml-draft-optimizer",
+  "description": "ML Draft Optimizer (Draft Oracle) - Standalone offline Python ML pipeline that produces round-by-round player/team projections and multi-step snake-draft pick recommendations under the SportsNot ruleset. Source PRD: tasks/prd-ml-draft-optimizer.md",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add signInWithOtp and verifyOtp methods to useAuth hook",
-      "description": "As a developer, I need the Supabase auth hook to support sending OTP codes and verifying them so the login page can use either flow.",
+      "title": "Scaffold the Python ML workspace in ml/",
+      "description": "As the tool owner, I want an isolated uv-managed Python project inside the repo so the ML pipeline has a home without disturbing the Nx/TypeScript workspace. (PRD US-001)",
       "acceptanceCriteria": [
-        "useAuth returns a `signInWithOtp(email)` method that calls `supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })` without `emailRedirectTo`",
-        "useAuth returns a `verifyOtp(email, token)` method that calls `supabase.auth.verifyOtp({ email, token, type: 'email' })` and returns `{ data, error }`",
-        "Existing `signInWithMagicLink` method is unchanged and still works",
-        "Both new methods are wrapped in useCallback",
+        "New top-level ml/ directory with a uv-managed Python 3.12+ project (pyproject.toml, committed lockfile)",
+        "Package draft_oracle with subpackages: ingest/, features/, models/, optimize/, cli/, backtest/ (each with __init__.py)",
+        "ruff (lint+format), mypy --strict, and pytest configured and runnable via documented uv run commands",
+        "ml/ excluded from the Nx project graph and yarn/ESLint/TS tooling; existing nx run-many targets are unaffected",
+        "ml/README.md documents setup, commands, and pipeline stages",
+        "uv run pytest passes on a fresh clone (at least one placeholder test per subpackage)",
+        "ml/.gitignore covers ml/data/raw/, ml/artifacts/ (except backtest reports/manifests), .env, and virtualenvs",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -19,18 +22,23 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "File: packages/supabase/src/lib/hooks/useAuth.ts. Add two new useCallback methods alongside existing signInWithMagicLink and signOut. The key difference from magic link is NOT passing emailRedirectTo in signInWithOtp options — this tells Supabase to send a code instead of a link."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-002",
-      "title": "Extend AuthContext with OTP methods",
-      "description": "As a developer, I need the AuthContext to expose the new OTP methods so components can access them.",
+      "title": "Python rules engine mirroring SportsNot scoring and draft order",
+      "description": "As the tool owner, I want a draft_oracle.rules module that exactly reproduces SportsNot scoring and draft-order rules so every projection, simulation, and backtest is scored identically to the real app. (PRD US-002)",
       "acceptanceCriteria": [
-        "AuthContextValue interface includes `signInWithOtp: (email: string) => Promise<{ error: Error | null }>`",
-        "AuthContextValue interface includes `verifyOtp: (email: string, token: string) => Promise<{ data: unknown; error: Error | null }>`",
-        "AuthProvider passes both new methods from useAuth to the context",
-        "useAuthContext returns both new methods",
+        "Implement player_points(goals, assists) = goals*1 + assists*1",
+        "Implement goalie_series_points(wins, shutouts) = (wins - shutouts)*2 + shutouts*4",
+        "Implement goalie_game_points(team_score, opp_score): 0 unless team_score > opp_score; 4 if opp_score == 0 else 2 (shutout replaces win, a 1-0 win = 4 pts, never 6)",
+        "Implement snake_order(participants, total_picks) reversing order on odd rounds, matching generateSnakeDraftOrder in packages/utils/src/lib/utils.ts",
+        "Implement redraft_order(standings, total_picks) sorting points ascending (worst first), matching generateReDraftOrder",
+        "Implement roster_composition(allow_ir_slots): 5F/3D/1G, plus 1 IR_F and 1 IR_D only when allow_ir_slots is true",
+        "Roster validator rejects rosters violating composition, duplicate players, or eliminated-team players, with reason strings",
+        "Golden test vectors copied from packages/utils/src/lib/utils.test.ts cases so rules drift in either language is caught",
+        "Property-based tests (hypothesis) cover scoring and snake-order invariants",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -38,24 +46,19 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "File: packages/web/src/app/context/AuthContext.tsx. The useAuth hook already returns all methods as a spread object, so AuthProvider may already pass them through — but the AuthContextValue TypeScript interface must be explicitly updated with the new method signatures."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Add OTP checkbox and dynamic button to login form",
-      "description": "As a user, I want a checkbox on the login page to choose between OTP code and magic link so I can pick my preferred sign-in method.",
+      "title": "NHL API client with disk caching and rate limiting",
+      "description": "As the tool owner, I want a typed NHL API client (api-web.nhle.com) with polite fetching and raw-response caching so all downstream ingestion is reliable and repeatable. (PRD US-003, part 1)",
       "acceptanceCriteria": [
-        "A Mantine Checkbox labeled 'Use OTP Code?' is rendered between the email input and submit button",
-        "The checkbox is checked by default (OTP is the default login method)",
-        "When checkbox is checked, submit button reads 'Send Code'",
-        "When checkbox is unchecked, submit button reads 'Send Magic Link'",
-        "Subtitle text reads 'Enter your email to receive a one-time code' when checked",
-        "Subtitle text reads 'Enter your email to receive a magic link' when unchecked",
-        "Submitting with checkbox checked calls signInWithOtp(email) from AuthContext",
-        "Submitting with checkbox unchecked calls signInWithMagicLink(email) (existing behavior)",
-        "Unchecked magic link flow still shows 'Check your email' confirmation (existing behavior preserved)",
-        "Verify in browser if browser testing tools are available",
+        "Client in draft_oracle.ingest with pydantic-typed responses for: skater game logs, team schedules/results with scores, playoff bracket/series metadata, team rosters, player info (position, status)",
+        "All raw JSON responses cached to ml/data/raw/ keyed by endpoint+params; cache hit skips the network entirely",
+        "Configurable request delay and retry with exponential backoff on failures",
+        "All endpoint knowledge isolated behind typed adapter functions (no raw URLs outside the client module)",
+        "Unit tests use recorded fixture responses (no live network in tests)",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -63,25 +66,20 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "File: packages/web/src/app/routes/auth/LoginPage.tsx. Add `useOtp` boolean state (default true). Import Checkbox from @mantine/core. The checkbox toggles useOtp. handleSubmit branches: if useOtp, call signInWithOtp and set otpSent=true; else call signInWithMagicLink and set sent=true (existing flow)."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Add OTP verification screen with PinInput",
-      "description": "As a user, I want to enter the 6-digit code I received via email on an in-app verification screen so I can sign in without leaving the browser.",
+      "title": "Normalized NHL data tables and dated snapshots",
+      "description": "As the tool owner, I want raw NHL responses normalized into documented Parquet tables with snapshotting so models train on reproducible data. (PRD US-003, part 2)",
       "acceptanceCriteria": [
-        "After OTP is sent, the login form is replaced with an OTP verification screen (same page, conditional render)",
-        "Heading reads 'Enter your code'",
-        "Subtext reads 'We sent a 6-digit code to {email}' with the email bolded",
-        "A Mantine PinInput with length={6}, type='number' is rendered for code entry",
-        "A 'Verify Code' button is shown, disabled until all 6 digits are entered",
-        "Clicking 'Verify Code' calls verifyOtp(email, token) from AuthContext",
-        "On successful verification, Supabase fires SIGNED_IN event and user is redirected to / (no manual navigation needed)",
-        "On failed verification, an inline Alert shows 'Invalid or expired code. Please try again.' and the PinInput clears",
-        "A 'Use a different email' button returns to the email input form and resets OTP state",
-        "Error from signInWithOtp (sending step) is shown as an Alert on the email form",
-        "Verify in browser if browser testing tools are available",
+        "Normalized Parquet tables in ml/data/: skater_games, team_games, series, players, teams, with schemas documented in ml/README.md",
+        "Position mapping collapses NHL codes C/L/R to F and D to D; goalies excluded from the skater pool",
+        "Ingestion covers the 10 most recent completed seasons (regular season + playoffs) plus the current season",
+        "Re-running ingestion is idempotent and incremental (only fetches missing/changed data)",
+        "A snapshot CLI command freezes a dated copy of normalized tables; downstream stages can pin a snapshot id",
+        "Unit tests validate normalization from fixture data including position mapping and dedup on re-run",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -89,21 +87,21 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "File: packages/web/src/app/routes/auth/LoginPage.tsx. Add states: otpSent (boolean), otpToken (string). When otpSent is true, render the verification view (same pattern as the existing 'sent' confirmation view). Import PinInput from @mantine/core. The PinInput onChange sets otpToken. Verify button calls verifyOtp — on success the onAuthStateChange listener in useAuth handles session creation and AuthCallbackPage-style redirect happens automatically."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Add resend code button with 60-second cooldown timer",
-      "description": "As a user, I want a resend button with a visible countdown so I know when I can request a new code.",
+      "title": "Betting-odds ingestion with de-vigging",
+      "description": "As the tool owner, I want game moneylines and series prices ingested and de-vigged into implied probabilities so the series model can use market signal. (PRD US-014)",
       "acceptanceCriteria": [
-        "OTP verification screen shows 'Didn't get a code?' text with a 'Resend code' button",
-        "After sending (initial send or resend), the resend button is disabled for 60 seconds",
-        "While disabled, button text shows countdown: 'Resend code (Xs)' where X counts down from 60",
-        "After countdown reaches 0, button becomes enabled and text returns to 'Resend code'",
-        "Clicking resend calls signInWithOtp(email) again and resets the timer to 60",
-        "Timer is implemented with useEffect and setInterval, cleaning up on unmount",
-        "Verify in browser if browser testing tools are available",
+        "Odds provider selected and integrated (evaluate free-tier options, e.g. The Odds API for NHL moneylines and series/outright markets); rationale, quota limits, and API-key setup documented in ml/README.md",
+        "Per playoff game: moneyline prices from at least 1 book (median consensus if several); per series: series-winner prices where offered",
+        "Prices de-vigged into implied probabilities (proportional or Shin method, documented choice) and stored in a normalized odds Parquet table keyed to games/series",
+        "Historical odds backfilled for as many past playoff seasons as freely obtainable; seasons without coverage explicitly flagged in the table",
+        "API keys read from environment variables / gitignored .env, never committed",
+        "Pipeline runs cleanly with --no-odds leaving the stat-only path fully functional",
+        "Unit tests cover de-vigging math and missing-odds handling using fixture data",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -111,19 +109,20 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "File: packages/web/src/app/routes/auth/LoginPage.tsx. Add resendCooldown state (number, starts at 60 when OTP is sent). useEffect with setInterval decrements every second. Resend button disabled when resendCooldown > 0. On resend click, call signInWithOtp again and reset cooldown to 60. Clean up interval on unmount."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Add mock mode OTP support",
-      "description": "As a developer, I want the OTP flow to work in mock mode so I can develop and test offline, accepting any 6-digit code.",
+      "title": "League draft-history sheet parsing (Google Sheets)",
+      "description": "As the tool owner, I want the league's three historical draft spreadsheets parsed into a raw picks table so the opponent model can learn from real league drafts. (PRD US-015, part 1)",
       "acceptanceCriteria": [
-        "useMockAuth returns a signInWithOtp method that always resolves with { error: null }",
-        "useMockAuth returns a verifyOtp method that accepts any 6-digit numeric string and returns { data: { user, session }, error: null }",
-        "verifyOtp in mock mode returns { data: null, error: Error('Invalid OTP code') } for non-6-digit or non-numeric input",
-        "MockAuthProvider passes signInWithOtp and verifyOtp to AuthContext",
-        "The full OTP flow (enter email → send code → enter code → signed in) works in mock mode",
+        "Ingestion supports the three known sheets by id: 11jklDKn0xTYwW4A4Is9FDggj6q-fdvkuVnoo9A-M7j8, 1ExXl0jmsYSNotlOUQBQmi-soUZzWPd3N45BC-aIZwU0, 1-LBNUxnuSgPLm7BUvYw2FFD2yYkP7BjxdsVNhbd5jb8",
+        "Works from CSV exports (export?format=csv&gid=...) via a documented one-command download AND from manually downloaded files dropped into ml/data/raw/league-drafts/",
+        "Schema-discovery step performed: each sheet's actual layout (tabs, header rows, row-per-pick vs. grid board) documented in ml/README.md",
+        "Per-layout parsers emit rows (season, playoff_round, manager, pick_number, snake_slot, position, player_or_team_name); parsers fail loudly with a clear error on unexpected layout changes, never silently misparse",
+        "Downloaded CSV snapshots committed under ml/data/raw/league-drafts/ so the pipeline never depends on Google availability",
+        "Unit tests cover each discovered layout using the committed CSV snapshots",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -131,17 +130,20 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "Files: packages/web/src/mock/hooks/useMockAuth.ts and packages/web/src/mock/MockAuthProvider.tsx. Add signInWithOtp and verifyOtp to useMockAuth return value. verifyOtp validates token is 6 digits via /^\\d{6}$/ regex. MockAuthProvider spreads the mock auth object into AuthContext — verify the new methods are included in the spread."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-007",
-      "title": "Add E2E test fixtures and route mocks for OTP verification",
-      "description": "As a developer, I need E2E test infrastructure to mock the OTP verify endpoint so Playwright tests can simulate the full flow.",
+      "title": "Draft-history entity matching to NHL IDs",
+      "description": "As the tool owner, I want parsed draft picks matched to NHL player/team IDs and managers normalized across seasons, producing the final league_draft_picks table. (PRD US-015, part 2)",
       "acceptanceCriteria": [
-        "auth.fixture.ts mocks the Supabase OTP verify endpoint (POST /auth/v1/verify*) returning a valid session for authenticated pages",
-        "auth.fixture.ts mocks the verify endpoint returning an error for unauthenticated pages",
-        "Existing auth route mocks (otp send, signout, token refresh, user) are unchanged",
+        "Normalized fuzzy name matching maps player_or_team_name to NHL player_id (skaters) or team_id (goalie/team picks)",
+        "Low-confidence matches emitted to a reviewable report; unresolved names fixable via a mapping override file in ml/data/overrides/",
+        "Manager identity normalized across seasons via a manager alias mapping file (same human, different team names)",
+        "Final league_draft_picks Parquet table with columns (season, playoff_round, manager, pick_number, snake_slot, position, player_id, team_id) and at least 98% of picks matched",
+        "A match-rate report is printed by the ingestion command showing matched/unmatched counts per season",
+        "Unit tests cover fuzzy matching normalization (accents, initials, nicknames) and alias resolution",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -149,20 +151,19 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 7,
-      "passes": true,
-      "notes": "File: packages/e2e/fixtures/auth.fixture.ts. Add a route mock for `${SUPABASE_URL}/auth/v1/verify*` inside setupAuthMocks. When authenticated=true, return 200 with session JSON. When authenticated=false, return 400 with error JSON. The existing /auth/v1/otp** mock already handles the send step."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-008",
-      "title": "Add E2E tests for OTP login flow",
-      "description": "As a developer, I want E2E tests covering the OTP login flow to prevent regressions.",
+      "title": "Injury-report source integration with manual overrides",
+      "description": "As the tool owner, I want a structured injury source feeding per-player status automatically, with a manual override file as final authority, so injury data never requires routine hand entry. (PRD US-011, part 1)",
       "acceptanceCriteria": [
-        "Test: 'login page renders OTP checkbox checked by default' — checkbox is visible and checked",
-        "Test: 'submitting email with OTP sends code and shows verification screen' — fill email, submit, PinInput is visible, 'Enter your code' heading is visible",
-        "Test: 'entering valid OTP code signs in and redirects to dashboard' — fill 6-digit code, click verify, user is redirected to /",
-        "Test: 'resend code button has cooldown timer' — on verification screen, resend button shows countdown text and is disabled",
-        "Test: 'unchecking OTP checkbox shows magic link flow' — uncheck checkbox, submit, 'Check your email' confirmation appears",
-        "All existing auth E2E tests continue to pass without modification",
+        "Candidate sources evaluated in order of preference (ESPN public JSON endpoints, free API tiers like Sportradar/SportsDataIO, then aggregator scraping); selection criteria (freshness, return-timeline detail, stability, terms of use) and decision documented in ml/README.md",
+        "Chosen source ingests per-player status (out/IR/day-to-day/healthy) and expected-return info into a normalized injuries table on each run",
+        "Manually-editable ml/data/overrides/injuries.yaml merges over source data as the final authority",
+        "Source failures degrade gracefully: pipeline continues with last-known injury data plus overrides, with a warning",
+        "Unit tests cover status normalization, override merging precedence, and source-failure fallback using fixtures",
         "All Typecheck passes (even if it's outside of your changes)",
         "Lint passes (even if it's outside of your changes)",
         "Unit tests have been added",
@@ -170,8 +171,364 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 8,
-      "passes": true,
-      "notes": "File: packages/e2e/tests/auth.spec.ts. Add tests within the existing 'Authentication Flow' describe block. Use unauthenticatedPage fixture for login tests, authenticatedPage for the redirect-after-verify test. Existing tests reference 'Send Magic Link' button — those must still pass since the button text changes based on checkbox state. For the OTP verify redirect test, mock the verify endpoint to return a session and inject it into localStorage similar to the magic link callback test."
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Skater feature engineering with leakage guard",
+      "description": "As the tool owner, I want as-of skater features per player per playoff round so the projection model trains without future information. (PRD US-004, part 1)",
+      "acceptanceCriteria": [
+        "Features per player per round, as-of round start: regular-season G/A/P per game, last-25-games rates, power-play time share, average TOI, shots/game, shooting %, age, position, teammate quality proxy (linemate P/GP), team offensive rates",
+        "Every feature has a unit-tested computation and a docstring defining its as-of semantics",
+        "Automated leakage test asserts no feature for round N uses any game played in round N or later; test fails the build on violation",
+        "Feature matrices written to ml/data/features/ keyed by a feature-set version string",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Team/series feature engineering (stats, Elo, odds, goalie situation)",
+      "description": "As the tool owner, I want as-of team and series features including market and goaltender-situation signals so the series model has everything it needs. (PRD US-004 part 2, plus odds and goalie features from US-005/US-014 decisions)",
+      "acceptanceCriteria": [
+        "Series/team features as-of series start: regular-season goal differential, GF/GA per game, special-teams percentages, head-to-head record, home-ice advantage, rest days",
+        "Elo-style team rating maintained across seasons with unit-tested update rule",
+        "Goaltender-situation features: confirmed/probable starter save % (season and last 15 starts), backup save %, starter-unavailability risk flag from the injuries table",
+        "Market features joined from the odds table: de-vigged implied game win probability and series price where available, with explicit missing-flags for uncovered games/seasons",
+        "Round-context features: round number (1-4), expected opponent strength, days between games",
+        "Leakage test extended to team/series features (no round-N game data in round-N features)",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Per-game win model with market blend and ablation",
+      "description": "As the tool owner, I want a calibrated single-game win probability model blending team stats and betting-market features so series simulation rests on the sharpest available estimate. (PRD US-005, part 1)",
+      "acceptanceCriteria": [
+        "Model predicts P(team A beats team B) for a single game, home/away aware, trained on historical playoff + regular-season games (gradient-boosted trees or logistic regression; selection justified by validation results in a committed report)",
+        "Market features included when available; model runs correctly in stat-only mode when odds are missing for a game",
+        "Ablation reported on seasons with odds coverage: market+stats vs. stats-only Brier score",
+        "Beats baselines on held-out seasons by Brier score: (a) coin flip, (b) higher regular-season points wins",
+        "Training uses strict temporal splits (no test-season leakage); fixed seeds make training reproducible",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Shutout probability model with goaltender features",
+      "description": "As the tool owner, I want a calibrated P(win is a shutout) model including starter/backup goaltender situation so goalie-slot value prices shutout upside and goalie-injury risk. (PRD US-005, part 2)",
+      "acceptanceCriteria": [
+        "Model predicts P(shutout | win, teams) using goaltender-situation features (starter save % season and last 15 starts, backup save %, starter-unavailability risk term)",
+        "Calibrated against historical playoff shutout rates; predicted frequency within +/-25% of observed frequency on held-out seasons",
+        "Calibration plot and metrics written to a committed report",
+        "Unit tests cover feature assembly and probability bounds (0 <= p <= 1, monotone in goalie quality on synthetic data)",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Best-of-7 series simulator and goalie-slot valuation",
+      "description": "As the tool owner, I want per-game win and shutout probabilities composed into a full series-outcome distribution so every team gets expected wins, series length, and goalie-slot fantasy points. (PRD US-005, part 3)",
+      "acceptanceCriteria": [
+        "Simulator composes per-game probabilities into a best-of-7 with the 2-2-1-1-1 home-ice pattern",
+        "Outputs per series: P(win series) per team, distribution over 4/5/6/7-game outcomes, E[wins] per team, E[games], and E[goalie-slot points] computed through the rules engine (shutout replaces win)",
+        "Calibration report on held-out seasons: reliability curve and Brier score for series winners; predicted vs. actual series-length distribution; predicted vs. actual shutouts per round",
+        "Deterministic under a fixed seed; exact enumeration preferred over Monte Carlo where tractable (2^7 outcomes)",
+        "Unit tests verify known-probability edge cases (p=0.5 symmetric, p=1.0 sweeps) and home-ice pattern ordering",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Skater per-game production model",
+      "description": "As the tool owner, I want a model of expected fantasy points (G+A) per game for each skater in the upcoming round so projections can be composed with expected games played. (PRD US-006, part 1)",
+      "acceptanceCriteria": [
+        "Model predicts E[G+A per game] for the round from US-009 skater features (regularized gradient boosting or Poisson/negative-binomial regression; choice justified by validation)",
+        "Strict temporal cross-validation: each historical round predicted using only data available before that round",
+        "Cold cases handled: rookies/low-sample players shrink toward position-team priors; players with no regular-season games get a flagged low-confidence projection, not a crash",
+        "Validation metrics (MAE, Spearman rank correlation vs. actual per-game rates) reported per held-out season in a committed report",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Injury return-time model and availability adjustment",
+      "description": "As the tool owner, I want P(returns by game k of the round) per injured player so both skater projections and IR valuation can price availability. (PRD US-011, part 2)",
+      "acceptanceCriteria": [
+        "Return-time model outputs P(available for game k), k=1..7, per injured player, calibrated from the injury source's status + timeline fields",
+        "Historical injury-return outcomes used for calibration where obtainable; otherwise a documented status-based mapping with stated assumptions",
+        "Availability haircut applied to expected games played for injured/questionable skaters in projection composition",
+        "Override file entries (injuries.yaml) can pin an explicit return game, taking precedence over the model",
+        "Unit tests cover monotonicity (P available game k is non-decreasing in k) and override precedence",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Skater round-point projections with uncertainty",
+      "description": "As the tool owner, I want per-skater expected round fantasy points with quantiles, composed from per-game production, series-length distribution, and availability, beating naive baselines. (PRD US-006, part 2)",
+      "acceptanceCriteria": [
+        "Output per skater per round: expected_points (mean), p10/p50/p90 quantiles via Monte Carlo over the series-length distribution and per-game scoring variance (or quantile models), plus decomposition (pts_per_game, expected_games)",
+        "Expected games taken from the series simulator's distribution for the player's team, with the US-015 availability haircut applied",
+        "Beats baselines on held-out seasons by MAE and Spearman rank correlation vs. actual round fantasy points: (a) regular-season PPG x 5.5 games, (b) previous-round fantasy points; results in a committed report",
+        "Fixed seeds make quantile outputs reproducible",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Batch projection command and artifact format",
+      "description": "As the tool owner, I want one command producing a self-contained precomputed prediction artifact for an upcoming round so drafting never depends on live inference. (PRD US-007)",
+      "acceptanceCriteria": [
+        "uv run oracle project --season <year> --round <n> runs ingest-refresh, features, and inference, writing ml/artifacts/<season>-r<round>/",
+        "Artifact contains skaters.parquet + skaters.csv (id, name, team, position F/D, expected_points, quantiles, decomposition, injury flag) and teams.parquet + teams.csv (goalie-slot expected points, E[wins], E[games], P(series win), shutout expectations)",
+        "Artifact contains run_manifest.json recording data snapshot id, model versions, feature version, git SHA, seeds, and timestamp",
+        "Only draft-eligible entries appear: eliminated teams and their players excluded automatically from bracket state",
+        "Re-running with the same snapshot reproduces byte-identical Parquet outputs (fixed seeds, deterministic ordering)",
+        "Completes in under 10 minutes on a laptop given an up-to-date data cache",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "VOR, positional scarcity, and cheat sheet",
+      "description": "As the tool owner, I want projections converted to value-over-replacement rankings that price the 5F/3D/1G structure and league size, exported as a readable cheat sheet. (PRD US-008)",
+      "acceptanceCriteria": [
+        "Replacement level per position from league size N: F = (5N+1)-th ranked F, D = (3N+1)-th D, G/team = (N+1)-th team, with sensible handling when fewer teams remain than managers",
+        "VOR = expected_points - replacement_level_points computed for every skater and team",
+        "cheatsheet.md added to the artifact: sorted by VOR with position, projection, quantiles, and injury flags",
+        "League size and IR flag are CLI parameters (--managers, --ir/--no-ir) that change replacement levels and sheet layout",
+        "Unit tests cover scarcity edge cases: 2-manager league, 12-manager league, final round with only 2 teams alive",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Rules-enforcing draft simulator with fallback opponent model",
+      "description": "As the tool owner, I want a faithful snake-draft simulator with a baseline opponent model and survival estimation so lookahead has an engine to roll out on. (PRD US-009, part 1)",
+      "acceptanceCriteria": [
+        "Simulator enforces the full ruleset via draft_oracle.rules: snake order, per-position roster limits (a manager with 5 F must pick D or G), IR slots pickable only when enabled, no duplicates, eliminated players unavailable",
+        "Fallback opponent model: greedy by public-perception ranking (regular-season points) with softmax noise (configurable temperature) and positional-need awareness, behind a pluggable OpponentModel interface",
+        "Survival estimation: for any draft state and candidate, Monte Carlo over opponent picks yields P(candidate survives until my next pick) with >=1000 rollouts completing in <5 seconds",
+        "Deterministic under a fixed seed; a unit test round-trips a full 10-manager 11-pick draft producing a valid roster for every manager",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Fitted opponent model from league draft history",
+      "description": "As the tool owner, I want opponents modeled from my league's real historical picks so survival estimates reflect how these specific managers draft. (PRD US-009, part 2)",
+      "acceptanceCriteria": [
+        "Discrete-choice model (conditional logit or Plackett-Luce over the available pool) fit to league_draft_picks, with features: public-ranking position, positional need, own-team fandom signals, reach tendency",
+        "League-level model at minimum; per-manager models where a manager has enough historical picks, with automatic sample-size-based blending toward the league model and the greedy fallback",
+        "Validated on held-out draft rounds from the sheets: top-1 and top-5 pick-prediction accuracy reported and beating the greedy fallback",
+        "Implements the same OpponentModel interface as US-019 so the simulator swaps models via config",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Multi-step pick recommendation engine",
+      "description": "As the tool owner, I want the optimizer to recommend the best pick right now by rolling out all of my remaining picks against the fitted opponent model, not just the next turn. (PRD US-010)",
+      "acceptanceCriteria": [
+        "Recommendation = argmax over available candidates of expected final-roster points via multi-step Monte Carlo rollout to the end of the draft: simulate opponents through all of the owner's remaining turns, fill the owner's future slots with the rollout policy, average total roster points across >=500 seeded rollouts",
+        "Rollout depth defaults to the full remaining draft; --depth and --rollouts flags trade accuracy for speed",
+        "Full-depth recommendation completes in <10 seconds at any state of a 12-manager 11-pick draft (vectorized/parallel rollouts as needed)",
+        "Top-5 recommendations include explanations: VOR, P(survives to next pick), expected final-roster delta vs. the #2 option, positional-need reasoning",
+        "Correctly handles forced picks (roster slots nearly full) and goalie-slot timing (team vs. skater)",
+        "In >=200 seeded simulated drafts vs. 9 fitted-model opponents, the multi-step engine's average final roster projects higher total points than (a) pure greedy-VOR and (b) one-step lookahead, from the same slot",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "IR stash valuation with retroactive point swap",
+      "description": "As the tool owner, I want injured players valued for IR slots using the retroactive point-swap rule so I know when stashing an injured star beats a healthy depth pick. (PRD US-011, part 3)",
+      "acceptanceCriteria": [
+        "IR stash EV computes E[points if stashed and activated optimally]: on activation, the IR player's full round points replace the swapped same-position active player's points from the start of the round (F swaps F, D swaps D, enforced)",
+        "Stash EV uses the US-015 return-time distribution and US-016 projections",
+        "Cheat sheet gains an IR section ranking injured F/D by stash EV vs. the healthy replacement-level alternative, with a clear stash/avoid verdict",
+        "Optimizer treats IR_F/IR_D as distinct slots valued by stash EV when --ir is set",
+        "Unit tests verify the retroactive swap math on hand-computed scenarios (early return, no return, late return)",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Per-slot draft strategy report",
+      "description": "As the tool owner, I want pre-computed strategy plans for every snake slot 1..N, because round-1 order is randomized and revealed late — I need my slot's plan the moment order is announced. (PRD US-016)",
+      "acceptanceCriteria": [
+        "oracle project additionally emits slot_strategies.md: for each slot 1..N, expected pick numbers in the snake, recommended pick plus top-3 alternatives at each turn from full multi-step simulation vs. the fitted opponent model, and projected final-roster total",
+        "First two turns of each slot include contingency guidance conditional on the most likely board states, derived from the highest-probability rollout branches",
+        "Covers both IR and no-IR configurations when --ir is set",
+        "Generation for a 12-slot league completes in under 15 minutes as part of the batch run",
+        "Summary table compares projected final-roster points across slots",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Interactive CLI draft assistant",
+      "description": "As the tool owner, I want a terminal session where I record every pick live and instantly see my best options, powered entirely by the precomputed artifact. (PRD US-012)",
+      "acceptanceCriteria": [
+        "uv run oracle draft --artifact <path> --managers <n> --slot <k> [--ir] starts a session; all valuation comes from the precomputed artifact (no network, no model training at draft time)",
+        "Commands: pick <manager> <fuzzy name>, undo, board (remaining by position), roster (mine), recommend (top 5 with US-021 explanations, full multi-step lookahead), save/resume session to JSON",
+        "Illegal actions rejected with the reason (position full, already drafted, eliminated)",
+        "recommend returns in under 10 seconds at any draft state with full-depth rollouts (under 5 seconds with --depth 1)",
+        "Session log written so the draft can be replayed for post-hoc analysis",
+        "Unit tests cover command parsing, fuzzy pick resolution, undo, and session save/resume round-trip",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "Backtest replay engine with leakage guard",
+      "description": "As the tool owner, I want historical playoff rounds replayed end-to-end (as-of projections, simulated drafts, scoring against actual results) so the system's edge is measured, not assumed. (PRD US-013, part 1)",
+      "acceptanceCriteria": [
+        "uv run oracle backtest --seasons <list> replays every playoff round of each season: builds as-of projections, runs simulated drafts with the oracle in each snake slot vs. the fitted opponent model where league history covers that season (greedy fallback otherwise), scores all rosters with actual historical results via the rules engine",
+        "Automated leakage check fails the backtest loudly if any input artifact for round N contains round-N data",
+        "Backtest runs are seeded and reproducible; per-round intermediate results persisted so reporting can run separately",
+        "Unit tests cover the replay loop on a small fixture season",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Backtest reporting with baselines and league comparison",
+      "description": "As the tool owner, I want backtest results reported against baselines and against what my league-mates actually drafted, so I can trust the tool before a real draft. (PRD US-013, part 2)",
+      "acceptanceCriteria": [
+        "Report per season and aggregate: projection MAE and rank correlation (skaters and teams), series-model Brier score on two tracks (market-aware where historical odds exist, stat-only everywhere)",
+        "Report oracle roster actual points vs. greedy-VOR, one-step-lookahead, and random-legal-draft baselines, plus win rate across snake slots",
+        "Where the league's real drafts overlap a backtested season, compare the oracle's simulated roster against the actual rosters the league's managers drafted that round",
+        "Results written to ml/artifacts/backtests/<run-id>/report.md with tables per round and per snake slot; report committed for at least 3 seasons",
+        "All Typecheck passes (even if it's outside of your changes)",
+        "Lint passes (even if it's outside of your changes)",
+        "Unit tests have been added",
+        "All Unit tests pass (even if it's outside of your changes)",
+        "All Playwright tests pass (even if it's outside of your changes)"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
     }
   ]
 }
