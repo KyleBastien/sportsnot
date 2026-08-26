@@ -104,7 +104,7 @@
         "The Odds API (the-odds-api.com) free tier is the selected provider (owner decision, locked in): integrate its NHL ice-hockey endpoints for game moneylines and series/outright markets where offered; document quota limits and ODDS_API_KEY setup (read from environment / gitignored ml/.env) in ml/README.md",
         "Per playoff game: moneyline prices from at least 1 book (median consensus if several); per series: series-winner prices where offered",
         "Prices de-vigged into implied probabilities (proportional or Shin method, documented choice) and stored in a normalized odds Parquet table keyed to games/series",
-        "Historical odds backfilled for as many past playoff seasons as freely obtainable; seasons without coverage explicitly flagged in the table",
+        "Historical odds come from the committed archive files in ml/data/raw/odds-archive/ (sportsbookreviews-style per-season NHL odds workbooks, downloaded once by the owner; read that directory's README.md and PROVENANCE.md before parsing): parse every committed season into the odds table, mapping team name strings to NHL ids and tagging playoff games by date; seasons/games without coverage explicitly flagged, never imputed",
         "API keys read from environment variables / gitignored .env, never committed",
         "Pipeline runs cleanly with --no-odds leaving the stat-only path fully functional",
         "Unit tests cover de-vigging math and missing-odds handling using fixture data",

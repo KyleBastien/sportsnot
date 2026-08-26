@@ -98,9 +98,15 @@ implementation; isolate all URLs in `ingest/nhl_api.py`):
 - Bulk skater stats (separate host): `https://api.nhle.com/stats/rest/en/skater/summary`
   with `cayenneExp=seasonId=20252026 and gameTypeId=3` — prefer this for bulk pulls.
 
-**Odds** — The Odds API (`https://api.the-odds-api.com/v4`), free tier. Sport key
-`icehockey_nhl`; historical via `/v4/historical/...` as quota allows. Key from
-`ODDS_API_KEY` env var (gitignored `ml/.env`). Everything must run with `--no-odds`.
+**Odds, live** — The Odds API (`https://api.the-odds-api.com/v4`), free tier. Sport key
+`icehockey_nhl`. Key from `ODDS_API_KEY` env var (gitignored `ml/.env`). The free tier
+serves current/upcoming odds only — do NOT call its paid historical endpoints.
+Everything must run with `--no-odds`.
+
+**Odds, historical (training/backtests)** — committed archive files in
+`ml/data/raw/odds-archive/` (sportsbookreviews-style per-season NHL odds workbooks,
+owner-downloaded; see that directory's README.md and PROVENANCE.md). Game moneylines
+only, no series prices; playoff games tagged by date; team names mapped to NHL ids.
 
 **Injuries** — ESPN public JSON:
 `https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries` (player detail via

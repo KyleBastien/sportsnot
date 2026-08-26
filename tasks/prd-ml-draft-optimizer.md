@@ -273,7 +273,7 @@ These rules are extracted from the SportsNot codebase and are **normative** for 
 - [ ] **The Odds API (the-odds-api.com) free tier is the selected provider (owner decision, 2026-08-26)**: integrate its NHL ice-hockey endpoints for game moneylines and series/outright markets where offered; quota limits and `ODDS_API_KEY` setup documented in `ml/README.md`
 - [ ] Ingestion fetches, per playoff game: moneyline prices from ≥1 book (consensus/median if several); per series: series-winner prices where the provider offers them
 - [ ] Prices are de-vigged into implied probabilities (proportional or Shin method — documented choice) and stored in a normalized `odds` Parquet table keyed to games/series, cached and snapshot alongside other data
-- [ ] Historical odds are backfilled for as many past playoff seasons as the provider (or a supplementary free historical dataset) allows; seasons without odds coverage are explicitly flagged so backtests can report market-aware and stat-only tracks separately
+- [ ] Historical odds come from the committed archive files in `ml/data/raw/odds-archive/` (sportsbookreviews-style per-season NHL odds workbooks, owner-downloaded once — The Odds API free tier serves live odds only); every committed season is parsed into the odds table, and seasons/games without coverage are explicitly flagged so backtests can report market-aware and stat-only tracks separately
 - [ ] API keys live in environment variables / a gitignored `.env`, never in the repo
 - [ ] Pipeline runs cleanly with odds ingestion disabled (`--no-odds`), leaving the stat-only path fully functional
 - [ ] All Typecheck passes (even if it's outside of your changes)
