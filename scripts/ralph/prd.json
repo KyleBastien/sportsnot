@@ -81,7 +81,7 @@
         "Read ml/SPEC.md in full before starting: it is the binding implementation contract (ruleset, pinned stack, directory layout, data sources, leakage and honesty rules)",
         "Normalized Parquet tables in ml/data/: skater_games, team_games, series, players, teams, with schemas documented in ml/README.md",
         "Position mapping collapses NHL codes C/L/R to F and D to D; goalies excluded from the skater pool",
-        "Ingestion covers the 10 most recent completed seasons (regular season + playoffs) plus the current season",
+        "Historical seasons (2015-16 through 2025-26) load from the committed snapshot in ml/data/raw/nhl-archive/ (read its PROVENANCE.md first - it documents the 10k-row API cap, month partitioning, TOI-in-seconds, the six goalie-goal reconciliation exceptions, and the teamId-vs-abbreviation join asymmetry); the live NHL API is used only for the current season and gaps",
         "Re-running ingestion is idempotent and incremental (only fetches missing/changed data)",
         "A snapshot CLI command freezes a dated copy of normalized tables; downstream stages can pin a snapshot id",
         "Unit tests validate normalization from fixture data including position mapping and dedup on re-run",
