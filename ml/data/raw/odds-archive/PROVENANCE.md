@@ -587,3 +587,103 @@ reason the team-name mapping in §3.4 needs to be per-source.
 moneyline coverage, playoffs included.** The one remaining hole is the front half of
 2022-23 for *both-side* Open/Close prices, which only SBR carried and which SBR never
 published.
+
+---
+
+## 10. Experiment: does ESPN retain as-of-game `injuries` on old summaries? (2026-08-26)
+
+**Verdict: no. The `injuries` block is resolved live at request time and reflects
+today's rosters and today's injuries, not the state of play on the game date. It is
+unusable for historical training and would inject both nonsense and leakage.**
+
+Do not backfill injury history from this endpoint. It cannot supply it.
+
+### Method
+
+Eight playoff games, two each from 2024, 2022, 2019 and 2017, event ids found via
+`.../scoreboard?dates=YYYYMMDD`, then one call each to:
+
+```
+https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/summary?event=<id>
+```
+
+One request per second, `curl`'s default User-Agent (this host 403s browser-like UAs —
+see §9). Sample payloads are committed under `espn-injury-experiment/raw/<id>.json.gz`,
+gzipped with the same five bulky keys dropped as `fetch_espn.py` drops (`plays`, `news`,
+`article`, `videos`, `standings`).
+
+### Raw result
+
+| Game | Event id | `injuries` key | Teams listed | Entries |
+|---|---|---|---|---|
+| 2024-04-24 East R1 G3, BOS @ TOR | 401655553 | present | 2 | 6 |
+| 2024-06-24 SCF G7, EDM @ FLA | 401675111 | present | 2 | 6 |
+| 2022-05-05 East R1 G2, PIT @ NYR | 401434788 | **absent** | 0 | 0 |
+| 2022-06-26 SCF G6, COL @ TBL | 401445853 | present | 2 | 1 |
+| 2019-04-10 East R1 G1, CBJ @ TBL | 401126313 | present | 2 | 3 |
+| 2019-06-12 SCF G7, STL @ BOS | 401133947 | present | 2 | 3 |
+| 2017-04-12 East R1 G1, NYR @ MTL | 400950086 | **absent** | 0 | 0 |
+| 2017-06-11 SCF G6, PIT @ NSH | 400954322 | **absent** | 0 | 0 |
+
+Five of eight carry a populated block. The block is keyed by the two teams in the game
+and filled with each team's **current** injury list.
+
+### Evidence that the entries are current-day, not as-of-game
+
+**1. Every timestamp is 2026.** Not one entry across all five populated games is dated
+anywhere near its game. Every `date` falls between 2026-04-11 and 2026-08-20 — i.e.
+"recently", relative to the 2026-08-26 fetch — for games played in 2019 and 2024.
+
+**2. The players did not play for those teams at the time.** From the 2019-06-12
+Blues-at-Bruins Cup final:
+
+```
+Boston Bruins
+  Charlie McAvoy    status=Suspension  date=2026-05-13T00:13Z
+  Nikita Zadorov    status=Out         date=2026-05-02T11:45Z   Knee
+St. Louis Blues
+  Brandon Carlo     status=Out         date=2026-06-27T16:05Z   Lower Body
+```
+
+Zadorov did not join Boston until 2024-25. Brandon Carlo is listed under **St. Louis** —
+he was a Bruin in 2019 and appears here under whichever team currently holds him. From
+the 2019-04-10 Blue Jackets-at-Lightning game:
+
+```
+Tampa Bay Lightning
+  Pontus Holmberg   status=Out  date=2026-05-05T16:10Z  Collarbone
+Columbus Blue Jackets
+  Elvis Merzlikins  status=Out  date=2026-08-20T17:23Z  Shoulder
+  Isac Lundestrom   status=Out  date=2026-07-19T18:33Z  Achilles
+```
+
+Holmberg's NHL debut was 2022-23 — three seasons after this game.
+
+**3. The same team returns byte-identical entries across different eras.** Boston's two
+entries in the 2019 Cup final (McAvoy `2026-05-13T00:13Z`, Zadorov `2026-05-02T11:45Z`)
+are the *same two entries with the same timestamps* returned for the 2024-04-24
+Bruins-at-Leafs game. Tampa Bay's single Holmberg entry (`2026-05-05T16:10Z`) is
+identical in both the 2022 Cup final and the 2019 first-round game. One current-day
+roster snapshot is being re-served for every historical game those teams appear in.
+
+**4. Entry shape is a live-feed shape.** Each entry carries `fantasyStatus`
+(`OUT`, `IR-LT`) and a `returnDate` — forward-looking fantasy-advice fields that only
+make sense for an upcoming game, not a settled one.
+
+Taken together there is no ambiguity: the block is a join against the current injury
+table, not an archived snapshot.
+
+### Consequence for US-003/US-004
+
+* **Historical injury features cannot come from this endpoint.** Using it would label a
+  2019 game with 2026 injuries — pure noise, and leakage wherever a currently-injured
+  star was healthy and productive in the historical game.
+* The `injuries` block remains valid for **live/upcoming** use, which is what §9's
+  pipeline needs it for. Nothing already committed is affected: the 2025-26 completion
+  in §9 uses `pickcenter` only and never read `injuries`.
+* If injury history is wanted for training seasons it needs a genuinely archival
+  source — the NHL API's own daily rosters/scratches, or a third-party historical
+  transactions feed. Out of scope here, and not started.
+
+The three games with no `injuries` key at all (2022 R1, both 2017 games) do not change
+the verdict; they only show ESPN omits the block for some older events.
