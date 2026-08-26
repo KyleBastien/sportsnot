@@ -123,13 +123,18 @@ only, no series prices.
 **Injuries** — ESPN public JSON:
 `https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries` (player detail via
 ESPN core API as needed). Final authority: `ml/data/overrides/injuries.yaml`.
-Historical bonus for return-time calibration (US-015): the raw ESPN game summaries
-committed under `odds-archive/espn-2025-26-completion/raw/summary/` each carry an
-as-of-game `injuries` block (athlete, date, status, details) for Dec 2025 - June 2026.
-Worth one experiment during implementation: check whether summaries of OLDER seasons'
-games also retain as-of-game injury blocks — if yes, that's calibration data for past
-seasons too; if they reflect current status instead, use only the committed 2025-26
-captures.
+Historical injury data: ESPN is settled as UNAVAILABLE — the 2026-08-26 experiment
+(odds-archive/PROVENANCE.md §10) proved old game summaries resolve `injuries` live
+against today's rosters (2019 games return 2026 injuries), so that endpoint must never
+be used for training seasons. **Return-time calibration (US-015) instead derives
+ABSENCE SPELLS from the committed NHL archive**: for each skater, gaps between
+appearances relative to their team's played games (`nhl-archive/skater-games-*` joined
+to `team-games-*`) give real missed-game spells and return timings across 11 seasons —
+no external feed, no leakage. Caveat: spells conflate injury with healthy scratches;
+mitigate by minimum-spell-length thresholds and regular-TOI filters, documented. The
+as-of-game `injuries` blocks captured for Dec 2025 - June 2026
+(`odds-archive/espn-2025-26-completion/raw/summary/`) serve as a labeled validation
+slice. The live ESPN injuries feed remains the source for CURRENT status only.
 
 ## 6. As-of & leakage rules (hard requirements)
 

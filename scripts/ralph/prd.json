@@ -317,7 +317,7 @@
       "description": "As the tool owner, I want P(returns by game k of the round) per injured player so both skater projections and IR valuation can price availability. (PRD US-011, part 2)",
       "acceptanceCriteria": [
         "Read ml/SPEC.md in full before starting: it is the binding implementation contract (ruleset, pinned stack, directory layout, data sources, leakage and honesty rules)",
-        "Return-time model outputs P(available for game k), k=1..7, per injured player, calibrated from the injury source's status + timeline fields",
+        "Return-time model outputs P(available for game k), k=1..7, per injured player, calibrated on ABSENCE SPELLS derived from ml/data/raw/nhl-archive/ (skater appearance gaps vs. their team's played games, 11 seasons; minimum-spell and TOI filters to exclude healthy scratches, documented) - ESPN cannot supply historical injuries (odds-archive/PROVENANCE.md section 10); the Dec 2025 - June 2026 as-of-game injuries blocks in espn-2025-26-completion/raw/summary/ are the labeled validation slice",
         "Historical injury-return outcomes used for calibration where obtainable; otherwise a documented status-based mapping with stated assumptions",
         "Availability haircut applied to expected games played for injured/questionable skaters in projection composition",
         "Override file entries (injuries.yaml) can pin an explicit return game, taking precedence over the model",
