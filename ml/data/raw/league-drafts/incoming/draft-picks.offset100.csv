@@ -1,0 +1,101 @@
+league_name,playoff_round,pick_number,manager,team_name,position,player_id,player_name,team_id,nhl_team_name,picked_at
+Press Play-offs,3,13,connor.fehr,Rons team,F,8480018,Nick Suzuki,null,null,2026-05-19 19:00:19.238523+00
+Press Play-offs,3,14,nuttguy,56 Years and Counting,F,8478427,Sebastian Aho,null,null,2026-05-19 19:00:26.214458+00
+Press Play-offs,3,15,paul.markhauser,Canadian Bloody Knucks,F,8478133,Jake Evans,null,null,2026-05-19 19:00:34.413037+00
+Press Play-offs,3,16,Tobi,Frozen Assets,F,8477964,Ivan Barbashev,null,null,2026-05-19 19:00:41.399528+00
+Press Play-offs,3,17,Tobi,Frozen Assets,F,8475913,Mark Stone,null,null,2026-05-19 19:00:46.617352+00
+Press Play-offs,3,18,paul.markhauser,Canadian Bloody Knucks,F,8480074,Alexandre Texier,null,null,2026-05-19 19:00:53.529375+00
+Press Play-offs,3,19,nuttguy,56 Years and Counting,F,8482093,Seth Jarvis,null,null,2026-05-19 19:01:01.287059+00
+Press Play-offs,3,20,connor.fehr,Rons team,F,8481618,Alex Newhook,null,null,2026-05-19 19:07:11.783594+00
+Press Play-offs,3,21,connor.fehr,Rons team,D,8480069,Cale Makar,null,null,2026-05-19 19:07:19.916397+00
+Press Play-offs,3,22,nuttguy,56 Years and Counting,D,8480817,K'Andre Miller,null,null,2026-05-19 19:07:28.881906+00
+Press Play-offs,3,23,paul.markhauser,Canadian Bloody Knucks,D,8482087,Kaiden Guhle,null,null,2026-05-19 19:07:37.747127+00
+Press Play-offs,3,24,Tobi,Frozen Assets,D,8478396,Noah Hanifin,null,null,2026-05-19 19:07:44.118013+00
+Press Play-offs,3,25,Tobi,Frozen Assets,D,8476967,Brett Kulak,null,null,2026-05-19 19:07:50.513713+00
+Press Play-offs,3,26,paul.markhauser,Canadian Bloody Knucks,D,8478851,Alexandre Carrier,null,null,2026-05-19 19:08:02.661201+00
+Press Play-offs,3,27,nuttguy,56 Years and Counting,D,8478970,Jalen Chatfield,null,null,2026-05-19 19:08:10.949972+00
+Press Play-offs,3,28,connor.fehr,Rons team,D,8483457,Lane Hutson,null,null,2026-05-19 19:08:49.938149+00
+Press Play-offs,3,29,connor.fehr,Rons team,D,8478038,Devon Toews,null,null,2026-05-19 19:08:59.352631+00
+Press Play-offs,3,30,nuttguy,56 Years and Counting,D,8476422,Mike Reilly,null,null,2026-05-19 19:09:07.130364+00
+Press Play-offs,3,31,paul.markhauser,Canadian Bloody Knucks,D,8476875,Mike Matheson,null,null,2026-05-19 19:09:14.687849+00
+Press Play-offs,3,32,Tobi,Frozen Assets,D,8475188,Brayden McNabb,null,null,2026-05-19 19:09:22.528606+00
+Press Play-offs,3,33,Tobi,Frozen Assets,G,null,null,54,Vegas Golden Knights,2026-05-19 19:10:04.646862+00
+Press Play-offs,3,34,paul.markhauser,Canadian Bloody Knucks,G,null,null,8,Montréal Canadiens,2026-05-19 19:10:18.956791+00
+Press Play-offs,3,35,nuttguy,56 Years and Counting,G,null,null,12,Carolina Hurricanes,2026-05-19 19:10:26.388468+00
+Press Play-offs,3,36,connor.fehr,Rons team,G,null,null,21,Colorado Avalanche,2026-05-19 19:10:58.439076+00
+Press Play-offs,3,37,connor.fehr,Rons team,IR_F,8478483,Mitch Marner,null,null,2026-05-19 19:11:14.875271+00
+Press Play-offs,3,38,nuttguy,56 Years and Counting,IR_F,8477940,Nikolaj Ehlers,null,null,2026-05-19 19:11:21.978643+00
+Press Play-offs,3,39,paul.markhauser,Canadian Bloody Knucks,IR_F,8477476,Artturi Lehkonen,null,null,2026-05-19 19:11:29.245797+00
+Press Play-offs,3,40,Tobi,Frozen Assets,IR_F,8482737,Zachary Bolduc,null,null,2026-05-19 19:11:35.728943+00
+Press Play-offs,3,41,Tobi,Frozen Assets,IR_D,8484258,Sam Malinski,null,null,2026-05-19 19:11:43.428357+00
+Press Play-offs,3,42,paul.markhauser,Canadian Bloody Knucks,IR_D,8470613,Brent Burns,null,null,2026-05-19 19:11:51.188617+00
+Press Play-offs,3,43,nuttguy,56 Years and Counting,IR_D,8476906,Shayne Gostisbehere,null,null,2026-05-19 19:11:57.116462+00
+Press Play-offs,3,44,connor.fehr,Rons team,IR_D,8477447,Shea Theodore,null,null,2026-05-19 19:12:12.537322+00
+The Gemmell Cup,1,1,nuttguy,56 Years and Counting,F,8478402,Connor McDavid,null,null,2026-04-16 15:46:50.463569+00
+The Gemmell Cup,1,2,judah18,"Connor McJudah ",F,8477492,Nathan MacKinnon,null,null,2026-04-16 16:06:04.648588+00
+The Gemmell Cup,1,3,gemmell.levi,12 Bar Hughes,F,8476453,Nikita Kucherov,null,null,2026-04-16 16:06:18.032466+00
+The Gemmell Cup,1,4,bentunigold,BLT Sandwich - Chomp Chomp,F,8478864,Kirill Kaprizov,null,null,2026-04-16 16:06:35.525451+00
+The Gemmell Cup,1,5,bentunigold,BLT Sandwich - Chomp Chomp,F,8480027,Jason Robertson,null,null,2026-04-16 16:06:51.060697+00
+The Gemmell Cup,1,6,gemmell.levi,12 Bar Hughes,F,8478420,Mikko Rantanen,null,null,2026-04-16 16:07:10.033687+00
+The Gemmell Cup,1,7,judah18,"Connor McJudah ",F,8477934,Leon Draisaitl,null,null,2026-04-16 16:07:21.467173+00
+The Gemmell Cup,1,8,nuttguy,56 Years and Counting,F,8477956,David Pastrnak,null,null,2026-04-16 16:07:32.342261+00
+The Gemmell Cup,1,9,nuttguy,56 Years and Counting,F,8480039,Martin Necas,null,null,2026-04-16 16:07:42.102005+00
+The Gemmell Cup,1,10,judah18,"Connor McJudah ",F,8481557,Matt Boldy,null,null,2026-04-16 16:07:58.925246+00
+The Gemmell Cup,1,11,gemmell.levi,12 Bar Hughes,F,8480018,Nick Suzuki,null,null,2026-04-16 16:08:56.436741+00
+The Gemmell Cup,1,12,bentunigold,BLT Sandwich - Chomp Chomp,F,8481540,Cole Caufield,null,null,2026-04-16 16:09:10.804835+00
+The Gemmell Cup,1,13,bentunigold,BLT Sandwich - Chomp Chomp,F,8482740,Wyatt Johnston,null,null,2026-04-16 16:13:06.034052+00
+The Gemmell Cup,1,14,gemmell.levi,12 Bar Hughes,F,8471675,Sidney Crosby,null,null,2026-04-16 16:13:17.669071+00
+The Gemmell Cup,1,15,judah18,"Connor McJudah ",F,8477960,Adrian Kempe,null,null,2026-04-16 16:13:34.145827+00
+The Gemmell Cup,1,16,nuttguy,56 Years and Counting,F,8478427,Sebastian Aho,null,null,2026-04-16 16:13:49.200095+00
+The Gemmell Cup,1,17,nuttguy,56 Years and Counting,F,8478483,Mitch Marner,null,null,2026-04-16 16:14:01.472307+00
+The Gemmell Cup,1,18,judah18,"Connor McJudah ",F,8477404,Jake Guentzel,null,null,2026-04-16 16:14:14.22079+00
+The Gemmell Cup,1,19,gemmell.levi,12 Bar Hughes,F,8478403,Jack Eichel,null,null,2026-04-16 16:14:26.12499+00
+The Gemmell Cup,1,20,bentunigold,BLT Sandwich - Chomp Chomp,F,8485406,Porter Martone,null,null,2026-04-16 16:14:43.864637+00
+The Gemmell Cup,1,21,bentunigold,BLT Sandwich - Chomp Chomp,D,8480803,Evan Bouchard,null,null,2026-04-16 16:14:52.357265+00
+The Gemmell Cup,1,22,gemmell.levi,12 Bar Hughes,D,8480800,Quinn Hughes,null,null,2026-04-16 16:15:04.947839+00
+The Gemmell Cup,1,23,judah18,"Connor McJudah ",D,8483457,Lane Hutson,null,null,2026-04-16 16:15:16.201543+00
+The Gemmell Cup,1,24,nuttguy,56 Years and Counting,D,8480036,Miro Heiskanen,null,null,2026-04-16 16:15:28.389169+00
+The Gemmell Cup,1,25,nuttguy,56 Years and Counting,D,8479325,Charlie McAvoy,null,null,2026-04-16 16:15:38.071556+00
+The Gemmell Cup,1,26,judah18,"Connor McJudah ",D,8482122,Brock Faber,null,null,2026-04-16 16:15:49.11794+00
+The Gemmell Cup,1,27,gemmell.levi,12 Bar Hughes,D,8480839,Rasmus Dahlin,null,null,2026-04-16 16:16:05.688977+00
+The Gemmell Cup,1,28,bentunigold,BLT Sandwich - Chomp Chomp,D,8480069,Cale Makar,null,null,2026-04-16 16:16:21.069455+00
+The Gemmell Cup,1,29,bentunigold,BLT Sandwich - Chomp Chomp,D,8478178,Darren Raddysh,null,null,2026-04-16 16:16:31.661428+00
+The Gemmell Cup,1,30,gemmell.levi,12 Bar Hughes,D,8474578,Erik Karlsson,null,null,2026-04-16 16:16:41.23508+00
+The Gemmell Cup,1,31,judah18,"Connor McJudah ",D,8470613,Brent Burns,null,null,2026-04-16 16:23:45.42168+00
+The Gemmell Cup,1,32,nuttguy,56 Years and Counting,D,8476906,Shayne Gostisbehere,null,null,2026-04-16 16:23:59.569484+00
+The Gemmell Cup,1,33,nuttguy,56 Years and Counting,G,null,null,22,Edmonton Oilers,2026-04-16 16:24:11.66323+00
+The Gemmell Cup,1,34,judah18,"Connor McJudah ",G,null,null,21,Colorado Avalanche,2026-04-16 16:24:26.995921+00
+The Gemmell Cup,1,35,gemmell.levi,12 Bar Hughes,G,null,null,7,Buffalo Sabres,2026-04-16 16:24:44.820686+00
+The Gemmell Cup,1,36,bentunigold,BLT Sandwich - Chomp Chomp,G,null,null,12,Carolina Hurricanes,2026-04-16 16:24:55.736614+00
+The Gemmell Cup,2,1,nuttguy,56 Years and Counting,F,8481557,Matt Boldy,null,null,2026-05-04 22:06:28.591902+00
+The Gemmell Cup,2,2,bentunigold,BLT Sandwich - Chomp Chomp,F,8478403,Jack Eichel,null,null,2026-05-04 22:06:35.01343+00
+The Gemmell Cup,2,3,judah18,"Connor McJudah ",F,8477492,Nathan MacKinnon,null,null,2026-05-04 22:06:44.153012+00
+The Gemmell Cup,2,4,gemmell.levi,12 Bar Hughes,F,8480039,Martin Necas,null,null,2026-05-04 22:06:50.26424+00
+The Gemmell Cup,2,5,gemmell.levi,12 Bar Hughes,F,8480018,Nick Suzuki,null,null,2026-05-04 22:26:37.468959+00
+The Gemmell Cup,2,6,judah18,"Connor McJudah ",F,8478864,Kirill Kaprizov,null,null,2026-05-04 22:26:49.044767+00
+The Gemmell Cup,2,7,bentunigold,BLT Sandwich - Chomp Chomp,F,8482702,Logan Stankoven,null,null,2026-05-04 22:26:55.703276+00
+The Gemmell Cup,2,8,nuttguy,56 Years and Counting,F,8475791,Taylor Hall,null,null,2026-05-04 22:27:07.013572+00
+The Gemmell Cup,2,9,nuttguy,56 Years and Counting,F,8477476,Artturi Lehkonen,null,null,2026-05-04 22:27:11.575037+00
+The Gemmell Cup,2,10,bentunigold,BLT Sandwich - Chomp Chomp,F,8477949,Alex Tuch,null,null,2026-05-04 22:27:18.898847+00
+The Gemmell Cup,2,11,judah18,"Connor McJudah ",F,8481540,Cole Caufield,null,null,2026-05-04 22:27:24.065935+00
+The Gemmell Cup,2,12,gemmell.levi,12 Bar Hughes,F,8478483,Mitch Marner,null,null,2026-05-04 22:27:29.321682+00
+The Gemmell Cup,2,13,gemmell.levi,12 Bar Hughes,F,8479420,Tage Thompson,null,null,2026-05-04 22:27:36.940419+00
+The Gemmell Cup,2,14,judah18,"Connor McJudah ",F,8475692,Mats Zuccarello,null,null,2026-05-04 22:27:54.706696+00
+The Gemmell Cup,2,15,bentunigold,BLT Sandwich - Chomp Chomp,F,8484153,Leo Carlsson,null,null,2026-05-04 22:28:00.6322+00
+The Gemmell Cup,2,16,nuttguy,56 Years and Counting,F,8478427,Sebastian Aho,null,null,2026-05-04 22:28:08.339086+00
+The Gemmell Cup,2,17,nuttguy,56 Years and Counting,F,8482809,Jackson Blake,null,null,2026-05-04 22:28:18.764058+00
+The Gemmell Cup,2,18,bentunigold,BLT Sandwich - Chomp Chomp,F,8478873,Troy Terry,null,null,2026-05-04 22:28:26.376478+00
+The Gemmell Cup,2,19,judah18,"Connor McJudah ",F,8476455,Gabriel Landeskog,null,null,2026-05-04 22:28:34.86064+00
+The Gemmell Cup,2,20,gemmell.levi,12 Bar Hughes,F,8475913,Mark Stone,null,null,2026-05-04 22:28:41.609736+00
+The Gemmell Cup,2,21,gemmell.levi,12 Bar Hughes,D,8480069,Cale Makar,null,null,2026-05-04 22:28:46.170829+00
+The Gemmell Cup,2,22,judah18,"Connor McJudah ",D,8483457,Lane Hutson,null,null,2026-05-04 22:28:55.095417+00
+The Gemmell Cup,2,23,bentunigold,BLT Sandwich - Chomp Chomp,D,8478038,Devon Toews,null,null,2026-05-04 22:29:03.285907+00
+The Gemmell Cup,2,24,nuttguy,56 Years and Counting,D,8480800,Quinn Hughes,null,null,2026-05-04 22:29:09.558343+00
+The Gemmell Cup,2,25,nuttguy,56 Years and Counting,D,8481524,Bowen Byram,null,null,2026-05-04 22:29:15.802431+00
+The Gemmell Cup,2,26,bentunigold,BLT Sandwich - Chomp Chomp,D,8482122,Brock Faber,null,null,2026-05-04 22:29:22.307237+00
+The Gemmell Cup,2,27,judah18,"Connor McJudah ",D,8481605,Jackson LaCombe,null,null,2026-05-04 22:29:32.604364+00
+The Gemmell Cup,2,28,gemmell.levi,12 Bar Hughes,D,8480839,Rasmus Dahlin,null,null,2026-05-04 22:29:47.821235+00
+The Gemmell Cup,2,29,gemmell.levi,12 Bar Hughes,D,8474590,John Carlson,null,null,2026-05-04 22:29:53.480156+00
+The Gemmell Cup,2,30,judah18,"Connor McJudah ",D,8482671,Owen Power,null,null,2026-05-04 22:30:01.434062+00
+The Gemmell Cup,2,31,bentunigold,BLT Sandwich - Chomp Chomp,D,8477447,Shea Theodore,null,null,2026-05-04 22:30:05.214587+00
+The Gemmell Cup,2,32,nuttguy,56 Years and Counting,D,8478396,Noah Hanifin,null,null,2026-05-04 22:30:10.972729+00

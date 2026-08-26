@@ -836,3 +836,35 @@ snake direction** (§3.2), and **any 2026 scoring or 2026 round-3+4 draft** (§4
 
 Six fully scored manager-rounds × 4 managers = 24 scored roster observations, plus 8
 unscored 2026 roster observations.
+
+---
+
+# app-export-2026 (Supabase export of the in-app 2026 season)
+
+Exported by the owner via the SQL editor per `APP_EXPORT.md`, assembled and validated
+from 100-row chunks (raw chunks kept in `incoming/`).
+
+## app-export-2026__draft-picks.csv — COMPLETE (240 rows, validated)
+
+One row per pick, true pick order. Columns: `league_name, playoff_round, pick_number,
+manager, team_name, position, player_id, player_name, team_id, nhl_team_name,
+picked_at`. Literal string `null` means SQL NULL (skater picks have team_id/nhl_team_name
+null; goalie/team picks have player_id/player_name null).
+
+- Two leagues: **The Gemmell Cup** (nuttguy, judah18, gemmell.levi, bentunigold; no IR;
+  36 picks/round = 5F/3D/1G x4) and **Press Play-offs** (nuttguy, Tobi,
+  paul.markhauser, connor.fehr; IR enabled; 44 picks/round = +IR_F/IR_D x4).
+- Rounds 1-3 only; no round-4 draft exists (round-3 rosters carried through the final).
+- `position` is the SLOT the pick filled (F/D/G/IR_F/IR_D), and unlike the sheets the
+  row order IS the pick sequence — `pick_number` is authoritative.
+- Validated: counts match the DB (`incoming/pick-counts.csv`), pick numbers contiguous
+  1..N per league-round, every manager-round has a legal roster composition.
+- Manager usernames map via the alias file: nuttguy=kyle, bentunigold=ben,
+  judah18=judah, gemmell.levi=levi; Press-only managers keep their usernames.
+- Owner caveat: prefer round 3 for validation; rounds 1-2 may carry artifacts from
+  mid-playoffs draft bugs (none were detected by the checks above, but stay lenient).
+
+## app-export-2026__rosters.csv, app-export-2026__draft-order.csv — PENDING
+
+Queries 2 and 3 in `APP_EXPORT.md`; same chunked procedure. Add their column notes
+here when they land.

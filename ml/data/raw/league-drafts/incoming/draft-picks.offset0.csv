@@ -1,0 +1,101 @@
+league_name,playoff_round,pick_number,manager,team_name,position,player_id,player_name,team_id,nhl_team_name,picked_at
+Press Play-offs,1,1,nuttguy,56 Years and Counting,F,8478402,Connor McDavid,null,null,2026-04-17 18:31:51.924078+00
+Press Play-offs,1,2,Tobi,Frozen Assets,F,8476453,Nikita Kucherov,null,null,2026-04-17 18:33:11.146609+00
+Press Play-offs,1,3,paul.markhauser,Canadian Bloody Knucks,F,8477492,Nathan MacKinnon,null,null,2026-04-17 19:17:50.546728+00
+Press Play-offs,1,4,connor.fehr,Rons team,F,8477934,Leon Draisaitl,null,null,2026-04-17 19:17:57.431651+00
+Press Play-offs,1,5,connor.fehr,Rons team,F,8478864,Kirill Kaprizov,null,null,2026-04-17 19:18:11.146644+00
+Press Play-offs,1,6,paul.markhauser,Canadian Bloody Knucks,F,8478420,Mikko Rantanen,null,null,2026-04-17 19:18:50.59691+00
+Press Play-offs,1,7,Tobi,Frozen Assets,F,8480018,Nick Suzuki,null,null,2026-04-17 19:19:02.428375+00
+Press Play-offs,1,8,nuttguy,56 Years and Counting,F,8480039,Martin Necas,null,null,2026-04-17 19:19:08.144227+00
+Press Play-offs,1,9,nuttguy,56 Years and Counting,F,8477956,David Pastrnak,null,null,2026-04-17 19:19:13.220221+00
+Press Play-offs,1,10,Tobi,Frozen Assets,F,8481540,Cole Caufield,null,null,2026-04-17 19:19:19.224406+00
+Press Play-offs,1,11,paul.markhauser,Canadian Bloody Knucks,F,8478403,Jack Eichel,null,null,2026-04-17 19:19:25.030258+00
+Press Play-offs,1,12,connor.fehr,Rons team,F,8480027,Jason Robertson,null,null,2026-04-17 19:19:30.020468+00
+Press Play-offs,1,13,connor.fehr,Rons team,F,8478483,Mitch Marner,null,null,2026-04-17 19:19:35.675519+00
+Press Play-offs,1,14,paul.markhauser,Canadian Bloody Knucks,F,8478427,Sebastian Aho,null,null,2026-04-17 19:19:40.450845+00
+Press Play-offs,1,15,Tobi,Frozen Assets,F,8481557,Matt Boldy,null,null,2026-04-17 19:19:46.447335+00
+Press Play-offs,1,16,nuttguy,56 Years and Counting,F,8482740,Wyatt Johnston,null,null,2026-04-17 19:19:51.368093+00
+Press Play-offs,1,17,nuttguy,56 Years and Counting,D,8480803,Evan Bouchard,null,null,2026-04-17 19:29:06.538599+00
+Press Play-offs,1,18,Tobi,Frozen Assets,F,8477404,Jake Guentzel,null,null,2026-04-17 19:29:17.34585+00
+Press Play-offs,1,19,paul.markhauser,Canadian Bloody Knucks,D,8480036,Miro Heiskanen,null,null,2026-04-17 19:29:28.503582+00
+Press Play-offs,1,20,connor.fehr,Rons team,D,8480069,Cale Makar,null,null,2026-04-17 19:29:53.0784+00
+Press Play-offs,1,21,connor.fehr,Rons team,D,8480800,Quinn Hughes,null,null,2026-04-17 19:30:00.925117+00
+Press Play-offs,1,22,paul.markhauser,Canadian Bloody Knucks,G,null,null,12,Carolina Hurricanes,2026-04-17 19:30:21.573224+00
+Press Play-offs,1,23,Tobi,Frozen Assets,D,8479325,Charlie McAvoy,null,null,2026-04-17 19:30:31.128136+00
+Press Play-offs,1,24,nuttguy,56 Years and Counting,D,8480839,Rasmus Dahlin,null,null,2026-04-17 19:30:37.405863+00
+Press Play-offs,1,25,nuttguy,56 Years and Counting,D,8478178,Darren Raddysh,null,null,2026-04-17 19:30:42.215956+00
+Press Play-offs,1,26,Tobi,Frozen Assets,G,null,null,22,Edmonton Oilers,2026-04-17 19:30:58.404549+00
+Press Play-offs,1,27,paul.markhauser,Canadian Bloody Knucks,F,8478010,Brayden Point,null,null,2026-04-17 19:33:25.637702+00
+Press Play-offs,1,28,connor.fehr,Rons team,F,8482116,Tim Stützle,null,null,2026-04-17 19:33:38.554095+00
+Press Play-offs,1,29,connor.fehr,Rons team,D,8483457,Lane Hutson,null,null,2026-04-17 19:33:55.331903+00
+Press Play-offs,1,30,paul.markhauser,Canadian Bloody Knucks,D,8477447,Shea Theodore,null,null,2026-04-17 19:34:05.700946+00
+Press Play-offs,1,31,Tobi,Frozen Assets,D,8479410,Mikhail Sergachev,null,null,2026-04-17 19:34:18.312947+00
+Press Play-offs,1,32,nuttguy,56 Years and Counting,G,null,null,21,Colorado Avalanche,2026-04-17 19:34:52.167312+00
+Press Play-offs,1,33,nuttguy,56 Years and Counting,F,8479542,Brandon Hagel,null,null,2026-04-17 19:35:14.885367+00
+Press Play-offs,1,34,Tobi,Frozen Assets,D,8480336,Sean Walker,null,null,2026-04-17 19:35:28.494841+00
+Press Play-offs,1,35,paul.markhauser,Canadian Bloody Knucks,D,8475167,Victor Hedman,null,null,2026-04-17 19:35:38.844748+00
+Press Play-offs,1,36,connor.fehr,Rons team,G,null,null,54,Vegas Golden Knights,2026-04-17 19:35:53.972002+00
+Press Play-offs,1,37,connor.fehr,Rons team,IR_F,8479420,Tage Thompson,null,null,2026-04-17 19:36:01.283204+00
+Press Play-offs,1,38,paul.markhauser,Canadian Bloody Knucks,IR_F,8483515,Juraj Slafkovský,null,null,2026-04-17 19:36:10.66321+00
+Press Play-offs,1,39,Tobi,Frozen Assets,IR_F,8471675,Sidney Crosby,null,null,2026-04-17 19:36:16.774784+00
+Press Play-offs,1,40,nuttguy,56 Years and Counting,IR_F,8478550,Artemi Panarin,null,null,2026-04-17 19:36:32.809926+00
+Press Play-offs,1,41,nuttguy,56 Years and Counting,IR_D,8474578,Erik Karlsson,null,null,2026-04-17 19:36:40.098074+00
+Press Play-offs,1,42,Tobi,Frozen Assets,IR_D,8478469,Thomas Chabot,null,null,2026-04-17 19:36:47.505041+00
+Press Play-offs,1,43,paul.markhauser,Canadian Bloody Knucks,IR_D,8482671,Owen Power,null,null,2026-04-17 19:36:53.34639+00
+Press Play-offs,1,44,connor.fehr,Rons team,IR_D,8482122,Brock Faber,null,null,2026-04-17 19:37:01.191563+00
+Press Play-offs,2,1,paul.markhauser,Canadian Bloody Knucks,F,8480039,Martin Necas,null,null,2026-05-04 21:01:49.935711+00
+Press Play-offs,2,2,Tobi,Frozen Assets,F,8477949,Alex Tuch,null,null,2026-05-04 21:02:01.473503+00
+Press Play-offs,2,3,nuttguy,56 Years and Counting,F,8478864,Kirill Kaprizov,null,null,2026-05-04 21:02:09.036455+00
+Press Play-offs,2,4,connor.fehr,Rons team,F,8477492,Nathan MacKinnon,null,null,2026-05-04 21:02:17.739225+00
+Press Play-offs,2,5,connor.fehr,Rons team,F,8479420,Tage Thompson,null,null,2026-05-04 21:47:31.871212+00
+Press Play-offs,2,6,nuttguy,56 Years and Counting,F,8475791,Taylor Hall,null,null,2026-05-04 21:47:41.034021+00
+Press Play-offs,2,7,Tobi,Frozen Assets,F,8481557,Matt Boldy,null,null,2026-05-04 21:47:49.557609+00
+Press Play-offs,2,8,paul.markhauser,Canadian Bloody Knucks,F,8482702,Logan Stankoven,null,null,2026-05-04 21:47:57.822145+00
+Press Play-offs,2,9,paul.markhauser,Canadian Bloody Knucks,F,8483515,Juraj Slafkovský,null,null,2026-05-04 21:48:04.536983+00
+Press Play-offs,2,10,Tobi,Frozen Assets,F,8478403,Jack Eichel,null,null,2026-05-04 21:48:11.865511+00
+Press Play-offs,2,11,nuttguy,56 Years and Counting,F,8478483,Mitch Marner,null,null,2026-05-04 21:48:27.163473+00
+Press Play-offs,2,12,connor.fehr,Rons team,F,8484153,Leo Carlsson,null,null,2026-05-04 21:48:35.956754+00
+Press Play-offs,2,13,connor.fehr,Rons team,F,8475913,Mark Stone,null,null,2026-05-04 21:48:41.774565+00
+Press Play-offs,2,14,nuttguy,56 Years and Counting,F,8477476,Artturi Lehkonen,null,null,2026-05-04 21:48:50.69592+00
+Press Play-offs,2,15,Tobi,Frozen Assets,F,8478873,Troy Terry,null,null,2026-05-04 21:48:56.521658+00
+Press Play-offs,2,16,paul.markhauser,Canadian Bloody Knucks,F,8480018,Nick Suzuki,null,null,2026-05-04 21:49:01.988581+00
+Press Play-offs,2,17,paul.markhauser,Canadian Bloody Knucks,F,8475172,Nazem Kadri,null,null,2026-05-04 21:49:06.890777+00
+Press Play-offs,2,18,Tobi,Frozen Assets,F,8473986,Alex Killorn,null,null,2026-05-04 21:49:12.474176+00
+Press Play-offs,2,19,nuttguy,56 Years and Counting,F,8475692,Mats Zuccarello,null,null,2026-05-04 21:49:17.371258+00
+Press Play-offs,2,20,connor.fehr,Rons team,F,8478427,Sebastian Aho,null,null,2026-05-04 21:49:23.63087+00
+Press Play-offs,2,21,connor.fehr,Rons team,D,8480069,Cale Makar,null,null,2026-05-04 21:49:30.894155+00
+Press Play-offs,2,22,nuttguy,56 Years and Counting,D,8482122,Brock Faber,null,null,2026-05-04 21:49:36.490765+00
+Press Play-offs,2,23,Tobi,Frozen Assets,D,8480800,Quinn Hughes,null,null,2026-05-04 21:49:41.745995+00
+Press Play-offs,2,24,paul.markhauser,Canadian Bloody Knucks,D,8483457,Lane Hutson,null,null,2026-05-04 21:49:54.829794+00
+Press Play-offs,2,25,paul.markhauser,Canadian Bloody Knucks,D,8478038,Devon Toews,null,null,2026-05-04 21:50:06.483753+00
+Press Play-offs,2,26,Tobi,Frozen Assets,D,8481524,Bowen Byram,null,null,2026-05-04 21:50:11.501214+00
+Press Play-offs,2,27,nuttguy,56 Years and Counting,D,8478396,Noah Hanifin,null,null,2026-05-04 21:50:15.972035+00
+Press Play-offs,2,28,connor.fehr,Rons team,D,8481605,Jackson LaCombe,null,null,2026-05-04 21:50:22.962663+00
+Press Play-offs,2,29,connor.fehr,Rons team,D,8480839,Rasmus Dahlin,null,null,2026-05-04 21:50:27.961543+00
+Press Play-offs,2,30,nuttguy,56 Years and Counting,D,8477447,Shea Theodore,null,null,2026-05-04 21:50:34.85553+00
+Press Play-offs,2,31,Tobi,Frozen Assets,D,8474590,John Carlson,null,null,2026-05-04 21:50:40.430514+00
+Press Play-offs,2,32,paul.markhauser,Canadian Bloody Knucks,D,8470613,Brent Burns,null,null,2026-05-04 21:50:46.641318+00
+Press Play-offs,2,33,paul.markhauser,Canadian Bloody Knucks,G,null,null,24,Anaheim Ducks,2026-05-04 21:51:07.407763+00
+Press Play-offs,2,34,Tobi,Frozen Assets,G,null,null,21,Colorado Avalanche,2026-05-04 21:51:14.681287+00
+Press Play-offs,2,35,nuttguy,56 Years and Counting,G,null,null,12,Carolina Hurricanes,2026-05-04 21:51:19.622699+00
+Press Play-offs,2,36,connor.fehr,Rons team,G,null,null,7,Buffalo Sabres,2026-05-04 21:51:27.139302+00
+Press Play-offs,2,37,connor.fehr,Rons team,IR_F,8483445,Cutter Gauthier,null,null,2026-05-04 21:51:33.929327+00
+Press Play-offs,2,38,nuttguy,56 Years and Counting,IR_F,8482809,Jackson Blake,null,null,2026-05-04 21:51:41.234466+00
+Press Play-offs,2,39,Tobi,Frozen Assets,IR_F,8475798,Mikael Granlund,null,null,2026-05-04 21:51:47.307852+00
+Press Play-offs,2,40,paul.markhauser,Canadian Bloody Knucks,IR_D,8476875,Mike Matheson,null,null,2026-05-04 21:52:27.359571+00
+Press Play-offs,2,41,paul.markhauser,Canadian Bloody Knucks,IR_F,8477501,Valeri Nichushkin,null,null,2026-05-04 21:53:26.868863+00
+Press Play-offs,2,42,Tobi,Frozen Assets,IR_D,8482087,Kaiden Guhle,null,null,2026-05-04 21:53:43.115063+00
+Press Play-offs,2,43,nuttguy,56 Years and Counting,IR_D,8482671,Owen Power,null,null,2026-05-04 21:53:47.318703+00
+Press Play-offs,2,44,connor.fehr,Rons team,IR_D,8477948,Travis Sanheim,null,null,2026-05-04 21:53:52.583649+00
+Press Play-offs,3,1,Tobi,Frozen Assets,F,8478403,Jack Eichel,null,null,2026-05-19 18:58:03.741189+00
+Press Play-offs,3,2,paul.markhauser,Canadian Bloody Knucks,F,8481604,Pavel Dorofeyev,null,null,2026-05-19 18:58:15.849375+00
+Press Play-offs,3,3,nuttguy,56 Years and Counting,F,8482809,Jackson Blake,null,null,2026-05-19 18:58:29.738387+00
+Press Play-offs,3,4,connor.fehr,Rons team,F,8477492,Nathan MacKinnon,null,null,2026-05-19 18:58:37.214041+00
+Press Play-offs,3,5,connor.fehr,Rons team,F,8476455,Gabriel Landeskog,null,null,2026-05-19 18:58:49.453035+00
+Press Play-offs,3,6,nuttguy,56 Years and Counting,F,8475791,Taylor Hall,null,null,2026-05-19 18:58:57.132403+00
+Press Play-offs,3,7,paul.markhauser,Canadian Bloody Knucks,F,8484984,Ivan Demidov,null,null,2026-05-19 18:59:24.573569+00
+Press Play-offs,3,8,Tobi,Frozen Assets,F,8479353,Brett Howden,null,null,2026-05-19 18:59:31.111427+00
+Press Play-offs,3,9,Tobi,Frozen Assets,F,8481540,Cole Caufield,null,null,2026-05-19 18:59:36.890351+00
+Press Play-offs,3,10,paul.markhauser,Canadian Bloody Knucks,F,8483515,Juraj Slafkovský,null,null,2026-05-19 18:59:54.543064+00
+Press Play-offs,3,11,nuttguy,56 Years and Counting,F,8480039,Martin Necas,null,null,2026-05-19 19:00:03.630493+00
+Press Play-offs,3,12,connor.fehr,Rons team,F,8482702,Logan Stankoven,null,null,2026-05-19 19:00:13.666765+00
