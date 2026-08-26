@@ -171,25 +171,30 @@ def fetch_game_type(season, label, gt, gaps):
     return trows, srows, stats
 
 
+def bios_page(season, label, gt, gaps):
+    """One skater/bios query for a season/gameType. Returns its rows ([] on failure)."""
+    d = get(f"{REST}/skater/bios", {"isGame": "false", "limit": "-1", "start": "0",
+                                    "cayenneExp": f"seasonId={season} and gameTypeId={gt}"})
+    if d is None:
+        gaps.append({"season": label, "gameTypeId": gt,
+                     "issue": "skater/bios request failed after retries"})
+        return []
+    if d.get("total", 0) >= CAP:
+        gaps.append({"season": label, "gameTypeId": gt,
+                     "issue": f"skater/bios at the {CAP} cap - TRUNCATED"})
+    return d.get("data", [])
+
+
 def fetch_bios(season, label, gaps):
     """Season bios, merged across game types, first occurrence per player wins."""
     bios, seen = [], set()
-    for gt in GAME_TYPES:
-        d = get(f"{REST}/skater/bios", {"isGame": "false", "limit": "-1", "start": "0",
-                                        "cayenneExp": f"seasonId={season} and gameTypeId={gt}"})
-        if d is None:
-            gaps.append({"season": label, "gameTypeId": gt,
-                         "issue": "skater/bios request failed after retries"})
+    pages = (r for gt in GAME_TYPES for r in bios_page(season, label, gt, gaps))
+    for r in pages:
+        if r["playerId"] in seen:
             continue
-        if d.get("total", 0) >= CAP:
-            gaps.append({"season": label, "gameTypeId": gt,
-                         "issue": f"skater/bios at the {CAP} cap - TRUNCATED"})
-        for r in d.get("data", []):
-            if r["playerId"] in seen:
-                continue
-            seen.add(r["playerId"])
-            r["seasonId"] = season
-            bios.append(r)
+        seen.add(r["playerId"])
+        r["seasonId"] = season
+        bios.append(r)
     return bios
 
 
