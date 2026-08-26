@@ -1,0 +1,7226 @@
+[
+ {
+  "id": "401802844",
+  "date": "2025-12-13T01:00Z",
+  "name": "Chicago Blackhawks at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802845",
+  "date": "2025-12-13T02:00Z",
+  "name": "Seattle Kraken at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802846",
+  "date": "2025-12-13T17:30Z",
+  "name": "Anaheim Ducks at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802847",
+  "date": "2025-12-13T19:00Z",
+  "name": "Ottawa Senators at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802848",
+  "date": "2025-12-13T20:00Z",
+  "name": "San Jose Sharks at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802849",
+  "date": "2025-12-13T20:30Z",
+  "name": "Tampa Bay Lightning at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802850",
+  "date": "2025-12-14T00:00Z",
+  "name": "Edmonton Oilers at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802851",
+  "date": "2025-12-14T00:00Z",
+  "name": "Montreal Canadiens at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802852",
+  "date": "2025-12-14T00:00Z",
+  "name": "Carolina Hurricanes at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802853",
+  "date": "2025-12-14T00:00Z",
+  "name": "Vegas Golden Knights at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802854",
+  "date": "2025-12-14T00:00Z",
+  "name": "Washington Capitals at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802855",
+  "date": "2025-12-14T01:00Z",
+  "name": "Detroit Red Wings at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802856",
+  "date": "2025-12-14T01:00Z",
+  "name": "Florida Panthers at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802857",
+  "date": "2025-12-14T02:00Z",
+  "name": "Nashville Predators at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802858",
+  "date": "2025-12-14T03:00Z",
+  "name": "Calgary Flames at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802859",
+  "date": "2025-12-14T17:30Z",
+  "name": "Vancouver Canucks at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802860",
+  "date": "2025-12-14T20:00Z",
+  "name": "Utah Mammoth at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802861",
+  "date": "2025-12-14T22:00Z",
+  "name": "Philadelphia Flyers at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802862",
+  "date": "2025-12-14T23:00Z",
+  "name": "Boston Bruins at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802863",
+  "date": "2025-12-15T00:00Z",
+  "name": "Edmonton Oilers at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802864",
+  "date": "2025-12-15T01:00Z",
+  "name": "Buffalo Sabres at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802865",
+  "date": "2025-12-16T00:00Z",
+  "name": "Florida Panthers at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802866",
+  "date": "2025-12-16T00:00Z",
+  "name": "Anaheim Ducks at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802867",
+  "date": "2025-12-16T00:30Z",
+  "name": "Ottawa Senators at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802868",
+  "date": "2025-12-16T01:00Z",
+  "name": "Nashville Predators at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802869",
+  "date": "2025-12-16T01:00Z",
+  "name": "Los Angeles Kings at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802870",
+  "date": "2025-12-17T00:00Z",
+  "name": "Utah Mammoth at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802871",
+  "date": "2025-12-17T00:00Z",
+  "name": "Chicago Blackhawks at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802872",
+  "date": "2025-12-17T00:00Z",
+  "name": "Philadelphia Flyers at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802873",
+  "date": "2025-12-17T00:00Z",
+  "name": "New York Islanders at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802874",
+  "date": "2025-12-17T00:00Z",
+  "name": "Vancouver Canucks at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802876",
+  "date": "2025-12-17T00:00Z",
+  "name": "Anaheim Ducks at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802875",
+  "date": "2025-12-17T00:30Z",
+  "name": "Edmonton Oilers at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802877",
+  "date": "2025-12-17T01:00Z",
+  "name": "Washington Capitals at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802878",
+  "date": "2025-12-17T03:00Z",
+  "name": "Calgary Flames at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802879",
+  "date": "2025-12-17T03:00Z",
+  "name": "Colorado Avalanche at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802880",
+  "date": "2025-12-18T00:00Z",
+  "name": "Los Angeles Kings at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802881",
+  "date": "2025-12-18T00:30Z",
+  "name": "Utah Mammoth at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802882",
+  "date": "2025-12-18T01:00Z",
+  "name": "Winnipeg Jets at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802883",
+  "date": "2025-12-18T01:00Z",
+  "name": "Carolina Hurricanes at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802884",
+  "date": "2025-12-18T03:00Z",
+  "name": "New Jersey Devils at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802885",
+  "date": "2025-12-19T00:00Z",
+  "name": "Edmonton Oilers at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802887",
+  "date": "2025-12-19T00:00Z",
+  "name": "Chicago Blackhawks at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802888",
+  "date": "2025-12-19T00:00Z",
+  "name": "Pittsburgh Penguins at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802889",
+  "date": "2025-12-19T00:00Z",
+  "name": "Los Angeles Kings at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802890",
+  "date": "2025-12-19T00:00Z",
+  "name": "Toronto Maple Leafs at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802891",
+  "date": "2025-12-19T00:00Z",
+  "name": "Minnesota Wild at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802886",
+  "date": "2025-12-19T00:30Z",
+  "name": "Philadelphia Flyers at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802892",
+  "date": "2025-12-19T01:00Z",
+  "name": "New York Rangers at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802893",
+  "date": "2025-12-19T02:00Z",
+  "name": "Seattle Kraken at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802894",
+  "date": "2025-12-19T03:00Z",
+  "name": "Dallas Stars at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802895",
+  "date": "2025-12-20T00:00Z",
+  "name": "Carolina Hurricanes at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802896",
+  "date": "2025-12-20T00:00Z",
+  "name": "Vancouver Canucks at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802897",
+  "date": "2025-12-20T02:00Z",
+  "name": "Winnipeg Jets at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802898",
+  "date": "2025-12-20T02:00Z",
+  "name": "New Jersey Devils at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802899",
+  "date": "2025-12-20T03:00Z",
+  "name": "Dallas Stars at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802900",
+  "date": "2025-12-20T17:30Z",
+  "name": "Philadelphia Flyers at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802901",
+  "date": "2025-12-20T17:30Z",
+  "name": "Detroit Red Wings at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802902",
+  "date": "2025-12-20T20:00Z",
+  "name": "Chicago Blackhawks at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802903",
+  "date": "2025-12-20T20:00Z",
+  "name": "Edmonton Oilers at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802904",
+  "date": "2025-12-20T22:00Z",
+  "name": "New York Islanders at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802905",
+  "date": "2025-12-20T23:00Z",
+  "name": "St. Louis Blues at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802906",
+  "date": "2025-12-21T00:00Z",
+  "name": "Vancouver Canucks at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802907",
+  "date": "2025-12-21T00:00Z",
+  "name": "Pittsburgh Penguins at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802908",
+  "date": "2025-12-21T00:00Z",
+  "name": "Carolina Hurricanes at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802909",
+  "date": "2025-12-21T00:00Z",
+  "name": "Toronto Maple Leafs at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802910",
+  "date": "2025-12-21T03:00Z",
+  "name": "Vegas Golden Knights at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802911",
+  "date": "2025-12-21T03:00Z",
+  "name": "Columbus Blue Jackets at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802912",
+  "date": "2025-12-21T03:00Z",
+  "name": "Seattle Kraken at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802913",
+  "date": "2025-12-21T18:00Z",
+  "name": "Washington Capitals at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802914",
+  "date": "2025-12-21T23:00Z",
+  "name": "Colorado Avalanche at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802915",
+  "date": "2025-12-22T00:00Z",
+  "name": "Ottawa Senators at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802916",
+  "date": "2025-12-22T00:00Z",
+  "name": "Buffalo Sabres at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802917",
+  "date": "2025-12-22T00:00Z",
+  "name": "Montreal Canadiens at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802918",
+  "date": "2025-12-22T00:00Z",
+  "name": "New York Rangers at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802919",
+  "date": "2025-12-22T00:00Z",
+  "name": "Toronto Maple Leafs at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802920",
+  "date": "2025-12-22T00:00Z",
+  "name": "Winnipeg Jets at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802921",
+  "date": "2025-12-22T01:00Z",
+  "name": "Vegas Golden Knights at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802922",
+  "date": "2025-12-23T00:00Z",
+  "name": "St. Louis Blues at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802923",
+  "date": "2025-12-23T00:30Z",
+  "name": "Vancouver Canucks at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802924",
+  "date": "2025-12-23T03:00Z",
+  "name": "Seattle Kraken at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802925",
+  "date": "2025-12-23T03:00Z",
+  "name": "Columbus Blue Jackets at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802926",
+  "date": "2025-12-23T21:00Z",
+  "name": "Pittsburgh Penguins at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802930",
+  "date": "2025-12-23T23:30Z",
+  "name": "Dallas Stars at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802927",
+  "date": "2025-12-24T00:00Z",
+  "name": "New York Rangers at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802928",
+  "date": "2025-12-24T00:00Z",
+  "name": "Montreal Canadiens at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802929",
+  "date": "2025-12-24T00:00Z",
+  "name": "Buffalo Sabres at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802931",
+  "date": "2025-12-24T00:00Z",
+  "name": "New Jersey Devils at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802932",
+  "date": "2025-12-24T00:00Z",
+  "name": "Florida Panthers at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802933",
+  "date": "2025-12-24T01:00Z",
+  "name": "Nashville Predators at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802934",
+  "date": "2025-12-24T02:00Z",
+  "name": "Philadelphia Flyers at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802935",
+  "date": "2025-12-24T02:00Z",
+  "name": "Utah Mammoth at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802936",
+  "date": "2025-12-24T02:00Z",
+  "name": "Calgary Flames at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802937",
+  "date": "2025-12-24T03:00Z",
+  "name": "San Jose Sharks at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802938",
+  "date": "2025-12-24T03:00Z",
+  "name": "Seattle Kraken at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802939",
+  "date": "2025-12-27T23:00Z",
+  "name": "New York Rangers at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802940",
+  "date": "2025-12-28T00:00Z",
+  "name": "Boston Bruins at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802941",
+  "date": "2025-12-28T00:00Z",
+  "name": "Ottawa Senators at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802942",
+  "date": "2025-12-28T00:00Z",
+  "name": "Tampa Bay Lightning at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802943",
+  "date": "2025-12-28T00:00Z",
+  "name": "Washington Capitals at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802944",
+  "date": "2025-12-28T00:00Z",
+  "name": "Detroit Red Wings at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802945",
+  "date": "2025-12-28T00:00Z",
+  "name": "Minnesota Wild at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802946",
+  "date": "2025-12-28T01:00Z",
+  "name": "Nashville Predators at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802947",
+  "date": "2025-12-28T01:00Z",
+  "name": "Chicago Blackhawks at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802948",
+  "date": "2025-12-28T02:00Z",
+  "name": "Anaheim Ducks at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802949",
+  "date": "2025-12-28T03:00Z",
+  "name": "Edmonton Oilers at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802950",
+  "date": "2025-12-28T03:00Z",
+  "name": "San Jose Sharks at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802951",
+  "date": "2025-12-28T03:00Z",
+  "name": "Colorado Avalanche at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802953",
+  "date": "2025-12-28T22:00Z",
+  "name": "Montreal Canadiens at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802954",
+  "date": "2025-12-28T22:00Z",
+  "name": "New York Islanders at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802952",
+  "date": "2025-12-29T00:00Z",
+  "name": "Toronto Maple Leafs at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802955",
+  "date": "2025-12-29T00:00Z",
+  "name": "Pittsburgh Penguins at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802956",
+  "date": "2025-12-29T01:00Z",
+  "name": "Philadelphia Flyers at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802958",
+  "date": "2025-12-30T00:00Z",
+  "name": "Washington Capitals at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802959",
+  "date": "2025-12-30T00:00Z",
+  "name": "New York Rangers at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802957",
+  "date": "2025-12-30T00:30Z",
+  "name": "Columbus Blue Jackets at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802960",
+  "date": "2025-12-30T00:30Z",
+  "name": "Edmonton Oilers at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802961",
+  "date": "2025-12-30T01:00Z",
+  "name": "Buffalo Sabres at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802962",
+  "date": "2025-12-30T02:00Z",
+  "name": "Los Angeles Kings at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802963",
+  "date": "2025-12-30T02:00Z",
+  "name": "Nashville Predators at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802964",
+  "date": "2025-12-30T02:00Z",
+  "name": "Boston Bruins at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802965",
+  "date": "2025-12-30T03:00Z",
+  "name": "Minnesota Wild at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802966",
+  "date": "2025-12-30T03:00Z",
+  "name": "San Jose Sharks at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802967",
+  "date": "2025-12-30T03:00Z",
+  "name": "Vancouver Canucks at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802968",
+  "date": "2025-12-31T00:00Z",
+  "name": "New Jersey Devils at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802969",
+  "date": "2025-12-31T00:00Z",
+  "name": "Montreal Canadiens at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802970",
+  "date": "2025-12-31T00:00Z",
+  "name": "Carolina Hurricanes at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802971",
+  "date": "2025-12-31T01:30Z",
+  "name": "New York Islanders at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802972",
+  "date": "2025-12-31T03:00Z",
+  "name": "Philadelphia Flyers at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802973",
+  "date": "2025-12-31T17:30Z",
+  "name": "New York Rangers at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802974",
+  "date": "2025-12-31T20:00Z",
+  "name": "Nashville Predators at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802975",
+  "date": "2025-12-31T21:00Z",
+  "name": "Tampa Bay Lightning at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802976",
+  "date": "2025-12-31T21:00Z",
+  "name": "Minnesota Wild at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802977",
+  "date": "2025-12-31T23:30Z",
+  "name": "Winnipeg Jets at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802978",
+  "date": "2026-01-01T00:00Z",
+  "name": "New Jersey Devils at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802979",
+  "date": "2026-01-01T01:00Z",
+  "name": "Buffalo Sabres at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802980",
+  "date": "2026-01-01T02:00Z",
+  "name": "St. Louis Blues at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802981",
+  "date": "2026-01-01T02:30Z",
+  "name": "Philadelphia Flyers at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802982",
+  "date": "2026-01-01T02:30Z",
+  "name": "Boston Bruins at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802983",
+  "date": "2026-01-01T18:00Z",
+  "name": "Washington Capitals at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802984",
+  "date": "2026-01-01T20:00Z",
+  "name": "Utah Mammoth at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802985",
+  "date": "2026-01-02T00:00Z",
+  "name": "Winnipeg Jets at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802986",
+  "date": "2026-01-02T00:00Z",
+  "name": "Detroit Red Wings at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802987",
+  "date": "2026-01-02T00:00Z",
+  "name": "Montreal Canadiens at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802990",
+  "date": "2026-01-02T00:00Z",
+  "name": "Tampa Bay Lightning at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802988",
+  "date": "2026-01-02T01:30Z",
+  "name": "Dallas Stars at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802989",
+  "date": "2026-01-02T03:00Z",
+  "name": "Nashville Predators at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802991",
+  "date": "2026-01-02T20:00Z",
+  "name": "Vegas Golden Knights at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802992",
+  "date": "2026-01-03T01:00Z",
+  "name": "New York Rangers at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": "Discover NHL Winter Classic"
+ },
+ {
+  "id": "401802993",
+  "date": "2026-01-03T03:30Z",
+  "name": "Seattle Kraken at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802994",
+  "date": "2026-01-03T03:30Z",
+  "name": "Minnesota Wild at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802995",
+  "date": "2026-01-03T17:00Z",
+  "name": "Pittsburgh Penguins at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802996",
+  "date": "2026-01-03T20:00Z",
+  "name": "Utah Mammoth at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802997",
+  "date": "2026-01-03T20:00Z",
+  "name": "Buffalo Sabres at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802998",
+  "date": "2026-01-03T20:30Z",
+  "name": "Philadelphia Flyers at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401802999",
+  "date": "2026-01-03T21:00Z",
+  "name": "Montreal Canadiens at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803000",
+  "date": "2026-01-03T21:00Z",
+  "name": "Tampa Bay Lightning at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803001",
+  "date": "2026-01-04T00:00Z",
+  "name": "Winnipeg Jets at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803002",
+  "date": "2026-01-04T00:00Z",
+  "name": "Toronto Maple Leafs at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803003",
+  "date": "2026-01-04T00:00Z",
+  "name": "Chicago Blackhawks at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803004",
+  "date": "2026-01-04T00:00Z",
+  "name": "Colorado Avalanche at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803005",
+  "date": "2026-01-04T00:00Z",
+  "name": "Nashville Predators at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803006",
+  "date": "2026-01-04T02:00Z",
+  "name": "Minnesota Wild at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803007",
+  "date": "2026-01-04T03:00Z",
+  "name": "Boston Bruins at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803008",
+  "date": "2026-01-04T19:00Z",
+  "name": "Montreal Canadiens at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803009",
+  "date": "2026-01-04T20:00Z",
+  "name": "Pittsburgh Penguins at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803010",
+  "date": "2026-01-04T22:00Z",
+  "name": "Colorado Avalanche at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803011",
+  "date": "2026-01-05T00:00Z",
+  "name": "Carolina Hurricanes at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803012",
+  "date": "2026-01-05T00:00Z",
+  "name": "Vegas Golden Knights at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803013",
+  "date": "2026-01-06T00:00Z",
+  "name": "Utah Mammoth at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803014",
+  "date": "2026-01-06T00:00Z",
+  "name": "Anaheim Ducks at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803015",
+  "date": "2026-01-06T00:30Z",
+  "name": "Detroit Red Wings at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803016",
+  "date": "2026-01-06T02:30Z",
+  "name": "Seattle Kraken at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803017",
+  "date": "2026-01-06T03:30Z",
+  "name": "Minnesota Wild at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803018",
+  "date": "2026-01-07T00:00Z",
+  "name": "Vancouver Canucks at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803019",
+  "date": "2026-01-07T00:00Z",
+  "name": "Colorado Avalanche at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803021",
+  "date": "2026-01-07T00:00Z",
+  "name": "Anaheim Ducks at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803022",
+  "date": "2026-01-07T00:00Z",
+  "name": "Dallas Stars at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803020",
+  "date": "2026-01-07T00:30Z",
+  "name": "New Jersey Devils at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803023",
+  "date": "2026-01-07T00:30Z",
+  "name": "Florida Panthers at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803024",
+  "date": "2026-01-07T01:00Z",
+  "name": "Vegas Golden Knights at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803025",
+  "date": "2026-01-07T02:00Z",
+  "name": "Nashville Predators at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803026",
+  "date": "2026-01-07T03:00Z",
+  "name": "Columbus Blue Jackets at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803027",
+  "date": "2026-01-07T03:00Z",
+  "name": "Boston Bruins at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803028",
+  "date": "2026-01-08T00:00Z",
+  "name": "Dallas Stars at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803029",
+  "date": "2026-01-08T00:30Z",
+  "name": "Calgary Flames at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803030",
+  "date": "2026-01-08T02:30Z",
+  "name": "St. Louis Blues at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803031",
+  "date": "2026-01-08T02:30Z",
+  "name": "Ottawa Senators at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803032",
+  "date": "2026-01-08T03:30Z",
+  "name": "San Jose Sharks at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803033",
+  "date": "2026-01-09T00:00Z",
+  "name": "Calgary Flames at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803034",
+  "date": "2026-01-09T00:00Z",
+  "name": "Florida Panthers at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803035",
+  "date": "2026-01-09T00:00Z",
+  "name": "Vancouver Canucks at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803036",
+  "date": "2026-01-09T00:00Z",
+  "name": "Buffalo Sabres at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803037",
+  "date": "2026-01-09T00:00Z",
+  "name": "Toronto Maple Leafs at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803038",
+  "date": "2026-01-09T00:00Z",
+  "name": "New Jersey Devils at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803039",
+  "date": "2026-01-09T00:00Z",
+  "name": "Anaheim Ducks at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803040",
+  "date": "2026-01-09T01:00Z",
+  "name": "New York Islanders at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803041",
+  "date": "2026-01-09T01:00Z",
+  "name": "Edmonton Oilers at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803042",
+  "date": "2026-01-09T02:00Z",
+  "name": "Ottawa Senators at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803043",
+  "date": "2026-01-09T03:00Z",
+  "name": "Columbus Blue Jackets at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803044",
+  "date": "2026-01-09T03:00Z",
+  "name": "Minnesota Wild at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803045",
+  "date": "2026-01-10T01:00Z",
+  "name": "Washington Capitals at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803046",
+  "date": "2026-01-10T01:00Z",
+  "name": "Los Angeles Kings at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803047",
+  "date": "2026-01-10T02:00Z",
+  "name": "St. Louis Blues at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803048",
+  "date": "2026-01-10T18:00Z",
+  "name": "New York Rangers at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803049",
+  "date": "2026-01-10T20:30Z",
+  "name": "Calgary Flames at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803050",
+  "date": "2026-01-10T21:00Z",
+  "name": "Columbus Blue Jackets at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803051",
+  "date": "2026-01-10T21:00Z",
+  "name": "Dallas Stars at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803052",
+  "date": "2026-01-11T00:00Z",
+  "name": "Anaheim Ducks at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803053",
+  "date": "2026-01-11T00:00Z",
+  "name": "Vancouver Canucks at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803054",
+  "date": "2026-01-11T00:00Z",
+  "name": "Detroit Red Wings at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803055",
+  "date": "2026-01-11T00:00Z",
+  "name": "Florida Panthers at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803056",
+  "date": "2026-01-11T00:00Z",
+  "name": "Tampa Bay Lightning at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803057",
+  "date": "2026-01-11T00:00Z",
+  "name": "Seattle Kraken at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803058",
+  "date": "2026-01-11T01:00Z",
+  "name": "Chicago Blackhawks at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803059",
+  "date": "2026-01-11T01:00Z",
+  "name": "New York Islanders at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803060",
+  "date": "2026-01-11T03:00Z",
+  "name": "Los Angeles Kings at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803061",
+  "date": "2026-01-11T03:00Z",
+  "name": "St. Louis Blues at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803062",
+  "date": "2026-01-11T19:00Z",
+  "name": "New Jersey Devils at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803063",
+  "date": "2026-01-11T22:00Z",
+  "name": "Pittsburgh Penguins at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803064",
+  "date": "2026-01-12T00:00Z",
+  "name": "Washington Capitals at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803065",
+  "date": "2026-01-12T00:00Z",
+  "name": "Columbus Blue Jackets at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803066",
+  "date": "2026-01-12T01:00Z",
+  "name": "Vegas Golden Knights at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803067",
+  "date": "2026-01-13T00:00Z",
+  "name": "Florida Panthers at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803068",
+  "date": "2026-01-13T00:00Z",
+  "name": "Carolina Hurricanes at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803069",
+  "date": "2026-01-13T00:00Z",
+  "name": "Seattle Kraken at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803070",
+  "date": "2026-01-13T00:00Z",
+  "name": "Tampa Bay Lightning at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803071",
+  "date": "2026-01-13T00:30Z",
+  "name": "Vancouver Canucks at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803072",
+  "date": "2026-01-13T01:00Z",
+  "name": "New Jersey Devils at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803073",
+  "date": "2026-01-13T01:30Z",
+  "name": "Edmonton Oilers at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803074",
+  "date": "2026-01-13T03:00Z",
+  "name": "Toronto Maple Leafs at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803075",
+  "date": "2026-01-13T03:00Z",
+  "name": "Dallas Stars at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803076",
+  "date": "2026-01-14T00:00Z",
+  "name": "Vancouver Canucks at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803077",
+  "date": "2026-01-14T00:00Z",
+  "name": "Tampa Bay Lightning at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803078",
+  "date": "2026-01-14T00:00Z",
+  "name": "Montreal Canadiens at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803079",
+  "date": "2026-01-14T00:00Z",
+  "name": "Calgary Flames at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803080",
+  "date": "2026-01-14T00:30Z",
+  "name": "Detroit Red Wings at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803081",
+  "date": "2026-01-14T00:30Z",
+  "name": "Carolina Hurricanes at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803082",
+  "date": "2026-01-14T01:00Z",
+  "name": "Edmonton Oilers at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803083",
+  "date": "2026-01-14T01:00Z",
+  "name": "New York Islanders at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803084",
+  "date": "2026-01-14T03:00Z",
+  "name": "Toronto Maple Leafs at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803085",
+  "date": "2026-01-14T03:00Z",
+  "name": "Dallas Stars at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803086",
+  "date": "2026-01-15T00:00Z",
+  "name": "Seattle Kraken at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803087",
+  "date": "2026-01-15T00:30Z",
+  "name": "Philadelphia Flyers at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803088",
+  "date": "2026-01-15T00:30Z",
+  "name": "Ottawa Senators at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803089",
+  "date": "2026-01-15T03:00Z",
+  "name": "Vegas Golden Knights at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803091",
+  "date": "2026-01-16T00:00Z",
+  "name": "Montreal Canadiens at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803092",
+  "date": "2026-01-16T00:00Z",
+  "name": "Philadelphia Flyers at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803093",
+  "date": "2026-01-16T00:00Z",
+  "name": "San Jose Sharks at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803094",
+  "date": "2026-01-16T00:00Z",
+  "name": "Vancouver Canucks at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803090",
+  "date": "2026-01-16T01:00Z",
+  "name": "Seattle Kraken at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803095",
+  "date": "2026-01-16T01:00Z",
+  "name": "Winnipeg Jets at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803096",
+  "date": "2026-01-16T01:30Z",
+  "name": "Calgary Flames at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803097",
+  "date": "2026-01-16T02:00Z",
+  "name": "Dallas Stars at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803098",
+  "date": "2026-01-16T02:00Z",
+  "name": "New York Islanders at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803099",
+  "date": "2026-01-16T02:30Z",
+  "name": "Toronto Maple Leafs at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803100",
+  "date": "2026-01-17T00:00Z",
+  "name": "San Jose Sharks at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803101",
+  "date": "2026-01-17T00:00Z",
+  "name": "Florida Panthers at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803102",
+  "date": "2026-01-17T01:00Z",
+  "name": "Tampa Bay Lightning at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803103",
+  "date": "2026-01-17T02:00Z",
+  "name": "Nashville Predators at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803104",
+  "date": "2026-01-17T03:30Z",
+  "name": "Anaheim Ducks at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803105",
+  "date": "2026-01-17T17:30Z",
+  "name": "Minnesota Wild at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803106",
+  "date": "2026-01-17T18:00Z",
+  "name": "New York Rangers at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803107",
+  "date": "2026-01-17T20:00Z",
+  "name": "New York Islanders at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803108",
+  "date": "2026-01-17T22:00Z",
+  "name": "Seattle Kraken at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803109",
+  "date": "2026-01-18T00:00Z",
+  "name": "Montreal Canadiens at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803110",
+  "date": "2026-01-18T00:00Z",
+  "name": "Carolina Hurricanes at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803111",
+  "date": "2026-01-18T00:00Z",
+  "name": "Columbus Blue Jackets at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803112",
+  "date": "2026-01-18T00:00Z",
+  "name": "Florida Panthers at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803113",
+  "date": "2026-01-18T00:00Z",
+  "name": "Toronto Maple Leafs at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803114",
+  "date": "2026-01-18T01:00Z",
+  "name": "Boston Bruins at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803115",
+  "date": "2026-01-18T03:00Z",
+  "name": "Edmonton Oilers at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803116",
+  "date": "2026-01-18T03:00Z",
+  "name": "Nashville Predators at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803117",
+  "date": "2026-01-18T03:00Z",
+  "name": "Los Angeles Kings at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803118",
+  "date": "2026-01-18T19:00Z",
+  "name": "Tampa Bay Lightning at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803119",
+  "date": "2026-01-18T22:00Z",
+  "name": "Ottawa Senators at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803120",
+  "date": "2026-01-19T01:00Z",
+  "name": "St. Louis Blues at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803121",
+  "date": "2026-01-19T18:30Z",
+  "name": "Buffalo Sabres at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803122",
+  "date": "2026-01-19T21:00Z",
+  "name": "Washington Capitals at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803123",
+  "date": "2026-01-19T22:00Z",
+  "name": "Pittsburgh Penguins at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803124",
+  "date": "2026-01-19T23:00Z",
+  "name": "San Jose Sharks at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803125",
+  "date": "2026-01-20T00:30Z",
+  "name": "Minnesota Wild at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803126",
+  "date": "2026-01-20T01:00Z",
+  "name": "Philadelphia Flyers at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803127",
+  "date": "2026-01-20T01:30Z",
+  "name": "Winnipeg Jets at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803128",
+  "date": "2026-01-20T02:00Z",
+  "name": "New Jersey Devils at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803129",
+  "date": "2026-01-20T03:00Z",
+  "name": "New York Islanders at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803130",
+  "date": "2026-01-20T03:00Z",
+  "name": "New York Rangers at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803131",
+  "date": "2026-01-21T00:00Z",
+  "name": "Minnesota Wild at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803132",
+  "date": "2026-01-21T00:00Z",
+  "name": "San Jose Sharks at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803133",
+  "date": "2026-01-21T00:00Z",
+  "name": "Ottawa Senators at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803134",
+  "date": "2026-01-21T00:30Z",
+  "name": "Boston Bruins at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803135",
+  "date": "2026-01-21T01:00Z",
+  "name": "Buffalo Sabres at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803136",
+  "date": "2026-01-21T01:00Z",
+  "name": "St. Louis Blues at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803137",
+  "date": "2026-01-21T03:00Z",
+  "name": "New Jersey Devils at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803138",
+  "date": "2026-01-21T03:00Z",
+  "name": "New York Rangers at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803139",
+  "date": "2026-01-22T00:00Z",
+  "name": "Detroit Red Wings at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803140",
+  "date": "2026-01-22T02:00Z",
+  "name": "Anaheim Ducks at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803141",
+  "date": "2026-01-22T02:00Z",
+  "name": "Philadelphia Flyers at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803142",
+  "date": "2026-01-22T02:30Z",
+  "name": "Pittsburgh Penguins at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803144",
+  "date": "2026-01-22T02:30Z",
+  "name": "New York Islanders at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803143",
+  "date": "2026-01-22T03:00Z",
+  "name": "Washington Capitals at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803145",
+  "date": "2026-01-23T00:00Z",
+  "name": "Vegas Golden Knights at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803146",
+  "date": "2026-01-23T00:00Z",
+  "name": "Buffalo Sabres at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803147",
+  "date": "2026-01-23T00:00Z",
+  "name": "Chicago Blackhawks at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803148",
+  "date": "2026-01-23T00:00Z",
+  "name": "Dallas Stars at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803149",
+  "date": "2026-01-23T01:00Z",
+  "name": "Ottawa Senators at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803150",
+  "date": "2026-01-23T01:00Z",
+  "name": "Florida Panthers at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803151",
+  "date": "2026-01-23T02:00Z",
+  "name": "Pittsburgh Penguins at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803152",
+  "date": "2026-01-23T02:30Z",
+  "name": "Detroit Red Wings at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803153",
+  "date": "2026-01-24T00:00Z",
+  "name": "Vegas Golden Knights at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803154",
+  "date": "2026-01-24T00:00Z",
+  "name": "Tampa Bay Lightning at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803155",
+  "date": "2026-01-24T01:00Z",
+  "name": "St. Louis Blues at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803156",
+  "date": "2026-01-24T02:00Z",
+  "name": "Philadelphia Flyers at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803157",
+  "date": "2026-01-24T02:00Z",
+  "name": "Washington Capitals at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803158",
+  "date": "2026-01-24T03:00Z",
+  "name": "New Jersey Devils at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803159",
+  "date": "2026-01-24T03:00Z",
+  "name": "New York Rangers at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803160",
+  "date": "2026-01-24T03:00Z",
+  "name": "Anaheim Ducks at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803161",
+  "date": "2026-01-24T18:00Z",
+  "name": "Buffalo Sabres at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803162",
+  "date": "2026-01-24T18:30Z",
+  "name": "Utah Mammoth at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803163",
+  "date": "2026-01-25T00:00Z",
+  "name": "Montreal Canadiens at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803164",
+  "date": "2026-01-25T00:00Z",
+  "name": "Carolina Hurricanes at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803165",
+  "date": "2026-01-25T00:00Z",
+  "name": "Tampa Bay Lightning at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803166",
+  "date": "2026-01-25T00:00Z",
+  "name": "Detroit Red Wings at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803167",
+  "date": "2026-01-25T01:00Z",
+  "name": "Los Angeles Kings at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803168",
+  "date": "2026-01-25T02:00Z",
+  "name": "Florida Panthers at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803169",
+  "date": "2026-01-25T03:00Z",
+  "name": "Washington Capitals at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803170",
+  "date": "2026-01-25T18:30Z",
+  "name": "Colorado Avalanche at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803171",
+  "date": "2026-01-25T20:00Z",
+  "name": "New Jersey Devils at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803172",
+  "date": "2026-01-25T22:00Z",
+  "name": "Vegas Golden Knights at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803173",
+  "date": "2026-01-25T23:00Z",
+  "name": "Pittsburgh Penguins at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803174",
+  "date": "2026-01-26T00:00Z",
+  "name": "Florida Panthers at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803175",
+  "date": "2026-01-26T01:00Z",
+  "name": "Anaheim Ducks at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803176",
+  "date": "2026-01-27T00:00Z",
+  "name": "Utah Mammoth at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803177",
+  "date": "2026-01-27T00:00Z",
+  "name": "Boston Bruins at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803178",
+  "date": "2026-01-27T00:00Z",
+  "name": "New York Islanders at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803179",
+  "date": "2026-01-27T00:00Z",
+  "name": "Los Angeles Kings at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": "Makeup date March 9"
+ },
+ {
+  "id": "401803180",
+  "date": "2026-01-27T01:30Z",
+  "name": "Anaheim Ducks at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803181",
+  "date": "2026-01-28T00:00Z",
+  "name": "Nashville Predators at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803182",
+  "date": "2026-01-28T00:00Z",
+  "name": "Buffalo Sabres at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803183",
+  "date": "2026-01-28T00:00Z",
+  "name": "Vegas Golden Knights at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803184",
+  "date": "2026-01-28T00:00Z",
+  "name": "Los Angeles Kings at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803185",
+  "date": "2026-01-28T00:00Z",
+  "name": "Utah Mammoth at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803186",
+  "date": "2026-01-28T00:00Z",
+  "name": "Winnipeg Jets at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803187",
+  "date": "2026-01-28T01:00Z",
+  "name": "Dallas Stars at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803188",
+  "date": "2026-01-28T01:00Z",
+  "name": "Chicago Blackhawks at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803189",
+  "date": "2026-01-28T03:00Z",
+  "name": "San Jose Sharks at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803190",
+  "date": "2026-01-28T03:00Z",
+  "name": "Washington Capitals at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803193",
+  "date": "2026-01-29T00:00Z",
+  "name": "New York Rangers at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803191",
+  "date": "2026-01-29T00:30Z",
+  "name": "Philadelphia Flyers at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803192",
+  "date": "2026-01-29T00:30Z",
+  "name": "Colorado Avalanche at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803194",
+  "date": "2026-01-30T00:00Z",
+  "name": "Philadelphia Flyers at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803195",
+  "date": "2026-01-30T00:00Z",
+  "name": "Los Angeles Kings at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803196",
+  "date": "2026-01-30T00:00Z",
+  "name": "Colorado Avalanche at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803198",
+  "date": "2026-01-30T00:00Z",
+  "name": "Winnipeg Jets at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803199",
+  "date": "2026-01-30T00:00Z",
+  "name": "Nashville Predators at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803200",
+  "date": "2026-01-30T00:00Z",
+  "name": "New York Islanders at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803201",
+  "date": "2026-01-30T00:00Z",
+  "name": "Chicago Blackhawks at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803202",
+  "date": "2026-01-30T00:00Z",
+  "name": "Utah Mammoth at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803197",
+  "date": "2026-01-30T00:30Z",
+  "name": "Washington Capitals at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803203",
+  "date": "2026-01-30T01:00Z",
+  "name": "Florida Panthers at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803204",
+  "date": "2026-01-30T01:00Z",
+  "name": "Calgary Flames at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803205",
+  "date": "2026-01-30T02:00Z",
+  "name": "San Jose Sharks at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803206",
+  "date": "2026-01-30T03:00Z",
+  "name": "Anaheim Ducks at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803207",
+  "date": "2026-01-30T03:00Z",
+  "name": "Dallas Stars at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803208",
+  "date": "2026-01-30T03:00Z",
+  "name": "Toronto Maple Leafs at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803209",
+  "date": "2026-01-31T01:30Z",
+  "name": "Columbus Blue Jackets at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803210",
+  "date": "2026-01-31T17:30Z",
+  "name": "Los Angeles Kings at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803211",
+  "date": "2026-01-31T18:00Z",
+  "name": "Colorado Avalanche at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803212",
+  "date": "2026-01-31T20:30Z",
+  "name": "New York Rangers at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803213",
+  "date": "2026-01-31T21:00Z",
+  "name": "Winnipeg Jets at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803214",
+  "date": "2026-01-31T21:00Z",
+  "name": "San Jose Sharks at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803215",
+  "date": "2026-01-31T22:00Z",
+  "name": "Carolina Hurricanes at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803216",
+  "date": "2026-02-01T00:00Z",
+  "name": "Montreal Canadiens at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803217",
+  "date": "2026-02-01T00:00Z",
+  "name": "New Jersey Devils at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803218",
+  "date": "2026-02-01T00:00Z",
+  "name": "Nashville Predators at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803219",
+  "date": "2026-02-01T00:00Z",
+  "name": "Columbus Blue Jackets at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803220",
+  "date": "2026-02-01T00:00Z",
+  "name": "Toronto Maple Leafs at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803221",
+  "date": "2026-02-01T02:00Z",
+  "name": "Dallas Stars at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803222",
+  "date": "2026-02-01T03:00Z",
+  "name": "Minnesota Wild at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803223",
+  "date": "2026-02-01T03:00Z",
+  "name": "Seattle Kraken at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803225",
+  "date": "2026-02-01T20:00Z",
+  "name": "Los Angeles Kings at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803224",
+  "date": "2026-02-01T23:30Z",
+  "name": "Boston Bruins at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": "Navy Federal Credit Union Stadium Series"
+ },
+ {
+  "id": "401803226",
+  "date": "2026-02-02T02:30Z",
+  "name": "Vegas Golden Knights at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803227",
+  "date": "2026-02-03T00:00Z",
+  "name": "Buffalo Sabres at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803228",
+  "date": "2026-02-03T00:00Z",
+  "name": "Ottawa Senators at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803229",
+  "date": "2026-02-03T00:00Z",
+  "name": "New York Islanders at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803230",
+  "date": "2026-02-03T00:30Z",
+  "name": "Montreal Canadiens at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803231",
+  "date": "2026-02-03T01:00Z",
+  "name": "St. Louis Blues at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803232",
+  "date": "2026-02-03T01:30Z",
+  "name": "San Jose Sharks at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803233",
+  "date": "2026-02-03T01:30Z",
+  "name": "Winnipeg Jets at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803234",
+  "date": "2026-02-03T02:00Z",
+  "name": "Detroit Red Wings at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803235",
+  "date": "2026-02-03T02:30Z",
+  "name": "Vancouver Canucks at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803236",
+  "date": "2026-02-03T03:00Z",
+  "name": "Toronto Maple Leafs at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803238",
+  "date": "2026-02-04T00:00Z",
+  "name": "Columbus Blue Jackets at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803240",
+  "date": "2026-02-04T00:00Z",
+  "name": "Washington Capitals at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803241",
+  "date": "2026-02-04T00:00Z",
+  "name": "Ottawa Senators at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803237",
+  "date": "2026-02-04T00:30Z",
+  "name": "Buffalo Sabres at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803239",
+  "date": "2026-02-04T00:30Z",
+  "name": "Pittsburgh Penguins at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803242",
+  "date": "2026-02-04T01:30Z",
+  "name": "Toronto Maple Leafs at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803243",
+  "date": "2026-02-04T03:00Z",
+  "name": "Seattle Kraken at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803244",
+  "date": "2026-02-05T00:00Z",
+  "name": "Boston Bruins at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803245",
+  "date": "2026-02-05T00:00Z",
+  "name": "Chicago Blackhawks at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803246",
+  "date": "2026-02-05T00:00Z",
+  "name": "Montreal Canadiens at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803247",
+  "date": "2026-02-05T01:00Z",
+  "name": "Minnesota Wild at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803248",
+  "date": "2026-02-05T02:00Z",
+  "name": "San Jose Sharks at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803249",
+  "date": "2026-02-05T02:00Z",
+  "name": "Detroit Red Wings at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803250",
+  "date": "2026-02-05T02:30Z",
+  "name": "St. Louis Blues at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803251",
+  "date": "2026-02-05T03:00Z",
+  "name": "Edmonton Oilers at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803252",
+  "date": "2026-02-05T03:00Z",
+  "name": "Vancouver Canucks at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803253",
+  "date": "2026-02-05T03:00Z",
+  "name": "Seattle Kraken at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803254",
+  "date": "2026-02-06T00:00Z",
+  "name": "Pittsburgh Penguins at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803256",
+  "date": "2026-02-06T00:00Z",
+  "name": "New York Islanders at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803257",
+  "date": "2026-02-06T00:00Z",
+  "name": "Carolina Hurricanes at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803258",
+  "date": "2026-02-06T00:00Z",
+  "name": "Ottawa Senators at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803259",
+  "date": "2026-02-06T00:00Z",
+  "name": "Nashville Predators at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803255",
+  "date": "2026-02-06T00:30Z",
+  "name": "Florida Panthers at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803260",
+  "date": "2026-02-06T03:00Z",
+  "name": "Los Angeles Kings at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803261",
+  "date": "2026-02-26T00:00Z",
+  "name": "Buffalo Sabres at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803262",
+  "date": "2026-02-26T00:00Z",
+  "name": "Philadelphia Flyers at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803263",
+  "date": "2026-02-26T00:30Z",
+  "name": "Toronto Maple Leafs at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803264",
+  "date": "2026-02-26T01:00Z",
+  "name": "Seattle Kraken at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803265",
+  "date": "2026-02-26T02:00Z",
+  "name": "Colorado Avalanche at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803266",
+  "date": "2026-02-26T03:00Z",
+  "name": "Winnipeg Jets at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803267",
+  "date": "2026-02-26T03:20Z",
+  "name": "Vegas Golden Knights at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803268",
+  "date": "2026-02-26T03:30Z",
+  "name": "Edmonton Oilers at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803269",
+  "date": "2026-02-27T00:00Z",
+  "name": "Columbus Blue Jackets at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803270",
+  "date": "2026-02-27T00:00Z",
+  "name": "New York Islanders at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803271",
+  "date": "2026-02-27T00:00Z",
+  "name": "Detroit Red Wings at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803272",
+  "date": "2026-02-27T00:00Z",
+  "name": "Toronto Maple Leafs at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803273",
+  "date": "2026-02-27T00:00Z",
+  "name": "New Jersey Devils at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803274",
+  "date": "2026-02-27T00:00Z",
+  "name": "Tampa Bay Lightning at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803275",
+  "date": "2026-02-27T01:00Z",
+  "name": "Philadelphia Flyers at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803276",
+  "date": "2026-02-27T01:00Z",
+  "name": "Seattle Kraken at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803277",
+  "date": "2026-02-27T01:00Z",
+  "name": "Chicago Blackhawks at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803278",
+  "date": "2026-02-27T02:00Z",
+  "name": "Minnesota Wild at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803279",
+  "date": "2026-02-27T03:00Z",
+  "name": "Calgary Flames at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803280",
+  "date": "2026-02-27T03:30Z",
+  "name": "Edmonton Oilers at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803281",
+  "date": "2026-02-28T00:00Z",
+  "name": "Buffalo Sabres at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803282",
+  "date": "2026-02-28T00:00Z",
+  "name": "Vegas Golden Knights at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803283",
+  "date": "2026-02-28T02:00Z",
+  "name": "Minnesota Wild at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803284",
+  "date": "2026-02-28T03:00Z",
+  "name": "Winnipeg Jets at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803285",
+  "date": "2026-02-28T17:30Z",
+  "name": "Pittsburgh Penguins at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803286",
+  "date": "2026-02-28T20:20Z",
+  "name": "Boston Bruins at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803287",
+  "date": "2026-02-28T21:00Z",
+  "name": "Edmonton Oilers at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803294",
+  "date": "2026-02-28T22:00Z",
+  "name": "New Jersey Devils at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803288",
+  "date": "2026-02-28T23:00Z",
+  "name": "New York Islanders at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803289",
+  "date": "2026-02-28T23:00Z",
+  "name": "Chicago Blackhawks at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803290",
+  "date": "2026-03-01T00:00Z",
+  "name": "Ottawa Senators at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803291",
+  "date": "2026-03-01T00:00Z",
+  "name": "Washington Capitals at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803292",
+  "date": "2026-03-01T00:00Z",
+  "name": "Buffalo Sabres at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803293",
+  "date": "2026-03-01T00:00Z",
+  "name": "Detroit Red Wings at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803295",
+  "date": "2026-03-01T00:00Z",
+  "name": "Calgary Flames at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803296",
+  "date": "2026-03-01T01:00Z",
+  "name": "Nashville Predators at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803297",
+  "date": "2026-03-01T03:00Z",
+  "name": "Vancouver Canucks at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803298",
+  "date": "2026-03-01T18:00Z",
+  "name": "Vegas Golden Knights at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803300",
+  "date": "2026-03-01T21:00Z",
+  "name": "Chicago Blackhawks at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803301",
+  "date": "2026-03-01T21:00Z",
+  "name": "Winnipeg Jets at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803302",
+  "date": "2026-03-01T22:00Z",
+  "name": "St. Louis Blues at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803299",
+  "date": "2026-03-01T23:30Z",
+  "name": "Florida Panthers at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803303",
+  "date": "2026-03-02T01:00Z",
+  "name": "Calgary Flames at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803306",
+  "date": "2026-03-02T19:00Z",
+  "name": "Detroit Red Wings at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803304",
+  "date": "2026-03-03T00:00Z",
+  "name": "Columbus Blue Jackets at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803305",
+  "date": "2026-03-03T00:30Z",
+  "name": "Philadelphia Flyers at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803307",
+  "date": "2026-03-03T03:00Z",
+  "name": "Dallas Stars at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803308",
+  "date": "2026-03-03T03:00Z",
+  "name": "Carolina Hurricanes at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803309",
+  "date": "2026-03-03T03:30Z",
+  "name": "Colorado Avalanche at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803310",
+  "date": "2026-03-04T00:00Z",
+  "name": "Pittsburgh Penguins at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803311",
+  "date": "2026-03-04T00:00Z",
+  "name": "Vegas Golden Knights at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803312",
+  "date": "2026-03-04T00:00Z",
+  "name": "Florida Panthers at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803313",
+  "date": "2026-03-04T00:00Z",
+  "name": "Utah Mammoth at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803314",
+  "date": "2026-03-04T00:00Z",
+  "name": "Nashville Predators at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803315",
+  "date": "2026-03-04T01:00Z",
+  "name": "Chicago Blackhawks at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803316",
+  "date": "2026-03-04T02:00Z",
+  "name": "Dallas Stars at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803317",
+  "date": "2026-03-04T02:00Z",
+  "name": "Ottawa Senators at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803318",
+  "date": "2026-03-04T02:30Z",
+  "name": "Tampa Bay Lightning at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803319",
+  "date": "2026-03-04T03:00Z",
+  "name": "Colorado Avalanche at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803320",
+  "date": "2026-03-04T03:00Z",
+  "name": "Montreal Canadiens at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803321",
+  "date": "2026-03-05T00:00Z",
+  "name": "Vegas Golden Knights at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803322",
+  "date": "2026-03-05T00:00Z",
+  "name": "Toronto Maple Leafs at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803323",
+  "date": "2026-03-05T03:00Z",
+  "name": "Carolina Hurricanes at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803324",
+  "date": "2026-03-05T03:00Z",
+  "name": "New York Islanders at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803325",
+  "date": "2026-03-05T03:00Z",
+  "name": "St. Louis Blues at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803326",
+  "date": "2026-03-06T00:00Z",
+  "name": "Toronto Maple Leafs at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803327",
+  "date": "2026-03-06T00:00Z",
+  "name": "Utah Mammoth at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803328",
+  "date": "2026-03-06T00:00Z",
+  "name": "Buffalo Sabres at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803329",
+  "date": "2026-03-06T00:00Z",
+  "name": "Florida Panthers at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803330",
+  "date": "2026-03-06T01:00Z",
+  "name": "Boston Bruins at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803331",
+  "date": "2026-03-06T01:00Z",
+  "name": "Tampa Bay Lightning at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803332",
+  "date": "2026-03-06T02:00Z",
+  "name": "Ottawa Senators at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803333",
+  "date": "2026-03-06T02:30Z",
+  "name": "New York Islanders at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803334",
+  "date": "2026-03-07T00:00Z",
+  "name": "Florida Panthers at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803335",
+  "date": "2026-03-07T01:00Z",
+  "name": "Colorado Avalanche at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803336",
+  "date": "2026-03-07T01:30Z",
+  "name": "Vancouver Canucks at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803337",
+  "date": "2026-03-07T02:00Z",
+  "name": "Carolina Hurricanes at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803338",
+  "date": "2026-03-07T02:00Z",
+  "name": "Montreal Canadiens at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803339",
+  "date": "2026-03-07T03:00Z",
+  "name": "Minnesota Wild at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803340",
+  "date": "2026-03-07T03:00Z",
+  "name": "St. Louis Blues at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803341",
+  "date": "2026-03-07T17:30Z",
+  "name": "Washington Capitals at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803342",
+  "date": "2026-03-07T20:00Z",
+  "name": "New York Rangers at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803343",
+  "date": "2026-03-07T22:30Z",
+  "name": "Nashville Predators at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803344",
+  "date": "2026-03-07T22:30Z",
+  "name": "Philadelphia Flyers at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803345",
+  "date": "2026-03-08T00:00Z",
+  "name": "Tampa Bay Lightning at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803346",
+  "date": "2026-03-08T00:00Z",
+  "name": "Utah Mammoth at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803347",
+  "date": "2026-03-08T00:00Z",
+  "name": "Vancouver Canucks at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803348",
+  "date": "2026-03-08T00:00Z",
+  "name": "Montreal Canadiens at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803349",
+  "date": "2026-03-08T03:00Z",
+  "name": "Carolina Hurricanes at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803350",
+  "date": "2026-03-08T03:00Z",
+  "name": "New York Islanders at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803351",
+  "date": "2026-03-08T03:00Z",
+  "name": "Ottawa Senators at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803352",
+  "date": "2026-03-08T18:00Z",
+  "name": "Minnesota Wild at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803353",
+  "date": "2026-03-08T20:30Z",
+  "name": "Boston Bruins at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803354",
+  "date": "2026-03-08T22:00Z",
+  "name": "Tampa Bay Lightning at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803355",
+  "date": "2026-03-08T22:00Z",
+  "name": "Chicago Blackhawks at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803356",
+  "date": "2026-03-08T23:00Z",
+  "name": "Detroit Red Wings at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803357",
+  "date": "2026-03-09T01:00Z",
+  "name": "St. Louis Blues at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803358",
+  "date": "2026-03-09T01:45Z",
+  "name": "Edmonton Oilers at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401857755",
+  "date": "2026-03-09T20:00Z",
+  "name": "Los Angeles Kings at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": "Makeup from Jan 26"
+ },
+ {
+  "id": "401803359",
+  "date": "2026-03-09T23:00Z",
+  "name": "New York Rangers at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803360",
+  "date": "2026-03-09T23:00Z",
+  "name": "Calgary Flames at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803361",
+  "date": "2026-03-10T00:30Z",
+  "name": "Utah Mammoth at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803362",
+  "date": "2026-03-10T01:00Z",
+  "name": "Ottawa Senators at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803363",
+  "date": "2026-03-10T23:00Z",
+  "name": "Los Angeles Kings at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803364",
+  "date": "2026-03-10T23:00Z",
+  "name": "San Jose Sharks at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803365",
+  "date": "2026-03-10T23:00Z",
+  "name": "Toronto Maple Leafs at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803366",
+  "date": "2026-03-10T23:00Z",
+  "name": "Columbus Blue Jackets at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803367",
+  "date": "2026-03-10T23:00Z",
+  "name": "Detroit Red Wings at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803368",
+  "date": "2026-03-10T23:00Z",
+  "name": "Calgary Flames at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803369",
+  "date": "2026-03-10T23:00Z",
+  "name": "Pittsburgh Penguins at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803370",
+  "date": "2026-03-10T23:30Z",
+  "name": "New York Islanders at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803371",
+  "date": "2026-03-11T00:00Z",
+  "name": "Vegas Golden Knights at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803372",
+  "date": "2026-03-11T00:00Z",
+  "name": "Utah Mammoth at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803373",
+  "date": "2026-03-11T00:30Z",
+  "name": "Anaheim Ducks at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803374",
+  "date": "2026-03-11T02:00Z",
+  "name": "Edmonton Oilers at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803375",
+  "date": "2026-03-11T02:00Z",
+  "name": "Nashville Predators at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803376",
+  "date": "2026-03-11T23:30Z",
+  "name": "Montreal Canadiens at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803377",
+  "date": "2026-03-11T23:30Z",
+  "name": "Washington Capitals at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803378",
+  "date": "2026-03-12T23:00Z",
+  "name": "San Jose Sharks at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803379",
+  "date": "2026-03-12T23:00Z",
+  "name": "Washington Capitals at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803380",
+  "date": "2026-03-12T23:00Z",
+  "name": "Anaheim Ducks at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803381",
+  "date": "2026-03-12T23:00Z",
+  "name": "Detroit Red Wings at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803382",
+  "date": "2026-03-12T23:00Z",
+  "name": "Columbus Blue Jackets at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803383",
+  "date": "2026-03-12T23:00Z",
+  "name": "Calgary Flames at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803384",
+  "date": "2026-03-12T23:00Z",
+  "name": "St. Louis Blues at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803385",
+  "date": "2026-03-13T00:00Z",
+  "name": "Edmonton Oilers at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803386",
+  "date": "2026-03-13T00:00Z",
+  "name": "Philadelphia Flyers at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803387",
+  "date": "2026-03-13T00:00Z",
+  "name": "New York Rangers at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803388",
+  "date": "2026-03-13T01:00Z",
+  "name": "Chicago Blackhawks at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803389",
+  "date": "2026-03-13T02:00Z",
+  "name": "Nashville Predators at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803390",
+  "date": "2026-03-13T02:00Z",
+  "name": "Pittsburgh Penguins at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803391",
+  "date": "2026-03-13T02:00Z",
+  "name": "Colorado Avalanche at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803392",
+  "date": "2026-03-13T23:00Z",
+  "name": "Los Angeles Kings at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803393",
+  "date": "2026-03-14T00:00Z",
+  "name": "Edmonton Oilers at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803394",
+  "date": "2026-03-14T17:00Z",
+  "name": "Anaheim Ducks at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803395",
+  "date": "2026-03-14T19:00Z",
+  "name": "Boston Bruins at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803396",
+  "date": "2026-03-14T20:00Z",
+  "name": "Colorado Avalanche at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803397",
+  "date": "2026-03-14T22:00Z",
+  "name": "New York Rangers at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803398",
+  "date": "2026-03-14T23:00Z",
+  "name": "Toronto Maple Leafs at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803399",
+  "date": "2026-03-14T23:00Z",
+  "name": "San Jose Sharks at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803400",
+  "date": "2026-03-14T23:00Z",
+  "name": "Carolina Hurricanes at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803401",
+  "date": "2026-03-14T23:00Z",
+  "name": "Los Angeles Kings at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803402",
+  "date": "2026-03-14T23:00Z",
+  "name": "Calgary Flames at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803403",
+  "date": "2026-03-14T23:30Z",
+  "name": "Columbus Blue Jackets at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803404",
+  "date": "2026-03-15T00:00Z",
+  "name": "Detroit Red Wings at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803405",
+  "date": "2026-03-15T01:00Z",
+  "name": "Pittsburgh Penguins at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803406",
+  "date": "2026-03-15T02:00Z",
+  "name": "Seattle Kraken at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803407",
+  "date": "2026-03-15T02:00Z",
+  "name": "Chicago Blackhawks at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803408",
+  "date": "2026-03-15T19:00Z",
+  "name": "St. Louis Blues at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803409",
+  "date": "2026-03-15T21:00Z",
+  "name": "San Jose Sharks at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803410",
+  "date": "2026-03-15T23:00Z",
+  "name": "Anaheim Ducks at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803411",
+  "date": "2026-03-15T23:30Z",
+  "name": "Toronto Maple Leafs at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803412",
+  "date": "2026-03-16T00:00Z",
+  "name": "Nashville Predators at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803413",
+  "date": "2026-03-16T00:00Z",
+  "name": "Florida Panthers at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803414",
+  "date": "2026-03-16T23:00Z",
+  "name": "Calgary Flames at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803415",
+  "date": "2026-03-16T23:00Z",
+  "name": "Boston Bruins at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803416",
+  "date": "2026-03-16T23:00Z",
+  "name": "Los Angeles Kings at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803417",
+  "date": "2026-03-17T00:00Z",
+  "name": "Utah Mammoth at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803418",
+  "date": "2026-03-17T01:50Z",
+  "name": "Pittsburgh Penguins at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803419",
+  "date": "2026-03-17T23:00Z",
+  "name": "New York Islanders at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803420",
+  "date": "2026-03-17T23:00Z",
+  "name": "Boston Bruins at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803421",
+  "date": "2026-03-17T23:00Z",
+  "name": "Carolina Hurricanes at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803423",
+  "date": "2026-03-17T23:30Z",
+  "name": "Minnesota Wild at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803422",
+  "date": "2026-03-18T00:00Z",
+  "name": "Nashville Predators at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803424",
+  "date": "2026-03-18T01:00Z",
+  "name": "San Jose Sharks at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803425",
+  "date": "2026-03-18T02:00Z",
+  "name": "Florida Panthers at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803426",
+  "date": "2026-03-18T02:00Z",
+  "name": "Buffalo Sabres at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803427",
+  "date": "2026-03-18T02:00Z",
+  "name": "Tampa Bay Lightning at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803428",
+  "date": "2026-03-18T23:00Z",
+  "name": "New Jersey Devils at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803429",
+  "date": "2026-03-18T23:00Z",
+  "name": "Pittsburgh Penguins at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803430",
+  "date": "2026-03-18T23:30Z",
+  "name": "Ottawa Senators at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803431",
+  "date": "2026-03-19T01:30Z",
+  "name": "Dallas Stars at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803432",
+  "date": "2026-03-19T01:30Z",
+  "name": "St. Louis Blues at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803433",
+  "date": "2026-03-19T02:00Z",
+  "name": "Philadelphia Flyers at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803434",
+  "date": "2026-03-19T23:00Z",
+  "name": "Winnipeg Jets at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803435",
+  "date": "2026-03-19T23:00Z",
+  "name": "New York Islanders at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803436",
+  "date": "2026-03-19T23:00Z",
+  "name": "Montreal Canadiens at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803437",
+  "date": "2026-03-19T23:00Z",
+  "name": "New York Rangers at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803439",
+  "date": "2026-03-19T23:30Z",
+  "name": "Chicago Blackhawks at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803438",
+  "date": "2026-03-20T00:00Z",
+  "name": "Seattle Kraken at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803440",
+  "date": "2026-03-20T01:00Z",
+  "name": "Florida Panthers at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803441",
+  "date": "2026-03-20T02:00Z",
+  "name": "Tampa Bay Lightning at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803442",
+  "date": "2026-03-20T02:00Z",
+  "name": "Utah Mammoth at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803443",
+  "date": "2026-03-20T02:00Z",
+  "name": "Buffalo Sabres at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803444",
+  "date": "2026-03-20T02:30Z",
+  "name": "Philadelphia Flyers at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803445",
+  "date": "2026-03-20T23:00Z",
+  "name": "Carolina Hurricanes at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803446",
+  "date": "2026-03-20T23:00Z",
+  "name": "New Jersey Devils at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803447",
+  "date": "2026-03-21T00:30Z",
+  "name": "Colorado Avalanche at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803448",
+  "date": "2026-03-21T01:00Z",
+  "name": "Florida Panthers at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803449",
+  "date": "2026-03-21T02:00Z",
+  "name": "Anaheim Ducks at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803450",
+  "date": "2026-03-21T17:00Z",
+  "name": "Winnipeg Jets at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803451",
+  "date": "2026-03-21T18:00Z",
+  "name": "Vegas Golden Knights at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803452",
+  "date": "2026-03-21T20:00Z",
+  "name": "Dallas Stars at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803453",
+  "date": "2026-03-21T20:00Z",
+  "name": "Buffalo Sabres at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803454",
+  "date": "2026-03-21T20:00Z",
+  "name": "Philadelphia Flyers at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803455",
+  "date": "2026-03-21T21:00Z",
+  "name": "Seattle Kraken at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803456",
+  "date": "2026-03-21T23:00Z",
+  "name": "New York Islanders at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803457",
+  "date": "2026-03-21T23:00Z",
+  "name": "Toronto Maple Leafs at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803458",
+  "date": "2026-03-21T23:00Z",
+  "name": "St. Louis Blues at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803459",
+  "date": "2026-03-22T00:00Z",
+  "name": "Boston Bruins at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803460",
+  "date": "2026-03-22T02:00Z",
+  "name": "Tampa Bay Lightning at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803461",
+  "date": "2026-03-22T16:00Z",
+  "name": "Winnipeg Jets at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803462",
+  "date": "2026-03-22T16:30Z",
+  "name": "Colorado Avalanche at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803463",
+  "date": "2026-03-22T19:00Z",
+  "name": "Carolina Hurricanes at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803464",
+  "date": "2026-03-22T19:00Z",
+  "name": "Nashville Predators at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803465",
+  "date": "2026-03-22T23:00Z",
+  "name": "Columbus Blue Jackets at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803466",
+  "date": "2026-03-22T23:00Z",
+  "name": "Vegas Golden Knights at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803467",
+  "date": "2026-03-23T00:00Z",
+  "name": "Tampa Bay Lightning at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803468",
+  "date": "2026-03-23T00:00Z",
+  "name": "Buffalo Sabres at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803469",
+  "date": "2026-03-23T01:00Z",
+  "name": "Los Angeles Kings at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803470",
+  "date": "2026-03-23T23:30Z",
+  "name": "Ottawa Senators at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803471",
+  "date": "2026-03-24T23:00Z",
+  "name": "Toronto Maple Leafs at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803472",
+  "date": "2026-03-24T23:00Z",
+  "name": "Carolina Hurricanes at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803473",
+  "date": "2026-03-24T23:00Z",
+  "name": "Ottawa Senators at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803474",
+  "date": "2026-03-24T23:00Z",
+  "name": "Seattle Kraken at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803475",
+  "date": "2026-03-24T23:00Z",
+  "name": "Chicago Blackhawks at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803476",
+  "date": "2026-03-24T23:00Z",
+  "name": "Columbus Blue Jackets at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803477",
+  "date": "2026-03-24T23:00Z",
+  "name": "Colorado Avalanche at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803478",
+  "date": "2026-03-24T23:30Z",
+  "name": "Minnesota Wild at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803479",
+  "date": "2026-03-25T00:00Z",
+  "name": "Washington Capitals at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803480",
+  "date": "2026-03-25T00:00Z",
+  "name": "San Jose Sharks at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803481",
+  "date": "2026-03-25T00:00Z",
+  "name": "New Jersey Devils at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803482",
+  "date": "2026-03-25T00:00Z",
+  "name": "Vegas Golden Knights at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803484",
+  "date": "2026-03-25T01:00Z",
+  "name": "Los Angeles Kings at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803483",
+  "date": "2026-03-25T01:30Z",
+  "name": "Edmonton Oilers at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803485",
+  "date": "2026-03-25T02:00Z",
+  "name": "Anaheim Ducks at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803486",
+  "date": "2026-03-25T23:30Z",
+  "name": "Boston Bruins at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803487",
+  "date": "2026-03-25T23:30Z",
+  "name": "New York Rangers at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803488",
+  "date": "2026-03-26T23:00Z",
+  "name": "Columbus Blue Jackets at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803489",
+  "date": "2026-03-26T23:00Z",
+  "name": "Pittsburgh Penguins at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803490",
+  "date": "2026-03-26T23:00Z",
+  "name": "Seattle Kraken at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803491",
+  "date": "2026-03-26T23:00Z",
+  "name": "Minnesota Wild at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803492",
+  "date": "2026-03-26T23:00Z",
+  "name": "Dallas Stars at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803493",
+  "date": "2026-03-26T23:00Z",
+  "name": "Chicago Blackhawks at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803494",
+  "date": "2026-03-27T00:00Z",
+  "name": "San Jose Sharks at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803495",
+  "date": "2026-03-27T00:00Z",
+  "name": "New Jersey Devils at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803496",
+  "date": "2026-03-27T00:00Z",
+  "name": "Colorado Avalanche at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803497",
+  "date": "2026-03-27T01:00Z",
+  "name": "Washington Capitals at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803498",
+  "date": "2026-03-27T01:00Z",
+  "name": "Anaheim Ducks at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803499",
+  "date": "2026-03-27T01:30Z",
+  "name": "Edmonton Oilers at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803500",
+  "date": "2026-03-27T02:00Z",
+  "name": "Los Angeles Kings at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803501",
+  "date": "2026-03-27T23:00Z",
+  "name": "Detroit Red Wings at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803502",
+  "date": "2026-03-27T23:00Z",
+  "name": "Chicago Blackhawks at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803503",
+  "date": "2026-03-28T17:00Z",
+  "name": "Ottawa Senators at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803504",
+  "date": "2026-03-28T17:00Z",
+  "name": "Florida Panthers at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803505",
+  "date": "2026-03-28T19:30Z",
+  "name": "Anaheim Ducks at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803506",
+  "date": "2026-03-28T21:00Z",
+  "name": "Minnesota Wild at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803507",
+  "date": "2026-03-28T21:00Z",
+  "name": "Dallas Stars at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803508",
+  "date": "2026-03-28T21:00Z",
+  "name": "New Jersey Devils at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803509",
+  "date": "2026-03-28T21:00Z",
+  "name": "San Jose Sharks at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803510",
+  "date": "2026-03-28T21:30Z",
+  "name": "Seattle Kraken at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803511",
+  "date": "2026-03-28T23:00Z",
+  "name": "Toronto Maple Leafs at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803512",
+  "date": "2026-03-28T23:00Z",
+  "name": "Montreal Canadiens at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803513",
+  "date": "2026-03-28T23:00Z",
+  "name": "Winnipeg Jets at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803514",
+  "date": "2026-03-29T00:00Z",
+  "name": "Philadelphia Flyers at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803515",
+  "date": "2026-03-29T01:00Z",
+  "name": "Utah Mammoth at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803516",
+  "date": "2026-03-29T02:00Z",
+  "name": "Vancouver Canucks at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803517",
+  "date": "2026-03-29T02:30Z",
+  "name": "Washington Capitals at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803518",
+  "date": "2026-03-29T17:00Z",
+  "name": "Florida Panthers at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803519",
+  "date": "2026-03-29T21:00Z",
+  "name": "Nashville Predators at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803520",
+  "date": "2026-03-29T21:00Z",
+  "name": "Montreal Canadiens at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803521",
+  "date": "2026-03-29T21:00Z",
+  "name": "Boston Bruins at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803522",
+  "date": "2026-03-29T23:00Z",
+  "name": "Chicago Blackhawks at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803523",
+  "date": "2026-03-29T23:00Z",
+  "name": "Dallas Stars at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803524",
+  "date": "2026-03-30T23:00Z",
+  "name": "Pittsburgh Penguins at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803525",
+  "date": "2026-03-31T00:30Z",
+  "name": "Calgary Flames at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803526",
+  "date": "2026-03-31T02:00Z",
+  "name": "Vancouver Canucks at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803527",
+  "date": "2026-03-31T02:00Z",
+  "name": "Toronto Maple Leafs at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803528",
+  "date": "2026-03-31T02:00Z",
+  "name": "St. Louis Blues at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803529",
+  "date": "2026-03-31T23:00Z",
+  "name": "Dallas Stars at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803530",
+  "date": "2026-03-31T23:00Z",
+  "name": "New York Islanders at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803531",
+  "date": "2026-03-31T23:00Z",
+  "name": "Montreal Canadiens at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803532",
+  "date": "2026-03-31T23:00Z",
+  "name": "Ottawa Senators at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803533",
+  "date": "2026-03-31T23:00Z",
+  "name": "New Jersey Devils at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803534",
+  "date": "2026-03-31T23:00Z",
+  "name": "Detroit Red Wings at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803535",
+  "date": "2026-03-31T23:00Z",
+  "name": "Philadelphia Flyers at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803536",
+  "date": "2026-03-31T23:30Z",
+  "name": "Carolina Hurricanes at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803537",
+  "date": "2026-04-01T00:30Z",
+  "name": "Winnipeg Jets at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803538",
+  "date": "2026-04-01T01:00Z",
+  "name": "Seattle Kraken at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803539",
+  "date": "2026-04-02T00:30Z",
+  "name": "Vancouver Canucks at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803540",
+  "date": "2026-04-02T01:00Z",
+  "name": "St. Louis Blues at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803541",
+  "date": "2026-04-02T01:00Z",
+  "name": "Anaheim Ducks at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803542",
+  "date": "2026-04-02T23:00Z",
+  "name": "Buffalo Sabres at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803543",
+  "date": "2026-04-02T23:00Z",
+  "name": "Pittsburgh Penguins at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803544",
+  "date": "2026-04-02T23:00Z",
+  "name": "Boston Bruins at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803546",
+  "date": "2026-04-02T23:00Z",
+  "name": "Montreal Canadiens at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803547",
+  "date": "2026-04-02T23:00Z",
+  "name": "Detroit Red Wings at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803548",
+  "date": "2026-04-02T23:00Z",
+  "name": "Columbus Blue Jackets at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803545",
+  "date": "2026-04-02T23:30Z",
+  "name": "Washington Capitals at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803549",
+  "date": "2026-04-03T00:00Z",
+  "name": "Winnipeg Jets at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803550",
+  "date": "2026-04-03T00:00Z",
+  "name": "Vancouver Canucks at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803551",
+  "date": "2026-04-03T01:00Z",
+  "name": "Chicago Blackhawks at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803552",
+  "date": "2026-04-03T02:00Z",
+  "name": "Calgary Flames at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803553",
+  "date": "2026-04-03T02:00Z",
+  "name": "Toronto Maple Leafs at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803554",
+  "date": "2026-04-03T02:00Z",
+  "name": "Utah Mammoth at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803555",
+  "date": "2026-04-03T02:30Z",
+  "name": "Nashville Predators at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803556",
+  "date": "2026-04-03T23:00Z",
+  "name": "Philadelphia Flyers at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803557",
+  "date": "2026-04-04T02:00Z",
+  "name": "St. Louis Blues at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803558",
+  "date": "2026-04-04T16:30Z",
+  "name": "Detroit Red Wings at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803559",
+  "date": "2026-04-04T17:00Z",
+  "name": "Minnesota Wild at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803560",
+  "date": "2026-04-04T19:00Z",
+  "name": "Colorado Avalanche at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803561",
+  "date": "2026-04-04T21:00Z",
+  "name": "Boston Bruins at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803562",
+  "date": "2026-04-04T21:00Z",
+  "name": "Florida Panthers at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803563",
+  "date": "2026-04-04T23:00Z",
+  "name": "Montreal Canadiens at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803564",
+  "date": "2026-04-04T23:00Z",
+  "name": "Buffalo Sabres at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803565",
+  "date": "2026-04-04T23:00Z",
+  "name": "New York Islanders at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803566",
+  "date": "2026-04-04T23:00Z",
+  "name": "Winnipeg Jets at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803567",
+  "date": "2026-04-04T23:00Z",
+  "name": "Utah Mammoth at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803568",
+  "date": "2026-04-04T23:00Z",
+  "name": "Toronto Maple Leafs at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803569",
+  "date": "2026-04-05T02:00Z",
+  "name": "Vegas Golden Knights at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803570",
+  "date": "2026-04-05T02:00Z",
+  "name": "Calgary Flames at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803571",
+  "date": "2026-04-05T02:00Z",
+  "name": "Nashville Predators at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803572",
+  "date": "2026-04-05T02:00Z",
+  "name": "Chicago Blackhawks at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803573",
+  "date": "2026-04-05T17:00Z",
+  "name": "Minnesota Wild at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803574",
+  "date": "2026-04-05T19:00Z",
+  "name": "Florida Panthers at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803575",
+  "date": "2026-04-05T19:30Z",
+  "name": "Boston Bruins at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803576",
+  "date": "2026-04-05T21:00Z",
+  "name": "Carolina Hurricanes at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803577",
+  "date": "2026-04-05T23:00Z",
+  "name": "New Jersey Devils at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803578",
+  "date": "2026-04-05T23:00Z",
+  "name": "Washington Capitals at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803579",
+  "date": "2026-04-06T01:45Z",
+  "name": "St. Louis Blues at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803580",
+  "date": "2026-04-06T23:00Z",
+  "name": "Tampa Bay Lightning at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803581",
+  "date": "2026-04-06T23:30Z",
+  "name": "Seattle Kraken at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803582",
+  "date": "2026-04-07T02:00Z",
+  "name": "Chicago Blackhawks at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803583",
+  "date": "2026-04-07T02:30Z",
+  "name": "Nashville Predators at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803584",
+  "date": "2026-04-07T23:00Z",
+  "name": "Florida Panthers at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803585",
+  "date": "2026-04-07T23:00Z",
+  "name": "Tampa Bay Lightning at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803586",
+  "date": "2026-04-07T23:00Z",
+  "name": "Columbus Blue Jackets at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803587",
+  "date": "2026-04-07T23:00Z",
+  "name": "Philadelphia Flyers at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803588",
+  "date": "2026-04-07T23:00Z",
+  "name": "Boston Bruins at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803589",
+  "date": "2026-04-08T00:00Z",
+  "name": "Colorado Avalanche at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803590",
+  "date": "2026-04-08T00:00Z",
+  "name": "Calgary Flames at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803591",
+  "date": "2026-04-08T00:00Z",
+  "name": "Seattle Kraken at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803592",
+  "date": "2026-04-08T01:30Z",
+  "name": "Edmonton Oilers at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803593",
+  "date": "2026-04-08T02:00Z",
+  "name": "Vegas Golden Knights at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803594",
+  "date": "2026-04-08T02:00Z",
+  "name": "Nashville Predators at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803595",
+  "date": "2026-04-08T23:00Z",
+  "name": "Buffalo Sabres at New York Rangers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803596",
+  "date": "2026-04-08T23:30Z",
+  "name": "Washington Capitals at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803597",
+  "date": "2026-04-09T02:00Z",
+  "name": "Edmonton Oilers at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803603",
+  "date": "2026-04-09T22:45Z",
+  "name": "Toronto Maple Leafs at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803598",
+  "date": "2026-04-09T23:00Z",
+  "name": "Columbus Blue Jackets at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803599",
+  "date": "2026-04-09T23:00Z",
+  "name": "Tampa Bay Lightning at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803600",
+  "date": "2026-04-09T23:00Z",
+  "name": "Florida Panthers at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803601",
+  "date": "2026-04-09T23:00Z",
+  "name": "Philadelphia Flyers at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803602",
+  "date": "2026-04-09T23:00Z",
+  "name": "Pittsburgh Penguins at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803604",
+  "date": "2026-04-10T00:00Z",
+  "name": "Winnipeg Jets at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803606",
+  "date": "2026-04-10T00:30Z",
+  "name": "Carolina Hurricanes at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803605",
+  "date": "2026-04-10T01:00Z",
+  "name": "Minnesota Wild at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803607",
+  "date": "2026-04-10T01:00Z",
+  "name": "Calgary Flames at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803608",
+  "date": "2026-04-10T01:00Z",
+  "name": "Nashville Predators at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803609",
+  "date": "2026-04-10T02:00Z",
+  "name": "San Jose Sharks at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803610",
+  "date": "2026-04-10T02:00Z",
+  "name": "Vegas Golden Knights at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803611",
+  "date": "2026-04-10T02:30Z",
+  "name": "Vancouver Canucks at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803612",
+  "date": "2026-04-11T16:30Z",
+  "name": "Tampa Bay Lightning at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803613",
+  "date": "2026-04-11T17:00Z",
+  "name": "Ottawa Senators at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803614",
+  "date": "2026-04-11T19:00Z",
+  "name": "Washington Capitals at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803615",
+  "date": "2026-04-11T20:00Z",
+  "name": "Edmonton Oilers at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803616",
+  "date": "2026-04-11T21:00Z",
+  "name": "New Jersey Devils at Detroit Red Wings",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803617",
+  "date": "2026-04-11T21:00Z",
+  "name": "St. Louis Blues at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803618",
+  "date": "2026-04-11T21:00Z",
+  "name": "Minnesota Wild at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803619",
+  "date": "2026-04-11T21:00Z",
+  "name": "New York Rangers at Dallas Stars",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803620",
+  "date": "2026-04-11T21:00Z",
+  "name": "Carolina Hurricanes at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803621",
+  "date": "2026-04-11T23:00Z",
+  "name": "Florida Panthers at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803622",
+  "date": "2026-04-11T23:00Z",
+  "name": "Columbus Blue Jackets at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803623",
+  "date": "2026-04-11T23:00Z",
+  "name": "Philadelphia Flyers at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803624",
+  "date": "2026-04-11T23:00Z",
+  "name": "Calgary Flames at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803625",
+  "date": "2026-04-12T00:00Z",
+  "name": "Vegas Golden Knights at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803626",
+  "date": "2026-04-12T02:00Z",
+  "name": "Vancouver Canucks at San Jose Sharks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803627",
+  "date": "2026-04-12T19:00Z",
+  "name": "Pittsburgh Penguins at Washington Capitals",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803628",
+  "date": "2026-04-12T22:00Z",
+  "name": "Montreal Canadiens at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803629",
+  "date": "2026-04-12T22:00Z",
+  "name": "Boston Bruins at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803630",
+  "date": "2026-04-12T23:00Z",
+  "name": "Ottawa Senators at New Jersey Devils",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803631",
+  "date": "2026-04-13T00:00Z",
+  "name": "Vancouver Canucks at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803632",
+  "date": "2026-04-13T01:00Z",
+  "name": "Utah Mammoth at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803633",
+  "date": "2026-04-13T23:00Z",
+  "name": "Detroit Red Wings at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803634",
+  "date": "2026-04-13T23:00Z",
+  "name": "New York Rangers at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803635",
+  "date": "2026-04-13T23:00Z",
+  "name": "Carolina Hurricanes at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803636",
+  "date": "2026-04-13T23:30Z",
+  "name": "Dallas Stars at Toronto Maple Leafs",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803637",
+  "date": "2026-04-14T00:00Z",
+  "name": "Minnesota Wild at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803638",
+  "date": "2026-04-14T00:00Z",
+  "name": "San Jose Sharks at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803639",
+  "date": "2026-04-14T00:30Z",
+  "name": "Buffalo Sabres at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803640",
+  "date": "2026-04-14T01:30Z",
+  "name": "Colorado Avalanche at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803642",
+  "date": "2026-04-14T01:30Z",
+  "name": "Los Angeles Kings at Seattle Kraken",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803641",
+  "date": "2026-04-14T02:00Z",
+  "name": "Winnipeg Jets at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803643",
+  "date": "2026-04-14T23:00Z",
+  "name": "New Jersey Devils at Boston Bruins",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803644",
+  "date": "2026-04-14T23:00Z",
+  "name": "Carolina Hurricanes at New York Islanders",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803645",
+  "date": "2026-04-14T23:00Z",
+  "name": "Montreal Canadiens at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803646",
+  "date": "2026-04-14T23:00Z",
+  "name": "Washington Capitals at Columbus Blue Jackets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803647",
+  "date": "2026-04-15T00:00Z",
+  "name": "Anaheim Ducks at Minnesota Wild",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803648",
+  "date": "2026-04-15T01:00Z",
+  "name": "Winnipeg Jets at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803649",
+  "date": "2026-04-15T01:00Z",
+  "name": "Colorado Avalanche at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803650",
+  "date": "2026-04-15T01:30Z",
+  "name": "Pittsburgh Penguins at St. Louis Blues",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803651",
+  "date": "2026-04-15T02:00Z",
+  "name": "Los Angeles Kings at Vancouver Canucks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803652",
+  "date": "2026-04-15T23:00Z",
+  "name": "Dallas Stars at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803653",
+  "date": "2026-04-15T23:00Z",
+  "name": "New York Rangers at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803654",
+  "date": "2026-04-15T23:00Z",
+  "name": "Detroit Red Wings at Florida Panthers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803655",
+  "date": "2026-04-15T23:30Z",
+  "name": "Toronto Maple Leafs at Ottawa Senators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803656",
+  "date": "2026-04-16T00:30Z",
+  "name": "San Jose Sharks at Chicago Blackhawks",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803657",
+  "date": "2026-04-16T02:00Z",
+  "name": "Seattle Kraken at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803660",
+  "date": "2026-04-16T23:30Z",
+  "name": "St. Louis Blues at Utah Mammoth",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803658",
+  "date": "2026-04-17T00:00Z",
+  "name": "Anaheim Ducks at Nashville Predators",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803659",
+  "date": "2026-04-17T00:00Z",
+  "name": "San Jose Sharks at Winnipeg Jets",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803661",
+  "date": "2026-04-17T01:00Z",
+  "name": "Los Angeles Kings at Calgary Flames",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803662",
+  "date": "2026-04-17T01:00Z",
+  "name": "Vancouver Canucks at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401803663",
+  "date": "2026-04-17T02:00Z",
+  "name": "Seattle Kraken at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 2,
+  "note": null
+ },
+ {
+  "id": "401869715",
+  "date": "2026-04-18T19:00Z",
+  "name": "Ottawa Senators at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 1"
+ },
+ {
+  "id": "401869716",
+  "date": "2026-04-18T21:30Z",
+  "name": "Minnesota Wild at Dallas Stars",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 1"
+ },
+ {
+  "id": "401869717",
+  "date": "2026-04-19T00:00Z",
+  "name": "Philadelphia Flyers at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 1"
+ },
+ {
+  "id": "401869721",
+  "date": "2026-04-19T19:00Z",
+  "name": "Los Angeles Kings at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 1"
+ },
+ {
+  "id": "401869718",
+  "date": "2026-04-19T21:45Z",
+  "name": "Montreal Canadiens at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 1"
+ },
+ {
+  "id": "401869719",
+  "date": "2026-04-19T23:30Z",
+  "name": "Boston Bruins at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 1"
+ },
+ {
+  "id": "401869720",
+  "date": "2026-04-20T02:22Z",
+  "name": "Utah Mammoth at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 1"
+ },
+ {
+  "id": "401869794",
+  "date": "2026-04-20T23:00Z",
+  "name": "Philadelphia Flyers at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 2"
+ },
+ {
+  "id": "401869781",
+  "date": "2026-04-20T23:30Z",
+  "name": "Ottawa Senators at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 2"
+ },
+ {
+  "id": "401869780",
+  "date": "2026-04-21T01:50Z",
+  "name": "Minnesota Wild at Dallas Stars",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 2"
+ },
+ {
+  "id": "401869722",
+  "date": "2026-04-21T02:22Z",
+  "name": "Anaheim Ducks at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 1"
+ },
+ {
+  "id": "401869769",
+  "date": "2026-04-21T23:00Z",
+  "name": "Montreal Canadiens at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 2"
+ },
+ {
+  "id": "401869757",
+  "date": "2026-04-21T23:30Z",
+  "name": "Boston Bruins at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 2"
+ },
+ {
+  "id": "401869756",
+  "date": "2026-04-22T01:52Z",
+  "name": "Utah Mammoth at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 2"
+ },
+ {
+  "id": "401869792",
+  "date": "2026-04-22T02:22Z",
+  "name": "Los Angeles Kings at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 2"
+ },
+ {
+  "id": "401869796",
+  "date": "2026-04-22T23:00Z",
+  "name": "Pittsburgh Penguins at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 3"
+ },
+ {
+  "id": "401869782",
+  "date": "2026-04-23T01:30Z",
+  "name": "Dallas Stars at Minnesota Wild",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 3"
+ },
+ {
+  "id": "401869768",
+  "date": "2026-04-23T02:00Z",
+  "name": "Anaheim Ducks at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 2"
+ },
+ {
+  "id": "401869759",
+  "date": "2026-04-23T23:00Z",
+  "name": "Buffalo Sabres at Boston Bruins",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 3"
+ },
+ {
+  "id": "401869783",
+  "date": "2026-04-23T23:30Z",
+  "name": "Carolina Hurricanes at Ottawa Senators",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 3"
+ },
+ {
+  "id": "401869793",
+  "date": "2026-04-24T02:00Z",
+  "name": "Colorado Avalanche at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 3"
+ },
+ {
+  "id": "401869771",
+  "date": "2026-04-24T23:00Z",
+  "name": "Tampa Bay Lightning at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 3"
+ },
+ {
+  "id": "401869758",
+  "date": "2026-04-25T01:30Z",
+  "name": "Vegas Golden Knights at Utah Mammoth",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 3"
+ },
+ {
+  "id": "401869770",
+  "date": "2026-04-25T02:00Z",
+  "name": "Edmonton Oilers at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 3"
+ },
+ {
+  "id": "401869786",
+  "date": "2026-04-25T19:00Z",
+  "name": "Carolina Hurricanes at Ottawa Senators",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 4"
+ },
+ {
+  "id": "401869784",
+  "date": "2026-04-25T21:30Z",
+  "name": "Dallas Stars at Minnesota Wild",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 4"
+ },
+ {
+  "id": "401869799",
+  "date": "2026-04-26T00:00Z",
+  "name": "Pittsburgh Penguins at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 4"
+ },
+ {
+  "id": "401869762",
+  "date": "2026-04-26T18:00Z",
+  "name": "Buffalo Sabres at Boston Bruins",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 4"
+ },
+ {
+  "id": "401869795",
+  "date": "2026-04-26T20:30Z",
+  "name": "Colorado Avalanche at Los Angeles Kings",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 4"
+ },
+ {
+  "id": "401869773",
+  "date": "2026-04-26T23:00Z",
+  "name": "Tampa Bay Lightning at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 4"
+ },
+ {
+  "id": "401869772",
+  "date": "2026-04-27T01:52Z",
+  "name": "Edmonton Oilers at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 4"
+ },
+ {
+  "id": "401869801",
+  "date": "2026-04-27T23:00Z",
+  "name": "Philadelphia Flyers at Pittsburgh Penguins",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 5"
+ },
+ {
+  "id": "401869760",
+  "date": "2026-04-28T01:50Z",
+  "name": "Vegas Golden Knights at Utah Mammoth",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 4"
+ },
+ {
+  "id": "401869764",
+  "date": "2026-04-28T23:30Z",
+  "name": "Boston Bruins at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 5"
+ },
+ {
+  "id": "401869785",
+  "date": "2026-04-29T00:00Z",
+  "name": "Minnesota Wild at Dallas Stars",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 5"
+ },
+ {
+  "id": "401869774",
+  "date": "2026-04-29T02:00Z",
+  "name": "Anaheim Ducks at Edmonton Oilers",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 5"
+ },
+ {
+  "id": "401869775",
+  "date": "2026-04-29T23:00Z",
+  "name": "Montreal Canadiens at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 5"
+ },
+ {
+  "id": "401869802",
+  "date": "2026-04-29T23:30Z",
+  "name": "Pittsburgh Penguins at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 6"
+ },
+ {
+  "id": "401869761",
+  "date": "2026-04-30T02:00Z",
+  "name": "Utah Mammoth at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 5"
+ },
+ {
+  "id": "401869787",
+  "date": "2026-04-30T23:30Z",
+  "name": "Dallas Stars at Minnesota Wild",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 6"
+ },
+ {
+  "id": "401869776",
+  "date": "2026-05-01T02:00Z",
+  "name": "Edmonton Oilers at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 6"
+ },
+ {
+  "id": "401869777",
+  "date": "2026-05-01T23:00Z",
+  "name": "Tampa Bay Lightning at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 6"
+ },
+ {
+  "id": "401869765",
+  "date": "2026-05-01T23:30Z",
+  "name": "Buffalo Sabres at Boston Bruins",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 6"
+ },
+ {
+  "id": "401869763",
+  "date": "2026-05-02T02:20Z",
+  "name": "Vegas Golden Knights at Utah Mammoth",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 1st Round - Game 6"
+ },
+ {
+  "id": "401871166",
+  "date": "2026-05-03T00:00Z",
+  "name": "Philadelphia Flyers at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 2nd Round - Game 1"
+ },
+ {
+  "id": "401869779",
+  "date": "2026-05-03T22:00Z",
+  "name": "Montreal Canadiens at Tampa Bay Lightning",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 1st Round - Game 7"
+ },
+ {
+  "id": "401871302",
+  "date": "2026-05-04T01:00Z",
+  "name": "Minnesota Wild at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 2nd Round - Game 1"
+ },
+ {
+  "id": "401871411",
+  "date": "2026-05-04T23:00Z",
+  "name": "Philadelphia Flyers at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 2nd Round - Game 2"
+ },
+ {
+  "id": "401871423",
+  "date": "2026-05-05T01:50Z",
+  "name": "Anaheim Ducks at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 2nd Round - Game 1"
+ },
+ {
+  "id": "401871417",
+  "date": "2026-05-06T00:00Z",
+  "name": "Minnesota Wild at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 2nd Round - Game 2"
+ },
+ {
+  "id": "401871404",
+  "date": "2026-05-06T23:00Z",
+  "name": "Montreal Canadiens at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 2nd Round - Game 1"
+ },
+ {
+  "id": "401871424",
+  "date": "2026-05-07T01:30Z",
+  "name": "Anaheim Ducks at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 2nd Round - Game 2"
+ },
+ {
+  "id": "401871412",
+  "date": "2026-05-08T00:00Z",
+  "name": "Carolina Hurricanes at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 2nd Round - Game 3"
+ },
+ {
+  "id": "401871405",
+  "date": "2026-05-08T23:00Z",
+  "name": "Montreal Canadiens at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 2nd Round - Game 2"
+ },
+ {
+  "id": "401871425",
+  "date": "2026-05-09T01:30Z",
+  "name": "Vegas Golden Knights at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 2nd Round - Game 3"
+ },
+ {
+  "id": "401871413",
+  "date": "2026-05-09T22:00Z",
+  "name": "Carolina Hurricanes at Philadelphia Flyers",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 2nd Round - Game 4"
+ },
+ {
+  "id": "401871418",
+  "date": "2026-05-10T01:00Z",
+  "name": "Colorado Avalanche at Minnesota Wild",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 2nd Round - Game 3"
+ },
+ {
+  "id": "401871406",
+  "date": "2026-05-10T23:00Z",
+  "name": "Buffalo Sabres at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 2nd Round - Game 3"
+ },
+ {
+  "id": "401871426",
+  "date": "2026-05-11T01:30Z",
+  "name": "Vegas Golden Knights at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 2nd Round - Game 4"
+ },
+ {
+  "id": "401871419",
+  "date": "2026-05-12T00:00Z",
+  "name": "Colorado Avalanche at Minnesota Wild",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 2nd Round - Game 4"
+ },
+ {
+  "id": "401871407",
+  "date": "2026-05-12T23:00Z",
+  "name": "Buffalo Sabres at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 2nd Round - Game 4"
+ },
+ {
+  "id": "401871427",
+  "date": "2026-05-13T01:52Z",
+  "name": "Anaheim Ducks at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 2nd Round - Game 5"
+ },
+ {
+  "id": "401871420",
+  "date": "2026-05-14T00:00Z",
+  "name": "Minnesota Wild at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 2nd Round - Game 5"
+ },
+ {
+  "id": "401871408",
+  "date": "2026-05-14T23:00Z",
+  "name": "Montreal Canadiens at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 2nd Round - Game 5"
+ },
+ {
+  "id": "401871428",
+  "date": "2026-05-15T01:30Z",
+  "name": "Vegas Golden Knights at Anaheim Ducks",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West 2nd Round - Game 6"
+ },
+ {
+  "id": "401871409",
+  "date": "2026-05-17T00:00Z",
+  "name": "Buffalo Sabres at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 2nd Round - Game 6"
+ },
+ {
+  "id": "401871410",
+  "date": "2026-05-18T23:30Z",
+  "name": "Montreal Canadiens at Buffalo Sabres",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East 2nd Round - Game 7"
+ },
+ {
+  "id": "401872903",
+  "date": "2026-05-21T00:00Z",
+  "name": "Vegas Golden Knights at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West Final - Game 1"
+ },
+ {
+  "id": "401873383",
+  "date": "2026-05-22T00:00Z",
+  "name": "Montreal Canadiens at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East Final - Game 1"
+ },
+ {
+  "id": "401872904",
+  "date": "2026-05-23T00:00Z",
+  "name": "Vegas Golden Knights at Colorado Avalanche",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West Final - Game 2"
+ },
+ {
+  "id": "401873384",
+  "date": "2026-05-23T23:00Z",
+  "name": "Montreal Canadiens at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East Final - Game 2"
+ },
+ {
+  "id": "401872905",
+  "date": "2026-05-25T00:00Z",
+  "name": "Colorado Avalanche at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West Final - Game 3"
+ },
+ {
+  "id": "401873385",
+  "date": "2026-05-26T00:00Z",
+  "name": "Carolina Hurricanes at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East Final - Game 3"
+ },
+ {
+  "id": "401872906",
+  "date": "2026-05-27T01:00Z",
+  "name": "Colorado Avalanche at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 3,
+  "note": "West Final - Game 4"
+ },
+ {
+  "id": "401873386",
+  "date": "2026-05-28T00:00Z",
+  "name": "Carolina Hurricanes at Montreal Canadiens",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East Final - Game 4"
+ },
+ {
+  "id": "401873387",
+  "date": "2026-05-30T00:00Z",
+  "name": "Montreal Canadiens at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 3,
+  "note": "East Final - Game 5"
+ },
+ {
+  "id": "401874171",
+  "date": "2026-06-03T00:00Z",
+  "name": "Vegas Golden Knights at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 3,
+  "note": "Stanley Cup Final - Game 1"
+ },
+ {
+  "id": "401874172",
+  "date": "2026-06-05T00:00Z",
+  "name": "Vegas Golden Knights at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 3,
+  "note": "Stanley Cup Final - Game 2"
+ },
+ {
+  "id": "401874173",
+  "date": "2026-06-07T00:00Z",
+  "name": "Carolina Hurricanes at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 3,
+  "note": "Stanley Cup Final - Game 3"
+ },
+ {
+  "id": "401874174",
+  "date": "2026-06-10T00:00Z",
+  "name": "Carolina Hurricanes at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 3,
+  "note": "Stanley Cup Final - Game 4"
+ },
+ {
+  "id": "401874175",
+  "date": "2026-06-12T00:00Z",
+  "name": "Vegas Golden Knights at Carolina Hurricanes",
+  "state": "post",
+  "seasontype": 3,
+  "note": "Stanley Cup Final - Game 5"
+ },
+ {
+  "id": "401874176",
+  "date": "2026-06-15T00:00Z",
+  "name": "Carolina Hurricanes at Vegas Golden Knights",
+  "state": "post",
+  "seasontype": 3,
+  "note": "Stanley Cup Final - Game 6"
+ }
+]

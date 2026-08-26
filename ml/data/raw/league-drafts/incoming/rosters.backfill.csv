@@ -1,0 +1,12 @@
+league_name,playoff_round,manager,position,player_id,is_active,points_earned,activated_from_ir
+Press Play-offs,3,nuttguy,D,8476422,true,0,false
+Press Play-offs,3,nuttguy,D,8478970,true,3,false
+Press Play-offs,3,nuttguy,D,8480817,true,2,false
+Press Play-offs,3,nuttguy,F,8475791,true,4,false
+Press Play-offs,3,nuttguy,F,8478427,true,3,false
+Press Play-offs,3,nuttguy,F,8480039,true,2,false
+Press Play-offs,3,nuttguy,F,8482093,true,4,false
+Press Play-offs,3,nuttguy,F,8482809,true,4,false
+Press Play-offs,3,nuttguy,G,null,true,10,false
+Press Play-offs,3,nuttguy,IR_D,8476906,true,4,false
+Press Play-offs,3,nuttguy,IR_F,8477940,true,5,false

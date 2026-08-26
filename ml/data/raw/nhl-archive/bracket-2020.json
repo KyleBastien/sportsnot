@@ -1,0 +1,1139 @@
+{
+ "bracketLogo": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-en.png",
+ "bracketLogoFr": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-fr.png",
+ "series": [
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-a/canadiens-vs-flyers",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "A",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "C4",
+   "topSeedWins": 4,
+   "bottomSeedRank": 8,
+   "bottomSeedRankAbbrev": "C12",
+   "bottomSeedWins": 2,
+   "winningTeamId": 4,
+   "losingTeamId": 8,
+   "topSeedTeam": {
+    "id": 4,
+    "abbrev": "PHI",
+    "name": {
+     "default": "Philadelphia Flyers",
+     "fr": "Flyers de Philadelphie"
+    },
+    "commonName": {
+     "default": "Flyers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Philadelphia",
+     "fr": "de Philadelphie"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PHI_19992000-20222023_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PHI_19992000-20222023_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 8,
+    "abbrev": "MTL",
+    "name": {
+     "default": "Montr\u00e9al Canadiens",
+     "fr": "Canadiens de Montr\u00e9al"
+    },
+    "commonName": {
+     "default": "Canadiens"
+    },
+    "placeNameWithPreposition": {
+     "default": "Montr\u00e9al",
+     "fr": "de Montr\u00e9al"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MTL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MTL_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-b/bluejackets-vs-lightning",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "B",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "C2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 7,
+   "bottomSeedRankAbbrev": "C9",
+   "bottomSeedWins": 1,
+   "winningTeamId": 14,
+   "losingTeamId": 29,
+   "topSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 29,
+    "abbrev": "CBJ",
+    "name": {
+     "default": "Columbus Blue Jackets",
+     "fr": "Blue Jackets de Columbus"
+    },
+    "commonName": {
+     "default": "Blue Jackets"
+    },
+    "placeNameWithPreposition": {
+     "default": "Columbus",
+     "fr": "de Columbus"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CBJ_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CBJ_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-c/islanders-vs-capitals",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "C",
+   "playoffRound": 1,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "C3",
+   "topSeedWins": 1,
+   "bottomSeedRank": 6,
+   "bottomSeedRankAbbrev": "C7",
+   "bottomSeedWins": 4,
+   "winningTeamId": 2,
+   "losingTeamId": 15,
+   "topSeedTeam": {
+    "id": 15,
+    "abbrev": "WSH",
+    "name": {
+     "default": "Washington Capitals",
+     "fr": "Capitals de Washington"
+    },
+    "commonName": {
+     "default": "Capitals"
+    },
+    "placeNameWithPreposition": {
+     "default": "Washington",
+     "fr": "de Washington"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WSH_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 2,
+    "abbrev": "NYI",
+    "name": {
+     "default": "New York Islanders",
+     "fr": "Islanders de New York"
+    },
+    "commonName": {
+     "default": "Islanders"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYI_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYI_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-d/hurricanes-vs-bruins",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "D",
+   "playoffRound": 1,
+   "topSeedRank": 4,
+   "topSeedRankAbbrev": "C1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 5,
+   "bottomSeedRankAbbrev": "C6",
+   "bottomSeedWins": 1,
+   "winningTeamId": 6,
+   "losingTeamId": 12,
+   "topSeedTeam": {
+    "id": 6,
+    "abbrev": "BOS",
+    "name": {
+     "default": "Boston Bruins",
+     "fr": "Bruins de Boston"
+    },
+    "commonName": {
+     "default": "Bruins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Boston",
+     "fr": "de Boston"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 12,
+    "abbrev": "CAR",
+    "name": {
+     "default": "Carolina Hurricanes",
+     "fr": "Hurricanes de la Caroline"
+    },
+    "commonName": {
+     "default": "Hurricanes"
+    },
+    "placeNameWithPreposition": {
+     "default": "Carolina",
+     "fr": "de la Caroline"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CAR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CAR_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-e/blackhawks-vs-goldenknights",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "E",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "C3",
+   "topSeedWins": 4,
+   "bottomSeedRank": 8,
+   "bottomSeedRankAbbrev": "C12",
+   "bottomSeedWins": 1,
+   "winningTeamId": 54,
+   "losingTeamId": 16,
+   "topSeedTeam": {
+    "id": 54,
+    "abbrev": "VGK",
+    "name": {
+     "default": "Vegas Golden Knights",
+     "fr": "Golden Knights de Vegas"
+    },
+    "commonName": {
+     "default": "Golden Knights"
+    },
+    "placeNameWithPreposition": {
+     "default": "Vegas",
+     "fr": "de Vegas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/VGK_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/VGK_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 16,
+    "abbrev": "CHI",
+    "name": {
+     "default": "Chicago Blackhawks",
+     "fr": "Blackhawks de Chicago"
+    },
+    "commonName": {
+     "default": "Blackhawks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Chicago",
+     "fr": "de Chicago"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-f/coyotes-vs-avalanche",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "F",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "C2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 7,
+   "bottomSeedRankAbbrev": "C11",
+   "bottomSeedWins": 1,
+   "winningTeamId": 21,
+   "losingTeamId": 53,
+   "topSeedTeam": {
+    "id": 21,
+    "abbrev": "COL",
+    "name": {
+     "default": "Colorado Avalanche",
+     "fr": "Avalanche du Colorado"
+    },
+    "commonName": {
+     "default": "Avalanche"
+    },
+    "placeNameWithPreposition": {
+     "default": "Colorado",
+     "fr": "du Colorado"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/COL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/COL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 53,
+    "abbrev": "ARI",
+    "name": {
+     "default": "Arizona Coyotes",
+     "fr": "Coyotes de l'Arizona"
+    },
+    "commonName": {
+     "default": "Coyotes"
+    },
+    "placeNameWithPreposition": {
+     "default": "Arizona",
+     "fr": "de l'Arizona"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/ARI_20142015-20202021_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/ARI_20142015-20202021_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-g/flames-vs-stars",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "G",
+   "playoffRound": 1,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "C4",
+   "topSeedWins": 4,
+   "bottomSeedRank": 6,
+   "bottomSeedRankAbbrev": "C8",
+   "bottomSeedWins": 2,
+   "winningTeamId": 25,
+   "losingTeamId": 20,
+   "topSeedTeam": {
+    "id": 25,
+    "abbrev": "DAL",
+    "name": {
+     "default": "Dallas Stars",
+     "fr": "Stars de Dallas"
+    },
+    "commonName": {
+     "default": "Stars"
+    },
+    "placeNameWithPreposition": {
+     "default": "Dallas",
+     "fr": "de Dallas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 20,
+    "abbrev": "CGY",
+    "name": {
+     "default": "Calgary Flames",
+     "fr": "Flames de Calgary"
+    },
+    "commonName": {
+     "default": "Flames"
+    },
+    "placeNameWithPreposition": {
+     "default": "Calgary",
+     "fr": "de Calgary"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CGY_19941995-20192020_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CGY_19941995-20192020_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-h/canucks-vs-blues",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "H",
+   "playoffRound": 1,
+   "topSeedRank": 4,
+   "topSeedRankAbbrev": "C1",
+   "topSeedWins": 2,
+   "bottomSeedRank": 5,
+   "bottomSeedRankAbbrev": "C7",
+   "bottomSeedWins": 4,
+   "winningTeamId": 23,
+   "losingTeamId": 19,
+   "topSeedTeam": {
+    "id": 19,
+    "abbrev": "STL",
+    "name": {
+     "default": "St. Louis Blues",
+     "fr": "Blues de St. Louis"
+    },
+    "commonName": {
+     "default": "Blues"
+    },
+    "placeNameWithPreposition": {
+     "default": "St. Louis",
+     "fr": "de St. Louis"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 23,
+    "abbrev": "VAN",
+    "name": {
+     "default": "Vancouver Canucks",
+     "fr": "Canucks de Vancouver"
+    },
+    "commonName": {
+     "default": "Canucks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Vancouver",
+     "fr": "de Vancouver"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/VAN_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/VAN_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-i/islanders-vs-flyers",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "I",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "C4",
+   "topSeedWins": 3,
+   "bottomSeedRank": 6,
+   "bottomSeedRankAbbrev": "C7",
+   "bottomSeedWins": 4,
+   "winningTeamId": 2,
+   "losingTeamId": 4,
+   "topSeedTeam": {
+    "id": 4,
+    "abbrev": "PHI",
+    "name": {
+     "default": "Philadelphia Flyers",
+     "fr": "Flyers de Philadelphie"
+    },
+    "commonName": {
+     "default": "Flyers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Philadelphia",
+     "fr": "de Philadelphie"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PHI_19992000-20222023_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PHI_19992000-20222023_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 2,
+    "abbrev": "NYI",
+    "name": {
+     "default": "New York Islanders",
+     "fr": "Islanders de New York"
+    },
+    "commonName": {
+     "default": "Islanders"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYI_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYI_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-j/bruins-vs-lightning",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "J",
+   "playoffRound": 2,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "C2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "C1",
+   "bottomSeedWins": 1,
+   "winningTeamId": 14,
+   "losingTeamId": 6,
+   "topSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 6,
+    "abbrev": "BOS",
+    "name": {
+     "default": "Boston Bruins",
+     "fr": "Bruins de Boston"
+    },
+    "commonName": {
+     "default": "Bruins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Boston",
+     "fr": "de Boston"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-k/canucks-vs-goldenknights",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "K",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "C3",
+   "topSeedWins": 4,
+   "bottomSeedRank": 5,
+   "bottomSeedRankAbbrev": "C7",
+   "bottomSeedWins": 3,
+   "winningTeamId": 54,
+   "losingTeamId": 23,
+   "topSeedTeam": {
+    "id": 54,
+    "abbrev": "VGK",
+    "name": {
+     "default": "Vegas Golden Knights",
+     "fr": "Golden Knights de Vegas"
+    },
+    "commonName": {
+     "default": "Golden Knights"
+    },
+    "placeNameWithPreposition": {
+     "default": "Vegas",
+     "fr": "de Vegas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/VGK_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/VGK_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 23,
+    "abbrev": "VAN",
+    "name": {
+     "default": "Vancouver Canucks",
+     "fr": "Canucks de Vancouver"
+    },
+    "commonName": {
+     "default": "Canucks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Vancouver",
+     "fr": "de Vancouver"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/VAN_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/VAN_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-l/stars-vs-avalanche",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "L",
+   "playoffRound": 2,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "C2",
+   "topSeedWins": 3,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "C4",
+   "bottomSeedWins": 4,
+   "winningTeamId": 25,
+   "losingTeamId": 21,
+   "topSeedTeam": {
+    "id": 21,
+    "abbrev": "COL",
+    "name": {
+     "default": "Colorado Avalanche",
+     "fr": "Avalanche du Colorado"
+    },
+    "commonName": {
+     "default": "Avalanche"
+    },
+    "placeNameWithPreposition": {
+     "default": "Colorado",
+     "fr": "du Colorado"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/COL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/COL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 25,
+    "abbrev": "DAL",
+    "name": {
+     "default": "Dallas Stars",
+     "fr": "Stars de Dallas"
+    },
+    "commonName": {
+     "default": "Stars"
+    },
+    "placeNameWithPreposition": {
+     "default": "Dallas",
+     "fr": "de Dallas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-m/islanders-vs-lightning",
+   "seriesTitle": "Eastern Conference Finals",
+   "seriesAbbrev": "ECF",
+   "seriesLetter": "M",
+   "conferenceAbbrev": "E",
+   "conferenceName": "Eastern",
+   "playoffRound": 3,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "C2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 6,
+   "bottomSeedRankAbbrev": "C7",
+   "bottomSeedWins": 2,
+   "winningTeamId": 14,
+   "losingTeamId": 2,
+   "topSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 2,
+    "abbrev": "NYI",
+    "name": {
+     "default": "New York Islanders",
+     "fr": "Islanders de New York"
+    },
+    "commonName": {
+     "default": "Islanders"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYI_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYI_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-n/stars-vs-goldenknights",
+   "seriesTitle": "Western Conference Finals",
+   "seriesAbbrev": "WCF",
+   "seriesLetter": "N",
+   "conferenceAbbrev": "W",
+   "conferenceName": "Western",
+   "playoffRound": 3,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "C3",
+   "topSeedWins": 1,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "C4",
+   "bottomSeedWins": 4,
+   "winningTeamId": 25,
+   "losingTeamId": 54,
+   "topSeedTeam": {
+    "id": 54,
+    "abbrev": "VGK",
+    "name": {
+     "default": "Vegas Golden Knights",
+     "fr": "Golden Knights de Vegas"
+    },
+    "commonName": {
+     "default": "Golden Knights"
+    },
+    "placeNameWithPreposition": {
+     "default": "Vegas",
+     "fr": "de Vegas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/VGK_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/VGK_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 25,
+    "abbrev": "DAL",
+    "name": {
+     "default": "Dallas Stars",
+     "fr": "Stars de Dallas"
+    },
+    "commonName": {
+     "default": "Stars"
+    },
+    "placeNameWithPreposition": {
+     "default": "Dallas",
+     "fr": "de Dallas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-o/stars-vs-lightning",
+   "seriesLogo": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesLogoFr": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesTitle": "Stanley Cup Final",
+   "seriesAbbrev": "SCF",
+   "seriesLetter": "O",
+   "playoffRound": 4,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "C2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "C4",
+   "bottomSeedWins": 2,
+   "winningTeamId": 14,
+   "losingTeamId": 25,
+   "topSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 25,
+    "abbrev": "DAL",
+    "name": {
+     "default": "Dallas Stars",
+     "fr": "Stars de Dallas"
+    },
+    "commonName": {
+     "default": "Stars"
+    },
+    "placeNameWithPreposition": {
+     "default": "Dallas",
+     "fr": "de Dallas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-s/canadiens-vs-penguins",
+   "seriesTitle": "Stanley Cup Qualifiers",
+   "seriesAbbrev": "SCQ",
+   "seriesLetter": "S",
+   "playoffRound": 0,
+   "topSeedRank": 5,
+   "topSeedRankAbbrev": "C5",
+   "topSeedWins": 1,
+   "bottomSeedRank": 12,
+   "bottomSeedRankAbbrev": "C12",
+   "bottomSeedWins": 3,
+   "winningTeamId": 8,
+   "losingTeamId": 5,
+   "topSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 8,
+    "abbrev": "MTL",
+    "name": {
+     "default": "Montr\u00e9al Canadiens",
+     "fr": "Canadiens de Montr\u00e9al"
+    },
+    "commonName": {
+     "default": "Canadiens"
+    },
+    "placeNameWithPreposition": {
+     "default": "Montr\u00e9al",
+     "fr": "de Montr\u00e9al"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MTL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MTL_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-t/rangers-vs-hurricanes",
+   "seriesTitle": "Stanley Cup Qualifiers",
+   "seriesAbbrev": "SCQ",
+   "seriesLetter": "T",
+   "playoffRound": 0,
+   "topSeedRank": 6,
+   "topSeedRankAbbrev": "C6",
+   "topSeedWins": 3,
+   "bottomSeedRank": 11,
+   "bottomSeedRankAbbrev": "C11",
+   "bottomSeedWins": 0,
+   "winningTeamId": 12,
+   "losingTeamId": 3,
+   "topSeedTeam": {
+    "id": 12,
+    "abbrev": "CAR",
+    "name": {
+     "default": "Carolina Hurricanes",
+     "fr": "Hurricanes de la Caroline"
+    },
+    "commonName": {
+     "default": "Hurricanes"
+    },
+    "placeNameWithPreposition": {
+     "default": "Carolina",
+     "fr": "de la Caroline"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CAR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CAR_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 3,
+    "abbrev": "NYR",
+    "name": {
+     "default": "New York Rangers",
+     "fr": "Rangers de New York"
+    },
+    "commonName": {
+     "default": "Rangers"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYR_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-u/panthers-vs-islanders",
+   "seriesTitle": "Stanley Cup Qualifiers",
+   "seriesAbbrev": "SCQ",
+   "seriesLetter": "U",
+   "playoffRound": 0,
+   "topSeedRank": 7,
+   "topSeedRankAbbrev": "C7",
+   "topSeedWins": 3,
+   "bottomSeedRank": 10,
+   "bottomSeedRankAbbrev": "C10",
+   "bottomSeedWins": 1,
+   "winningTeamId": 2,
+   "losingTeamId": 13,
+   "topSeedTeam": {
+    "id": 2,
+    "abbrev": "NYI",
+    "name": {
+     "default": "New York Islanders",
+     "fr": "Islanders de New York"
+    },
+    "commonName": {
+     "default": "Islanders"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYI_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYI_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 13,
+    "abbrev": "FLA",
+    "name": {
+     "default": "Florida Panthers",
+     "fr": "Panthers de la Floride"
+    },
+    "commonName": {
+     "default": "Panthers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Florida",
+     "fr": "de la Floride"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/FLA_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/FLA_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-v/bluejackets-vs-mapleleafs",
+   "seriesTitle": "Stanley Cup Qualifiers",
+   "seriesAbbrev": "SCQ",
+   "seriesLetter": "V",
+   "playoffRound": 0,
+   "topSeedRank": 8,
+   "topSeedRankAbbrev": "C8",
+   "topSeedWins": 2,
+   "bottomSeedRank": 9,
+   "bottomSeedRankAbbrev": "C9",
+   "bottomSeedWins": 3,
+   "winningTeamId": 29,
+   "losingTeamId": 10,
+   "topSeedTeam": {
+    "id": 10,
+    "abbrev": "TOR",
+    "name": {
+     "default": "Toronto Maple Leafs",
+     "fr": "Maple Leafs de Toronto"
+    },
+    "commonName": {
+     "default": "Maple Leafs"
+    },
+    "placeNameWithPreposition": {
+     "default": "Toronto",
+     "fr": "de Toronto"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TOR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TOR_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 29,
+    "abbrev": "CBJ",
+    "name": {
+     "default": "Columbus Blue Jackets",
+     "fr": "Blue Jackets de Columbus"
+    },
+    "commonName": {
+     "default": "Blue Jackets"
+    },
+    "placeNameWithPreposition": {
+     "default": "Columbus",
+     "fr": "de Columbus"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CBJ_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CBJ_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-w/blackhawks-vs-oilers",
+   "seriesTitle": "Stanley Cup Qualifiers",
+   "seriesAbbrev": "SCQ",
+   "seriesLetter": "W",
+   "playoffRound": 0,
+   "topSeedRank": 5,
+   "topSeedRankAbbrev": "C5",
+   "topSeedWins": 1,
+   "bottomSeedRank": 12,
+   "bottomSeedRankAbbrev": "C12",
+   "bottomSeedWins": 3,
+   "winningTeamId": 16,
+   "losingTeamId": 22,
+   "topSeedTeam": {
+    "id": 22,
+    "abbrev": "EDM",
+    "name": {
+     "default": "Edmonton Oilers",
+     "fr": "Oilers d'Edmonton"
+    },
+    "commonName": {
+     "default": "Oilers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Edmonton",
+     "fr": "d'Edmonton"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/EDM_20172018-20212022_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/EDM_20172018-20212022_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 16,
+    "abbrev": "CHI",
+    "name": {
+     "default": "Chicago Blackhawks",
+     "fr": "Blackhawks de Chicago"
+    },
+    "commonName": {
+     "default": "Blackhawks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Chicago",
+     "fr": "de Chicago"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-x/coyotes-vs-predators",
+   "seriesTitle": "Stanley Cup Qualifiers",
+   "seriesAbbrev": "SCQ",
+   "seriesLetter": "X",
+   "playoffRound": 0,
+   "topSeedRank": 6,
+   "topSeedRankAbbrev": "C6",
+   "topSeedWins": 1,
+   "bottomSeedRank": 11,
+   "bottomSeedRankAbbrev": "C11",
+   "bottomSeedWins": 3,
+   "winningTeamId": 53,
+   "losingTeamId": 18,
+   "topSeedTeam": {
+    "id": 18,
+    "abbrev": "NSH",
+    "name": {
+     "default": "Nashville Predators",
+     "fr": "Predators de Nashville"
+    },
+    "commonName": {
+     "default": "Predators"
+    },
+    "placeNameWithPreposition": {
+     "default": "Nashville",
+     "fr": "de Nashville"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NSH_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 53,
+    "abbrev": "ARI",
+    "name": {
+     "default": "Arizona Coyotes",
+     "fr": "Coyotes de l'Arizona"
+    },
+    "commonName": {
+     "default": "Coyotes"
+    },
+    "placeNameWithPreposition": {
+     "default": "Arizona",
+     "fr": "de l'Arizona"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/ARI_20142015-20202021_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/ARI_20142015-20202021_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-y/wild-vs-canucks",
+   "seriesTitle": "Stanley Cup Qualifiers",
+   "seriesAbbrev": "SCQ",
+   "seriesLetter": "Y",
+   "playoffRound": 0,
+   "topSeedRank": 7,
+   "topSeedRankAbbrev": "C7",
+   "topSeedWins": 3,
+   "bottomSeedRank": 10,
+   "bottomSeedRankAbbrev": "C10",
+   "bottomSeedWins": 1,
+   "winningTeamId": 23,
+   "losingTeamId": 30,
+   "topSeedTeam": {
+    "id": 23,
+    "abbrev": "VAN",
+    "name": {
+     "default": "Vancouver Canucks",
+     "fr": "Canucks de Vancouver"
+    },
+    "commonName": {
+     "default": "Canucks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Vancouver",
+     "fr": "de Vancouver"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/VAN_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/VAN_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 30,
+    "abbrev": "MIN",
+    "name": {
+     "default": "Minnesota Wild",
+     "fr": "Wild du Minnesota"
+    },
+    "commonName": {
+     "default": "Wild"
+    },
+    "placeNameWithPreposition": {
+     "default": "Minnesota",
+     "fr": "du Minnesota"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MIN_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MIN_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2020/series-z/jets-vs-flames",
+   "seriesTitle": "Stanley Cup Qualifiers",
+   "seriesAbbrev": "SCQ",
+   "seriesLetter": "Z",
+   "playoffRound": 0,
+   "topSeedRank": 8,
+   "topSeedRankAbbrev": "C8",
+   "topSeedWins": 3,
+   "bottomSeedRank": 9,
+   "bottomSeedRankAbbrev": "C9",
+   "bottomSeedWins": 1,
+   "winningTeamId": 20,
+   "losingTeamId": 52,
+   "topSeedTeam": {
+    "id": 20,
+    "abbrev": "CGY",
+    "name": {
+     "default": "Calgary Flames",
+     "fr": "Flames de Calgary"
+    },
+    "commonName": {
+     "default": "Flames"
+    },
+    "placeNameWithPreposition": {
+     "default": "Calgary",
+     "fr": "de Calgary"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CGY_19941995-20192020_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CGY_19941995-20192020_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 52,
+    "abbrev": "WPG",
+    "name": {
+     "default": "Winnipeg Jets",
+     "fr": "Jets de Winnipeg"
+    },
+    "commonName": {
+     "default": "Jets"
+    },
+    "placeNameWithPreposition": {
+     "default": "Winnipeg",
+     "fr": "de Winnipeg"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WPG_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WPG_dark.svg"
+   }
+  }
+ ]
+}

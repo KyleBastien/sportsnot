@@ -1,0 +1,747 @@
+{
+ "bracketLogo": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-en.png",
+ "bracketLogoFr": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-fr.png",
+ "series": [
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-a/islanders-vs-panthers",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "A",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 2,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC1",
+   "bottomSeedWins": 4,
+   "winningTeamId": 2,
+   "losingTeamId": 13,
+   "topSeedTeam": {
+    "id": 13,
+    "abbrev": "FLA",
+    "name": {
+     "default": "Florida Panthers",
+     "fr": "Panthers de la Floride"
+    },
+    "commonName": {
+     "default": "Panthers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Florida",
+     "fr": "de la Floride"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/FLA_19992000-20152016_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/FLA_19992000-20152016_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 2,
+    "abbrev": "NYI",
+    "name": {
+     "default": "New York Islanders",
+     "fr": "Islanders de New York"
+    },
+    "commonName": {
+     "default": "Islanders"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYI_20102011-20162017_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYI_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-b/redwings-vs-lightning",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "B",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 1,
+   "winningTeamId": 14,
+   "losingTeamId": 17,
+   "topSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 17,
+    "abbrev": "DET",
+    "name": {
+     "default": "Detroit Red Wings",
+     "fr": "Red Wings de Detroit"
+    },
+    "commonName": {
+     "default": "Red Wings"
+    },
+    "placeNameWithPreposition": {
+     "default": "Detroit",
+     "fr": "de Detroit"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/DET_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/DET_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-c/flyers-vs-capitals",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "C",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC2",
+   "bottomSeedWins": 2,
+   "winningTeamId": 15,
+   "losingTeamId": 4,
+   "topSeedTeam": {
+    "id": 15,
+    "abbrev": "WSH",
+    "name": {
+     "default": "Washington Capitals",
+     "fr": "Capitals de Washington"
+    },
+    "commonName": {
+     "default": "Capitals"
+    },
+    "placeNameWithPreposition": {
+     "default": "Washington",
+     "fr": "de Washington"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WSH_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 4,
+    "abbrev": "PHI",
+    "name": {
+     "default": "Philadelphia Flyers",
+     "fr": "Flyers de Philadelphie"
+    },
+    "commonName": {
+     "default": "Flyers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Philadelphia",
+     "fr": "de Philadelphie"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PHI_19992000-20222023_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PHI_19992000-20222023_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-d/rangers-vs-penguins",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "D",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 1,
+   "winningTeamId": 5,
+   "losingTeamId": 3,
+   "topSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 3,
+    "abbrev": "NYR",
+    "name": {
+     "default": "New York Rangers",
+     "fr": "Rangers de New York"
+    },
+    "commonName": {
+     "default": "Rangers"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYR_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-e/wild-vs-stars",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "E",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC2",
+   "bottomSeedWins": 2,
+   "winningTeamId": 25,
+   "losingTeamId": 30,
+   "topSeedTeam": {
+    "id": 25,
+    "abbrev": "DAL",
+    "name": {
+     "default": "Dallas Stars",
+     "fr": "Stars de Dallas"
+    },
+    "commonName": {
+     "default": "Stars"
+    },
+    "placeNameWithPreposition": {
+     "default": "Dallas",
+     "fr": "de Dallas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 30,
+    "abbrev": "MIN",
+    "name": {
+     "default": "Minnesota Wild",
+     "fr": "Wild du Minnesota"
+    },
+    "commonName": {
+     "default": "Wild"
+    },
+    "placeNameWithPreposition": {
+     "default": "Minnesota",
+     "fr": "du Minnesota"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MIN_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MIN_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-f/blackhawks-vs-blues",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "F",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 3,
+   "winningTeamId": 19,
+   "losingTeamId": 16,
+   "topSeedTeam": {
+    "id": 19,
+    "abbrev": "STL",
+    "name": {
+     "default": "St. Louis Blues",
+     "fr": "Blues de St. Louis"
+    },
+    "commonName": {
+     "default": "Blues"
+    },
+    "placeNameWithPreposition": {
+     "default": "St. Louis",
+     "fr": "de St. Louis"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 16,
+    "abbrev": "CHI",
+    "name": {
+     "default": "Chicago Blackhawks",
+     "fr": "Blackhawks de Chicago"
+    },
+    "commonName": {
+     "default": "Blackhawks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Chicago",
+     "fr": "de Chicago"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-g/predators-vs-ducks",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "G",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 3,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC1",
+   "bottomSeedWins": 4,
+   "winningTeamId": 18,
+   "losingTeamId": 24,
+   "topSeedTeam": {
+    "id": 24,
+    "abbrev": "ANA",
+    "name": {
+     "default": "Anaheim Ducks",
+     "fr": "Ducks d'Anaheim"
+    },
+    "commonName": {
+     "default": "Ducks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Anaheim",
+     "fr": "d'Anaheim"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 18,
+    "abbrev": "NSH",
+    "name": {
+     "default": "Nashville Predators",
+     "fr": "Predators de Nashville"
+    },
+    "commonName": {
+     "default": "Predators"
+    },
+    "placeNameWithPreposition": {
+     "default": "Nashville",
+     "fr": "de Nashville"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NSH_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-h/sharks-vs-kings",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "H",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 1,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 4,
+   "winningTeamId": 28,
+   "losingTeamId": 26,
+   "topSeedTeam": {
+    "id": 26,
+    "abbrev": "LAK",
+    "name": {
+     "default": "Los Angeles Kings",
+     "fr": "Kings de Los Angeles"
+    },
+    "commonName": {
+     "default": "Kings"
+    },
+    "placeNameWithPreposition": {
+     "default": "Los Angeles",
+     "fr": "de Los Angeles"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/LAK_20112012-20182019_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/LAK_20112012-20182019_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 28,
+    "abbrev": "SJS",
+    "name": {
+     "default": "San Jose Sharks",
+     "fr": "Sharks de San Jose"
+    },
+    "commonName": {
+     "default": "Sharks"
+    },
+    "placeNameWithPreposition": {
+     "default": "San Jose",
+     "fr": "de San Jose"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-i/islanders-vs-lightning",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "I",
+   "playoffRound": 2,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC1",
+   "bottomSeedWins": 1,
+   "winningTeamId": 14,
+   "losingTeamId": 2,
+   "topSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 2,
+    "abbrev": "NYI",
+    "name": {
+     "default": "New York Islanders",
+     "fr": "Islanders de New York"
+    },
+    "commonName": {
+     "default": "Islanders"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYI_20102011-20162017_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYI_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-j/penguins-vs-capitals",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "J",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 2,
+   "bottomSeedRank": 2,
+   "bottomSeedRankAbbrev": "D2",
+   "bottomSeedWins": 4,
+   "winningTeamId": 5,
+   "losingTeamId": 15,
+   "topSeedTeam": {
+    "id": 15,
+    "abbrev": "WSH",
+    "name": {
+     "default": "Washington Capitals",
+     "fr": "Capitals de Washington"
+    },
+    "commonName": {
+     "default": "Capitals"
+    },
+    "placeNameWithPreposition": {
+     "default": "Washington",
+     "fr": "de Washington"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WSH_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-k/blues-vs-stars",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "K",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 3,
+   "bottomSeedRank": 2,
+   "bottomSeedRankAbbrev": "D2",
+   "bottomSeedWins": 4,
+   "winningTeamId": 19,
+   "losingTeamId": 25,
+   "topSeedTeam": {
+    "id": 25,
+    "abbrev": "DAL",
+    "name": {
+     "default": "Dallas Stars",
+     "fr": "Stars de Dallas"
+    },
+    "commonName": {
+     "default": "Stars"
+    },
+    "placeNameWithPreposition": {
+     "default": "Dallas",
+     "fr": "de Dallas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/DAL_20122013-20202021_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 19,
+    "abbrev": "STL",
+    "name": {
+     "default": "St. Louis Blues",
+     "fr": "Blues de St. Louis"
+    },
+    "commonName": {
+     "default": "Blues"
+    },
+    "placeNameWithPreposition": {
+     "default": "St. Louis",
+     "fr": "de St. Louis"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-l/predators-vs-sharks",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "L",
+   "playoffRound": 2,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "D3",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC1",
+   "bottomSeedWins": 3,
+   "winningTeamId": 28,
+   "losingTeamId": 18,
+   "topSeedTeam": {
+    "id": 28,
+    "abbrev": "SJS",
+    "name": {
+     "default": "San Jose Sharks",
+     "fr": "Sharks de San Jose"
+    },
+    "commonName": {
+     "default": "Sharks"
+    },
+    "placeNameWithPreposition": {
+     "default": "San Jose",
+     "fr": "de San Jose"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 18,
+    "abbrev": "NSH",
+    "name": {
+     "default": "Nashville Predators",
+     "fr": "Predators de Nashville"
+    },
+    "commonName": {
+     "default": "Predators"
+    },
+    "placeNameWithPreposition": {
+     "default": "Nashville",
+     "fr": "de Nashville"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NSH_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-m/lightning-vs-penguins",
+   "seriesTitle": "Eastern Conference Finals",
+   "seriesAbbrev": "ECF",
+   "seriesLetter": "M",
+   "conferenceAbbrev": "E",
+   "conferenceName": "Eastern",
+   "playoffRound": 3,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 2,
+   "bottomSeedRankAbbrev": "D2",
+   "bottomSeedWins": 3,
+   "winningTeamId": 5,
+   "losingTeamId": 14,
+   "topSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-n/sharks-vs-blues",
+   "seriesTitle": "Western Conference Finals",
+   "seriesAbbrev": "WCF",
+   "seriesLetter": "N",
+   "conferenceAbbrev": "W",
+   "conferenceName": "Western",
+   "playoffRound": 3,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 2,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 4,
+   "winningTeamId": 28,
+   "losingTeamId": 19,
+   "topSeedTeam": {
+    "id": 19,
+    "abbrev": "STL",
+    "name": {
+     "default": "St. Louis Blues",
+     "fr": "Blues de St. Louis"
+    },
+    "commonName": {
+     "default": "Blues"
+    },
+    "placeNameWithPreposition": {
+     "default": "St. Louis",
+     "fr": "de St. Louis"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 28,
+    "abbrev": "SJS",
+    "name": {
+     "default": "San Jose Sharks",
+     "fr": "Sharks de San Jose"
+    },
+    "commonName": {
+     "default": "Sharks"
+    },
+    "placeNameWithPreposition": {
+     "default": "San Jose",
+     "fr": "de San Jose"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2016/series-o/sharks-vs-penguins",
+   "seriesLogo": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesLogoFr": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesTitle": "Stanley Cup Final",
+   "seriesAbbrev": "SCF",
+   "seriesLetter": "O",
+   "playoffRound": 4,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 2,
+   "winningTeamId": 5,
+   "losingTeamId": 28,
+   "topSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 28,
+    "abbrev": "SJS",
+    "name": {
+     "default": "San Jose Sharks",
+     "fr": "Sharks de San Jose"
+    },
+    "commonName": {
+     "default": "Sharks"
+    },
+    "placeNameWithPreposition": {
+     "default": "San Jose",
+     "fr": "de San Jose"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_dark.svg"
+   }
+  }
+ ]
+}

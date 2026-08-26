@@ -86,3 +86,6 @@ sportsnot-release.keystore
 .claude/worktrees
 .nx/polygraph
 .nx/self-healing
+# Python bytecode (ml/ archive scripts)
+__pycache__/
+*.pyc
