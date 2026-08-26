@@ -370,7 +370,8 @@ These rules are extracted from the SportsNot codebase and are **normative** for 
 
 ## Technical Considerations
 
-- **Language/stack:** Python 3.12+, `uv` for env/deps, `polars` or `pandas` for frames, `scikit-learn` + `xgboost`/`lightgbm` for models, `pydantic` for API response typing, `pytest` + `hypothesis` for tests, `ruff` + `mypy --strict`.
+- **Implementation contract:** `ml/SPEC.md` distills this PRD into a binding, read-first contract for autonomous implementation (ruleset table, pinned stack, directory layout, data-source endpoints, leakage and honesty rules). Every Ralph story's first acceptance criterion requires reading it. Where SPEC and PRD conflict, SPEC is a bug — fix SPEC.
+- **Language/stack (pinned in SPEC.md):** Python 3.12+, `uv` for env/deps, `pandas` (+ pyarrow) for frames, `scikit-learn` + `lightgbm` for models, `httpx` + `pydantic` v2 for API clients, `typer` + `rich` for the CLI, `pytest` + `hypothesis` for tests, `ruff` + `mypy --strict`.
 - **Repo placement:** top-level `ml/` directory, excluded from the Nx graph (add to `.nxignore`/ESLint ignore as needed) so `yarn nx affected` and existing CI are untouched. Raw data and artifacts are gitignored except backtest reports and manifests.
 - **NHL API risk:** the API is undocumented and can change; ingestion isolates all endpoint knowledge in `draft_oracle.ingest` behind typed adapters, caches raw JSON to disk, and supports a manual CSV drop-in path as a fallback (mirrors the app's own risk-mitigation stance in `plans/sportsnot-plan.md`).
 - **Small-data reality:** each season contributes only ~15 series and ~300–400 skater-round rows. Ten seasons ≈ 150 series — regularization, shrinkage toward priors, and simple models will beat complex ones. This is why the series model composes a per-*game* model (thousands of training rows) rather than learning series outcomes directly.
