@@ -192,7 +192,7 @@ These rules are extracted from the SportsNot codebase and are **normative** for 
 
 **Acceptance Criteria:**
 - [ ] Simulator enforces the full ruleset via `draft_oracle.rules`: snake order, per-position roster limits (a manager with 5 F must pick D or G), IR slots pickable only when enabled, no duplicates, eliminated players unavailable
-- [ ] Opponent model is **fit to the league's real draft history** ingested in US-015: a discrete-choice model (e.g., conditional logit / Plackett-Luce over the available pool) estimating pick probability from public-ranking position, positional need, own-team fandom signals, and reach tendencies — per-league-wide at minimum, per-manager where a manager has enough historical picks
+- [ ] Opponent model is **fit to the league's real draft history** ingested in US-015, acknowledging pick sequence is not observable (final rosters + snake order only): a discrete-choice model (conditional logit / Plackett-Luce) fit by marginalizing over feasible pick sequences, or a documented simpler propensity approximation — estimating selection probability from positional need, public-ranking rank, and own-team fandom signals; league-wide at minimum, per-manager where sample size allows
 - [ ] Fallback opponent model retained for cold starts (new managers, sparse data): greedy by public-perception ranking with softmax noise and positional-need awareness; blending between fitted and fallback is automatic based on sample size
 - [ ] Fitted model validated by held-out draft rounds from the sheets: top-1 and top-5 pick-prediction accuracy reported and beating the greedy fallback
 - [ ] Survival estimation: for any draft state and any candidate, Monte Carlo over opponent picks yields P(candidate survives until my next pick) with ≥1,000 rollouts completing in <5 seconds
@@ -223,7 +223,7 @@ These rules are extracted from the SportsNot codebase and are **normative** for 
 **Description:** As the tool owner, I want injured players valued correctly for IR slots — including the retroactive point-swap on activation — so I know when stashing an injured star beats a healthy depth pick.
 
 **Acceptance Criteria:**
-- [ ] A structured injury-report source is evaluated and integrated — candidates to assess, in order of preference: dedicated sports-data APIs with injury endpoints (e.g., ESPN's public JSON endpoints, Sportradar/SportsDataIO free tiers), then reputable aggregator pages (e.g., dailyfaceoff-style report pages) via a resilient scraper. Selection criteria (freshness, return-timeline detail, stability, terms of use) and the decision are documented in `ml/README.md`
+- [ ] **ESPN's public NHL JSON endpoints are the selected source (owner decision, 2026-08-26)**: ingest per-player injury status from ESPN's NHL injuries feed (`site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries`, with player detail from ESPN's core sports API where needed); the endpoints and response shapes actually used are documented in `ml/README.md`
 - [ ] The chosen source feeds per-player status (out/IR/day-to-day/healthy) and expected-return information into the pipeline automatically on each projection run
 - [ ] A manually-editable override file `ml/data/overrides/injuries.yaml` remains as the fallback and final authority when the source is wrong or lags breaking news
 - [ ] Return-time model: P(returns by game k of the round) per injured player, calibrated from the source's status + timeline fields; historical injury-return outcomes are used for calibration where obtainable
@@ -270,7 +270,7 @@ These rules are extracted from the SportsNot codebase and are **normative** for 
 **Description:** As the tool owner, I want game moneylines and series prices ingested for current and (where obtainable) historical playoffs, because betting markets are the sharpest available public estimate of series outcomes and should feed the series model.
 
 **Acceptance Criteria:**
-- [ ] An odds provider is selected and integrated — evaluate free/cheap API options first (e.g., The Odds API free tier for NHL moneylines and series/outright markets); the selection rationale, quota limits, and API-key setup are documented in `ml/README.md`
+- [ ] **The Odds API (the-odds-api.com) free tier is the selected provider (owner decision, 2026-08-26)**: integrate its NHL ice-hockey endpoints for game moneylines and series/outright markets where offered; quota limits and `ODDS_API_KEY` setup documented in `ml/README.md`
 - [ ] Ingestion fetches, per playoff game: moneyline prices from ≥1 book (consensus/median if several); per series: series-winner prices where the provider offers them
 - [ ] Prices are de-vigged into implied probabilities (proportional or Shin method — documented choice) and stored in a normalized `odds` Parquet table keyed to games/series, cached and snapshot alongside other data
 - [ ] Historical odds are backfilled for as many past playoff seasons as the provider (or a supplementary free historical dataset) allows; seasons without odds coverage are explicitly flagged so backtests can report market-aware and stat-only tracks separately
@@ -291,7 +291,7 @@ These rules are extracted from the SportsNot codebase and are **normative** for 
   - `https://docs.google.com/spreadsheets/d/1ExXl0jmsYSNotlOUQBQmi-soUZzWPd3N45BC-aIZwU0`
   - `https://docs.google.com/spreadsheets/d/1-LBNUxnuSgPLm7BUvYw2FFD2yYkP7BjxdsVNhbd5jb8`
 - [ ] Ingestion works from CSV exports of each sheet/tab (`export?format=csv&gid=...`) with a documented one-command download step, and equally from manually downloaded files dropped into `ml/data/raw/league-drafts/` (for environments where Google endpoints are unreachable)
-- [ ] Because the sheets' layouts were not inspectable at PRD time, the story includes a schema-discovery step: document each sheet's actual layout (tabs, header rows, one row per pick vs. grid-style boards) in `ml/README.md`, then write per-layout parsers — parsers must fail loudly on unexpected layout changes, never silently misparse
+- [ ] Schema discovery is DONE: the snapshots are committed under `ml/data/raw/league-drafts/` with layouts documented in that directory's `SCHEMA.md` and owner-confirmed facts in `OPEN_QUESTIONS.md` (rows are NOT in pick order, so no pick numbers are recoverable; sheet-era seasons have three draft events R1/R2/R3+4; Evi = Levi; documented data corrections apply). Parsers implement `SCHEMA.md` and must fail loudly on layout mismatch, never silently misparse
 - [ ] Output: a normalized `league_draft_picks` Parquet table with columns (season, playoff_round, manager, pick_number, snake_slot, position F/D/G, player_or_team name, matched NHL player_id/team_id)
 - [ ] Name matching to NHL IDs uses normalized fuzzy matching with a reviewable low-confidence report; unresolved names are fixable via a mapping override file, and the table ships with ≥98% of picks matched
 - [ ] Manager identity is normalized across seasons (same human, possibly different team names) via a small alias mapping file
@@ -401,8 +401,8 @@ These rules are extracted from the SportsNot codebase and are **normative** for 
 
 ## Open Questions
 
-1. **Odds provider choice:** which free-tier provider gives NHL playoff moneylines *and* series-winner markets with acceptable quotas — and does any free source offer historical NHL playoff odds deep enough to backtest the market-aware track over ≥3 seasons? (US-014 resolves this during implementation; if historical coverage is <3 seasons, the market feature's ablation runs on whatever coverage exists.)
-2. **Injury source selection:** which of the candidate injury sources (ESPN endpoints, free API tiers, aggregator scraping) survives the US-011 evaluation on freshness and stability? Decision to be recorded in `ml/README.md`.
-3. **Sheet schemas:** the three draft-history sheets were not inspectable from the PRD-authoring environment (Google egress blocked). US-015's schema-discovery step must confirm: one row per pick vs. board-grid layout, whether pick numbers/snake slots are explicit or must be inferred from position, and whether goalie picks are recorded as team names.
+1. ~~**Odds provider choice**~~ — RESOLVED (2026-08-26): The Odds API free tier. Remaining sub-question: how deep its historical NHL playoff odds coverage goes; if <3 seasons, the market-aware ablation runs on whatever coverage exists.
+2. ~~**Injury source selection**~~ — RESOLVED (2026-08-26): ESPN's public NHL JSON endpoints, with the manual override file as final authority.
+3. ~~**Sheet schemas**~~ — RESOLVED: snapshots committed under `ml/data/raw/league-drafts/` with `SCHEMA.md` + answered `OPEN_QUESTIONS.md`. Key facts: grid-style manager blocks (not row-per-pick), rows NOT in pick order (pick numbers unrecoverable — opponent model sees final rosters + snake order only), goalie picks recorded as team names, three draft events per sheet-era season (R3+4 combined), Evi = Levi, 2026 scored in the app (champion: Ben).
 4. **Per-manager vs. league-level opponent models:** with ~1,100–1,300 total observed picks, where is the blending threshold at which a per-manager model beats the pooled league model? Decide empirically from US-009's held-out validation.
 5. **Strategy report depth:** are top-3 alternatives plus two turns of contingencies enough in `slot_strategies.md`, or is a deeper decision-tree format worth the extra size? Revisit after using it in one real draft.

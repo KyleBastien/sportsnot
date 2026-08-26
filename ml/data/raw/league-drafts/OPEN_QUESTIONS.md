@@ -291,6 +291,29 @@ either way (only 2024+ drafts exist). **[confirm]** as a formality.
 
 ---
 
+## Kyle's answers (2026-08-26)
+
+1. **Rows are NOT in pick order** — confirmed. `pick_number` stays null for sheet-era
+   drafts; parsers emit `snake_slot` from the order lists only, and the opponent model
+   must not assume pick sequence is observable (it sees final rosters + snake order).
+2. **R3+4 replacement rule** — question didn't land; re-asked in plainer terms and still
+   open. Plain version: *in 2024 you drafted rounds 3 and 4 together; when Ben's Trouba
+   (Rangers) was knocked out after round 3, Ben swapped in Kulikov for round 4. Was any
+   manager allowed to replace an eliminated player between rounds 3 and 4, or was that a
+   special case?* **Pipeline default until answered:** treat it as an allowed
+   substitution and parse the recorded swaps as-is.
+3. **Ben won 2026.** Recorded as league champion 2026. An export of the app's 2026
+   drafts from Supabase is approved in principle — when provided, drop it in this
+   directory as CSV (suggested name `app-export-2026__<round>.csv`) with a short section
+   added to SCHEMA.md; parsers may then include 2026 as a fourth training season. Not a
+   blocker for the pipeline.
+4. **Evi = Levi confirmed.** Canonical manager id `levi`, alias `evi`.
+
+Champions table for the record: 2018 Ben, 2019–2022 Levi, 2023 Kyle, 2024 Levi,
+2025 Levi, **2026 Ben**.
+
+---
+
 ## Resolved by the xlsx exports
 
 Kept for the record — these were open questions before link-sharing was enabled.
