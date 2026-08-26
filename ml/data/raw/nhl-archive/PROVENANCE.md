@@ -4,7 +4,9 @@ Snapshot fetched **2026-08-26** from the public NHL APIs (no auth). Seasons **20
 through 2025-26**, regular season and playoffs (`gameTypeId` 2 and 3).
 
 Contents: 11 × 3 gzipped CSVs, 11 playoff brackets, the fetch script (`fetch_nhl.py`)
-and the verification script (`verify_nhl.py`). 47 files, 12 MB. No `.gitignore` rule
+and the verification script (`verify_nhl.py`). `fetch_nhl.py` was refactored after the
+run (functions extracted, behavior identical) to satisfy the repo's CodeScene gate;
+the byte-exact run version is in git history at the commit that added this archive. 47 files, 12 MB. No `.gitignore` rule
 matches this directory, so no exception was needed.
 
 **No gaps. No imputation.** Every request succeeded, `_gaps.json` came back empty, and
