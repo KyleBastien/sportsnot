@@ -163,3 +163,20 @@ ORDER BY playoff_round, player_name;
   (canonical ids: ben, judah, kyle, levi).
 - Parsers (Ralph story US-006) pick these files up by the `app-export-*.csv` pattern
   and preserve `pick_number`.
+
+## Backfill — the one missing roster row
+
+The roster export lost one row to a pagination-boundary duplicate: **Press Play-offs,
+round 3, nuttguy, D, Jalen Chatfield (8478970)** — specifically its `points_earned`
+value. Run this (11 rows, no chunking) and paste the result:
+
+```sql
+SELECT l.name AS league_name, r.round AS playoff_round, u.display_name AS manager,
+       r.position, r.player_id, r.is_active, r.points_earned, r.activated_from_ir
+FROM rosters r
+JOIN league_members lm ON lm.id = r.league_member_id
+JOIN leagues l ON l.id = lm.league_id
+JOIN users u ON u.id = lm.user_id
+WHERE l.name = 'Press Play-offs' AND r.round = 3 AND u.display_name = 'nuttguy'
+ORDER BY r.position, r.player_id;
+```
