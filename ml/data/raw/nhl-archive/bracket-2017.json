@@ -1,0 +1,750 @@
+{
+ "bracketLogo": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-en.png",
+ "bracketLogoFr": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-fr.png",
+ "series": [
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-a/rangers-vs-canadiens",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "A",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 2,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC1",
+   "bottomSeedWins": 4,
+   "winningTeamId": 3,
+   "losingTeamId": 8,
+   "topSeedTeam": {
+    "id": 8,
+    "abbrev": "MTL",
+    "name": {
+     "default": "Montr\u00e9al Canadiens",
+     "fr": "Canadiens de Montr\u00e9al"
+    },
+    "commonName": {
+     "default": "Canadiens"
+    },
+    "placeNameWithPreposition": {
+     "default": "Montr\u00e9al",
+     "fr": "de Montr\u00e9al"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MTL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MTL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 3,
+    "abbrev": "NYR",
+    "name": {
+     "default": "New York Rangers",
+     "fr": "Rangers de New York"
+    },
+    "commonName": {
+     "default": "Rangers"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYR_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-b/bruins-vs-senators",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "B",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 2,
+   "winningTeamId": 9,
+   "losingTeamId": 6,
+   "topSeedTeam": {
+    "id": 9,
+    "abbrev": "OTT",
+    "name": {
+     "default": "Ottawa Senators",
+     "fr": "S\u00e9nateurs d'Ottawa"
+    },
+    "commonName": {
+     "default": "Senators",
+     "fr": "S\u00e9nateurs"
+    },
+    "placeNameWithPreposition": {
+     "default": "Ottawa",
+     "fr": "d'Ottawa"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/OTT_20072008-20192020_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/OTT_20072008-20192020_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 6,
+    "abbrev": "BOS",
+    "name": {
+     "default": "Boston Bruins",
+     "fr": "Bruins de Boston"
+    },
+    "commonName": {
+     "default": "Bruins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Boston",
+     "fr": "de Boston"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-c/mapleleafs-vs-capitals",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "C",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC2",
+   "bottomSeedWins": 2,
+   "winningTeamId": 15,
+   "losingTeamId": 10,
+   "topSeedTeam": {
+    "id": 15,
+    "abbrev": "WSH",
+    "name": {
+     "default": "Washington Capitals",
+     "fr": "Capitals de Washington"
+    },
+    "commonName": {
+     "default": "Capitals"
+    },
+    "placeNameWithPreposition": {
+     "default": "Washington",
+     "fr": "de Washington"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WSH_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 10,
+    "abbrev": "TOR",
+    "name": {
+     "default": "Toronto Maple Leafs",
+     "fr": "Maple Leafs de Toronto"
+    },
+    "commonName": {
+     "default": "Maple Leafs"
+    },
+    "placeNameWithPreposition": {
+     "default": "Toronto",
+     "fr": "de Toronto"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TOR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TOR_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-d/bluejackets-vs-penguins",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "D",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 1,
+   "winningTeamId": 5,
+   "losingTeamId": 29,
+   "topSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 29,
+    "abbrev": "CBJ",
+    "name": {
+     "default": "Columbus Blue Jackets",
+     "fr": "Blue Jackets de Columbus"
+    },
+    "commonName": {
+     "default": "Blue Jackets"
+    },
+    "placeNameWithPreposition": {
+     "default": "Columbus",
+     "fr": "de Columbus"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CBJ_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CBJ_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-e/predators-vs-blackhawks",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "E",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 0,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC2",
+   "bottomSeedWins": 4,
+   "winningTeamId": 18,
+   "losingTeamId": 16,
+   "topSeedTeam": {
+    "id": 16,
+    "abbrev": "CHI",
+    "name": {
+     "default": "Chicago Blackhawks",
+     "fr": "Blackhawks de Chicago"
+    },
+    "commonName": {
+     "default": "Blackhawks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Chicago",
+     "fr": "de Chicago"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 18,
+    "abbrev": "NSH",
+    "name": {
+     "default": "Nashville Predators",
+     "fr": "Predators de Nashville"
+    },
+    "commonName": {
+     "default": "Predators"
+    },
+    "placeNameWithPreposition": {
+     "default": "Nashville",
+     "fr": "de Nashville"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NSH_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-f/blues-vs-wild",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "F",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 1,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 4,
+   "winningTeamId": 19,
+   "losingTeamId": 30,
+   "topSeedTeam": {
+    "id": 30,
+    "abbrev": "MIN",
+    "name": {
+     "default": "Minnesota Wild",
+     "fr": "Wild du Minnesota"
+    },
+    "commonName": {
+     "default": "Wild"
+    },
+    "placeNameWithPreposition": {
+     "default": "Minnesota",
+     "fr": "du Minnesota"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MIN_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MIN_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 19,
+    "abbrev": "STL",
+    "name": {
+     "default": "St. Louis Blues",
+     "fr": "Blues de St. Louis"
+    },
+    "commonName": {
+     "default": "Blues"
+    },
+    "placeNameWithPreposition": {
+     "default": "St. Louis",
+     "fr": "de St. Louis"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-g/flames-vs-ducks",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "G",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC1",
+   "bottomSeedWins": 0,
+   "winningTeamId": 24,
+   "losingTeamId": 20,
+   "topSeedTeam": {
+    "id": 24,
+    "abbrev": "ANA",
+    "name": {
+     "default": "Anaheim Ducks",
+     "fr": "Ducks d'Anaheim"
+    },
+    "commonName": {
+     "default": "Ducks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Anaheim",
+     "fr": "d'Anaheim"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 20,
+    "abbrev": "CGY",
+    "name": {
+     "default": "Calgary Flames",
+     "fr": "Flames de Calgary"
+    },
+    "commonName": {
+     "default": "Flames"
+    },
+    "placeNameWithPreposition": {
+     "default": "Calgary",
+     "fr": "de Calgary"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CGY_19941995-20192020_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CGY_19941995-20192020_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-h/sharks-vs-oilers",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "H",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 2,
+   "winningTeamId": 22,
+   "losingTeamId": 28,
+   "topSeedTeam": {
+    "id": 22,
+    "abbrev": "EDM",
+    "name": {
+     "default": "Edmonton Oilers",
+     "fr": "Oilers d'Edmonton"
+    },
+    "commonName": {
+     "default": "Oilers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Edmonton",
+     "fr": "d'Edmonton"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/EDM_20112012-20162017_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/EDM_20112012-20162017_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 28,
+    "abbrev": "SJS",
+    "name": {
+     "default": "San Jose Sharks",
+     "fr": "Sharks de San Jose"
+    },
+    "commonName": {
+     "default": "Sharks"
+    },
+    "placeNameWithPreposition": {
+     "default": "San Jose",
+     "fr": "de San Jose"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-i/rangers-vs-senators",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "I",
+   "playoffRound": 2,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC1",
+   "bottomSeedWins": 2,
+   "winningTeamId": 9,
+   "losingTeamId": 3,
+   "topSeedTeam": {
+    "id": 9,
+    "abbrev": "OTT",
+    "name": {
+     "default": "Ottawa Senators",
+     "fr": "S\u00e9nateurs d'Ottawa"
+    },
+    "commonName": {
+     "default": "Senators",
+     "fr": "S\u00e9nateurs"
+    },
+    "placeNameWithPreposition": {
+     "default": "Ottawa",
+     "fr": "d'Ottawa"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/OTT_20072008-20192020_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/OTT_20072008-20192020_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 3,
+    "abbrev": "NYR",
+    "name": {
+     "default": "New York Rangers",
+     "fr": "Rangers de New York"
+    },
+    "commonName": {
+     "default": "Rangers"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYR_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-j/penguins-vs-capitals",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "J",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 3,
+   "bottomSeedRank": 2,
+   "bottomSeedRankAbbrev": "D2",
+   "bottomSeedWins": 4,
+   "winningTeamId": 5,
+   "losingTeamId": 15,
+   "topSeedTeam": {
+    "id": 15,
+    "abbrev": "WSH",
+    "name": {
+     "default": "Washington Capitals",
+     "fr": "Capitals de Washington"
+    },
+    "commonName": {
+     "default": "Capitals"
+    },
+    "placeNameWithPreposition": {
+     "default": "Washington",
+     "fr": "de Washington"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WSH_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-k/predators-vs-blues",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "K",
+   "playoffRound": 2,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "D3",
+   "topSeedWins": 2,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC2",
+   "bottomSeedWins": 4,
+   "winningTeamId": 18,
+   "losingTeamId": 19,
+   "topSeedTeam": {
+    "id": 19,
+    "abbrev": "STL",
+    "name": {
+     "default": "St. Louis Blues",
+     "fr": "Blues de St. Louis"
+    },
+    "commonName": {
+     "default": "Blues"
+    },
+    "placeNameWithPreposition": {
+     "default": "St. Louis",
+     "fr": "de St. Louis"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 18,
+    "abbrev": "NSH",
+    "name": {
+     "default": "Nashville Predators",
+     "fr": "Predators de Nashville"
+    },
+    "commonName": {
+     "default": "Predators"
+    },
+    "placeNameWithPreposition": {
+     "default": "Nashville",
+     "fr": "de Nashville"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NSH_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-l/oilers-vs-ducks",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "L",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 2,
+   "bottomSeedRankAbbrev": "D2",
+   "bottomSeedWins": 3,
+   "winningTeamId": 24,
+   "losingTeamId": 22,
+   "topSeedTeam": {
+    "id": 24,
+    "abbrev": "ANA",
+    "name": {
+     "default": "Anaheim Ducks",
+     "fr": "Ducks d'Anaheim"
+    },
+    "commonName": {
+     "default": "Ducks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Anaheim",
+     "fr": "d'Anaheim"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 22,
+    "abbrev": "EDM",
+    "name": {
+     "default": "Edmonton Oilers",
+     "fr": "Oilers d'Edmonton"
+    },
+    "commonName": {
+     "default": "Oilers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Edmonton",
+     "fr": "d'Edmonton"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/EDM_20112012-20162017_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/EDM_20112012-20162017_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-m/senators-vs-penguins",
+   "seriesTitle": "Eastern Conference Finals",
+   "seriesAbbrev": "ECF",
+   "seriesLetter": "M",
+   "conferenceAbbrev": "E",
+   "conferenceName": "Eastern",
+   "playoffRound": 3,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 2,
+   "bottomSeedRankAbbrev": "D2",
+   "bottomSeedWins": 3,
+   "winningTeamId": 5,
+   "losingTeamId": 9,
+   "topSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 9,
+    "abbrev": "OTT",
+    "name": {
+     "default": "Ottawa Senators",
+     "fr": "S\u00e9nateurs d'Ottawa"
+    },
+    "commonName": {
+     "default": "Senators",
+     "fr": "S\u00e9nateurs"
+    },
+    "placeNameWithPreposition": {
+     "default": "Ottawa",
+     "fr": "d'Ottawa"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/OTT_20072008-20192020_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/OTT_20072008-20192020_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-n/predators-vs-ducks",
+   "seriesTitle": "Western Conference Finals",
+   "seriesAbbrev": "WCF",
+   "seriesLetter": "N",
+   "conferenceAbbrev": "W",
+   "conferenceName": "Western",
+   "playoffRound": 3,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 2,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC2",
+   "bottomSeedWins": 4,
+   "winningTeamId": 18,
+   "losingTeamId": 24,
+   "topSeedTeam": {
+    "id": 24,
+    "abbrev": "ANA",
+    "name": {
+     "default": "Anaheim Ducks",
+     "fr": "Ducks d'Anaheim"
+    },
+    "commonName": {
+     "default": "Ducks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Anaheim",
+     "fr": "d'Anaheim"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 18,
+    "abbrev": "NSH",
+    "name": {
+     "default": "Nashville Predators",
+     "fr": "Predators de Nashville"
+    },
+    "commonName": {
+     "default": "Predators"
+    },
+    "placeNameWithPreposition": {
+     "default": "Nashville",
+     "fr": "de Nashville"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NSH_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2017/series-o/predators-vs-penguins",
+   "seriesLogo": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesLogoFr": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesTitle": "Stanley Cup Final",
+   "seriesAbbrev": "SCF",
+   "seriesLetter": "O",
+   "playoffRound": 4,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC2",
+   "bottomSeedWins": 2,
+   "winningTeamId": 5,
+   "losingTeamId": 18,
+   "topSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 18,
+    "abbrev": "NSH",
+    "name": {
+     "default": "Nashville Predators",
+     "fr": "Predators de Nashville"
+    },
+    "commonName": {
+     "default": "Predators"
+    },
+    "placeNameWithPreposition": {
+     "default": "Nashville",
+     "fr": "de Nashville"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NSH_dark.svg"
+   }
+  }
+ ]
+}

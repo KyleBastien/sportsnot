@@ -1,0 +1,743 @@
+{
+ "bracketLogo": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-en.png",
+ "bracketLogoFr": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-fr.png",
+ "series": [
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-a/islanders-vs-penguins",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "A",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 2,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "D4",
+   "bottomSeedWins": 4,
+   "winningTeamId": 2,
+   "losingTeamId": 5,
+   "topSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 2,
+    "abbrev": "NYI",
+    "name": {
+     "default": "New York Islanders",
+     "fr": "Islanders de New York"
+    },
+    "commonName": {
+     "default": "Islanders"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYI_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYI_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-b/bruins-vs-capitals",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "B",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 1,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 4,
+   "winningTeamId": 6,
+   "losingTeamId": 15,
+   "topSeedTeam": {
+    "id": 15,
+    "abbrev": "WSH",
+    "name": {
+     "default": "Washington Capitals",
+     "fr": "Capitals de Washington"
+    },
+    "commonName": {
+     "default": "Capitals"
+    },
+    "placeNameWithPreposition": {
+     "default": "Washington",
+     "fr": "de Washington"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WSH_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 6,
+    "abbrev": "BOS",
+    "name": {
+     "default": "Boston Bruins",
+     "fr": "Bruins de Boston"
+    },
+    "commonName": {
+     "default": "Bruins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Boston",
+     "fr": "de Boston"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-c/predators-vs-hurricanes",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "C",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "D4",
+   "bottomSeedWins": 2,
+   "winningTeamId": 12,
+   "losingTeamId": 18,
+   "topSeedTeam": {
+    "id": 12,
+    "abbrev": "CAR",
+    "name": {
+     "default": "Carolina Hurricanes",
+     "fr": "Hurricanes de la Caroline"
+    },
+    "commonName": {
+     "default": "Hurricanes"
+    },
+    "placeNameWithPreposition": {
+     "default": "Carolina",
+     "fr": "de la Caroline"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CAR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CAR_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 18,
+    "abbrev": "NSH",
+    "name": {
+     "default": "Nashville Predators",
+     "fr": "Predators de Nashville"
+    },
+    "commonName": {
+     "default": "Predators"
+    },
+    "placeNameWithPreposition": {
+     "default": "Nashville",
+     "fr": "de Nashville"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NSH_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-d/lightning-vs-panthers",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "D",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 2,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 4,
+   "winningTeamId": 14,
+   "losingTeamId": 13,
+   "topSeedTeam": {
+    "id": 13,
+    "abbrev": "FLA",
+    "name": {
+     "default": "Florida Panthers",
+     "fr": "Panthers de la Floride"
+    },
+    "commonName": {
+     "default": "Panthers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Florida",
+     "fr": "de la Floride"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/FLA_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/FLA_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-e/blues-vs-avalanche",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "E",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "D4",
+   "bottomSeedWins": 0,
+   "winningTeamId": 21,
+   "losingTeamId": 19,
+   "topSeedTeam": {
+    "id": 21,
+    "abbrev": "COL",
+    "name": {
+     "default": "Colorado Avalanche",
+     "fr": "Avalanche du Colorado"
+    },
+    "commonName": {
+     "default": "Avalanche"
+    },
+    "placeNameWithPreposition": {
+     "default": "Colorado",
+     "fr": "du Colorado"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/COL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/COL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 19,
+    "abbrev": "STL",
+    "name": {
+     "default": "St. Louis Blues",
+     "fr": "Blues de St. Louis"
+    },
+    "commonName": {
+     "default": "Blues"
+    },
+    "placeNameWithPreposition": {
+     "default": "St. Louis",
+     "fr": "de St. Louis"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-f/wild-vs-goldenknights",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "F",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 3,
+   "winningTeamId": 54,
+   "losingTeamId": 30,
+   "topSeedTeam": {
+    "id": 54,
+    "abbrev": "VGK",
+    "name": {
+     "default": "Vegas Golden Knights",
+     "fr": "Golden Knights de Vegas"
+    },
+    "commonName": {
+     "default": "Golden Knights"
+    },
+    "placeNameWithPreposition": {
+     "default": "Vegas",
+     "fr": "de Vegas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/VGK_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/VGK_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 30,
+    "abbrev": "MIN",
+    "name": {
+     "default": "Minnesota Wild",
+     "fr": "Wild du Minnesota"
+    },
+    "commonName": {
+     "default": "Wild"
+    },
+    "placeNameWithPreposition": {
+     "default": "Minnesota",
+     "fr": "du Minnesota"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MIN_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MIN_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-g/canadiens-vs-mapleleafs",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "G",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 3,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "D4",
+   "bottomSeedWins": 4,
+   "winningTeamId": 8,
+   "losingTeamId": 10,
+   "topSeedTeam": {
+    "id": 10,
+    "abbrev": "TOR",
+    "name": {
+     "default": "Toronto Maple Leafs",
+     "fr": "Maple Leafs de Toronto"
+    },
+    "commonName": {
+     "default": "Maple Leafs"
+    },
+    "placeNameWithPreposition": {
+     "default": "Toronto",
+     "fr": "de Toronto"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TOR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TOR_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 8,
+    "abbrev": "MTL",
+    "name": {
+     "default": "Montr\u00e9al Canadiens",
+     "fr": "Canadiens de Montr\u00e9al"
+    },
+    "commonName": {
+     "default": "Canadiens"
+    },
+    "placeNameWithPreposition": {
+     "default": "Montr\u00e9al",
+     "fr": "de Montr\u00e9al"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MTL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MTL_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-h/jets-vs-oilers",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "H",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 0,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 4,
+   "winningTeamId": 52,
+   "losingTeamId": 22,
+   "topSeedTeam": {
+    "id": 22,
+    "abbrev": "EDM",
+    "name": {
+     "default": "Edmonton Oilers",
+     "fr": "Oilers d'Edmonton"
+    },
+    "commonName": {
+     "default": "Oilers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Edmonton",
+     "fr": "d'Edmonton"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/EDM_20172018-20212022_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/EDM_20172018-20212022_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 52,
+    "abbrev": "WPG",
+    "name": {
+     "default": "Winnipeg Jets",
+     "fr": "Jets de Winnipeg"
+    },
+    "commonName": {
+     "default": "Jets"
+    },
+    "placeNameWithPreposition": {
+     "default": "Winnipeg",
+     "fr": "de Winnipeg"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WPG_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WPG_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-i/islanders-vs-bruins",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "I",
+   "playoffRound": 2,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "D3",
+   "topSeedWins": 2,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "D4",
+   "bottomSeedWins": 4,
+   "winningTeamId": 2,
+   "losingTeamId": 6,
+   "topSeedTeam": {
+    "id": 6,
+    "abbrev": "BOS",
+    "name": {
+     "default": "Boston Bruins",
+     "fr": "Bruins de Boston"
+    },
+    "commonName": {
+     "default": "Bruins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Boston",
+     "fr": "de Boston"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 2,
+    "abbrev": "NYI",
+    "name": {
+     "default": "New York Islanders",
+     "fr": "Islanders de New York"
+    },
+    "commonName": {
+     "default": "Islanders"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYI_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYI_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-j/lightning-vs-hurricanes",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "J",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 1,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 4,
+   "winningTeamId": 14,
+   "losingTeamId": 12,
+   "topSeedTeam": {
+    "id": 12,
+    "abbrev": "CAR",
+    "name": {
+     "default": "Carolina Hurricanes",
+     "fr": "Hurricanes de la Caroline"
+    },
+    "commonName": {
+     "default": "Hurricanes"
+    },
+    "placeNameWithPreposition": {
+     "default": "Carolina",
+     "fr": "de la Caroline"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CAR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CAR_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-k/goldenknights-vs-avalanche",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "K",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 2,
+   "bottomSeedRank": 2,
+   "bottomSeedRankAbbrev": "D2",
+   "bottomSeedWins": 4,
+   "winningTeamId": 54,
+   "losingTeamId": 21,
+   "topSeedTeam": {
+    "id": 21,
+    "abbrev": "COL",
+    "name": {
+     "default": "Colorado Avalanche",
+     "fr": "Avalanche du Colorado"
+    },
+    "commonName": {
+     "default": "Avalanche"
+    },
+    "placeNameWithPreposition": {
+     "default": "Colorado",
+     "fr": "du Colorado"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/COL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/COL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 54,
+    "abbrev": "VGK",
+    "name": {
+     "default": "Vegas Golden Knights",
+     "fr": "Golden Knights de Vegas"
+    },
+    "commonName": {
+     "default": "Golden Knights"
+    },
+    "placeNameWithPreposition": {
+     "default": "Vegas",
+     "fr": "de Vegas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/VGK_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/VGK_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-l/canadiens-vs-jets",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "L",
+   "playoffRound": 2,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "D3",
+   "topSeedWins": 0,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "D4",
+   "bottomSeedWins": 4,
+   "winningTeamId": 8,
+   "losingTeamId": 52,
+   "topSeedTeam": {
+    "id": 52,
+    "abbrev": "WPG",
+    "name": {
+     "default": "Winnipeg Jets",
+     "fr": "Jets de Winnipeg"
+    },
+    "commonName": {
+     "default": "Jets"
+    },
+    "placeNameWithPreposition": {
+     "default": "Winnipeg",
+     "fr": "de Winnipeg"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WPG_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WPG_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 8,
+    "abbrev": "MTL",
+    "name": {
+     "default": "Montr\u00e9al Canadiens",
+     "fr": "Canadiens de Montr\u00e9al"
+    },
+    "commonName": {
+     "default": "Canadiens"
+    },
+    "placeNameWithPreposition": {
+     "default": "Montr\u00e9al",
+     "fr": "de Montr\u00e9al"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MTL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MTL_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-m/canadiens-vs-goldenknights",
+   "seriesTitle": "Stanley Cup Semifinals",
+   "seriesAbbrev": "SF",
+   "seriesLetter": "M",
+   "playoffRound": 3,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 2,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "D4",
+   "bottomSeedWins": 4,
+   "winningTeamId": 8,
+   "losingTeamId": 54,
+   "topSeedTeam": {
+    "id": 54,
+    "abbrev": "VGK",
+    "name": {
+     "default": "Vegas Golden Knights",
+     "fr": "Golden Knights de Vegas"
+    },
+    "commonName": {
+     "default": "Golden Knights"
+    },
+    "placeNameWithPreposition": {
+     "default": "Vegas",
+     "fr": "de Vegas"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/VGK_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/VGK_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 8,
+    "abbrev": "MTL",
+    "name": {
+     "default": "Montr\u00e9al Canadiens",
+     "fr": "Canadiens de Montr\u00e9al"
+    },
+    "commonName": {
+     "default": "Canadiens"
+    },
+    "placeNameWithPreposition": {
+     "default": "Montr\u00e9al",
+     "fr": "de Montr\u00e9al"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MTL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MTL_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-n/islanders-vs-lightning",
+   "seriesTitle": "Stanley Cup Semifinals",
+   "seriesAbbrev": "SF",
+   "seriesLetter": "N",
+   "playoffRound": 3,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "D3",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "D4",
+   "bottomSeedWins": 3,
+   "winningTeamId": 14,
+   "losingTeamId": 2,
+   "topSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 2,
+    "abbrev": "NYI",
+    "name": {
+     "default": "New York Islanders",
+     "fr": "Islanders de New York"
+    },
+    "commonName": {
+     "default": "Islanders"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYI_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYI_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2021/series-o/canadiens-vs-lightning",
+   "seriesLogo": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesLogoFr": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesTitle": "Stanley Cup Final",
+   "seriesAbbrev": "SCF",
+   "seriesLetter": "O",
+   "playoffRound": 4,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "D3",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "D4",
+   "bottomSeedWins": 1,
+   "winningTeamId": 14,
+   "losingTeamId": 8,
+   "topSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 8,
+    "abbrev": "MTL",
+    "name": {
+     "default": "Montr\u00e9al Canadiens",
+     "fr": "Canadiens de Montr\u00e9al"
+    },
+    "commonName": {
+     "default": "Canadiens"
+    },
+    "placeNameWithPreposition": {
+     "default": "Montr\u00e9al",
+     "fr": "de Montr\u00e9al"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MTL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MTL_dark.svg"
+   }
+  }
+ ]
+}
