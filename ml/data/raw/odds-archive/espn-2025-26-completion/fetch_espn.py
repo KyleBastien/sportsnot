@@ -117,20 +117,14 @@ def extract_odds(summary):
     return p.get("provider", {}).get("name"), p.get("spread"), p.get("overUnder"), fav_ml, reason
 
 
-def competitor_row(ev, comp, season, odds, c, scores):
-    """One per-team row, mirroring the Kaggle file's odds semantics."""
+def base_row(ev, summary, odds):
+    """Game-level fields shared by both of a game's rows."""
     provider, spread, over_under, fav_ml, _ = odds
-    ha = c.get("homeAway")
-    opp = "away" if ha == "home" else "home"
+    comp = first(summary.get("header", {}).get("competitions"))
     return {
         "game_id": ev["id"],
         "date": comp.get("date"),
-        "season": season,
-        "team_name": c.get("team", {}).get("displayName"),
-        "is_home": int(ha == "home"),
-        "won": int(bool(c.get("winner"))),
-        "goals_for": num(scores.get(ha)),
-        "goals_against": num(scores.get(opp)),
+        "season": summary.get("header", {}).get("season", {}).get("year"),
         "spread": spread,
         "over_under": over_under,
         "favorite_moneyline": fav_ml,
@@ -141,13 +135,26 @@ def competitor_row(ev, comp, season, odds, c, scores):
     }
 
 
+def competitor_fields(c, scores):
+    """Per-team fields for one competitor, mirroring the Kaggle file's semantics."""
+    ha = c.get("homeAway")
+    opp = "away" if ha == "home" else "home"
+    return {
+        "team_name": c.get("team", {}).get("displayName"),
+        "is_home": int(ha == "home"),
+        "won": int(bool(c.get("winner"))),
+        "goals_for": num(scores.get(ha)),
+        "goals_against": num(scores.get(opp)),
+    }
+
+
 def game_rows(ev, summary, odds):
     """Two per-team rows for one game."""
     comp = first(summary.get("header", {}).get("competitions"))
-    season = summary.get("header", {}).get("season", {}).get("year")
     cs = comp.get("competitors") or []
     scores = {c.get("homeAway"): c.get("score") for c in cs}
-    return [competitor_row(ev, comp, season, odds, c, scores) for c in cs]
+    base = base_row(ev, summary, odds)
+    return [base | competitor_fields(c, scores) for c in cs]
 
 
 def missing_record(ev, summary, reason):
