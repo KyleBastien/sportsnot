@@ -1,5 +1,34 @@
 # Exporting the 2026 league data from Supabase
 
+## Export status and findings (2026-08-26, in progress)
+
+The export is being done in chunks (the owner's Supabase SQL editor caps results at
+100 rows with no way to raise it, so queries page with `ORDER BY league_name,
+playoff_round, pick_number ... LIMIT 100 OFFSET 0/100/200`). Raw chunks land in
+`incoming/` and are assembled, deduped on (league, round, pick_number), into the final
+`app-export-2026__*.csv` files once complete. Facts established so far:
+
+- **Two 2026 leagues exist in the database** and BOTH are being exported, distinguished
+  by `league_name`: **The Gemmell Cup** (the historical league: nuttguy, judah18,
+  gemmell.levi, bentunigold; IR disabled, 36 picks/round) and **Press Play-offs**
+  (nuttguy, Tobi, paul.markhauser, connor.fehr; IR enabled, 44 picks/round). Press
+  Play-offs is extra training data for league-agnostic components, not Gemmell
+  opponent history.
+- **Username mapping** (add to the manager alias file): nuttguy = kyle,
+  bentunigold = ben, judah18 = judah, gemmell.levi = levi. Press-only managers keep
+  their usernames (tobi, paul.markhauser, connor.fehr).
+- **Pick counts** (from `incoming/pick-counts.csv`): each league drafted rounds 1, 2,
+  and 3 only — **there is no round-4 draft in the app**, consistent with the league's
+  sheet-era tradition of the round-3 draft carrying through the final. Total picks:
+  Gemmell 108, Press 132, grand total 240 → query 1 needs 3 chunks.
+- **Owner data-quality caveat:** trust the round 3(+4) data; rounds 1–2 in-app data
+  may carry artifacts from draft bugs fixed mid-playoffs (see
+  `tasks/prd-draft-sorting-and-bugs.md`, `tasks/prd-round-progression-bugs.md`).
+  Parsers should validate counts against round 3 and flag—not hard-fail—round 1–2
+  anomalies.
+- **Query 4 (stats cache) is skipped**: it was optional validation data and the
+  pipeline re-derives player stats from the NHL API.
+
 The 2026 season was drafted and scored in the SportsNot app, not the sheets. This
 document is the one-time, owner-run procedure to export it into this directory so the
 ML pipeline can use 2026 as a fourth training season. The pipeline itself never reads
