@@ -164,7 +164,7 @@ ORDER BY playoff_round, player_name;
 - Parsers (Ralph story US-006) pick these files up by the `app-export-*.csv` pattern
   and preserve `pick_number`.
 
-## Backfill — the one missing roster row
+## Backfill — the one missing roster row (DONE 2026-08-26: Chatfield R3 = 3 points)
 
 The roster export lost one row to a pagination-boundary duplicate: **Press Play-offs,
 round 3, nuttguy, D, Jalen Chatfield (8478970)** — specifically its `points_earned`
