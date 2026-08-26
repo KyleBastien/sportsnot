@@ -396,3 +396,194 @@ one row). Odds columns are **game-level, repeated identically on both rows**:
 
 The overlap seasons (2016-17 – 2021-22) double as a cross-validation set between the
 two sources.
+
+---
+
+## 9. Third source: ESPN API completion for 2025-26 (fetched 2026-08-26)
+
+Closes the gap §8 left open: the Kaggle file's season-2026 coverage stops on
+2025-12-11, so the rest of the 2025-26 regular season and the entire 2026 playoffs
+were pulled directly from ESPN's public API into `espn-2025-26-completion/`.
+
+**This is the same upstream source as the Kaggle file** — §8 established that the
+Kaggle dataset's own build scripts hit these very endpoints — so the odds semantics
+match by construction rather than by coincidence.
+
+### Endpoints
+
+Scoreboard, to enumerate game ids in 7-day windows (29 requests):
+
+```
+https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=YYYYMMDD-YYYYMMDD
+```
+
+Per-game summary, for odds and results (903 requests):
+
+```
+https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/summary?event=<game_id>
+```
+
+Window fetched: **2025-12-12 through 2026-06-30**. One request per second, three
+attempts with exponential backoff. **0 retries and 0 failures** — every one of the 932
+requests succeeded first try.
+
+One gotcha worth recording: ESPN **403s browser-like `User-Agent` headers** on this
+host. `curl`'s default UA works; a Chrome UA returns `Access Denied`. The committed
+`fetch_espn.py` is the exact script used.
+
+### Deliverables
+
+| Path | What |
+|---|---|
+| `espn-2025-26-completion/games.csv` | 1 806 rows, 903 games, schema identical to the Kaggle `nhl_data_plus.csv` odds columns |
+| `espn-2025-26-completion/raw/summary/<game_id>.json.gz` | 903 raw summary responses, gzipped individually |
+| `espn-2025-26-completion/raw/scoreboard/<range>.json.gz` | 29 raw scoreboard responses |
+| `espn-2025-26-completion/raw/scoreboard-events.json` | flat event index (id, date, name, state, season type, series note) |
+| `espn-2025-26-completion/fetch_espn.py` | the fetcher, for reproducibility |
+
+Total 12 MB across 935 files. No `.gitignore` rule matches the directory.
+
+**What the raw JSON omits.** A full summary response is ~450 KB, of which ~313 KB is
+`plays` (play-by-play). Five keys are dropped before gzipping — `plays`, `news`,
+`article`, `videos`, `standings` — taking a payload from 450 KB to 127 KB (11.7 KB
+gzipped) and the commit from ~40 MB to 12 MB. **Everything else is preserved verbatim**:
+`boxscore`, `header`, `seasonseries`, `pickcenter`, `odds`, `againstTheSpread`,
+`gameInfo`, `leaders`, `injuries`, `onIce`, `format`, `meta`. To recover a dropped
+block, re-request the same URL — the game ids are all in `scoreboard-events.json`.
+
+### Column semantics
+
+`games.csv` columns are exactly the Kaggle file's:
+`game_id, date, season, team_name, is_home, won, goals_for, goals_against, spread,
+over_under, favorite_moneyline`.
+
+* `date` is rendered in the Kaggle file's format (`2026-06-15 00:00:00+00:00`) from
+  ESPN's `header.competitions[0].date`. It is **UTC**, so a 7pm ET game shows as the
+  next calendar day — the December seam below is expressed in UTC dates.
+* `season` is `2026`, the season's **ending** year, matching §8.
+* `spread`, `over_under`, `favorite_moneyline` are **game-level and repeated
+  identically on both rows** of a game, exactly as in the Kaggle file. Verified: 0 of
+  903 games disagree between their two rows.
+* Odds come from `pickcenter[0]`, which is **Draft Kings for all 1 806 rows** — a
+  single book across the whole window, so no cross-book mixing.
+* `favorite_moneyline` is the favorite's side only. The underdog price is not in this
+  column, so exact de-vigging is still impossible — same caveat as §8.
+
+**One improvement over the Kaggle file worth using.** §8 records that the Kaggle
+`spread` does not identify which team the moneyline belongs to. In this file it does:
+ESPN's `pickcenter.spread` is **home-relative**, so a negative `spread` means the home
+team is the favorite. Checked against `homeTeamOdds.favorite` in the raw JSON for all
+903 games — **903 agree, 0 disagree**. So `favorite_moneyline` can be attributed to a
+side with `spread < 0 ⇒ home`, no raw-JSON lookup needed. (The raw JSON also carries
+both `moneyLine` values and `favoriteAtOpen`, if the underdog price is ever wanted.)
+
+### Row counts and fill rates
+
+| Metric | Value |
+|---|---|
+| Rows | 1 806 |
+| Games | 903 (all unique game ids) |
+| Regular-season games (ESPN `season.type` 2) | 821 |
+| Playoff games (ESPN `season.type` 3) | 82 |
+| `favorite_moneyline` filled | **1 806 / 1 806 (100%)** |
+| `spread` filled | 1 806 / 1 806 (100%) |
+| `over_under` filled | 1 806 / 1 806 (100%) |
+| **Apr–Jun 2026 rows** | 418 |
+| **`favorite_moneyline` filled, Apr–Jun 2026** | **418 / 418 (100%)** |
+| `spread` / `over_under` filled, Apr–Jun 2026 | 418 / 418 (100%) each |
+
+**Games with missing or empty `pickcenter`: none.** Every one of the 903 games returned
+a populated `pickcenter[0]` with a spread, a total, and a favorite moneyline. Nothing
+was filled in, imputed, or defaulted — the 100% figures are what the API returned.
+
+Rows by month, and why February dips:
+
+| Month | Rows | Regular | Playoff |
+|---|---|---|---|
+| 2025-12 (from the 12th) | 268 | 134 | — |
+| 2026-01 | 476 | 238 | — |
+| 2026-02 | 150 | 75 | — |
+| 2026-03 | 494 | 247 | — |
+| 2026-04 | 334 | 127 | 40 |
+| 2026-05 | 72 | — | 36 |
+| 2026-06 | 12 | — | 6 |
+
+February is thin because of the **Milan-Cortina Olympic break**, not missing data — the
+scoreboard returns 20 events for 2026-02-20…02-26 against 53–59 in surrounding weeks.
+
+### Seam with the Kaggle file
+
+The Kaggle file's season-2026 rows cover **2025-09-20 … 2025-12-11** (583 games,
+including 71 September preseason games that §8 already flags for filtering). This file
+starts **2025-12-13** (UTC) and runs to 2026-06-15.
+
+**Overlap: 0 games.** Intersecting the two game-id sets gives the empty set; the union
+is 1 486 distinct season-2026 games. So the two sources concatenate cleanly with no
+dedupe step and no gap.
+
+### Sanity checks performed before committing
+
+1. **Two rows per game** — 903/903 games have exactly two rows, each with one
+   `is_home=1` and one `is_home=0`. No orphans.
+2. **Odds agree across a game's two rows** — 0/903 disagreements.
+3. **Moneylines are sane American odds** — range **-470 to -102**; zero values inside
+   the impossible `(-100, +100)` interval; zero positive values, which is correct since
+   the column is by definition the favorite's price.
+4. **Playoffs present, and the 2026 Final is there.** 82 playoff games across
+   April (40), May (36) and June (6). The Final is **Carolina vs Vegas**, six games,
+   and Carolina won it 4-2:
+
+```
+game_id     date        away @ home                                 away-home  won  ml     ou   spread
+401874171   2026-06-03  Vegas Golden Knights @ Carolina Hurricanes    5-4      VGK  -162   5.5   -1.5
+401874172   2026-06-05  Vegas Golden Knights @ Carolina Hurricanes    3-4      CAR  -162   5.5   -1.5
+401874173   2026-06-07  Carolina Hurricanes @ Vegas Golden Knights    4-5      VGK  -108   5.5    1.5
+401874174   2026-06-10  Carolina Hurricanes @ Vegas Golden Knights    5-3      CAR  -115   5.5    1.5
+401874175   2026-06-12  Vegas Golden Knights @ Carolina Hurricanes    2-4      CAR  -155   6.5   -1.5
+401874176   2026-06-15  Carolina Hurricanes @ Vegas Golden Knights    3-0      CAR  -115   5.5    1.5
+```
+
+   Series 4-2 Carolina. Scores are as the file records them (`goals_for` on each team's
+   own row). Note game 3 and game 6: home Vegas with `spread = +1.5`, i.e. the home team
+   is the underdog, so the `-108` / `-115` belongs to Carolina — the home-relative spread
+   rule in action.
+
+### Example rows, verbatim
+
+First two rows of the file (the 12 December seam) and the Cup-winning game:
+
+```
+game_id,date,season,team_name,is_home,won,goals_for,goals_against,spread,over_under,favorite_moneyline
+401802844,2025-12-13 01:00:00+00:00,2026,St. Louis Blues,1,1,3.0,2.0,1.5,5.5,-115.0
+401802844,2025-12-13 01:00:00+00:00,2026,Chicago Blackhawks,0,0,2.0,3.0,1.5,5.5,-115.0
+401802845,2025-12-13 02:00:00+00:00,2026,Utah Mammoth,1,1,5.0,3.0,-1.5,5.5,-192.0
+401802845,2025-12-13 02:00:00+00:00,2026,Seattle Kraken,0,0,3.0,5.0,-1.5,5.5,-192.0
+```
+
+A round-1 playoff pair and the Cup clincher:
+
+```
+401869720,2026-04-20 02:22:00+00:00,2026,Vegas Golden Knights,1,1,4.0,2.0,-1.5,5.5,-162.0
+401869720,2026-04-20 02:22:00+00:00,2026,Utah Mammoth,0,0,2.0,4.0,-1.5,5.5,-162.0
+401874176,2026-06-15 00:00:00+00:00,2026,Vegas Golden Knights,1,0,0.0,3.0,1.5,5.5,-115.0
+401874176,2026-06-15 00:00:00+00:00,2026,Carolina Hurricanes,0,1,3.0,0.0,1.5,5.5,-115.0
+```
+
+Note `Utah Mammoth` — a team name that exists in no other file here, and one more
+reason the team-name mapping in §3.4 needs to be per-source.
+
+### Coverage picture after this addition
+
+| Seasons | Game moneylines | Source |
+|---|---|---|
+| 2004 – 2015-16 | favorite price only | Kaggle/ESPN file |
+| 2016-17 – 2021-22 | both-side Open/Close (preferred) + favorite price (cross-check) | SBR workbooks + Kaggle/ESPN file |
+| 2022-23 | SBR through Nov 2022; favorite price for the full season incl. playoffs | both |
+| 2023-24 – 2024-25 | favorite price only, playoffs included | Kaggle/ESPN file |
+| 2025-26 to 2025-12-11 | favorite price only | Kaggle/ESPN file |
+| **2025-26 from 2025-12-12, incl. all 82 playoff games** | **favorite price, 100% filled, side identifiable via `spread` sign** | **this section** |
+
+**All ten of the originally requested seasons (2016-17 … 2025-26) now have game
+moneyline coverage, playoffs included.** The one remaining hole is the front half of
+2022-23 for *both-side* Open/Close prices, which only SBR carried and which SBR never
+published.
