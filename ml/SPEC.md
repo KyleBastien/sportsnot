@@ -111,15 +111,25 @@ playoff windows in 2020/2021, team-name variants, ending-year season labels, pre
 rows). Two committed sources: SBR workbooks (2016-17 – 2021-22 complete with both-side
 Open/Close moneylines — preferred where present; 2022-23 partial) and the Kaggle/ESPN
 file (2004 – Dec 2025 with favorite-side moneyline only, playoffs included through
-2024-25). Gap-filler for 2025-26 playoffs and all future games: ESPN's public summary
-endpoint (`site.api.espn.com/.../summary?event=<id>`, `pickcenter` block — same host as
-injuries). Favorite-only prices cannot be exactly de-vigged: use a documented
+2024-25). The 2025-26 completion (Dec 2025 - June 2026, incl. the full 2026 playoffs, 100%
+odds fill, DraftKings via ESPN's pickcenter) is committed under
+`odds-archive/espn-2025-26-completion/` — so committed archives now cover every game
+2004 through June 2026 with no gaps. ESPN's public summary endpoint
+(`site.api.espn.com/.../summary?event=<id>`, `pickcenter` block; note: browser-like
+User-Agents get 403'd, curl's default works) is the fetcher for FUTURE games only. Favorite-only prices cannot be exactly de-vigged: use a documented
 standard-overround approximation, never fabricate an underdog price. Game moneylines
 only, no series prices.
 
 **Injuries** — ESPN public JSON:
 `https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries` (player detail via
 ESPN core API as needed). Final authority: `ml/data/overrides/injuries.yaml`.
+Historical bonus for return-time calibration (US-015): the raw ESPN game summaries
+committed under `odds-archive/espn-2025-26-completion/raw/summary/` each carry an
+as-of-game `injuries` block (athlete, date, status, details) for Dec 2025 - June 2026.
+Worth one experiment during implementation: check whether summaries of OLDER seasons'
+games also retain as-of-game injury blocks — if yes, that's calibration data for past
+seasons too; if they reflect current status instead, use only the committed 2025-26
+captures.
 
 ## 6. As-of & leakage rules (hard requirements)
 
