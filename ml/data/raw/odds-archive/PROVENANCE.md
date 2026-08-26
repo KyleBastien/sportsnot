@@ -341,3 +341,58 @@ exists. Columns in the 16-value order of §3.1.
 * `N` rows have no home-ice information; flag rather than guess.
 * 2023-24, 2024-25 and 2025-26 have **no odds coverage at all** — flag explicitly, never
   impute.
+
+---
+
+## 8. Second source: Kaggle `jonathanncoletti/nhl-historical-game-data` (added 2026-08-26)
+
+Owner-downloaded from Kaggle (logged-in web download; the dataset page advertises
+"2004-today", last updated 2025-12-12) and committed under `kaggle-nhl-historical/`,
+gzipped for repo size (gunzip restores the original bytes; md5 of the uncompressed
+files: `nhl_data_extensive.csv` c3bbbece8c5d31928d58822be5ade6cc,
+`nhl_data_plus.csv` 21f190e96f43497439fc24d63fa6917d). The dataset's own build scripts
+are committed alongside — they reveal the odds provenance: **ESPN's public
+scoreboard/summary API** (`site.api.espn.com/.../scoreboard` and `/summary`, the
+`pickcenter` odds block). `aussportsbetting.com` was also checked by the owner and has
+no NHL data.
+
+### Layout (`nhl_data_extensive.csv`, 59,160 data rows; `nhl_data_plus.csv` is the same
+games with fewer columns)
+
+One row per **team per game** (two rows per `game_id`; 326 early-era games have only
+one row). Odds columns are **game-level, repeated identically on both rows**:
+
+- `favorite_moneyline` — the favorite's American-odds price (single side only; the
+  underdog price is NOT present, so exact de-vigging is impossible — treat as a
+  monotone win-probability proxy or apply a documented standard-overround assumption)
+- `spread` — puck line for the row's team; the favorite's row carries the negative
+  spread, which identifies which team the moneyline belongs to
+- `over_under` — game total
+- `season` — the season's ENDING year (season 2025 = 2024-25); September rows are
+  preseason, so filter by joining to the real NHL schedule
+- plus ~120 stat/context columns (rolling team stats, records, officials) that the
+  pipeline derives itself from the NHL API — ignore them, they are convenience data
+
+### Verification (performed on the uncompressed files)
+
+- `favorite_moneyline` is 100% filled and non-zero in ALL 59,160 rows, seasons 2004
+  through 2026-partial; values are sane American odds (none in the impossible
+  (-100, +100) open interval)
+- Season date ranges confirm ending-year labeling; **2023-24 and 2024-25 are complete
+  including May-June playoff games** (106 and 94 May-June rows respectively)
+- **Season 2025-26 ends 2025-12-11** — the 2026 playoffs are NOT in this file
+- The favorite moneyline is identical on both rows of all 29,417 two-row games
+
+### Updated coverage picture
+
+| Seasons | Game moneylines | Source |
+|---|---|---|
+| 2004 – 2015-16 | favorite price only | Kaggle/ESPN file |
+| 2016-17 – 2021-22 | both-side Open/Close (preferred) + favorite price (cross-check) | SBR workbooks + Kaggle/ESPN file |
+| 2022-23 | SBR through Nov 2022 only; favorite price for the full season incl. playoffs | both |
+| 2023-24 – 2024-25 | favorite price only, playoffs included | Kaggle/ESPN file |
+| 2025-26 regular season (to Dec 11) | favorite price only | Kaggle/ESPN file |
+| **2025-26 playoffs and beyond** | **fetchable live: ESPN summary API** (`site.api.espn.com/.../summary?event=<id>`, `pickcenter` block) — same host already pinned for injuries; US-005 ingests these directly | ESPN API |
+
+The overlap seasons (2016-17 – 2021-22) double as a cross-validation set between the
+two sources.

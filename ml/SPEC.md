@@ -106,11 +106,16 @@ Everything must run with `--no-odds`.
 **Odds, historical (training/backtests)** — committed archive files in
 `ml/data/raw/odds-archive/`; that directory's PROVENANCE.md is the authoritative layout
 and parsing reference (read it in full before writing the parser — it documents real
-traps: 13 headers over 16 columns, MMDD dates with no year, non-April playoff windows
-in 2020/2021, team-name variants). Actual coverage: complete seasons with playoffs
-2016-17 through 2021-22; 2022-23 partial (regular season through Nov 2022, NO
-playoffs); 2023-24 through 2025-26 have NO historical odds — flag, never impute.
-Game moneylines only, no series prices.
+traps in both sources: 13 headers over 16 columns, MMDD dates with no year, non-April
+playoff windows in 2020/2021, team-name variants, ending-year season labels, preseason
+rows). Two committed sources: SBR workbooks (2016-17 – 2021-22 complete with both-side
+Open/Close moneylines — preferred where present; 2022-23 partial) and the Kaggle/ESPN
+file (2004 – Dec 2025 with favorite-side moneyline only, playoffs included through
+2024-25). Gap-filler for 2025-26 playoffs and all future games: ESPN's public summary
+endpoint (`site.api.espn.com/.../summary?event=<id>`, `pickcenter` block — same host as
+injuries). Favorite-only prices cannot be exactly de-vigged: use a documented
+standard-overround approximation, never fabricate an underdog price. Game moneylines
+only, no series prices.
 
 **Injuries** — ESPN public JSON:
 `https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries` (player detail via
