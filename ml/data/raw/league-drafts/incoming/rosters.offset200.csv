@@ -1,0 +1,101 @@
+league_name,playoff_round,manager,team_name,position,player_id,player_name,team_id,nhl_team_name,is_active,points_earned,activated_from_ir
+The Gemmell Cup,1,judah18,"Connor McJudah ",F,8477492,Nathan MacKinnon,null,null,true,4,false
+The Gemmell Cup,1,judah18,"Connor McJudah ",F,8477960,Adrian Kempe,null,null,true,2,false
+The Gemmell Cup,1,judah18,"Connor McJudah ",G,null,null,21,Colorado Avalanche,true,8,false
+The Gemmell Cup,1,nuttguy,56 Years and Counting,D,8480036,Miro Heiskanen,null,null,true,6,false
+The Gemmell Cup,1,nuttguy,56 Years and Counting,D,8476906,Shayne Gostisbehere,null,null,true,0,false
+The Gemmell Cup,1,nuttguy,56 Years and Counting,D,8479325,Charlie McAvoy,null,null,true,2,false
+The Gemmell Cup,1,nuttguy,56 Years and Counting,F,8478402,Connor McDavid,null,null,true,6,false
+The Gemmell Cup,1,nuttguy,56 Years and Counting,F,8478427,Sebastian Aho,null,null,true,3,false
+The Gemmell Cup,1,nuttguy,56 Years and Counting,F,8480039,Martin Necas,null,null,true,2,false
+The Gemmell Cup,1,nuttguy,56 Years and Counting,F,8478483,Mitch Marner,null,null,true,7,false
+The Gemmell Cup,1,nuttguy,56 Years and Counting,F,8477956,David Pastrnak,null,null,true,7,false
+The Gemmell Cup,1,nuttguy,56 Years and Counting,G,null,null,22,Edmonton Oilers,true,4,false
+The Gemmell Cup,2,bentunigold,BLT Sandwich - Chomp Chomp,D,8477447,Shea Theodore,null,null,true,5,false
+The Gemmell Cup,2,bentunigold,BLT Sandwich - Chomp Chomp,D,8482122,Brock Faber,null,null,true,4,false
+The Gemmell Cup,2,bentunigold,BLT Sandwich - Chomp Chomp,D,8478038,Devon Toews,null,null,true,5,false
+The Gemmell Cup,2,bentunigold,BLT Sandwich - Chomp Chomp,F,8484153,Leo Carlsson,null,null,true,3,false
+The Gemmell Cup,2,bentunigold,BLT Sandwich - Chomp Chomp,F,8478403,Jack Eichel,null,null,true,6,false
+The Gemmell Cup,2,bentunigold,BLT Sandwich - Chomp Chomp,F,8482702,Logan Stankoven,null,null,true,3,false
+The Gemmell Cup,2,bentunigold,BLT Sandwich - Chomp Chomp,F,8477949,Alex Tuch,null,null,true,0,false
+The Gemmell Cup,2,bentunigold,BLT Sandwich - Chomp Chomp,F,8478873,Troy Terry,null,null,true,3,false
+The Gemmell Cup,2,bentunigold,BLT Sandwich - Chomp Chomp,G,null,null,12,Carolina Hurricanes,true,10,false
+The Gemmell Cup,2,gemmell.levi,12 Bar Hughes,D,8474590,John Carlson,null,null,true,1,false
+The Gemmell Cup,2,gemmell.levi,12 Bar Hughes,D,8480839,Rasmus Dahlin,null,null,true,10,false
+The Gemmell Cup,2,gemmell.levi,12 Bar Hughes,D,8480069,Cale Makar,null,null,true,3,false
+The Gemmell Cup,2,gemmell.levi,12 Bar Hughes,F,8480018,Nick Suzuki,null,null,true,7,false
+The Gemmell Cup,2,gemmell.levi,12 Bar Hughes,F,8478483,Mitch Marner,null,null,true,11,false
+The Gemmell Cup,2,gemmell.levi,12 Bar Hughes,F,8479420,Tage Thompson,null,null,true,8,false
+The Gemmell Cup,2,gemmell.levi,12 Bar Hughes,F,8480039,Martin Necas,null,null,true,9,false
+The Gemmell Cup,2,gemmell.levi,12 Bar Hughes,F,8475913,Mark Stone,null,null,true,2,false
+The Gemmell Cup,2,gemmell.levi,12 Bar Hughes,G,null,null,7,Buffalo Sabres,true,6,false
+The Gemmell Cup,2,judah18,"Connor McJudah ",D,8482671,Owen Power,null,null,true,2,false
+The Gemmell Cup,2,judah18,"Connor McJudah ",D,8481605,Jackson LaCombe,null,null,true,1,false
+The Gemmell Cup,2,judah18,"Connor McJudah ",D,8483457,Lane Hutson,null,null,true,8,false
+The Gemmell Cup,2,judah18,"Connor McJudah ",F,8478864,Kirill Kaprizov,null,null,true,6,false
+The Gemmell Cup,2,judah18,"Connor McJudah ",F,8476455,Gabriel Landeskog,null,null,true,4,false
+The Gemmell Cup,2,judah18,"Connor McJudah ",F,8475692,Mats Zuccarello,null,null,true,4,false
+The Gemmell Cup,2,judah18,"Connor McJudah ",F,8477492,Nathan MacKinnon,null,null,true,9,false
+The Gemmell Cup,2,judah18,"Connor McJudah ",F,8481540,Cole Caufield,null,null,true,5,false
+The Gemmell Cup,2,judah18,"Connor McJudah ",G,null,null,21,Colorado Avalanche,true,8,false
+The Gemmell Cup,2,nuttguy,56 Years and Counting,D,8480800,Quinn Hughes,null,null,true,7,false
+The Gemmell Cup,2,nuttguy,56 Years and Counting,D,8481524,Bowen Byram,null,null,true,2,false
+The Gemmell Cup,2,nuttguy,56 Years and Counting,D,8478396,Noah Hanifin,null,null,true,1,false
+The Gemmell Cup,2,nuttguy,56 Years and Counting,F,8482809,Jackson Blake,null,null,true,7,false
+The Gemmell Cup,2,nuttguy,56 Years and Counting,F,8478427,Sebastian Aho,null,null,true,1,false
+The Gemmell Cup,2,nuttguy,56 Years and Counting,F,8481557,Matt Boldy,null,null,true,4,false
+The Gemmell Cup,2,nuttguy,56 Years and Counting,F,8477476,Artturi Lehkonen,null,null,true,2,false
+The Gemmell Cup,2,nuttguy,56 Years and Counting,F,8475791,Taylor Hall,null,null,true,5,false
+The Gemmell Cup,2,nuttguy,56 Years and Counting,G,null,null,54,Vegas Golden Knights,true,8,false
+The Gemmell Cup,3,bentunigold,BLT Sandwich - Chomp Chomp,D,8480817,K'Andre Miller,null,null,true,2,false
+The Gemmell Cup,3,bentunigold,BLT Sandwich - Chomp Chomp,D,8477447,Shea Theodore,null,null,true,2,false
+The Gemmell Cup,3,bentunigold,BLT Sandwich - Chomp Chomp,D,8482087,Kaiden Guhle,null,null,true,2,false
+The Gemmell Cup,3,bentunigold,BLT Sandwich - Chomp Chomp,F,8478483,Mitch Marner,null,null,true,3,false
+The Gemmell Cup,3,bentunigold,BLT Sandwich - Chomp Chomp,F,8475791,Taylor Hall,null,null,true,4,false
+The Gemmell Cup,3,bentunigold,BLT Sandwich - Chomp Chomp,F,8482702,Logan Stankoven,null,null,true,4,false
+The Gemmell Cup,3,bentunigold,BLT Sandwich - Chomp Chomp,F,8482093,Seth Jarvis,null,null,true,4,false
+The Gemmell Cup,3,bentunigold,BLT Sandwich - Chomp Chomp,F,8478403,Jack Eichel,null,null,true,3,false
+The Gemmell Cup,3,bentunigold,BLT Sandwich - Chomp Chomp,G,null,null,12,Carolina Hurricanes,true,10,false
+The Gemmell Cup,3,gemmell.levi,12 Bar Hughes,D,8470613,Brent Burns,null,null,true,1,false
+The Gemmell Cup,3,gemmell.levi,12 Bar Hughes,D,8476967,Brett Kulak,null,null,true,0,false
+The Gemmell Cup,3,gemmell.levi,12 Bar Hughes,D,8480865,Noah Dobson,null,null,true,0,false
+The Gemmell Cup,3,gemmell.levi,12 Bar Hughes,F,8480018,Nick Suzuki,null,null,true,3,false
+The Gemmell Cup,3,gemmell.levi,12 Bar Hughes,F,8475172,Nazem Kadri,null,null,true,3,false
+The Gemmell Cup,3,gemmell.levi,12 Bar Hughes,F,8481540,Cole Caufield,null,null,true,4,false
+The Gemmell Cup,3,gemmell.levi,12 Bar Hughes,F,8480039,Martin Necas,null,null,true,2,false
+The Gemmell Cup,3,gemmell.levi,12 Bar Hughes,F,8475754,Brock Nelson,null,null,true,0,false
+The Gemmell Cup,3,gemmell.levi,12 Bar Hughes,G,null,null,8,Montréal Canadiens,true,2,false
+The Gemmell Cup,3,judah18,"Connor McJudah ",D,8480069,Cale Makar,null,null,true,0,false
+The Gemmell Cup,3,judah18,"Connor McJudah ",D,8483457,Lane Hutson,null,null,true,2,false
+The Gemmell Cup,3,judah18,"Connor McJudah ",D,8480336,Sean Walker,null,null,true,0,false
+The Gemmell Cup,3,judah18,"Connor McJudah ",F,8478133,Jake Evans,null,null,true,2,false
+The Gemmell Cup,3,judah18,"Connor McJudah ",F,8473533,Jordan Staal,null,null,true,1,false
+The Gemmell Cup,3,judah18,"Connor McJudah ",F,8477492,Nathan MacKinnon,null,null,true,2,false
+The Gemmell Cup,3,judah18,"Connor McJudah ",F,8478427,Sebastian Aho,null,null,true,3,false
+The Gemmell Cup,3,judah18,"Connor McJudah ",F,8482809,Jackson Blake,null,null,true,4,false
+The Gemmell Cup,3,judah18,"Connor McJudah ",G,null,null,54,Vegas Golden Knights,true,8,false
+The Gemmell Cup,3,nuttguy,56 Years and Counting,D,8476312,Josh Manson,null,null,true,1,false
+The Gemmell Cup,3,nuttguy,56 Years and Counting,D,8484258,Sam Malinski,null,null,true,0,false
+The Gemmell Cup,3,nuttguy,56 Years and Counting,D,8478038,Devon Toews,null,null,true,3,false
+The Gemmell Cup,3,nuttguy,56 Years and Counting,F,8476455,Gabriel Landeskog,null,null,true,3,false
+The Gemmell Cup,3,nuttguy,56 Years and Counting,F,8478462,Nicolas Roy,null,null,true,0,false
+The Gemmell Cup,3,nuttguy,56 Years and Counting,F,8480835,Jack Drury,null,null,true,1,false
+The Gemmell Cup,3,nuttguy,56 Years and Counting,F,8477476,Artturi Lehkonen,null,null,true,0,false
+The Gemmell Cup,3,nuttguy,56 Years and Counting,F,8480448,Parker Kelly,null,null,true,1,false
+The Gemmell Cup,3,nuttguy,56 Years and Counting,G,null,null,21,Colorado Avalanche,true,0,false
+The Gemmell Cup,4,bentunigold,BLT Sandwich - Chomp Chomp,D,8480817,K'Andre Miller,null,null,true,1,false
+The Gemmell Cup,4,bentunigold,BLT Sandwich - Chomp Chomp,D,8482087,Kaiden Guhle,null,null,true,0,false
+The Gemmell Cup,4,bentunigold,BLT Sandwich - Chomp Chomp,D,8477447,Shea Theodore,null,null,true,7,false
+The Gemmell Cup,4,bentunigold,BLT Sandwich - Chomp Chomp,F,8482702,Logan Stankoven,null,null,true,4,false
+The Gemmell Cup,4,bentunigold,BLT Sandwich - Chomp Chomp,F,8475791,Taylor Hall,null,null,true,3,false
+The Gemmell Cup,4,bentunigold,BLT Sandwich - Chomp Chomp,F,8478403,Jack Eichel,null,null,true,4,false
+The Gemmell Cup,4,bentunigold,BLT Sandwich - Chomp Chomp,F,8482093,Seth Jarvis,null,null,true,3,false
+The Gemmell Cup,4,bentunigold,BLT Sandwich - Chomp Chomp,F,8478483,Mitch Marner,null,null,true,8,false
+The Gemmell Cup,4,bentunigold,BLT Sandwich - Chomp Chomp,G,null,null,12,Carolina Hurricanes,true,10,false
+The Gemmell Cup,4,gemmell.levi,12 Bar Hughes,D,8476967,Brett Kulak,null,null,true,0,false
+The Gemmell Cup,4,gemmell.levi,12 Bar Hughes,D,8480865,Noah Dobson,null,null,true,0,false
+The Gemmell Cup,4,gemmell.levi,12 Bar Hughes,D,8470613,Brent Burns,null,null,true,0,false
+The Gemmell Cup,4,gemmell.levi,12 Bar Hughes,F,8475754,Brock Nelson,null,null,true,0,false
+The Gemmell Cup,4,gemmell.levi,12 Bar Hughes,F,8481540,Cole Caufield,null,null,true,0,false
+The Gemmell Cup,4,gemmell.levi,12 Bar Hughes,F,8480018,Nick Suzuki,null,null,true,0,false
+The Gemmell Cup,4,gemmell.levi,12 Bar Hughes,F,8475172,Nazem Kadri,null,null,true,0,false

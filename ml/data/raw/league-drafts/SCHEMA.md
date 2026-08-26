@@ -864,7 +864,34 @@ null; goalie/team picks have player_id/player_name null).
 - Owner caveat: prefer round 3 for validation; rounds 1-2 may carry artifacts from
   mid-playoffs draft bugs (none were detected by the checks above, but stay lenient).
 
-## app-export-2026__rosters.csv, app-export-2026__draft-order.csv — PENDING
+## app-export-2026__rosters.csv — COMPLETE except ONE known-missing row (319/320)
 
-Queries 2 and 3 in `APP_EXPORT.md`; same chunked procedure. Add their column notes
-here when they land.
+One row per roster slot per round, INCLUDING round-4 rows (the round-3 draft carried
+through the final; round-4 rows are the same players with round-4 points tracked
+separately). Columns: `league_name, playoff_round, manager, team_name, position,
+player_id, player_name, team_id, nhl_team_name, is_active, points_earned,
+activated_from_ir`.
+
+- **Known gap:** the row for Press Play-offs, round 3, nuttguy, D, Jalen Chatfield
+  (player_id 8478970) was lost to a pagination-boundary duplicate during export (the
+  roster ORDER BY had ties, so OFFSET chunks duplicated one row and skipped this one).
+  Every other manager-round reconciles exactly against the draft picks. Backfill query
+  is in `APP_EXPORT.md`; until it lands, parsers must tolerate exactly this one gap.
+- Validated: rosters match drafted players exactly for every league/round/manager
+  (round-4 rosters match the round-3 draft); no other gaps or extras.
+- `activated_from_ir` is false and `is_active` true on ALL rows: no in-app IR
+  activation ever happened in 2026. IR-slot players earn `points_earned` in place but
+  the app excludes IR slots from standings (migration
+  `20260419182007_exclude_ir_from_standings.sql`).
+- Empirical rule confirmation: Gemmell round-1 active-slot totals (nuttguy 37,
+  bentunigold 51, judah18 53, gemmell.levi 56) produce exactly the stored round-2
+  order nuttguy→bentunigold→judah18→gemmell.levi — the worst-to-best re-draft rule
+  operating on real data.
+
+## app-export-2026__draft-order.csv — COMPLETE (240 rows)
+
+The app's stored draft order per round, fully expanded to one row per pick slot
+(`league_name, playoff_round, order_position, manager`). The sequences are perfectly
+regular snakes over a 4-manager base order. Cross-validated: every one of the 240
+actual picks was made by exactly the manager the stored order assigns to that pick
+number — no out-of-turn picks, no commissioner overrides.

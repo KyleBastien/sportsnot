@@ -1,0 +1,21 @@
+league_name,playoff_round,manager,team_name,position,player_id,player_name,team_id,nhl_team_name,is_active,points_earned,activated_from_ir
+The Gemmell Cup,4,gemmell.levi,12 Bar Hughes,F,8480039,Martin Necas,null,null,true,0,false
+The Gemmell Cup,4,gemmell.levi,12 Bar Hughes,G,null,null,8,Montréal Canadiens,true,0,false
+The Gemmell Cup,4,judah18,"Connor McJudah ",D,8483457,Lane Hutson,null,null,true,0,false
+The Gemmell Cup,4,judah18,"Connor McJudah ",D,8480336,Sean Walker,null,null,true,1,false
+The Gemmell Cup,4,judah18,"Connor McJudah ",D,8480069,Cale Makar,null,null,true,0,false
+The Gemmell Cup,4,judah18,"Connor McJudah ",F,8473533,Jordan Staal,null,null,true,7,false
+The Gemmell Cup,4,judah18,"Connor McJudah ",F,8482809,Jackson Blake,null,null,true,5,false
+The Gemmell Cup,4,judah18,"Connor McJudah ",F,8478427,Sebastian Aho,null,null,true,5,false
+The Gemmell Cup,4,judah18,"Connor McJudah ",F,8477492,Nathan MacKinnon,null,null,true,0,false
+The Gemmell Cup,4,judah18,"Connor McJudah ",F,8478133,Jake Evans,null,null,true,0,false
+The Gemmell Cup,4,judah18,"Connor McJudah ",G,null,null,54,Vegas Golden Knights,true,4,false
+The Gemmell Cup,4,nuttguy,56 Years and Counting,D,8478038,Devon Toews,null,null,true,0,false
+The Gemmell Cup,4,nuttguy,56 Years and Counting,D,8484258,Sam Malinski,null,null,true,0,false
+The Gemmell Cup,4,nuttguy,56 Years and Counting,D,8476312,Josh Manson,null,null,true,0,false
+The Gemmell Cup,4,nuttguy,56 Years and Counting,F,8476455,Gabriel Landeskog,null,null,true,0,false
+The Gemmell Cup,4,nuttguy,56 Years and Counting,F,8477476,Artturi Lehkonen,null,null,true,0,false
+The Gemmell Cup,4,nuttguy,56 Years and Counting,F,8478462,Nicolas Roy,null,null,true,0,false
+The Gemmell Cup,4,nuttguy,56 Years and Counting,F,8480448,Parker Kelly,null,null,true,0,false
+The Gemmell Cup,4,nuttguy,56 Years and Counting,F,8480835,Jack Drury,null,null,true,0,false
+The Gemmell Cup,4,nuttguy,56 Years and Counting,G,null,null,21,Colorado Avalanche,true,0,false
