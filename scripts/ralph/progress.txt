@@ -83,6 +83,21 @@ Started: 08/27/2026 22:10:47
   `canonical_manager` (Evi->levi; app usernames nuttguy/bentunigold/judah18/gemmell.levi).
   When app/scoring/roster rules change (utils.ts/types.ts/rules.py), re-check the
   correction tables here too. Run `uv run oracle league-drafts`.
+- Entity matching goes through `draft_oracle.ingest.entity_match` (US-007). Turns
+  `league_picks.parquet` into the FINAL `league_draft_picks.parquet`: skater slots
+  (F/D/IR_F/IR_D) -> NHL `player_id` from `players.parquet`; goalie/team slots (G) ->
+  `team_id` from `teams.parquet` (a goalie pick is a bet on a TEAM's goalie situation).
+  `normalize_name` strips accents + punctuation (initials collapse: J.T.=JT). Skater
+  match order: override -> exact(norm) -> fuzzy(difflib ratio>=0.88) -> unique last-name
+  (bare "McDavid") -> low-conf fuzzy>=0.80 (needs_review) -> unmatched. SAME-NAME
+  collisions (two Sebastian Aho) disambiguated by the pick's roster position — always
+  pass position into match_skater. Team resolve = odds.resolve_team_id (city/full/abbrev)
+  + a nickname index (Panthers->FLA, Maple Leafs->TOR) scanning ALL tokens surname-first.
+  Committed 2024-2026 snapshots match at 100% (489 exact/56 team/6 fuzzy/1 lastname), so
+  the override files ship EMPTY. Config lives in `ml/data/overrides/` (NOT gitignored —
+  data/raw,features,normalized are, overrides are committed): `manager_aliases.yaml`
+  (canonical->alias list, evi=levi) and `name_overrides.yaml` (players/teams raw-name->id;
+  close gaps by ADDING here, never by dropping rows). Run `uv run oracle match-drafts`.
 
 ## 2026-08-27 22:10 - US-001
 - Scaffolded the isolated uv-managed Python ML workspace under `ml/` for the
@@ -297,4 +312,41 @@ Started: 08/27/2026 22:10:47
     picks and are skipped, so sheet1 R1 = 36 picks (IR-less), not 44.
   - No UI change; Playwright not applicable (ml/ is outside the Nx/web graph, so
     `yarn nx affected` is empty for these changes).
+---
+
+## 2026-08-27 23:40 - US-007
+- Implemented draft_oracle.ingest.entity_match: matches parsed league_picks to NHL
+  player/team ids and normalizes managers, emitting the final league_draft_picks table.
+- Files changed:
+  - ml/src/draft_oracle/ingest/entity_match.py (new): normalize_name/name_tokens/
+    last_name_key (accent + punctuation + initials folding); load_manager_aliases +
+    resolve_manager (yaml-driven, evi=levi); load_name_overrides (NameOverrides);
+    resolve_team (odds.resolve_team_id + nickname index, all-token scan);
+    build_player_index + match_skater (override->exact->fuzzy>=0.88->unique-lastname->
+    low-conf->unmatched, position-disambiguated); match_team; build_league_draft_picks
+    (writes league_draft_picks.parquet + per-season SeasonMatchReport + review CSV).
+  - ml/data/overrides/manager_aliases.yaml, name_overrides.yaml (new, committed, empty maps).
+  - ml/src/draft_oracle/ingest/__init__.py: re-export entity_match public API.
+  - ml/src/draft_oracle/cli/project.py: oracle match-drafts command.
+  - ml/tests/test_entity_match.py (new): 49 tests (normalization, aliases, overrides,
+    team resolution, fuzzy typos, last-name fallback, Aho collision, end-to-end build,
+    review report, override gap-close, fail-loud).
+  - ml/README.md: "Entity matching" section + command row.
+- Quality (from ml/): ruff check clean, ruff format --check clean, mypy --strict clean
+  (24 files), pytest 219 passed. oracle match-drafts => 552/552 picks matched (100.0%):
+  108/108 (2024), 132/132 (2025), 312/312 (2026); 0 to review. Beats the >=98% target.
+- **Learnings for future iterations:**
+  - Goalie picks already have a parsed 	eam_name column in league_picks; match on that
+    (not the "Team Goalie (Name)" free text). player_id stays null for G; team_id is set.
+  - There are TWO Sebastian Aho (F CAR 8478427, D NYI 8480222) — position filtering in
+    match_skater is REQUIRED, not optional, or the wrong id is assigned.
+  - difflib.SequenceMatcher (stdlib, deterministic) is enough for the real typos
+    (Pastrank/Petterson/Ekblad/Skjei/Montour ratios 0.92-0.97); no rapidfuzz dep needed.
+  - Bare surnames (McDavid) score ~0.70 on full-string fuzzy — the unique last-name
+    fallback catches them; ordered AFTER fuzzy>=0.88 so it only fires when needed.
+  - pandas 3.0: Series | pythonlist raises; wrap the mask list in pd.Series first.
+    itertuples values are Any to mypy — cast via a tiny _as_int helper, not bare int().
+  - data/overrides/ is NOT gitignored (unlike data/raw,features,normalized), so the yaml
+    config files are committed as intended by SPEC §4.
+  - No UI change; Playwright not applicable (ml/ outside the Nx/web graph, affected empty).
 ---

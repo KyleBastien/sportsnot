@@ -13,6 +13,10 @@ from typing import Annotated
 import typer
 
 from draft_oracle import __version__
+from draft_oracle.ingest.entity_match import (
+    DEFAULT_OVERRIDES_DIR,
+    build_league_draft_picks,
+)
 from draft_oracle.ingest.league_drafts import (
     DEFAULT_LEAGUE_DRAFTS_DIR,
     build_league_drafts,
@@ -130,6 +134,28 @@ def league_drafts(
 ) -> None:
     """Parse the committed league draft-history snapshots into Parquet tables."""
     result = build_league_drafts(league_dir=league_dir, out_dir=out_dir)
+    for line in result.report_lines():
+        typer.echo(line)
+
+
+@app.command(name="match-drafts")
+def match_drafts(
+    normalized_dir: Annotated[
+        Path, typer.Option(help="Directory holding normalized Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    overrides_dir: Annotated[
+        Path, typer.Option(help="Directory holding the override YAML files.")
+    ] = DEFAULT_OVERRIDES_DIR,
+    out_dir: Annotated[
+        Path, typer.Option(help="Output directory for league_draft_picks.parquet.")
+    ] = DEFAULT_NORMALIZED_DIR,
+) -> None:
+    """Match league picks to NHL ids -> league_draft_picks + match-rate report."""
+    result = build_league_draft_picks(
+        normalized_dir=normalized_dir,
+        overrides_dir=overrides_dir,
+        out_dir=out_dir,
+    )
     for line in result.report_lines():
         typer.echo(line)
 

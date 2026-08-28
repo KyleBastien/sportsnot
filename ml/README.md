@@ -50,6 +50,7 @@ All commands run from the `ml/` directory.
 | Build odds      | `uv run oracle odds`                     |
 | Skip odds       | `uv run oracle odds --no-odds`           |
 | League drafts   | `uv run oracle league-drafts`            |
+| Match drafts    | `uv run oracle match-drafts`             |
 
 ## Package layout
 
@@ -281,6 +282,54 @@ owner-confirmed, scored in the app, not a sheet).
 
 Parsers **fail loudly** (`ValueError`) if a committed file's header, block count,
 or slot labels do not match `SCHEMA.md`.
+
+
+## Entity matching (`ingest/entity_match.py`)
+
+Resolves every parsed `league_picks` row to a stable NHL id and emits the final
+`league_draft_picks` table. Depends on both `oracle league-drafts` (for
+`league_picks.parquet`) and `oracle normalize` (for `players.parquet` /
+`teams.parquet`).
+
+```bash
+uv run oracle match-drafts     # build data/normalized/league_draft_picks.parquet + match-rate report
+```
+
+**How ids are assigned:**
+
+- **Skater slots** (`F`/`D`/`IR_F`/`IR_D`) → NHL `player_id` from
+  `players.parquet` via normalized fuzzy name matching. `normalize_name` strips
+  accents (`Montréal`→`montreal`), folds case, and drops punctuation so initials
+  align (`J.T. Miller`=`JT Miller`). Match order: manual override → exact →
+  high-confidence fuzzy (`difflib` ratio ≥ `HIGH_CONFIDENCE`=0.88) → unique
+  last-name fallback (bare `McDavid`) → low-confidence fuzzy (≥0.80, flagged for
+  review) → unresolved. Same-name collisions (there are two `Sebastian Aho`s)
+  are disambiguated by the pick's roster position.
+- **Goalie / team slots** (`G`) → NHL `team_id` from `teams.parquet` — a goalie
+  pick is a bet on a team's goalie situation, so the id is the team. Resolution
+  extends `odds.resolve_team_id` (city / full name / abbrev) with a nickname
+  fallback (`Panthers Goalie`→FLA, `Maple Leafs`→TOR).
+- **Managers** fold to a canonical id across seasons via
+  `data/overrides/manager_aliases.yaml` (`evi`=`levi`, app usernames → canonical).
+
+**Overrides (`data/overrides/`, committed):**
+
+- `manager_aliases.yaml` — canonical id → alias list; the binding manager map.
+- `name_overrides.yaml` — `players`/`teams` maps of raw name → id for anything
+  the matcher misses. Overrides take precedence. Per the honesty rule (SPEC §7),
+  gaps are closed by **adding overrides, never by dropping rows or lowering the
+  bar**. The committed 2024–2026 snapshots match at **100%** via fuzzy matching,
+  so both maps ship empty.
+
+**`league_draft_picks` table** — the `league_picks` provenance (season, source,
+draft_event, manager, snake_slot, pick_number, position, slot_label, points
+fields, status flag) plus `matched_name`, `player_id` (skaters), `team_id`
+(goalie/team; also best-effort associated team for skaters), and match
+diagnostics (`match_method`, `match_confidence`, `needs_review`).
+
+The command prints a **per-season match-rate report** (matched/unmatched/review
+counts). Low-confidence or unresolved picks are written to
+`league_draft_picks_review.csv` for human review.
 
 
 

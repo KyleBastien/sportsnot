@@ -1,0 +1,20 @@
+# Manual entity-match overrides (US-007 / PRD US-015).
+#
+# Anything the automated fuzzy matcher cannot resolve (or resolves wrongly)
+# is fixed here — never by lowering the match-rate bar or dropping picks.
+# Overrides take precedence over exact/fuzzy matching.
+#
+# `players`: raw draft name (as it appears in the sheet/app export) -> NHL
+#   player_id (an integer from `players.parquet`). Used for F/D/IR skater slots.
+# `teams`: raw team/goalie name -> NHL team_id (an integer from `teams.parquet`).
+#   Used for goalie/team slots.
+#
+# Keys are normalized (accent-stripped, lowercased, punctuation removed) on
+# load, so "Montréal Canadiens" and "montreal canadiens" collide to one entry.
+#
+# The committed 2024-2026 snapshots currently match at 100% via fuzzy matching,
+# so both maps are intentionally empty. Add entries as new seasons surface
+# names the matcher misses.
+
+players: {}
+teams: {}
