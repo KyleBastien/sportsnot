@@ -63,6 +63,12 @@ from draft_oracle.models.projections import (
     _row_seed,
     project_skater_round,
 )
+from draft_oracle.models.returns import (
+    STATUS_MEAN_GAMES,
+    ReturnTimeModel,
+    derive_absence_spells,
+    fit_return_time_model,
+)
 from draft_oracle.models.series_sim import (
     SERIES_SIM_VERSION,
     _matchup_key,
@@ -79,6 +85,12 @@ from draft_oracle.models.skater_production import (
     SkaterProductionConfig,
     playoff_round_starts,
     train_skater_production_model,
+)
+from draft_oracle.optimize.ir_value import (
+    StashInput,
+    StashValuation,
+    build_stash_valuations,
+    render_ir_section,
 )
 from draft_oracle.optimize.vor import (
     CheatSheet,
@@ -118,6 +130,9 @@ SKATER_COLUMNS: tuple[str, ...] = (
     "availability_multiplier",
     "injured",
     "low_confidence",
+    "ir_stash_ev",
+    "ir_stash_value",
+    "ir_verdict",
 )
 TEAM_COLUMNS: tuple[str, ...] = (
     "team_id",
@@ -316,9 +331,109 @@ def _build_skater_rows(
                 "availability_multiplier": projection.availability_multiplier,
                 "injured": player_id in injured_ids,
                 "low_confidence": bool(rec.get("low_confidence", False)),
+                "ir_stash_ev": float("nan"),
+                "ir_stash_value": float("nan"),
+                "ir_verdict": "",
             }
         )
     return rows
+
+
+def _fit_return_model(
+    train_sk: pd.DataFrame, train_tg: pd.DataFrame, horizon: int
+) -> ReturnTimeModel:
+    """Fit the US-015 return-time model from pre-cutoff archive spells (leakage-free).
+
+    The absence spells come only from games before the round start, so nothing about
+    the target round leaks. A fixture too small to yield any spell falls back to a
+    degenerate model whose curve is still driven by the documented status means.
+    """
+    spells = derive_absence_spells(train_sk, train_tg)
+    if spells.empty:
+        return ReturnTimeModel(
+            spell_lengths=(), horizon=horizon, status_mean_games=dict(STATUS_MEAN_GAMES)
+        )
+    return fit_return_time_model(spells, horizon=horizon)
+
+
+def _apply_ir_stash(
+    skaters: pd.DataFrame,
+    cheatsheet: CheatSheet,
+    injuries: pd.DataFrame | None,
+    length_by_abbrev: dict[str, dict[int, float]],
+    train_sk: pd.DataFrame,
+    train_tg: pd.DataFrame,
+    config: ProjectArtifactConfig,
+) -> list[StashValuation]:
+    """Value injured F/D as IR stashes and fold the result into the sheet + table.
+
+    Composes the US-015 return-time curve with each injured skater's US-016 per-game
+    production and the retroactive-swap rule (US-022). Mutates ``skaters`` (fills the
+    ``ir_stash_ev`` / ``ir_stash_value`` / ``ir_verdict`` columns) and attaches the
+    rendered IR section to ``cheatsheet``; returns the valuations for the manifest.
+    """
+    if not config.ir or skaters.empty:
+        return []
+    injured = skaters.loc[skaters["injured"] & skaters["position"].isin(("F", "D"))]
+    if injured.empty:
+        return []
+
+    status_by_id: dict[int, str] = {}
+    if injuries is not None and not injuries.empty:
+        for rec in injuries.to_dict("records"):
+            pid = rec.get("player_id")
+            if pid is not None and pd.notna(pid):
+                status_by_id[int(pid)] = str(rec.get("status") or "out")
+
+    model = _fit_return_model(train_sk, train_tg, config.horizon)
+    inputs: list[StashInput] = []
+    for rec in injured.to_dict("records"):
+        team_abbrev = str(rec["team_abbrev"])
+        length_probs = length_by_abbrev.get(team_abbrev)
+        if length_probs is None:
+            continue
+        player_id = int(rec["player_id"])
+        status = status_by_id.get(player_id, "out")
+        curve = model.availability_curve(status)
+        inputs.append(
+            StashInput(
+                player_id=player_id,
+                player_name=str(rec.get("player_name", "")),
+                position=str(rec["position"]),
+                team_abbrev=team_abbrev,
+                status=status,
+                pts_per_game=float(rec["pts_per_game"]),
+                length_probs=length_probs,
+                availability_curve=curve,
+                expected_games_available=float(sum(curve)),
+            )
+        )
+
+    replacement_by_position = {
+        "F": cheatsheet.replacement_forward,
+        "D": cheatsheet.replacement_defense,
+    }
+    valuations = build_stash_valuations(
+        inputs,
+        replacement_by_position,
+        seed=config.seed,
+        n_sims=config.n_sims,
+        horizon=config.horizon,
+    )
+
+    by_id = {val.player_id: val for val in valuations}
+    for column, attr in (
+        ("ir_stash_ev", "stash_ev"),
+        ("ir_stash_value", "stash_value"),
+    ):
+        skaters[column] = skaters["player_id"].map(
+            lambda pid, a=attr: getattr(by_id[int(pid)], a) if int(pid) in by_id else float("nan")
+        )
+    skaters["ir_verdict"] = skaters["player_id"].map(
+        lambda pid: by_id[int(pid)].verdict if int(pid) in by_id else ""
+    )
+    cheatsheet.ir_section = render_ir_section(valuations)
+    return valuations
 
 
 def build_projection_artifact(
@@ -413,6 +528,9 @@ def build_projection_artifact(
     skaters = _finalize_skaters(skater_rows)
     teams = _finalize_teams(team_rows)
     cheatsheet = build_cheatsheet(skaters, teams, config=config.vor_config)
+    ir_valuations = _apply_ir_stash(
+        skaters, cheatsheet, injuries, length_by_abbrev, train_sk, train_tg, config
+    )
 
     manifest = {
         "artifact_version": LIVE_PROJECTION_VERSION,
@@ -440,6 +558,11 @@ def build_projection_artifact(
             "skaters_injured": int(skaters["injured"].sum()) if not skaters.empty else 0,
         },
         "eligible_team_abbrevs": sorted(length_by_abbrev),
+        "ir_stash": {
+            "enabled": config.ir,
+            "candidates": len(ir_valuations),
+            "stash_verdicts": sum(1 for v in ir_valuations if v.verdict == "stash"),
+        },
         "warnings": warnings,
     }
 

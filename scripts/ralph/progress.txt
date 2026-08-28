@@ -3,6 +3,20 @@ Started: 08/27/2026 22:10:47
 ---
 
 ## Codebase Patterns
+- IR-stash valuation (US-022, `optimize/ir_value.py`): IR activation is a RETROACTIVE
+  same-position swap (SPEC 1) - the stash's whole-round points REPLACE the swapped
+  active starter's from the start of the round, so the slot yields
+  `max(stash, starter)` (`retroactive_swap_points`), never additive. Marginal
+  `stash_value = E[max(X - Y, 0)]`, Y = US-018 replacement level for that position
+  (F swaps F, D swaps D). Compose US-015 `ReturnTimeModel.availability_curve(status)`
+  (fit spells pre-cutoff, leakage-free; degenerate fallback when no spells) + US-016
+  `simulate_round_points`. Verdict "stash" iff stash_value beats the healthy
+  replacement-level alt (`healthy_alternative_value`: ppg = baseline/E[len], fully
+  available). Cheat sheet gets an IR section via `CheatSheet.ir_section` (pre-rendered
+  lines so `vor.py` never imports `ir_value`). `reprice_pool_for_ir` sets injured
+  assets' projection to stash_value so the optimizer values IR_F/IR_D realistically;
+  `oracle recommend --ir` applies it. Artifact skaters carry
+  `ir_stash_ev/ir_stash_value/ir_verdict`.
 - Opponent modelling (US-020, `optimize/opponents.py`): pick SEQUENCE is unobservable
   for sheet-era seasons (final rosters + snake seats only); only the 2026 app export has
   true `pick_number`. Fit order-free (per-event/position pools, with-replacement softmax
@@ -1107,4 +1121,52 @@ p.asarray(..., dtype=float) to avoid no-any-return.
   - Use the single-decision same-slot comparison framing, not strategy-at-every-pick
     (the latter has a rollout-tail/actual-policy mismatch that can make lookahead lose).
   - No UI change; Playwright not applicable (Python-only ml/, zero affected Nx targets).
+---
+
+
+## 2026-08-28 12:40 - US-022
+- Implemented IR-stash valuation with the retroactive point-swap rule
+  (`optimize/ir_value.py`, PRD US-011 part 3). Injured F/D are valued for IR_F/IR_D
+  slots by the retroactive same-position swap: on activation the stash's whole-round
+  points REPLACE the swapped active starter's from the start of the round, so the slot
+  yields max(stash, starter) and stash_value = E[max(X - Y, 0)] over US-015 return
+  timing + US-016 production.
+- Files changed:
+  - `ml/src/draft_oracle/optimize/ir_value.py` (new): `retroactive_swap_points`,
+    `round_points_with_return` (deterministic hand-computable helper),
+    `simulate_stash_samples`, `value_stash`, `healthy_alternative_value`, `StashInput`,
+    `StashValuation` (+verdict), `build_stash_valuations`, `render_ir_section`,
+    `reprice_pool_for_ir`.
+  - `ml/src/draft_oracle/optimize/__init__.py`: re-export the IR-value public API.
+  - `ml/src/draft_oracle/optimize/vor.py`: `CheatSheet.ir_section` field +
+    `_append_ir_section` so the cheat sheet renders an IR block when supplied.
+  - `ml/src/draft_oracle/projection_artifact.py`: `_apply_ir_stash` composes the
+    return-time model (fit from pre-cutoff spells, degenerate fallback) + stash
+    valuations when `config.ir`; adds `ir_stash_ev/ir_stash_value/ir_verdict` skater
+    columns, the IR cheat-sheet section, and an `ir_stash` manifest block.
+  - `ml/src/draft_oracle/optimize/recommend.py`: `build_pool_from_projection_artifact`
+    gains `ir=` and reprices injured assets to stash value via `reprice_pool_for_ir`.
+  - `ml/src/draft_oracle/cli/project.py`: `oracle recommend --ir` threads ir into pool.
+  - `ml/README.md`: new IR-stash section.
+  - `ml/tests/test_ir_value.py` (new): 18 tests incl. hand-computed early/no/late
+    return swap math, MC composition, verdicts, cheat-sheet section, pool repricing.
+- Quality checks (from ml/): ruff format+check clean, mypy --strict clean (55 files),
+  pytest 491 passed (was 473; +18). Real 2025-r1 with a synthetic "out" Kucherov:
+  stash EV 5.44 / value 0.91 vs healthy-alt 0.93 -> verdict "avoid" (honest).
+- **Learnings for future iterations:**
+  - Retroactive swap is a FULL replacement, not additive: the slot pair yields
+    max(stash_round_points, starter_round_points). The marginal IR value over just
+    rostering the replacement-level starter is E[max(X - Y, 0)] where Y = the US-018
+    replacement level for that position (F swaps F, D swaps D - never cross-position).
+  - The "healthy replacement-level alternative" baseline reproduces `active_baseline`
+    expected points at full availability (ppg = baseline / E[series_length]); verdict
+    is "stash" only when the injured stash value beats that alt's pure upside variance.
+  - `ReturnTimeModel.availability_curve(status)` needs no injuries feed - fit spells
+    from pre-cutoff skater_games/team_games (leakage-free); empty fixtures fall back to
+    a degenerate `ReturnTimeModel(spell_lengths=())` whose curve still uses STATUS_MEAN.
+  - GOTCHA: `ruff format` rewrites a `.format()` call into an f-string and can then
+    trip E501 - build long table rows from short intermediate locals, not one f-string.
+  - Adding columns to `SKATER_COLUMNS` keeps `test_projection_artifact`'s exact-column
+    assertion green as long as `_build_skater_rows` always emits them (NaN/"" default).
+  - No UI change; browser/Playwright verification not applicable (Python-only ml/).
 ---

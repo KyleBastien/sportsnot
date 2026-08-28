@@ -559,7 +559,7 @@ def recommend(
 
     if not 1 <= seat <= managers:
         raise typer.BadParameter(f"seat must be in 1..{managers}")
-    pool = build_pool_from_projection_artifact(artifact_dir)
+    pool = build_pool_from_projection_artifact(artifact_dir, ir=ir)
     manager_ids = [f"seat{i + 1}" for i in range(managers)]
     owner = manager_ids[seat - 1]
     state = DraftState.new(manager_ids, pool, allow_ir=ir)

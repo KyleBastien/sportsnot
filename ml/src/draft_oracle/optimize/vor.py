@@ -24,7 +24,7 @@ skater and team; the cheat sheet is the union of both pools sorted by VOR.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -188,6 +188,7 @@ class CheatSheet:
     replacement_defense: float
     replacement_goalie: float
     rows: pd.DataFrame
+    ir_section: list[str] = field(default_factory=list)
 
     def summary(self) -> dict[str, Any]:
         """JSON-serialisable scarcity summary for the run manifest."""
@@ -327,7 +328,14 @@ def render_cheatsheet_markdown(sheet: CheatSheet) -> str:
             )
         )
 
+    _append_ir_section(lines, sheet)
     return "\n".join(lines) + "\n"
+
+
+def _append_ir_section(lines: list[str], sheet: CheatSheet) -> None:
+    """Append the pre-rendered IR-stash section (US-022) when the sheet carries one."""
+    if sheet.ir_section:
+        lines.extend(sheet.ir_section)
 
 
 def write_cheatsheet(sheet: CheatSheet, path: Path) -> Path:

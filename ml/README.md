@@ -662,6 +662,33 @@ asset prices at its full projection. `VOR = expected_points − replacement_leve
 `--managers` (2–12) and `--ir/--no-ir` set the replacement levels and change the
 `cheatsheet.md` layout (injured skaters are tagged `IR?` with IR, `OUT` without).
 
+## IR-stash valuation (`optimize/ir_value.py`)
+
+IR slots let a manager roster an *injured* skater who cannot help the active lineup
+yet. Activation is a **retroactive same-position swap** (SPEC §1): when the stash is
+activated it replaces a same-position active starter (`F` swaps `F`, `D` swaps `D`,
+enforced) and its points count **from the start of the round** — the swap rewrites
+the whole round, it is never additive. Playing optimally, the manager ends the round
+with whichever of the two same-position players scored more, so
+`retroactive_swap_points(ir, active) = max(ir, active)`.
+
+The stash EV composes the upstream models honestly: the **US-015 return-time curve**
+says *when* the stash is back (a long-shot that returns in game 6 of a short series
+adds almost nothing), and the **US-016 projection** drives the points it *would*
+score once available. `value_stash` Monte-Carlos those samples against the
+replacement-level active starter it would swap out (US-018 level): the marginal
+`stash_value = E[max(X − Y, 0)]` — a stash only ever helps, since the starter is kept
+when the stash underperforms.
+
+The cheat sheet gains an **IR stash candidates** section (only with `--ir` and injured
+skaters present) ranking injured `F`/`D` by stash value against the healthy
+replacement-level alternative a manager could take instead, with a `stash` / `avoid`
+verdict. With `--ir`, `oracle recommend` reprices injured skaters to their stash value
+(`reprice_pool_for_ir`) so the optimizer values an `IR_F` / `IR_D` slot for the
+retroactive-swap points it really adds, not for unreachable full-health production. The
+artifact's `skaters.parquet` carries `ir_stash_ev` / `ir_stash_value` / `ir_verdict`
+and the run manifest an `ir_stash` summary.
+
 ## Draft simulator & fallback opponent (`optimize/simulator.py`)
 
 The optimizer needs an engine to roll out on: a faithful re-draft that lookahead

@@ -1146,7 +1146,9 @@ def evaluate_recommendation_strategies_from_normalized(
     return fitted_comparison
 
 
-def build_pool_from_projection_artifact(artifact_dir: Path) -> list[DraftAsset]:
+def build_pool_from_projection_artifact(
+    artifact_dir: Path, *, ir: bool = False
+) -> list[DraftAsset]:
     """Build a draftable pool from a US-017 projection artifact directory.
 
     Skater rows become F/D assets priced by ``expected_points``; team rows become the
@@ -1154,8 +1156,14 @@ def build_pool_from_projection_artifact(artifact_dir: Path) -> list[DraftAsset]:
     opponents' public-perception signal) tracks the projection. Skater ``team_id`` is
     resolved from the teams table via ``team_abbrev`` so elimination and team affinity
     still work.
+
+    When ``ir`` is set, injured skaters carrying an ``ir_stash_value`` (US-022) are
+    repriced to that stash value, so the optimizer values an ``IR_F`` / ``IR_D`` stash
+    for the retroactive-swap points it really adds, not for full-health production.
     """
     import pandas as pd
+
+    from draft_oracle.optimize.ir_value import reprice_pool_for_ir
 
     skaters = pd.read_parquet(artifact_dir / "skaters.parquet")
     teams = pd.read_parquet(artifact_dir / "teams.parquet")
@@ -1193,4 +1201,12 @@ def build_pool_from_projection_artifact(artifact_dir: Path) -> list[DraftAsset]:
                 projection=projection,
             )
         )
+    if ir and "ir_stash_value" in skaters.columns:
+        stash_value_by_player = {
+            int(rec["player_id"]): float(rec["ir_stash_value"])
+            for rec in skaters.to_dict("records")
+            if pd.notna(rec.get("ir_stash_value"))
+        }
+        if stash_value_by_player:
+            pool = reprice_pool_for_ir(pool, stash_value_by_player)
     return pool
