@@ -127,6 +127,34 @@ Started: 08/27/2026 22:10:47
   or they pollute the leave-one-out PPG. mypy-strict test gotcha: build fixture frames
   with `pd.DataFrame([{...}])` NOT `pd.DataFrame.from_records([...])` (stub rejects
   `Mapping[str, object]` records).
+- As-of team/series features live in `draft_oracle.features.team_series` (US-010),
+  keyed by `TEAM_FEATURE_SET_VERSION` ("team-series-v1"). One row per team as-of a
+  round start; every game input funnels through `features.leakage.as_of` +
+  `assert_no_leakage` (same guard as skater). US-010 EXTENDED `normalize_team_games`
+  to carry `shots_for`/`shots_against` (single-game shots, NOT cumulative),
+  `faceoff_win_pct`, `power_play_pct`/`power_play_net_pct`,
+  `penalty_kill_pct`/`penalty_kill_net_pct` from the raw archive (all single-game
+  per-row values; PP/PK ~2% NaN on games with no opportunity). If team_games schema
+  changes, re-run `oracle normalize --force` (parquet is gitignored, no committed
+  snapshot to break; test_normalize has no exact-column-list assertion). DOCUMENTED
+  PROXIES (honesty §7): archive has NO goalie-level rows, so save% is TEAM-level
+  `1 - GA/shots_against` (season + last-15); `backup_save_pct` is left NA +
+  `goalie_split_available=False`, never fabricated. `power_play_pct`/`penalty_kill_pct`
+  are GAME-AVERAGED (equal weight/game), not opportunity-weighted. Elo
+  (`compute_elo_ratings`) replays the HOME row of each game chronologically across
+  ALL seasons before the cutoff (zero-sum: total stays n*initial; regress-to-mean at
+  season boundary is mean-preserving), K=20/home_adv=50/initial=1500. Market join maps
+  `season_id % 10000 -> season_end_year`, filters odds to reg-season pre-cutoff, avg
+  implied per team_id (home_implied when home_team_id, away_implied when away); missing
+  -> `market_available=False`, NaN prob. Injuries table is CURRENT-only: pass it only
+  for the current round (never historical/backtest -> leakage); goalie unavailability =
+  any injuries row position "G" + status in {out,ir,day_to_day} -> per-team
+  `starter_unavailability_risk`. Matchup enrichment (opponent, home_ice, head-to-head,
+  `expected_opponent_strength`=opponent Elo, series price) is optional; absent -> all
+  matchup cols at missing defaults + `matchup_available=False`. mypy-strict gotchas:
+  `pd.Timestamp - pd.Timestamp` `.days` types as a union (use `.date()` subtraction for
+  int days); iterate DataFrames with `.to_dict("records")` (itertuples attrs type as a
+  scalar union under strict); wrap `float(1.0/(1+10**...))` returns to avoid no-any-return.
 
 ## 2026-08-27 22:10 - US-001
 - Scaffolded the isolated uv-managed Python ML workspace under `ml/` for the
@@ -447,4 +475,40 @@ Started: 08/27/2026 22:10:47
     with 0 PPG otherwise drag teammate-quality down — caught by a test).
   - mypy-strict + pandas-stubs: build test fixtures with pd.DataFrame([{...}]),
     NOT pd.DataFrame.from_records([...]) (from_records rejects Mapping[str, object]).
+---
+
+## 2026-08-28 00:25 - US-010
+- Implemented as-of team/series feature engineering:
+  draft_oracle.features.team_series (build_team_series_features +
+  build_round_team_series_matrix), one row per team as-of a playoff-round start,
+  leakage-guarded via features.leakage. Feature groups: team form (goal diff/GF/GA
+  per game, game-averaged PP%/PK%, shots for/against, rest days, days-between-games),
+  cross-season Elo (unit-tested update rule + season regression), goaltender-situation
+  (team-level save% season + last-15 proxy, shutout rate, starter-unavailability risk
+  from injuries), market (de-vigged implied win prob from odds + missing flag, optional
+  series price), and round-context/matchup (round, head-to-head, home-ice, expected
+  opponent strength). Extended leakage test coverage to team/series features.
+- Extended ingest.normalize.normalize_team_games to carry shots_for/shots_against,
+  faceoff_win_pct, power_play_pct/net, penalty_kill_pct/net from the raw archive so the
+  special-teams + save% proxies have real inputs end-to-end (verified on 2023-24).
+- Files changed:
+  - ml/src/draft_oracle/features/team_series.py (new)
+  - ml/src/draft_oracle/features/__init__.py (re-exports)
+  - ml/src/draft_oracle/ingest/normalize.py (_TEAM_RENAME + _TEAM_COLUMNS)
+  - ml/tests/test_team_series.py (new, 20 tests: primitives, Elo replay/regression,
+    leakage guard, market/injury/matchup joins + missing flags)
+- Quality (from ml/): ruff check + format clean, mypy --strict clean (31 files),
+  pytest 285 passed. Python-only ml/ change => zero affected Nx lint/typecheck/
+  test/e2e targets (ml has no package.json); TS/Playwright gates unaffected. No UI
+  change => browser verification N/A.
+- **Learnings for future iterations:**
+  - Per-goalie starter/backup save% is NOT derivable from the committed archive
+    (no goalie game rows). Team-level save% proxy is the honest substitute; US-012
+    (shutout model) / US-013 (series sim) must value the goalie slot via team
+    goaltending + shutout rate, not per-goalie fantasy stats (aligns SPEC §8).
+  - Injuries table is CURRENT-only. Never pass it into historical/backtest rounds
+    (leakage); starter_unavailability_risk stays False + goalie_injury_data_available
+    False for those rounds.
+  - normalize_team_games now exposes special-teams + shots columns; re-run
+    `oracle normalize --force` after pulling this change so downstream parquet has them.
 ---

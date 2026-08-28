@@ -386,7 +386,9 @@ reads a game the model is about to project.
 from draft_oracle.features import build_round_feature_matrix, write_feature_matrix
 
 matrix = build_round_feature_matrix(
-    skater_games, players, team_games,
+    skater_games,
+    players,
+    team_games,
     season_id=20232024,
     round_start_dates={1: "2024-04-20", 2: "2024-05-05", 3: "2024-06-01", 4: "2024-06-08"},
 )
@@ -412,6 +414,50 @@ so "power-play time share" is proxied by power-play *production* (`pp_point_shar
 = PP points / total points). Regular-season aggregates use only
 `game_type_id == 2` games; the last-N window uses the most recent games of any
 type within the season before the cutoff.
+
+## Team/series features (`features/team_series.py`)
+
+As-of team/series feature engineering for the per-game win model and series
+simulator (US-010). One row per team, computed **as of a playoff-round (series)
+start**, sharing the same leakage guard as the skater features.
+
+```python
+from draft_oracle.features import build_team_series_features, EloConfig
+
+matrix = build_team_series_features(
+    team_games,
+    season_id=20232024,
+    as_of_date="2024-04-20",
+    playoff_round=1,
+    matchups=matchups,   # optional: opponent_team_abbrev, home_ice, series price
+    odds=odds,           # optional: normalized odds table for market features
+    injuries=injuries,   # optional (CURRENT round only — never historical)
+)
+```
+
+**Feature groups** (`TEAM_FEATURE_COLUMNS`, keyed by `team-series-v1`): team form
+(`goal_differential_per_game`, `goals_for/against_per_game`, game-averaged
+`power_play_pct` / `penalty_kill_pct`, `shots_for/against_per_game`, `rest_days`,
+`days_between_games`), `elo_rating` (cross-season, unit-tested `expected_score` /
+`update_rating` + season regression), goaltender situation
+(`starter_save_pct_season` / `_l15`, `team_shutout_rate`,
+`starter_unavailability_risk`), market (`market_implied_win_prob` +
+`market_available`, `series_implied_win_prob` + `series_market_available`), and
+round-context/matchup (`opponent_team_abbrev`, `home_ice_advantage`,
+`head_to_head_win_pct`, `expected_opponent_strength`, each with a `*_available`
+missing-flag).
+
+**Documented proxies (honesty, SPEC §7)** — the committed archive has **no
+goalie-level game rows**, so per-goalie save % cannot be computed. The league's
+goalie slot is a whole *team's* goaltending (SPEC §1), so save % is a **team-level
+proxy** `1 - GA / shots-against`; `backup_save_pct` is left missing +
+`goalie_split_available == False`, never fabricated. `power_play_pct` /
+`penalty_kill_pct` are **game-averaged** single-game rates, not opportunity
+weighted. The injuries table is **current-only**, so
+`starter_unavailability_risk` is meaningful for the upcoming round only. Elo is
+replayed game-by-game across seasons (`compute_elo_ratings`) with a between-season
+regression toward the mean; the market join maps `season_id % 10000` to the odds
+table's `season_end_year`.
 
 
 
