@@ -12,6 +12,19 @@ Started: 08/27/2026 22:10:47
   seasons held out for test, next for val, rest train); seed is fixed; misses reported
   honestly (SPEC §7), never forced. Per-game features are built leakage-free in ONE
   chronological pass (snapshot BEFORE folding the current result), reusing team_series Elo.
+- STALE PARQUET GOTCHA: the committed `ml/data/normalized/*.parquet` can lag the current
+  `normalize.py` schema (e.g. it was missing `shots_against`, which the raw team-games
+  archive DOES carry as `shotsAgainstPerGame`). If a model needs a column absent from the
+  current parquet, run `uv run oracle normalize --force` to regenerate before training.
+  `shotsAgainstPerGame` is per-game (== that game's shots-against). Team save % =
+  `1 - GA/shots_against` is the goalie-slot proxy (no per-goalie rows exist in the archive).
+- Shutout model (US-012, `models/shutout.py`) mirrors game_win: winner-framed rows (one per
+  decided game, label = winner held loser scoreless => `P(shutout | win)`), leakage-free
+  chronological pass over `ShutoutTeamState` (season + last-15 team save %, team shutout
+  rate, GF/game), LightGBM `monotone_constraints` keep it monotone in goalie quality.
+  Headline metric is CALIBRATION (predicted vs observed shutout rate within +/-25%), NOT
+  beating base rate — a rare event's constant base rate is a very strong Brier baseline and
+  is expected to roughly tie; report both honestly.
 - The `ml/` project is a standalone uv-managed Python 3.12+ package (`draft_oracle`),
   fully isolated from the Nx/TS workspace. It has NO package.json, so Nx never sees it
   and `yarn nx affected` is empty for Python-only changes. Never add a package.json to ml/.
@@ -561,4 +574,33 @@ Started: 08/27/2026 22:10:47
     estimators type as Any; annotate estimator holders as Any and wrap predict_proba in
     
 p.asarray(..., dtype=float) to avoid no-any-return.
+---
+
+## 08/28/2026 01:15 - US-012
+- Added the shutout probability model `P(shutout | a team wins)`, framed from the
+  winning team, with team-level goaltender-situation features (season + last-15 save %,
+  team shutout rate), the loser's GF/game, and backup-save-% / starter-unavailability
+  terms carrying explicit missing-flags (no per-goalie rows in the archive; no historical
+  injury feed -> imputed neutral + flagged, never fabricated). Monotone in goalie quality
+  via LightGBM monotone_constraints and logreg. Temporal split reused from game_win.
+  Calibration report (overall + reliability bins) vs a base-rate baseline; committed
+  report+manifest under artifacts/models/shutout/. Added `oracle train-shutout` CLI.
+- Files changed: ml/src/draft_oracle/models/shutout.py (new), ml/tests/test_shutout.py
+  (new, 13 tests), ml/src/draft_oracle/models/__init__.py (re-exports),
+  ml/src/draft_oracle/cli/project.py (train-shutout command), artifacts/models/shutout/
+  {report.md,manifest.json} (new, trained on real archive).
+- Result on real held-out seasons [2025, 2026]: calibration rel error 1.5% (target
+  +/-25% -> PASS). Test Brier 0.0981 vs base-rate 0.0979 (essentially tied; honestly
+  reported as "Beats base rate: NO" -- expected for a rare event whose constant base
+  rate is already a strong Brier baseline; the story's metric is calibration).
+- Quality: uv run ruff format/check clean, mypy clean (35 files), pytest 314 passed.
+- **Learnings for future iterations:**
+  - The local normalized parquet was STALE (missing shots_against). Always
+    `oracle normalize --force` when a feature needs a column the current parquet lacks;
+    the raw archive carries shotsAgainstPerGame (per-game shots-against).
+  - For rare-event models, use calibration (predicted vs observed frequency) as the
+    honesty metric; Brier vs a constant base rate barely moves and is not the target.
+  - Enforce monotonicity with LightGBM monotone_constraints (aligned to the fixed feature
+    tuple order) + naturally-monotone logreg, so whichever model selection picks stays
+    monotone in goalie quality (the unit test asserts this on synthetic data).
 ---

@@ -1,0 +1,80 @@
+{
+  "model_version": "shutout-v1",
+  "seed": 20260827,
+  "min_pregame_games": 5,
+  "goalie_last_n": 15,
+  "chosen_model_type": "logistic_regression",
+  "split": {
+    "train_years": [
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023
+    ],
+    "val_years": [
+      2024
+    ],
+    "test_years": [
+      2025,
+      2026
+    ]
+  },
+  "counts": {
+    "train": 8958,
+    "val": 1238,
+    "test": 2432
+  },
+  "validation_brier": {
+    "logistic_regression": 0.09981780874115923,
+    "lightgbm": 0.09995602142339816
+  },
+  "test_brier": {
+    "model": 0.0980912676926025,
+    "base_rate": 0.09789231006964412
+  },
+  "shutout_rate": {
+    "train": 0.1224009415457042,
+    "test_observed": 0.10978618421052631,
+    "test_predicted": 0.11145663980399026
+  },
+  "calibration": {
+    "relative_error": 0.015215535592900061,
+    "tolerance": 0.25,
+    "within_tolerance": true,
+    "bins": [
+      {
+        "lower": 0.037449423600263806,
+        "upper": 0.07489884720052761,
+        "count": 16,
+        "mean_predicted": 0.06945178424148736,
+        "observed_rate": 0.125
+      },
+      {
+        "lower": 0.07489884720052761,
+        "upper": 0.11234827080079142,
+        "count": 1299,
+        "mean_predicted": 0.10188918127206241,
+        "observed_rate": 0.1077752117013087
+      },
+      {
+        "lower": 0.11234827080079142,
+        "upper": 0.14979769440105523,
+        "count": 1100,
+        "mean_predicted": 0.1225849540375248,
+        "observed_rate": 0.11363636363636363
+      },
+      {
+        "lower": 0.14979769440105523,
+        "upper": 0.18724711800131902,
+        "count": 17,
+        "mean_predicted": 0.16198962010318957,
+        "observed_rate": 0.0
+      }
+    ]
+  },
+  "beats_base_rate": false
+}

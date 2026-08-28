@@ -41,6 +41,13 @@ from draft_oracle.models.game_win import (
     GameWinConfig,
     train_game_win_from_normalized,
 )
+from draft_oracle.models.shutout import (
+    DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_SHUTOUT_ARTIFACT_DIR,
+)
+from draft_oracle.models.shutout import (
+    ShutoutConfig,
+    train_shutout_from_normalized,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -227,6 +234,36 @@ def train_game_win(
         f"higher-points {result.test_brier_higher_points:.4f}"
     )
     typer.echo(f"  beats both baselines: {'yes' if result.beats_both_baselines else 'no'}")
+
+
+@app.command(name="train-shutout")
+def train_shutout(
+    normalized_dir: Annotated[
+        Path, typer.Option(help="Directory holding normalized Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: Annotated[
+        Path, typer.Option(help="Output directory for the report + manifest.")
+    ] = DEFAULT_SHUTOUT_ARTIFACT_DIR,
+    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+) -> None:
+    """Train the shutout-probability model; write the evaluation report + manifest."""
+    result = train_shutout_from_normalized(
+        normalized_dir=normalized_dir,
+        artifact_dir=artifact_dir,
+        config=ShutoutConfig(seed=seed),
+    )
+    typer.echo(f"Shutout model -> {artifact_dir}")
+    typer.echo(f"  chosen model: {result.chosen_model_type}")
+    typer.echo(
+        f"  test Brier: model {result.test_brier_model:.4f} / "
+        f"base-rate {result.test_brier_base_rate:.4f}"
+    )
+    typer.echo(
+        f"  calibration: observed {result.test_observed_rate:.4f} / "
+        f"predicted {result.test_predicted_rate:.4f} "
+        f"(rel err {result.calibration_rel_error:.1%})"
+    )
+    typer.echo(f"  within +/-25%: {'yes' if result.calibrated_within_tolerance else 'no'}")
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -104,7 +104,7 @@
         "The Odds API (the-odds-api.com) free tier is the selected provider (owner decision, locked in): integrate its NHL ice-hockey endpoints for game moneylines and series/outright markets where offered; document quota limits and ODDS_API_KEY setup (read from environment / gitignored ml/.env) in ml/README.md",
         "Per playoff game: moneyline prices from at least 1 book (median consensus if several); per series: series-winner prices where offered",
         "Prices de-vigged into implied probabilities (proportional or Shin method, documented choice) and stored in a normalized odds Parquet table keyed to games/series",
-        "Historical odds come from the committed archives in ml/data/raw/odds-archive/ — THREE sources with different layouts, both documented in that directory's PROVENANCE.md (read it in full before parsing): SBR per-season workbooks (both-side Open/Close moneylines, preferred where present) the gzipped Kaggle/ESPN CSV (favorite-side moneyline only, seasons labeled by ending year, preseason rows to filter), and the espn-2025-26-completion directory (same semantics as Kaggle plus a home-relative spread that attributes the favorite). Parse both into the odds table, mapping team names to NHL ids and tagging playoffs by real per-season windows; where both sources cover a game, cross-validate and prefer SBR Close",
+        "Historical odds come from the committed archives in ml/data/raw/odds-archive/ \u00e2\u20ac\u201d THREE sources with different layouts, both documented in that directory's PROVENANCE.md (read it in full before parsing): SBR per-season workbooks (both-side Open/Close moneylines, preferred where present) the gzipped Kaggle/ESPN CSV (favorite-side moneyline only, seasons labeled by ending year, preseason rows to filter), and the espn-2025-26-completion directory (same semantics as Kaggle plus a home-relative spread that attributes the favorite). Parse both into the odds table, mapping team names to NHL ids and tagging playoffs by real per-season windows; where both sources cover a game, cross-validate and prefer SBR Close",
         "Games not covered by the committed archives (future games only - archives now cover 2004 through June 2026 completely) are fetched from ESPN's public summary endpoint (site.api.espn.com/apis/site/v2/sports/hockey/nhl/summary?event=<id>, pickcenter odds block) with the same caching/rate-limiting as other ingestion; favorite-only prices use a documented standard-overround approximation for implied probability, never a fabricated underdog price; genuinely uncovered games are flagged, never imputed",
         "API keys read from environment variables / gitignored .env, never committed",
         "Pipeline runs cleanly with --no-odds leaving the stat-only path fully functional",
@@ -267,7 +267,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -482,7 +482,7 @@
     {
       "id": "US-023",
       "title": "Per-slot draft strategy report",
-      "description": "As the tool owner, I want pre-computed strategy plans for every snake slot 1..N, because round-1 order is randomized and revealed late — I need my slot's plan the moment order is announced. (PRD US-016)",
+      "description": "As the tool owner, I want pre-computed strategy plans for every snake slot 1..N, because round-1 order is randomized and revealed late \u00e2\u20ac\u201d I need my slot's plan the moment order is announced. (PRD US-016)",
       "acceptanceCriteria": [
         "Read ml/SPEC.md in full before starting: it is the binding implementation contract (ruleset, pinned stack, directory layout, data sources, leakage and honesty rules)",
         "oracle project additionally emits slot_strategies.md: for each slot 1..N, expected pick numbers in the snake, recommended pick plus top-3 alternatives at each turn from full multi-step simulation vs. the fitted opponent model, and projected final-roster total",
