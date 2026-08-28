@@ -254,6 +254,28 @@ Started: 08/27/2026 22:10:47
   model MAE 1.3725 < reg 1.4955 < prev 1.6474; Spearman 0.5941 > 0.5796 > 0.5032 —
   beats BOTH. mypy: np.clip returns Any, assign to a `: np.ndarray` local then return
   it (astype(float) still types Any). CLI `oracle project-skaters`.
+- Batch projection artifact (US-017, `projection_artifact.py`, NOT under models/ or
+  optimize/): the LIVE forward-looking counterpart to projections.py's backtest. One
+  `oracle project --season <yr> --round <n>` composes win/shutout/production/series
+  sub-models into `artifacts/<season>-r<round>/{skaters,teams}.{parquet,csv}` +
+  `run_manifest.json`. Bracket source = normalized `series` table filtered to
+  (year==season, playoff_round==round); eliminated teams are excluded simply by NOT
+  being in that round's series rows (their skaters drop out on team_abbrev filter).
+  as-of cutoff = `playoff_round_starts(team_games, series)[season_id][round]`
+  (derivable only if the round's games exist in the archive -> works for committed
+  2016-2026). Sub-models train on games STRICTLY BEFORE the cutoff (filter
+  team_games/skater_games on game_date < cutoff) so the target round never leaks into
+  training; pre-series team snapshots reuse `reconstruct_series_matchups` (full
+  team_games; snapshots frozen at the round's first playoff game == round start ==
+  leakage-free). BYTE-IDENTICAL reproducibility: write parquet `index=False`, sort
+  rows deterministically (skaters by expected_points desc + player_id; teams by
+  p_series_win desc + team_id), seed every MC via `_row_seed`; the manifest is the
+  ONLY file carrying the wall-clock timestamp + git SHA (keep them OUT of the parquet
+  payload). Real 2025-r1: 16 teams / 446 skaters in ~17s (well under the 10-min bar).
+  The live artifact dir is gitignored (not committed). Cold-case skaters (no reg-season
+  feature row) are currently excluded (needs a round roster source); documented, not a
+  crash. Injury flag comes from injuries.parquet status in {out,ir,day_to_day} and
+  position!=G; availability haircut stays 1.0 for now (flag informs the drafter).
 
 ## 2026-08-28 01:52 - US-015
 - Implemented the injury return-time model + availability adjustment
@@ -821,5 +843,42 @@ p.asarray(..., dtype=float) to avoid no-any-return.
   - 107 real skater-rounds skip because their series pair does not reconstruct (2019-20
     bubble / missing pre-series snapshots) — matches the series_sim skip behavior;
     handled by counting, never crashing (SPEC 7).
+  - No UI change; browser/Playwright verification not applicable (Python-only ml/).
+---
+
+## 2026-08-28 10:20 - US-017
+- Implemented the batch projection command + artifact format (US-017, PRD US-007):
+  `oracle project --season <yr> --round <n>` precomputes a self-contained prediction
+  artifact for one upcoming round so drafting never needs live inference.
+- Files changed:
+  - `ml/src/draft_oracle/projection_artifact.py` (new): `build_projection_artifact`
+    (composes win/shutout/production/series sub-models; trains strictly before the
+    round-start cutoff; leakage-free pre-series snapshots via
+    reconstruct_series_matchups; seeded per-skater Monte Carlo), deterministic
+    `_finalize_skaters`/`_finalize_teams`, `write_projection_artifact` (parquet+csv+
+    run_manifest.json), `build_projection_artifact_from_normalized` (+ snapshot pin).
+  - `ml/src/draft_oracle/cli/project.py`: new `project` command (idempotent offline
+    ingest refresh -> build -> write; `--no-refresh`, `--snapshot`, `--season`,
+    `--round`).
+  - `ml/tests/test_projection_artifact.py` (new): 11 tests (columns/shapes,
+    ineligible-team exclusion, complementary series-win probs, injury flag, missing
+    round raises, manifest contents, BYTE-IDENTICAL parquet reruns, from-normalized
+    file set, CLI offline run).
+  - `ml/README.md`: commands-table row + "Batch projection artifact" section.
+- Quality checks (from ml/): ruff check clean, ruff format clean, mypy strict clean
+  (45 files), full pytest 393 passed. Real 2025-r1 end-to-end: 16 teams / 446 skaters
+  in ~17s, byte-identical on rerun (verified via Get-FileHash). Kucherov/MacKinnon/
+  McDavid top the board; VGK-MIN/TOR-OTT etc. are the real 2025 matchups.
+- **Learnings for future iterations:**
+  - The artifact is LIVE/forward-looking; projections.py's evaluate_* is the BACKTEST
+    sibling. Reuse its private helpers (`_row_seed`, `_predict_series`,
+    reconstruct_series_matchups) rather than duplicating composition.
+  - Bracket state = `series` table filtered to (year, round); eliminated teams drop
+    out for free. as-of cutoff needs the round's own games in the archive (works for
+    committed 2016-2026; a truly future round needs an NHL bracket ingest first).
+  - Byte-identical parquet: `index=False` + explicit deterministic sort + seeded MC;
+    keep timestamp/git SHA in run_manifest.json ONLY (never in the parquet payload).
+  - The live artifact dir `artifacts/<season>-r<round>/` is gitignored (generated
+    output); only backtests/models report.md+manifest.json are committed.
   - No UI change; browser/Playwright verification not applicable (Python-only ml/).
 ---

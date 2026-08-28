@@ -76,6 +76,11 @@ from draft_oracle.models.skater_production import (
     SkaterProductionConfig,
     train_skater_production_from_normalized,
 )
+from draft_oracle.projection_artifact import (
+    DEFAULT_ARTIFACTS_ROOT,
+    ProjectArtifactConfig,
+    build_projection_artifact_from_normalized,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -408,6 +413,58 @@ def project_skaters(
         f"prev-round {result.test_spearman_baseline_prev:.4f}"
     )
     typer.echo(f"  beats both baselines: {'yes' if result.beats_both_baselines else 'no'}")
+
+
+@app.command(name="project")
+def project(
+    season: Annotated[int, typer.Option(help="Playoff season end year, e.g. 2026.")],
+    playoff_round: Annotated[int, typer.Option("--round", help="Playoff round number (1-4).")],
+    normalized_dir: Annotated[
+        Path, typer.Option(help="Directory holding normalized Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    artifacts_root: Annotated[
+        Path, typer.Option(help="Root directory for the written artifact.")
+    ] = DEFAULT_ARTIFACTS_ROOT,
+    snapshot: Annotated[
+        str, typer.Option(help="Pin a frozen snapshot id (defaults to the live tables).")
+    ] = "",
+    archive_dir: Annotated[
+        Path, typer.Option(help="Committed NHL archive directory (for the ingest refresh).")
+    ] = DEFAULT_ARCHIVE_DIR,
+    no_refresh: Annotated[
+        bool,
+        typer.Option("--no-refresh", help="Skip the idempotent ingest refresh (offline)."),
+    ] = False,
+    seed: Annotated[int, typer.Option(help="Deterministic training/MC seed.")] = 20260827,
+) -> None:
+    """Precompute a self-contained projection artifact for one upcoming round.
+
+    Refreshes ingest (idempotent, offline), builds as-of features, runs inference, and
+    writes skaters/teams Parquet + CSV and run_manifest.json under
+    artifacts_root/<season>-r<round>/. Eliminated teams are excluded automatically.
+    """
+    if not no_refresh and not snapshot:
+        normalize_archive(archive_dir=archive_dir, out_dir=normalized_dir)
+    result, out_dir = build_projection_artifact_from_normalized(
+        season=season,
+        playoff_round=playoff_round,
+        normalized_dir=normalized_dir,
+        artifacts_root=artifacts_root,
+        snapshot=snapshot or None,
+        config=ProjectArtifactConfig(seed=seed),
+    )
+    counts = result.manifest["counts"]
+    typer.echo(f"Projection artifact -> {out_dir}")
+    typer.echo(
+        f"  season {result.season} round {result.playoff_round} (as of {result.as_of_cutoff})"
+    )
+    typer.echo(
+        f"  eligible: {counts['eligible_teams']} teams / "
+        f"{counts['skaters_projected']} skaters ({counts['skaters_injured']} injured)"
+    )
+    typer.echo(f"  snapshot id: {result.manifest['snapshot_id']}")
+    for warning in result.warnings:
+        typer.echo(f"  warning: {warning}")
 
 
 if __name__ == "__main__":  # pragma: no cover

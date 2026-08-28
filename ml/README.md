@@ -59,6 +59,7 @@ All commands run from the `ml/` directory.
 | Eval series sim | `uv run oracle eval-series-sim`          |
 | Return-time     | `uv run oracle train-return-time`        |
 | Project skaters | `uv run oracle project-skaters`          |
+| Batch projection| `uv run oracle project --season 2026 --round 1` |
 
 ## Package layout
 
@@ -607,6 +608,34 @@ actual against two fixed baselines: (a) reg-season points/game x 5.5 games and (
 the player's previous-round fantasy points. Misses are printed honestly (SPEC §7).
 Historical rounds have no injury feed, so the availability haircut is a no-op (1.0)
 in the backtest; it only bites at live projection time.
+
+## Batch projection artifact (`projection_artifact.py`)
+
+Produces a self-contained, **precomputed** prediction artifact for one upcoming
+round so drafting never depends on live inference (US-017). The bracket is read from
+the normalized `series` table, so eliminated teams (and their players) are excluded
+automatically. Sub-models (per-game win, shutout, skater production) train only on
+games strictly **before** the round start; leakage-free pre-series team snapshots are
+frozen at the round start.
+
+```bash
+uv run oracle project --season 2026 --round 1
+# writes artifacts/2026-r1/{skaters,teams}.{parquet,csv} + run_manifest.json
+```
+
+- `skaters.{parquet,csv}` — `player_id, player_name, team_abbrev, position (F/D),
+  expected_points, p10/p50/p90, pts_per_game, expected_games,
+  availability_multiplier, injured, low_confidence`.
+- `teams.{parquet,csv}` — `team_id, team_abbrev, opponent_abbrev, is_top_seed,
+  playoff_round, p_series_win, e_wins, e_games, e_goalie_points (goalie slot),
+  e_shutout_wins` (goalie slot = a whole team's goaltending, SPEC §1).
+- `run_manifest.json` — snapshot id, every sub-model version, feature version, git
+  SHA, seeds, and a UTC timestamp.
+
+The wall-clock timestamp and git SHA live **only** in `run_manifest.json`; the
+Parquet payload is byte-identical across reruns on the same snapshot (fixed seeds +
+deterministic ordering). `--no-refresh` skips the idempotent ingest step (offline);
+`--snapshot <id>` pins a frozen snapshot under `data/normalized/snapshots/`.
 
 ## Data & artifact layout
 
