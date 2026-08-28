@@ -36,6 +36,11 @@ from draft_oracle.ingest.odds import (
     DEFAULT_ODDS_ARCHIVE_DIR,
     build_odds_table,
 )
+from draft_oracle.models.game_win import (
+    DEFAULT_MODEL_ARTIFACT_DIR,
+    GameWinConfig,
+    train_game_win_from_normalized,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -188,6 +193,40 @@ def injuries(
     )
     for line in result.report_lines():
         typer.echo(line)
+
+
+@app.command(name="train-game-win")
+def train_game_win(
+    normalized_dir: Annotated[
+        Path, typer.Option(help="Directory holding normalized Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: Annotated[
+        Path, typer.Option(help="Output directory for the report + manifest.")
+    ] = DEFAULT_MODEL_ARTIFACT_DIR,
+    no_odds: Annotated[
+        bool,
+        typer.Option("--no-odds", help="Train stat-only (skip the market features)."),
+    ] = False,
+    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+) -> None:
+    """Train the per-game win model; write the evaluation report + manifest."""
+    result = train_game_win_from_normalized(
+        normalized_dir=normalized_dir,
+        artifact_dir=artifact_dir,
+        config=GameWinConfig(seed=seed),
+        use_odds=not no_odds,
+    )
+    typer.echo(f"Per-game win model -> {artifact_dir}")
+    typer.echo(f"  chosen model: {result.chosen_model_type}")
+    typer.echo(
+        f"  test Brier: market+stats {result.test_brier_market:.4f} / "
+        f"stats-only {result.test_brier_stats_only:.4f}"
+    )
+    typer.echo(
+        f"  baselines: coin-flip {result.test_brier_coin_flip:.4f} / "
+        f"higher-points {result.test_brier_higher_points:.4f}"
+    )
+    typer.echo(f"  beats both baselines: {'yes' if result.beats_both_baselines else 'no'}")
 
 
 if __name__ == "__main__":  # pragma: no cover

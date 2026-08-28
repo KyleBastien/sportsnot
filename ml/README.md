@@ -53,6 +53,8 @@ All commands run from the `ml/` directory.
 | Match drafts    | `uv run oracle match-drafts`             |
 | Build injuries  | `uv run oracle injuries`                 |
 | Injuries offline| `uv run oracle injuries --no-fetch`      |
+| Train win model | `uv run oracle train-game-win`           |
+| Win model (stat)| `uv run oracle train-game-win --no-odds` |
 
 ## Package layout
 
@@ -429,9 +431,9 @@ matrix = build_team_series_features(
     season_id=20232024,
     as_of_date="2024-04-20",
     playoff_round=1,
-    matchups=matchups,   # optional: opponent_team_abbrev, home_ice, series price
-    odds=odds,           # optional: normalized odds table for market features
-    injuries=injuries,   # optional (CURRENT round only — never historical)
+    matchups=matchups,  # optional: opponent_team_abbrev, home_ice, series price
+    odds=odds,  # optional: normalized odds table for market features
+    injuries=injuries,  # optional (CURRENT round only — never historical)
 )
 ```
 
@@ -459,15 +461,51 @@ replayed game-by-game across seasons (`compute_elo_ratings`) with a between-seas
 regression toward the mean; the market join maps `season_id % 10000` to the odds
 table's `season_end_year`.
 
+## Per-game win model (`models/game_win.py`)
 
+Calibrated single-game `P(home beats away)` model (US-011), home/away aware,
+trained on historical regular-season **and** playoff games. It is the sharpest
+per-game estimate the series simulator (US-013) rests on.
+
+```python
+from draft_oracle.models import train_game_win_model
+
+result = train_game_win_model(team_games, odds=odds)  # odds optional (stat-only)
+p = result.model.predict_matchup(home_snapshot, away_snapshot, is_playoff=True)
+```
+
+```bash
+uv run oracle train-game-win            # train + write report.md/manifest.json
+uv run oracle train-game-win --no-odds  # stat-only (drop the market feature)
+```
+
+**Features** are home-minus-away differences (`STAT_FEATURE_COLUMNS`): a
+cross-season `elo_diff` (reusing `team_series` Elo), in-season regular-season
+`goal_diff`/`goals_for`/`goals_against`/`win_pct`/`points_per_game` diffs, and an
+`is_playoff` flag. The market variant (`MARKET_FEATURE_COLUMNS`) adds the
+de-vigged `market_home_prob` + a `market_available` flag; a missing price imputes
+a neutral `0.5` and clears the flag, so the model **runs correctly in stat-only
+mode**. Pre-game state is accumulated in a single chronological pass, so a game
+can never read its own (or a later) result — leakage-free by construction.
+
+**Selection + evaluation** — logistic regression vs. LightGBM, chosen by
+**validation Brier**; the winner is refit on train+validation and scored on the
+**held-out latest seasons** against two fixed baselines (coin flip; higher
+regular-season points wins). Splits are strictly temporal (SPEC §6) and the seed
+is fixed. The committed report at `artifacts/models/game-win/report.md` (+
+`manifest.json`) prints the held-out Brier, the market-vs-stats **ablation**, and
+the baseline comparison **honestly** — a missed target is reported, never forced
+(SPEC §7).
+
+## Data & artifact layout
 
 - `data/raw/` — gitignored **except** the committed `league-drafts/`, `odds-archive/`,
   and `nhl-archive/` snapshots described in `SPEC.md §5`.
 - `data/normalized/` — normalized Parquet tables + dated snapshots (gitignored).
 - `data/features/` — generated feature matrices (gitignored).
 - `data/overrides/` — hand-maintained YAML overrides (injuries, name/alias maps).
-- `artifacts/` — model artifacts (gitignored) except committed backtest
-  `report.md` files and manifests under `artifacts/backtests/`.
+- `artifacts/` — model artifacts (gitignored) except committed `report.md` files
+  and manifests under `artifacts/backtests/` and `artifacts/models/`.
 
 ## Determinism
 

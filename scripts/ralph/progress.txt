@@ -3,6 +3,15 @@ Started: 08/27/2026 22:10:47
 ---
 
 ## Codebase Patterns
+- Predictive models live in `ml/src/draft_oracle/models/` (US-011+). Pattern: pure
+  unit-tested primitives (`brier_score`, feature-row builders) + a dataclass result with
+  `report_lines()` (ASCII Markdown) and `manifest()` (seed+splits+metrics), + a
+  `train_*_from_normalized` that reads `data/normalized/*.parquet` and writes committed
+  `artifacts/models/<name>/{report.md,manifest.json}` (both re-included in .gitignore), +
+  a `oracle <cmd>` CLI. Splits are strictly temporal (`default_temporal_split`: newest N
+  seasons held out for test, next for val, rest train); seed is fixed; misses reported
+  honestly (SPEC §7), never forced. Per-game features are built leakage-free in ONE
+  chronological pass (snapshot BEFORE folding the current result), reusing team_series Elo.
 - The `ml/` project is a standalone uv-managed Python 3.12+ package (`draft_oracle`),
   fully isolated from the Nx/TS workspace. It has NO package.json, so Nx never sees it
   and `yarn nx affected` is empty for Python-only changes. Never add a package.json to ml/.
@@ -511,4 +520,45 @@ Started: 08/27/2026 22:10:47
     False for those rounds.
   - normalize_team_games now exposes special-teams + shots columns; re-run
     `oracle normalize --force` after pulling this change so downstream parquet has them.
+---
+
+## 2026-08-28 00:58 - US-011
+- Implemented the per-game win probability model (models/game_win.py, PRD US-005 part 1):
+  `P(home beats away)` single-game model, home/away aware, trained on historical
+  regular-season + playoff games. Home-minus-away difference features (cross-season Elo
+  reused from team_series + in-season reg-season rates + is_playoff), optional de-vigged
+  market home prob with a missing-flag (stat-only mode works). Logistic regression vs.
+  LightGBM selected by validation Brier; winner refit on train+val, scored on held-out
+  latest seasons vs. two fixed baselines (coin flip, higher reg-season points). Market-vs-
+  stats ablation. Strict temporal split, fixed seed. oracle train-game-win [--no-odds]
+  writes committed rtifacts/models/game-win/report.md + manifest.json.
+- Real-data result (11 seasons, train 2016-23 / val 2024 / test 2025-26): chosen
+  logistic_regression; test Brier market+stats 0.2422, stats-only 0.2413, coin-flip 0.2500,
+  higher-points 0.4450 -> beats BOTH baselines. Market did NOT help (coverage only 31.6% on
+  test due to team_games<->odds date/UTC join gaps; imputed 0.5 dilutes it) — reported
+  honestly in the report, not forced.
+- Files changed: ml/src/draft_oracle/models/game_win.py (new), ml/src/draft_oracle/
+  models/__init__.py (re-exports), ml/src/draft_oracle/cli/project.py (train-game-win
+  command), ml/.gitignore (allow artifacts/models/*/report.md+manifest.json),
+  ml/README.md (command + section), ml/tests/test_game_win.py (new, 16 tests),
+  ml/artifacts/models/game-win/{report.md,manifest.json} (committed).
+- Quality (from ml/): ruff check + format clean, mypy strict clean (33 files), pytest 301
+  passed. Nx graph unaffected (Python-only, ml/ has no package.json).
+- **Learnings for future iterations:**
+  - Model modules follow the features pattern: pure unit-tested primitives + a dataclass
+    result with eport_lines()/manifest(); CLI command loads parquet, trains, writes
+    committed report+manifest under rtifacts/models/<name>/.
+  - The per-game dataset is built in ONE chronological pass (uild_game_dataset) that
+    maintains running Elo + in-season reg-season counters; pre-game snapshot is taken
+    BEFORE folding the current result -> leakage-free by construction (no as_of recompute).
+    This is cheaper than the round-level s_of recompute used by features/.
+  - team_games<->odds join is lossy: match on (season_end_year, game_date, home_team_id,
+    away_team_id) but ~68% of recent games miss (UTC date offset ±1 day, same trap odds.py
+    already documents). Downstream market features must tolerate low real coverage.
+  - Baseline "higher reg-season points wins" as a hard 1/0 prob scores a TERRIBLE Brier
+    (0.445) because it's punished on every upset — easy to beat; the real bar is coin flip.
+  - mypy strict + sklearn/LightGBM: they're in the ignore_missing_imports override so
+    estimators type as Any; annotate estimator holders as Any and wrap predict_proba in
+    
+p.asarray(..., dtype=float) to avoid no-any-return.
 ---

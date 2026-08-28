@@ -21,6 +21,11 @@ artifacts/backtests/*
 !artifacts/backtests/*/
 !artifacts/backtests/*/report.md
 !artifacts/backtests/*/manifest.json
+!artifacts/models/
+artifacts/models/*
+!artifacts/models/*/
+!artifacts/models/*/report.md
+!artifacts/models/*/manifest.json
 
 # Secrets / env
 .env

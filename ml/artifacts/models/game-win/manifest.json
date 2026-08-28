@@ -1,0 +1,45 @@
+{
+  "model_version": "game-win-v1",
+  "seed": 20260827,
+  "min_pregame_games": 5,
+  "chosen_model_type": "logistic_regression",
+  "split": {
+    "train_years": [
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023
+    ],
+    "val_years": [
+      2024
+    ],
+    "test_years": [
+      2025,
+      2026
+    ]
+  },
+  "counts": {
+    "train": 8892,
+    "val": 1232,
+    "test": 2421
+  },
+  "validation_brier": {
+    "logistic_regression": 0.23732408960777812,
+    "lightgbm": 0.2401142468552719
+  },
+  "test_brier": {
+    "market_plus_stats": 0.24217113633574336,
+    "stats_only": 0.2412556356002993,
+    "coin_flip": 0.25,
+    "higher_points": 0.44496076001652207
+  },
+  "test_market_coverage": 0.315572077653862,
+  "beats_coin_flip": true,
+  "beats_higher_points": true,
+  "beats_both_baselines": true,
+  "market_helps": false
+}
