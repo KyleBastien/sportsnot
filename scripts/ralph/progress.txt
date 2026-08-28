@@ -177,6 +177,19 @@ Started: 08/27/2026 22:10:47
   `pd.Timestamp - pd.Timestamp` `.days` types as a union (use `.date()` subtraction for
   int days); iterate DataFrames with `.to_dict("records")` (itertuples attrs type as a
   scalar union under strict); wrap `float(1.0/(1+10**...))` returns to avoid no-any-return.
+- Composed models (US-013 `models/series_sim.py`) COMPOSE the per-game win + shutout
+  models, they do not learn per-series. Best-of-7 = exact enumeration over <=2^7 paths
+  (recurse over game outcomes, stop at 4 wins, weight by product of per-game probs) -
+  deterministic, no seed; seeded Monte-Carlo only cross-checks. Home-ice = 2-2-1-1-1
+  `HOME_ICE_PATTERN=("A","A","B","B","A","B","A")` (A=higher seed). E[goalie points] is
+  LINEAR: `E[wins]*(WIN_POINTS + (SHUTOUT_POINTS-WIN_POINTS)*P(shutout|win))` == mean of
+  `rules.goalie_series_points` (shutout upgrades a win 2->4, never additive); P(shutout|win)
+  is venue-independent (winner-framed) so it's ONE scalar/team. Leakage-free composed
+  evaluation: filter team_games to seasons BEFORE the held-out set and train sub-models on
+  that slice (their `.model` is fit only on what you pass), but build as-of pre-series
+  FEATURES from ALL games in one chronological pass (feature computation != training).
+  The `series` parquet gives actual winner + length (top_seed_wins+bottom_seed_wins) +
+  playoff_round; `series.year == team_games season_id % 10000` (season end year).
 
 ## 2026-08-27 22:10 - US-001
 - Scaffolded the isolated uv-managed Python ML workspace under `ml/` for the
@@ -604,3 +617,40 @@ p.asarray(..., dtype=float) to avoid no-any-return.
     tuple order) + naturally-monotone logreg, so whichever model selection picks stays
     monotone in goalie quality (the unit test asserts this on synthetic data).
 ---
+
+## 2026-08-28 01:13 - US-013
+- Implemented the best-of-7 series simulator + goalie-slot valuation
+  (`models/series_sim.py`). Pure exact-enumeration core composes the per-game win
+  model (US-011) + shutout model (US-012) into a full series-outcome distribution
+  with the 2-2-1-1-1 home-ice pattern; a seeded Monte-Carlo variant cross-checks it.
+- Files changed:
+  - ml/src/draft_oracle/models/series_sim.py (new): HOME_ICE_PATTERN, game_win_probs,
+    simulate_series (exact 2^7 enumeration) + simulate_series_monte_carlo, SeriesOutcome
+    (P(win), 4/5/6/7 length dist, E[wins], E[games], E[goalie points]),
+    expected_goalie_points (through rules WIN/SHUTOUT_POINTS), reconstruct_series_matchups
+    (leakage-free single chronological pass freezing pre-series win+shutout snapshots +
+    observed shutouts), evaluate_series_sim(_from_normalized) calibration + report/manifest.
+  - ml/src/draft_oracle/models/__init__.py: re-export the new public API.
+  - ml/src/draft_oracle/cli/project.py: `oracle eval-series-sim` command.
+  - ml/tests/test_series_sim.py (new): 18 tests - p=0.5 symmetric, p=1.0/0.0 sweeps,
+    length sums, home-ice ordering, goalie points vs rules.goalie_series_points, MC~exact,
+    reconstruction, end-to-end eval (manifest/report/shutouts-by-round).
+  - ml/README.md: CLI rows + a series simulator section.
+  - ml/artifacts/models/series-sim/{report.md,manifest.json}: committed real-data run.
+- Quality (from ml/): ruff format/check clean, mypy --strict clean (37 files),
+  pytest 332 passed. Real data (oracle eval-series-sim): held-out 2025/2026, 30 series
+  scored, series-winner Brier 0.2300 (beats coin-flip 0.25 AND higher-seed 0.50).
+- **Learnings for future iterations:**
+  - E[goalie-slot points] is LINEAR in E[wins]: E[pts] = E[wins]*(2 + 2*P(shutout|win)),
+    exactly the mean of rules.goalie_series_points (a shutout upgrades a win 2->4, never
+    additive). No need to enumerate shutout draws - fold P(shutout|win) in afterward.
+  - Best-of-7 is tiny (<=128 paths): recurse over game outcomes, stop at 4 wins, weight by
+    the product of per-game probs. Exact + deterministic, no seed. P(shutout|win) from the
+    shutout model is venue-INDEPENDENT (winner-framed), so it is one scalar per team.
+  - To evaluate composed models leakage-free: filter team_games to seasons BEFORE the
+    held-out set, train the sub-models on that slice (their .model is fit only on what you
+    pass), but build as-of pre-series FEATURES from ALL games (feature computation != training).
+  - The `series` parquet gives actual winner + length (top_seed_wins+bottom_seed_wins) and
+    playoff_round; series.year == team_games season_id % 10000 (season end year) - join on that.
+  - mypy --strict narrows a loop variable to its FIRST-seen dataclass type; reusing the same
+    name `b` across two different-typed for-loops errors. Use distinct names per loop.

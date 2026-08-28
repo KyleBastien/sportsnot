@@ -41,6 +41,13 @@ from draft_oracle.models.game_win import (
     GameWinConfig,
     train_game_win_from_normalized,
 )
+from draft_oracle.models.series_sim import (
+    DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_SERIES_SIM_ARTIFACT_DIR,
+)
+from draft_oracle.models.series_sim import (
+    SeriesSimConfig,
+    evaluate_series_sim_from_normalized,
+)
 from draft_oracle.models.shutout import (
     DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_SHUTOUT_ARTIFACT_DIR,
 )
@@ -264,6 +271,31 @@ def train_shutout(
         f"(rel err {result.calibration_rel_error:.1%})"
     )
     typer.echo(f"  within +/-25%: {'yes' if result.calibrated_within_tolerance else 'no'}")
+
+
+@app.command(name="eval-series-sim")
+def eval_series_sim(
+    normalized_dir: Annotated[
+        Path, typer.Option(help="Directory holding normalized Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: Annotated[
+        Path, typer.Option(help="Output directory for the report + manifest.")
+    ] = DEFAULT_SERIES_SIM_ARTIFACT_DIR,
+    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+) -> None:
+    """Calibrate the best-of-7 series simulator; write the report + manifest."""
+    result = evaluate_series_sim_from_normalized(
+        normalized_dir=normalized_dir,
+        artifact_dir=artifact_dir,
+        config=SeriesSimConfig(seed=seed),
+    )
+    typer.echo(f"Series simulator -> {artifact_dir}")
+    typer.echo(f"  held-out seasons: {list(result.test_years)}")
+    typer.echo(f"  series scored: {result.n_series_scored} (skipped {result.n_series_skipped})")
+    typer.echo(
+        f"  series-winner Brier: model {result.brier_series:.4f} / "
+        f"higher-seed {result.brier_higher_seed:.4f} / coin {result.brier_coin_flip:.4f}"
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover

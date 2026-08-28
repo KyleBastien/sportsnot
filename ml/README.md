@@ -55,6 +55,8 @@ All commands run from the `ml/` directory.
 | Injuries offline| `uv run oracle injuries --no-fetch`      |
 | Train win model | `uv run oracle train-game-win`           |
 | Win model (stat)| `uv run oracle train-game-win --no-odds` |
+| Train shutout   | `uv run oracle train-shutout`            |
+| Eval series sim | `uv run oracle eval-series-sim`          |
 
 ## Package layout
 
@@ -496,6 +498,48 @@ is fixed. The committed report at `artifacts/models/game-win/report.md` (+
 `manifest.json`) prints the held-out Brier, the market-vs-stats **ablation**, and
 the baseline comparison **honestly** — a missed target is reported, never forced
 (SPEC §7).
+
+## Best-of-7 series simulator (`models/series_sim.py`)
+
+Composes the per-game win model (US-011) and shutout model (US-012) into a full
+best-of-7 series-outcome distribution (US-013). Every playoff round uses the
+**2-2-1-1-1** home-ice pattern (`HOME_ICE_PATTERN`): the higher seed hosts games
+1, 2, 5, 7; the lower seed hosts 3, 4, 6. The distribution is enumerated
+**exactly** over all series paths (`2**7` outcomes) — deterministic, no seed;
+a seeded `simulate_series_monte_carlo` exists only to cross-check the enumeration.
+
+```python
+from draft_oracle.models import simulate_series
+
+outcome = simulate_series(p_a_home=0.62, p_a_away=0.48,
+                          shutout_prob_a=0.12, shutout_prob_b=0.09)
+outcome.p_a_win_series      # P(higher seed wins the series)
+outcome.length_probs        # {4:.., 5:.., 6:.., 7:..}, sums to 1
+outcome.e_wins_a            # E[wins] for the higher seed
+outcome.e_goalie_points_a   # E[goalie-slot points] through the rules engine
+```
+
+```bash
+uv run oracle eval-series-sim   # calibrate on held-out seasons + write report/manifest
+```
+
+Per series it yields `P(win series)` per team, the 4/5/6/7-game length
+distribution, `E[wins]`, `E[games]`, and `E[goalie-slot points]`. Goalie points
+are scored **through the rules engine** (`expected_goalie_points`): a win is worth
+`WIN_POINTS` and a shutout win *replaces* it with `SHUTOUT_POINTS`, so
+`E[pts] = E[wins] * (2 + 2 * P(shutout | win))` — exactly the mean of
+`rules.goalie_series_points`.
+
+**Calibration** (`evaluate_series_sim_from_normalized`) fits the win + shutout
+models on the seasons **before** the held-out set (test-season series never touch
+training, SPEC §6), replays each historical series (`series.parquet`) through the
+simulator, and writes `artifacts/models/series-sim/report.md` (+ `manifest.json`):
+a reliability curve + Brier for series winners (vs. higher-seed and coin-flip
+baselines), the predicted-vs-actual series-length distribution, and
+predicted-vs-actual shutouts per round. Pre-series team snapshots are frozen in a
+single leakage-free chronological pass at each matchup's first playoff game.
+Metrics are reported **honestly** — the held-out sample is small (~30-40 series),
+so numbers are printed as measured (SPEC §7).
 
 ## Data & artifact layout
 
