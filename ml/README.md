@@ -65,6 +65,7 @@ All commands run from the `ml/` directory.
 | Slot strategies | `uv run oracle project --season 2026 --round 1 --managers 12` (emits `slot_strategies.md`) |
 | Recommend pick  | `uv run oracle recommend --artifact-dir artifacts/2025-r1 --managers 6 --seat 3` |
 | Compare drafters| `uv run oracle compare-strategies`       |
+| Draft assistant | `uv run oracle draft --artifact artifacts/2025-r1 --managers 4 --slot 1 [--ir]` |
 
 ## Package layout
 
@@ -842,6 +843,38 @@ uv run oracle project --season 2026 --round 1 --no-slot-strategies # skip the re
 
 A 12-slot league finishes well inside the 15-minute batch budget (greedy fallback in
 seconds via the vectorized kernel; the fitted-opponent path in a few minutes).
+
+## Interactive draft assistant (`cli/draft.py`)
+
+*"I'm live on draft night — record every pick and tell me my best option now."*
+`oracle draft` starts a terminal session that reads **only** the precomputed
+projection artifact: no network, no model training at draft time. Every valuation
+routes through the US-021 recommender and the rules-enforcing simulator.
+
+```
+uv run oracle draft --artifact artifacts/2025-r1 --managers 4 --slot 1        # start
+uv run oracle draft --artifact artifacts/2025-r1 --managers 4 --slot 2 --ir   # IR league
+uv run oracle draft --resume artifacts/2025-r1/draft-session.json             # resume a log
+```
+
+Session commands:
+
+| Command | Effect |
+| --- | --- |
+| `pick <manager> <name>` | Record a pick. `manager` is a seat number (`1`), id (`seat1`), or prefix; `name` is fuzzy-matched. |
+| `undo` | Undo the most recent pick (state is rebuilt by replay). |
+| `board` | Remaining assets grouped by position, best projection first. |
+| `roster [manager]` | A roster (yours by default). |
+| `recommend [--depth N]` | Top-5 explained picks (VOR, survival, need, delta vs #2). Full multi-step lookahead by default; `--depth 1` is the fast path. |
+| `save <path>` / `resume <path>` | Write / reload the session JSON. |
+| `help`, `quit` | Help and exit. |
+
+Illegal actions are rejected **with the reason** — not your turn, already drafted,
+position full, or on an eliminated team (`--eliminated ABC,DEF`). `recommend` returns
+in under 10 s at any state with full-depth rollouts (under 5 s with `--depth 1`). The
+session autosaves to a replayable JSON log after every pick (default
+`<artifact>/draft-session.json`, override with `--session`), so a draft can be
+replayed for post-hoc analysis.
 
 ## Data & artifact layout
 

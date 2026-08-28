@@ -13,6 +13,7 @@ from typing import Annotated
 import typer
 
 from draft_oracle import __version__
+from draft_oracle.cli.draft import draft as draft_command
 from draft_oracle.ingest.entity_match import (
     DEFAULT_OVERRIDES_DIR,
     build_league_draft_picks,
@@ -631,6 +632,9 @@ def compare_strategies_cmd(
     typer.echo(f"Strategy comparison -> {DEFAULT_RECOMMEND_ARTIFACT_DIR}")
     for line in result.report_lines():
         typer.echo(line)
+
+
+app.command(name="draft")(draft_command)
 
 
 if __name__ == "__main__":  # pragma: no cover
