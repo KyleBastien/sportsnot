@@ -47,6 +47,8 @@ All commands run from the `ml/` directory.
 | Normalize data  | `uv run oracle normalize`                |
 | Freeze snapshot | `uv run oracle snapshot`                 |
 | List snapshots  | `uv run oracle snapshot --list`          |
+| Build odds      | `uv run oracle odds`                     |
+| Skip odds       | `uv run oracle odds --no-odds`           |
 
 ## Package layout
 
@@ -166,7 +168,71 @@ Goalies excluded; each player keeps the row from their most recent season.
 `team_id`, `team_abbrev`, `team_full_name` (carries diacritics, e.g. `Montréal
 Canadiens`). Built from `team_games` (latest full name per id).
 
-## Data & artifacts
+## Betting odds (`ingest/odds.py`)
+
+Turns raw moneylines into de-vigged implied win probabilities in an `odds`
+table keyed to games. Read `data/raw/odds-archive/PROVENANCE.md` in full before
+touching the parsers — it documents every trap handled here.
+
+```bash
+uv run oracle odds              # build data/normalized/odds*.parquet from committed archives
+uv run oracle odds --no-odds    # skip odds entirely; the stat-only path is unaffected
+```
+
+**Sources** (all committed, offline; `build_odds_table` never hits the network):
+
+| Source (`source` col) | Coverage | Prices |
+| --- | --- | --- |
+| `sbr_close` (SBR workbooks) | 2016-17 – 2021-22 complete, 2022-23 partial | both-side Open/Close — **preferred** |
+| `kaggle_espn` (Kaggle/ESPN) | 2004 – Dec 2025 | favorite-side only |
+| `espn_completion` (ESPN API) | Dec 2025 – Jun 2026 incl. 2026 playoffs | favorite-side only |
+
+**De-vigging** (`SPEC.md §5`):
+
+- Two-sided prices (SBR) use the **proportional** method: each raw implied
+  probability (`1/decimal`) is divided by their sum (the overround), so fair
+  probabilities sum to 1 while preserving their ratio.
+- Favorite-only prices remove a documented **standard two-way overround**
+  (`STANDARD_OVERROUND = 1.045`, ~4.5% hold) from the favorite's raw implied
+  probability; the underdog is the complement. **No underdog American price is
+  ever fabricated** — only probabilities are produced.
+
+**Playoffs** are tagged by the real per-season windows (PROVENANCE §5), not a
+fixed April–June rule (the 2020 bubble ran Aug–Sep; 2021 ran May–Jul). The 2021
+window still overlaps a few regular-season days — a documented limitation of
+date-window tagging. September games outside a playoff window are treated as
+preseason and dropped.
+
+**Consolidation** collapses the per-source rows to one best row per game
+(`odds.parquet`); every source row is also kept in `odds_by_source.parquet`.
+Sources are matched on (season, away id, home id) with a ±1 day tolerance
+(Kaggle/ESPN dates are UTC, one calendar day ahead of SBR's local dates), at
+most one row per source per game so adjacent same-matchup games never merge. SBR
+Close wins ties; the de-vigged favorite probability of every covering source is
+cross-validated into `xval_delta`. Games present but priceless are flagged
+(`covered = False`), never imputed.
+
+**Key columns:** `source`, `season_end_year`, `game_date`, `is_playoff`,
+`neutral_site`, `away_team_id`/`home_team_id`, `away_ml`/`home_ml` (favorite-only
+sources leave the underdog `null`), `favorite_side`, `both_sides`, `covered`,
+`away_implied`/`home_implied` (sum to 1 when covered), `devig_method`,
+`overround`, `game_key`, plus `xval_delta` and `source_count` on `odds.parquet`.
+
+**Live / future odds** (never used for training; future games only):
+
+- `OddsApiClient` — The Odds API free tier (`icehockey_nhl`), current/upcoming
+  game moneylines (`h2h`) and series/outright markets where offered. The key is
+  read from `ODDS_API_KEY` (gitignored `ml/.env`) and never committed; the paid
+  historical endpoints are never called. The free tier is quota-capped (commonly
+  500 requests/month); each response's `x-requests-remaining` / `x-requests-used`
+  headers are captured on the client. Caching + rate-limiting mirror the NHL API
+  client, so repeated calls reuse the on-disk cache.
+- `EspnGameOddsClient` — ESPN's public `summary` endpoint (`pickcenter` block,
+  favorite-only) for individual future games; the same source as the committed
+  2025-26 completion, so semantics match. ESPN 403s browser-like User-Agents, so
+  the default httpx UA is used.
+
+
 
 - `data/raw/` — gitignored **except** the committed `league-drafts/`, `odds-archive/`,
   and `nhl-archive/` snapshots described in `SPEC.md §5`.

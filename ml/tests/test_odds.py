@@ -1,0 +1,639 @@
+"""Unit tests for betting-odds ingestion and de-vigging (US-005).
+
+No test touches the network: live clients are exercised through an
+``httpx.MockTransport`` and archive parsers run on small fixtures built in
+``tmp_path`` (SPEC §7 - fixtures only). One light real-file smoke test parses a
+single committed SBR workbook to guard the count against PROVENANCE.
+"""
+
+from __future__ import annotations
+
+import gzip
+from datetime import date
+from pathlib import Path
+
+import httpx
+import pandas as pd
+import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+
+from draft_oracle.ingest.nhl_api import NHLApiError
+from draft_oracle.ingest.odds import (
+    SOURCE_ESPN_COMPLETION,
+    SOURCE_KAGGLE,
+    SOURCE_SBR,
+    STANDARD_OVERROUND,
+    EspnGameOddsClient,
+    OddsApiClient,
+    american_to_decimal,
+    american_to_implied_prob,
+    build_odds_table,
+    build_source_odds,
+    consolidate_odds,
+    devig_favorite_only,
+    devig_proportional,
+    espn_summary_to_rows,
+    is_playoff_game,
+    is_preseason_game,
+    odds_api_events_to_rows,
+    parse_espn_completion,
+    parse_kaggle_extensive,
+    parse_sbr_workbook,
+    resolve_team_id,
+)
+from draft_oracle.ingest.odds import (
+    OddsApiEvent as _OddsApiEvent,
+)
+
+REAL_SBR_2016_17 = Path("data/raw/odds-archive/nhl-odds-2016-17.xlsx")
+
+
+# ── American-odds conversions ────────────────────────────────────────────
+
+
+def test_american_to_decimal_and_implied() -> None:
+    assert american_to_decimal(-150) == pytest.approx(1.6667, abs=1e-4)
+    assert american_to_decimal(130) == pytest.approx(2.30, abs=1e-9)
+    assert american_to_implied_prob(-200) == pytest.approx(2 / 3, abs=1e-9)
+    assert american_to_implied_prob(150) == pytest.approx(0.4, abs=1e-9)
+
+
+def test_american_odds_reject_zero() -> None:
+    with pytest.raises(ValueError):
+        american_to_decimal(0)
+    with pytest.raises(ValueError):
+        american_to_implied_prob(0)
+
+
+# ── De-vigging math ──────────────────────────────────────────────────────
+
+
+def test_devig_proportional_sums_to_one_and_removes_overround() -> None:
+    result = devig_proportional(home_ml=-200, away_ml=170)
+    assert result.home_prob + result.away_prob == pytest.approx(1.0, abs=1e-12)
+    # Raw implied sum exceeds 1 (the vig); overround captures it.
+    assert result.overround > 1.0
+    # Favourite (home) keeps the larger probability.
+    assert result.home_prob > result.away_prob
+    assert result.method == "proportional"
+
+
+def test_devig_proportional_preserves_probability_ratio() -> None:
+    home_ml, away_ml = -140, 120
+    result = devig_proportional(home_ml, away_ml)
+    raw_home = american_to_implied_prob(home_ml)
+    raw_away = american_to_implied_prob(away_ml)
+    assert result.home_prob / result.away_prob == pytest.approx(raw_home / raw_away, abs=1e-9)
+
+
+def test_devig_favorite_only_uses_standard_overround() -> None:
+    result = devig_favorite_only(-150)
+    q_fav = american_to_implied_prob(-150)
+    assert result.home_prob == pytest.approx(q_fav / STANDARD_OVERROUND, abs=1e-12)
+    assert result.home_prob + result.away_prob == pytest.approx(1.0, abs=1e-12)
+    assert result.method == "standard_overround"
+    # Favourite de-vigged below its raw (vig-inclusive) implied probability.
+    assert result.home_prob < q_fav
+
+
+def test_devig_favorite_only_rejects_bad_overround() -> None:
+    with pytest.raises(ValueError):
+        devig_favorite_only(-150, overround=0.0)
+
+
+@given(
+    home_ml=st.integers(min_value=-100000, max_value=100000).filter(lambda x: abs(x) >= 100),
+    away_ml=st.integers(min_value=-100000, max_value=100000).filter(lambda x: abs(x) >= 100),
+)
+def test_devig_proportional_probabilities_are_valid(home_ml: int, away_ml: int) -> None:
+    result = devig_proportional(home_ml, away_ml)
+    assert 0.0 < result.home_prob < 1.0
+    assert 0.0 < result.away_prob < 1.0
+    assert result.home_prob + result.away_prob == pytest.approx(1.0, abs=1e-9)
+
+
+# ── Team-name resolution ─────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("Toronto", 10),  # SBR city string (two-word nickname)
+        ("Toronto Maple Leafs", 10),  # full name
+        ("Columbus", 29),
+        ("Detroit", 17),
+        ("St.Louis", 19),  # SBR punctuation variant
+        ("St. Louis Blues", 19),
+        ("LosAngeles", 26),
+        ("Los Angeles Kings", 26),
+        ("TampaBay", 14),
+        ("Tampa", 14),  # 2019-20 typo (PROVENANCE 3.4)
+        ("Arizonas", 53),  # 2019-20 typo
+        ("NYRangers", 3),
+        ("NY Islanders", 2),
+        ("Utah Mammoth", 68),
+        ("Utah Hockey Club", 59),
+        ("Montreal Canadiens", 8),
+    ],
+)
+def test_resolve_team_id(name: str, expected: int) -> None:
+    assert resolve_team_id(name) == expected
+
+
+def test_resolve_team_id_unknown_is_none() -> None:
+    assert resolve_team_id("Nonexistent Club") is None
+    assert resolve_team_id(None) is None
+    assert resolve_team_id("") is None
+
+
+# ── Playoff windows (PROVENANCE 5) ───────────────────────────────────────
+
+
+def test_playoff_window_standard_and_special_seasons() -> None:
+    # Standard April-June window.
+    assert is_playoff_game(2017, date(2017, 5, 1))
+    assert not is_playoff_game(2017, date(2017, 2, 1))
+    # 2020 bubble ran Aug-Sep (never April-June).
+    assert is_playoff_game(2020, date(2020, 8, 15))
+    assert not is_playoff_game(2020, date(2020, 4, 15))
+    # 2021 late playoffs (May-July).
+    assert is_playoff_game(2021, date(2021, 6, 20))
+
+
+def test_preseason_flag_excludes_bubble() -> None:
+    # September is preseason for a normal season...
+    assert is_preseason_game(2024, date(2023, 9, 25))
+    # ...but the 2020 bubble September games are playoffs, not preseason.
+    assert not is_preseason_game(2020, date(2020, 9, 20))
+
+
+# ── SBR workbook parser ──────────────────────────────────────────────────
+
+_SBR_HEADER = [
+    "Date",
+    "Rot",
+    "VH",
+    "Team",
+    "1st",
+    "2nd",
+    "3rd",
+    "Final",
+    "Open",
+    "Close",
+    "PuckLine",
+    None,
+    "OpenOU",
+    None,
+    "CloseOU",
+    None,
+]
+
+
+def _write_sbr_workbook(path: Path, rows: list[list[object]]) -> None:
+    frame = pd.DataFrame([_SBR_HEADER, *rows])
+    frame.to_excel(path, sheet_name="Sheet1", header=False, index=False)
+
+
+def test_parse_sbr_workbook_two_sided(tmp_path: Path) -> None:
+    wb = tmp_path / "nhl-odds-2016-17.xlsx"
+    _write_sbr_workbook(
+        wb,
+        [
+            # Visitor Toronto @ home Ottawa, 12 Oct (regular season).
+            [1012, 1, "V", "Toronto", 2, 2, 0, 4, 114, 121, 1.5, -245, 5.5, -110, 5.5, 105],
+            [1012, 2, "H", "Ottawa", 2, 1, 1, 5, -134, -141, -1.5, 205, 5.5, -110, 5.5, -125],
+            # A playoff game in May.
+            [511, 3, "V", "Pittsburgh", 1, 0, 0, 1, 150, 160, 1.5, -130, 5.5, -110, 5.5, 100],
+            [511, 4, "H", "Washington", 2, 1, 0, 3, -170, -180, -1.5, 110, 5.5, -110, 5.5, -120],
+        ],
+    )
+    df = parse_sbr_workbook(wb)
+    assert len(df) == 2
+    assert bool(df["both_sides"].all())
+    assert bool(df["covered"].all())
+    first = df.iloc[0]
+    assert first["away_team_id"] == resolve_team_id("Toronto")
+    assert first["home_team_id"] == resolve_team_id("Ottawa")
+    assert first["source"] == SOURCE_SBR
+    assert first["game_date"] == "2016-10-12"
+    assert first["favorite_side"] == "home"  # Ottawa -141 favoured
+    assert first["home_implied"] + first["away_implied"] == pytest.approx(1.0, abs=1e-9)
+    assert not bool(first["is_playoff"])
+    assert bool(df.iloc[1]["is_playoff"])  # 11 May is in the playoff window
+
+
+def test_parse_sbr_workbook_flags_missing_price(tmp_path: Path) -> None:
+    wb = tmp_path / "nhl-odds-2018-19.xlsx"
+    _write_sbr_workbook(
+        wb,
+        [
+            [1012, 1, "V", "Boston", 1, 0, 0, 1, "", "", 1.5, -245, 5.5, -110, 5.5, 105],
+            [1012, 2, "H", "Buffalo", 0, 1, 0, 1, "", "", -1.5, 205, 5.5, -110, 5.5, -125],
+        ],
+    )
+    df = parse_sbr_workbook(wb)
+    assert len(df) == 1
+    row = df.iloc[0]
+    assert not bool(row["covered"])  # flagged, never imputed
+    assert row["home_ml"] is None
+    assert row["away_ml"] is None
+    assert row["home_implied"] is None
+    assert row["favorite_side"] is None
+
+
+def test_parse_sbr_workbook_reversed_pair_uses_vh(tmp_path: Path) -> None:
+    # PROVENANCE 5: one 2019-20 pair lists the home row first; VH must win.
+    wb = tmp_path / "nhl-odds-2019-20.xlsx"
+    _write_sbr_workbook(
+        wb,
+        [
+            [117, 55, "H", "Pittsburgh", 0, 0, 1, 2, -230, -230, -1.5, 110, 6, -110, 6, -105],
+            [117, 56, "V", "Detroit", 0, 1, 0, 1, 192, 205, 1.5, -130, 6, -110, 6, -115],
+        ],
+    )
+    df = parse_sbr_workbook(wb)
+    assert len(df) == 1
+    row = df.iloc[0]
+    assert row["home_team_id"] == resolve_team_id("Pittsburgh")
+    assert row["away_team_id"] == resolve_team_id("Detroit")
+
+
+def test_parse_sbr_real_workbook_smoke() -> None:
+    if not REAL_SBR_2016_17.exists():
+        pytest.skip("committed SBR workbook not present")
+    df = parse_sbr_workbook(REAL_SBR_2016_17)
+    # PROVENANCE 5: 2016-17 has 1,317 games, 322 playoff rows (161 games), 100% filled.
+    assert len(df) == 1317
+    assert bool(df["covered"].all())
+    assert int(df["is_playoff"].sum()) == 161
+
+
+# ── Favorite-only CSV parsers ────────────────────────────────────────────
+
+
+def _favorite_csv(rows: list[dict[str, object]]) -> pd.DataFrame:
+    return pd.DataFrame(rows)
+
+
+def _write_gz_csv(path: Path, frame: pd.DataFrame) -> None:
+    with gzip.open(path, "wt", encoding="utf-8", newline="") as handle:
+        frame.to_csv(handle, index=False)
+
+
+def test_parse_kaggle_extensive_favorite_only(tmp_path: Path) -> None:
+    frame = _favorite_csv(
+        [
+            # Home Carolina favoured (home spread negative), away Vegas.
+            {
+                "game_id": 1,
+                "date": "2026-05-01 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Carolina Hurricanes",
+                "is_home": 1,
+                "spread": -1.5,
+                "favorite_moneyline": -160,
+            },
+            {
+                "game_id": 1,
+                "date": "2026-05-01 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Vegas Golden Knights",
+                "is_home": 0,
+                "spread": 1.5,
+                "favorite_moneyline": -160,
+            },
+            # Preseason September row -> dropped.
+            {
+                "game_id": 2,
+                "date": "2025-09-25 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Boston Bruins",
+                "is_home": 1,
+                "spread": -1.5,
+                "favorite_moneyline": -120,
+            },
+            {
+                "game_id": 2,
+                "date": "2025-09-25 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Buffalo Sabres",
+                "is_home": 0,
+                "spread": 1.5,
+                "favorite_moneyline": -120,
+            },
+        ]
+    )
+    path = tmp_path / "nhl_data_extensive.csv.gz"
+    _write_gz_csv(path, frame)
+    df = parse_kaggle_extensive(path)
+    assert len(df) == 1  # preseason dropped
+    row = df.iloc[0]
+    assert row["source"] == SOURCE_KAGGLE
+    assert not bool(row["both_sides"])
+    assert row["favorite_side"] == "home"
+    assert row["home_ml"] == -160
+    assert row["away_ml"] is None  # underdog price never fabricated
+    assert row["home_implied"] > row["away_implied"]
+    assert row["home_implied"] + row["away_implied"] == pytest.approx(1.0, abs=1e-9)
+    assert bool(row["is_playoff"])  # 1 May 2026 is in the playoff window
+
+
+def test_parse_espn_completion_home_relative_spread(tmp_path: Path) -> None:
+    frame = _favorite_csv(
+        [
+            # Home Vegas underdog (spread +1.5) -> favourite is away Carolina.
+            {
+                "game_id": 401874176,
+                "date": "2026-06-15 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Vegas Golden Knights",
+                "is_home": 1,
+                "spread": 1.5,
+                "favorite_moneyline": -115,
+            },
+            {
+                "game_id": 401874176,
+                "date": "2026-06-15 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Carolina Hurricanes",
+                "is_home": 0,
+                "spread": 1.5,
+                "favorite_moneyline": -115,
+            },
+        ]
+    )
+    path = tmp_path / "games.csv"
+    frame.to_csv(path, index=False)
+    df = parse_espn_completion(path)
+    assert len(df) == 1
+    row = df.iloc[0]
+    assert row["source"] == SOURCE_ESPN_COMPLETION
+    assert row["favorite_side"] == "away"  # Carolina favoured
+    assert row["away_ml"] == -115
+    assert row["home_ml"] is None
+    assert row["away_implied"] > row["home_implied"]
+
+
+# ── Consolidation ────────────────────────────────────────────────────────
+
+
+def _two_sided_frame_row(**kwargs: object) -> dict[str, object]:
+    return kwargs
+
+
+def test_consolidate_prefers_sbr_and_cross_validates() -> None:
+    # Same game from SBR (two-sided) and Kaggle (favorite-only, UTC +1 day).
+    sbr = parse_sbr_workbook_from_rows(
+        season="2019-20",
+        rows=[
+            [501, 1, "V", "Boston", 1, 0, 0, 1, 150, 160, 1.5, -130, 6, -110, 6, -115],
+            [501, 2, "H", "Toronto", 2, 1, 0, 3, -170, -180, -1.5, 110, 6, -110, 6, -120],
+        ],
+    )
+    kaggle_frame = pd.DataFrame(
+        [
+            {
+                "game_id": 9,
+                "date": "2020-05-02 02:00:00+00:00",
+                "season": 2020,
+                "team_name": "Toronto Maple Leafs",
+                "is_home": 1,
+                "spread": -1.5,
+                "favorite_moneyline": -175,
+            },
+            {
+                "game_id": 9,
+                "date": "2020-05-02 02:00:00+00:00",
+                "season": 2020,
+                "team_name": "Boston Bruins",
+                "is_home": 0,
+                "spread": 1.5,
+                "favorite_moneyline": -175,
+            },
+        ]
+    )
+    from draft_oracle.ingest.odds import _favorite_rows_from_games, _finalize
+
+    kaggle = _finalize(_favorite_rows_from_games(kaggle_frame, source=SOURCE_KAGGLE))
+    combined = pd.concat([sbr, kaggle], ignore_index=True)
+    consolidated = consolidate_odds(combined)
+    assert len(consolidated) == 1  # the two sources collapse to one game
+    row = consolidated.iloc[0]
+    assert row["source"] == SOURCE_SBR  # SBR preferred
+    assert bool(row["both_sides"])
+    assert row["source_count"] == 2
+    assert row["xval_delta"] >= 0.0
+
+
+def parse_sbr_workbook_from_rows(season: str, rows: list[list[object]]) -> pd.DataFrame:
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / f"nhl-odds-{season}.xlsx"
+        _write_sbr_workbook(path, rows)
+        return parse_sbr_workbook(path)
+
+
+def test_consolidate_keeps_adjacent_distinct_games_separate() -> None:
+    # Same matchup on two consecutive days (back-to-back) must NOT merge.
+    sbr = parse_sbr_workbook_from_rows(
+        season="2016-17",
+        rows=[
+            [101, 1, "V", "Boston", 1, 0, 0, 1, 150, 160, 1.5, -130, 6, -110, 6, -115],
+            [101, 2, "H", "Toronto", 2, 1, 0, 3, -170, -180, -1.5, 110, 6, -110, 6, -120],
+            [102, 3, "V", "Boston", 1, 0, 0, 1, 140, 150, 1.5, -130, 6, -110, 6, -115],
+            [102, 4, "H", "Toronto", 2, 1, 0, 3, -160, -170, -1.5, 110, 6, -110, 6, -120],
+        ],
+    )
+    consolidated = consolidate_odds(sbr)
+    assert len(consolidated) == 2  # both games survive
+
+
+def test_consolidate_empty_frame() -> None:
+    empty = build_source_odds(Path("nonexistent-dir"))
+    assert empty.empty
+    out = consolidate_odds(empty)
+    assert out.empty
+    assert "xval_delta" in out.columns
+
+
+# ── build_odds_table (Parquet round-trip) ────────────────────────────────
+
+
+def test_build_odds_table_writes_parquet(tmp_path: Path) -> None:
+    archive = tmp_path / "odds-archive"
+    archive.mkdir()
+    _write_sbr_workbook(
+        archive / "nhl-odds-2016-17.xlsx",
+        [
+            [1012, 1, "V", "Toronto", 2, 2, 0, 4, 114, 121, 1.5, -245, 5.5, -110, 5.5, 105],
+            [1012, 2, "H", "Ottawa", 2, 1, 1, 5, -134, -141, -1.5, 205, 5.5, -110, 5.5, -125],
+        ],
+    )
+    out = tmp_path / "normalized"
+    result = build_odds_table(archive_dir=archive, out_dir=out)
+    assert result.game_rows == 1
+    assert result.covered_rows == 1
+    assert (out / "odds.parquet").exists()
+    assert (out / "odds_by_source.parquet").exists()
+    loaded = pd.read_parquet(out / "odds.parquet")
+    assert len(loaded) == 1
+    assert loaded.iloc[0]["home_team_id"] == resolve_team_id("Ottawa")
+
+
+# ── Live: The Odds API (MockTransport, no network) ───────────────────────
+
+
+def _noop_sleep(_seconds: float) -> None:
+    return None
+
+
+def _odds_api_payload() -> list[dict[str, object]]:
+    return [
+        {
+            "id": "evt1",
+            "commence_time": "2026-05-01T23:00:00Z",
+            "home_team": "Carolina Hurricanes",
+            "away_team": "Vegas Golden Knights",
+            "bookmakers": [
+                {
+                    "key": "draftkings",
+                    "markets": [
+                        {
+                            "key": "h2h",
+                            "outcomes": [
+                                {"name": "Carolina Hurricanes", "price": -160},
+                                {"name": "Vegas Golden Knights", "price": 140},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+
+
+def test_odds_api_client_fetches_and_captures_quota(tmp_path: Path) -> None:
+    calls: list[int] = [0]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls[0] += 1
+        assert "apiKey=secret" in str(request.url)
+        return httpx.Response(
+            200,
+            json=_odds_api_payload(),
+            headers={"x-requests-remaining": "480", "x-requests-used": "20"},
+        )
+
+    client = OddsApiClient(
+        cache_dir=tmp_path / "cache",
+        api_key="secret",
+        delay=0.0,
+        retry_backoff=0.0,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        sleep=_noop_sleep,
+    )
+    events = client.nhl_odds()
+    assert len(events) == 1
+    assert client.requests_remaining == 480
+    assert client.requests_used == 20
+    # Second call is served from cache -> no extra network hit.
+    client.nhl_odds()
+    assert calls[0] == 1
+    client.close()
+
+
+def test_odds_api_client_requires_key(tmp_path: Path) -> None:
+    client = OddsApiClient(
+        cache_dir=tmp_path / "cache",
+        api_key="",
+        delay=0.0,
+        client=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=[]))),
+        sleep=_noop_sleep,
+    )
+    with pytest.raises(NHLApiError):
+        client.nhl_odds()
+    client.close()
+
+
+def test_odds_api_events_to_rows_devigs() -> None:
+    events = [_OddsApiEvent.model_validate(item) for item in _odds_api_payload()]
+    df = odds_api_events_to_rows(events)
+    assert len(df) == 1
+    row = df.iloc[0]
+    assert bool(row["both_sides"])
+    assert row["home_team_id"] == resolve_team_id("Carolina Hurricanes")
+    assert row["home_implied"] + row["away_implied"] == pytest.approx(1.0, abs=1e-9)
+    assert row["favorite_side"] == "home"
+
+
+def test_odds_api_events_missing_market_flagged() -> None:
+    payload = _odds_api_payload()
+    payload[0]["bookmakers"] = []  # no prices
+    events = [_OddsApiEvent.model_validate(item) for item in payload]
+    df = odds_api_events_to_rows(events)
+    assert len(df) == 1
+    assert not bool(df.iloc[0]["covered"])  # flagged, not imputed
+
+
+# ── Live: ESPN summary (MockTransport + payload conversion) ──────────────
+
+
+def _espn_summary_payload(favorite_home: bool) -> dict[str, object]:
+    spread = -1.5 if favorite_home else 1.5
+    return {
+        "header": {
+            "competitions": [
+                {
+                    "date": "2026-05-01T23:00:00Z",
+                    "competitors": [
+                        {"homeAway": "home", "team": {"displayName": "Carolina Hurricanes"}},
+                        {"homeAway": "away", "team": {"displayName": "Vegas Golden Knights"}},
+                    ],
+                }
+            ]
+        },
+        "pickcenter": [
+            {
+                "spread": spread,
+                "homeTeamOdds": {"favorite": favorite_home, "moneyLine": -160},
+                "awayTeamOdds": {"favorite": not favorite_home, "moneyLine": -160},
+            }
+        ],
+    }
+
+
+def test_espn_summary_to_rows_home_favorite() -> None:
+    df = espn_summary_to_rows(_espn_summary_payload(favorite_home=True))
+    assert len(df) == 1
+    row = df.iloc[0]
+    assert row["favorite_side"] == "home"
+    assert not bool(row["both_sides"])
+    assert row["home_implied"] > row["away_implied"]
+
+
+def test_espn_summary_to_rows_missing_pickcenter_flagged() -> None:
+    payload = _espn_summary_payload(favorite_home=True)
+    payload["pickcenter"] = []
+    df = espn_summary_to_rows(payload)
+    assert len(df) == 1
+    assert not bool(df.iloc[0]["covered"])
+
+
+def test_espn_game_odds_client_uses_transport(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/summary")
+        return httpx.Response(200, json=_espn_summary_payload(favorite_home=False))
+
+    client = EspnGameOddsClient(
+        cache_dir=tmp_path / "cache",
+        delay=0.0,
+        retry_backoff=0.0,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        sleep=_noop_sleep,
+    )
+    df = client.game_odds(401874176)
+    assert len(df) == 1
+    assert df.iloc[0]["favorite_side"] == "away"
+    client.close()

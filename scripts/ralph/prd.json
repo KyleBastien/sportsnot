@@ -116,7 +116,7 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

@@ -20,6 +20,10 @@ from draft_oracle.ingest.normalize import (
     list_snapshots,
     normalize_archive,
 )
+from draft_oracle.ingest.odds import (
+    DEFAULT_ODDS_ARCHIVE_DIR,
+    build_odds_table,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -85,6 +89,30 @@ def snapshot(
         return
     result = create_snapshot(out_dir=out_dir, snapshot_id=snapshot_id or None)
     typer.echo(f"Snapshot {result.snapshot_id} -> {result.path}")
+
+
+@app.command()
+def odds(
+    archive_dir: Annotated[
+        Path, typer.Option(help="Committed odds-archive directory.")
+    ] = DEFAULT_ODDS_ARCHIVE_DIR,
+    out_dir: Annotated[
+        Path, typer.Option(help="Output directory for the odds Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    no_odds: Annotated[
+        bool,
+        typer.Option("--no-odds", help="Skip odds ingestion entirely (stat-only path)."),
+    ] = False,
+) -> None:
+    """Build the de-vigged odds tables from committed archives (offline)."""
+    if no_odds:
+        typer.echo("Odds ingestion skipped (--no-odds); stat-only path is unaffected.")
+        return
+    result = build_odds_table(archive_dir=archive_dir, out_dir=out_dir)
+    typer.echo(f"Odds tables -> {out_dir}")
+    typer.echo(f"  source rows: {result.source_rows}")
+    typer.echo(f"  games: {result.game_rows} priced/flagged")
+    typer.echo(f"  priced: {result.covered_rows}  flagged: {result.uncovered_rows}")
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -45,6 +45,26 @@ Started: 08/27/2026 22:10:47
   and every table dedups on its natural key. `oracle normalize [--force]` and
   `oracle snapshot [--list]` are the CLI entry points; snapshots freeze a dated copy under
   `data/normalized/snapshots/<id>/`.
+- Betting odds go through `draft_oracle.ingest.odds`. De-vig: two-sided prices
+  (SBR Close) use `devig_proportional` (each `1/decimal` divided by the overround
+  sum -> sums to 1); favorite-only prices (Kaggle/ESPN) use `devig_favorite_only`
+  with a documented `STANDARD_OVERROUND=1.045` and NEVER fabricate an underdog
+  American price (only probabilities). Team names resolve via `resolve_team_id`
+  (NHL_TEAMS + explicit city/typo aliases; the rsplit "city" mishandles two-word
+  nicknames like Maple Leafs/Red Wings/Blue Jackets -> every franchise city is
+  aliased explicitly). Playoffs tagged by real per-season windows
+  (`_PLAYOFF_WINDOWS`), NOT April-June: 2020 bubble = Aug-Sep, 2021 = May-Jul.
+  SBR MMDD->year: months >=8 belong to the earlier year EXCEPT 2019-20 whose
+  Aug-Sep bubble belongs to the ending year 2020 (special-cased in
+  `_reconstruct_date`). Consolidation matches sources on (season,away,home) with
+  a +/-1 day tolerance (Kaggle/ESPN dates are UTC, one day ahead of SBR local),
+  at most one row per source per cluster so adjacent same-matchup games never
+  merge; prefer SBR Close. `oracle odds [--no-odds]` builds odds.parquet +
+  odds_by_source.parquet. `openpyxl` was added to deps for the SBR .xlsx.
+- Live odds clients (`OddsApiClient` for The Odds API `icehockey_nhl`;
+  `EspnGameOddsClient` for ESPN `summary`/pickcenter) mirror NHLApiClient's
+  cache + retry + injectable `httpx.Client`/`sleep`; keys from env (`ODDS_API_KEY`),
+  never committed. Test with `httpx.MockTransport`, `delay=0.0`, no network.
 - Windows console is cp1252: NEVER print non-ASCII (`->` arrows, em-dashes) in
   `typer.echo` output — it crashes with UnicodeEncodeError. Use ASCII.
 - Typer options must use `Annotated[T, typer.Option(...)] = default` (NOT
@@ -171,4 +191,53 @@ Started: 08/27/2026 22:10:47
     rather than re-deriving — keep bracket knowledge in one place.
   - No UI change; Playwright not applicable (ml/ is outside the Nx/web graph, so
     `yarn nx affected` is empty for these changes).
+---
+
+## 2026-08-27 22:50 - US-005
+- Implemented draft_oracle.ingest.odds: betting-odds ingestion + de-vigging.
+  Parses 3 committed archive sources (SBR .xlsx both-side Close, Kaggle/ESPN
+  favorite-only CSV, ESPN 2025-26 completion CSV) into de-vigged implied win
+  probabilities in a normalized odds Parquet table keyed to games; adds live
+  clients for The Odds API (icehockey_nhl) and ESPN summary/pickcenter for
+  FUTURE games only. New `oracle odds [--no-odds]` CLI command.
+- Files changed:
+  - ml/src/draft_oracle/ingest/odds.py (new): american_to_decimal/implied,
+    devig_proportional, devig_favorite_only (STANDARD_OVERROUND=1.045),
+    NHL_TEAMS + resolve_team_id (city/typo aliases), per-season playoff windows,
+    SBR/Kaggle/ESPN parsers, build_source_odds, consolidate_odds (SBR-preferred,
+    +/-1 day cross-source match + xval_delta), build_odds_table, OddsApiClient,
+    EspnGameOddsClient, odds_api_events_to_rows, espn_summary_to_rows.
+  - ml/src/draft_oracle/ingest/__init__.py: re-export the odds public API.
+  - ml/src/draft_oracle/cli/project.py: `oracle odds` command (+ --no-odds).
+  - ml/tests/test_odds.py (new): 43 tests - de-vig math + hypothesis property,
+    name resolution, playoff windows, SBR/Kaggle/ESPN parsers on fixtures,
+    missing-odds flagging, consolidation (prefer SBR, don't merge adjacent
+    games), Parquet round-trip, live clients via httpx.MockTransport (no net),
+    plus a real-file smoke test asserting SBR 2016-17 = 1317 games / 161 playoff.
+  - ml/pyproject.toml + ml/uv.lock: added openpyxl>=3.1 (SBR .xlsx reader).
+  - ml/README.md: full "Betting odds" section (sources, de-vig, playoff windows,
+    consolidation, odds table schema, live clients) + command rows.
+- Quality (from ml/): ruff check clean, ruff format --check clean, mypy --strict
+  clean (20 files), pytest 135 passed. `oracle odds` on real archives => 36,017
+  source rows -> 28,153 consolidated games, 7,864 cross-validated (mean fav-prob
+  xval_delta 0.069). Real SBR counts match PROVENANCE (1317/1212/952/342 games).
+- **Learnings for future iterations:**
+  - The rsplit-based "city" (full_name minus last word) BREAKS two-word
+    nicknames (Toronto Maple Leafs -> "Toronto Maple"), silently dropping ~19%
+    of SBR games. Every franchise's city string is aliased explicitly; verify
+    game counts against PROVENANCE §5 when touching name resolution.
+  - MMDD->year: 2019-20 is the ONLY archive season with Aug/Sep games (the 2020
+    bubble). The generic "months>=8 => earlier year" rule maps those to 2019;
+    special-cased to 2020 in _reconstruct_date, else the bubble playoffs vanish.
+  - Kaggle dates are UTC (night games land on the next calendar day), so
+    cross-source consolidation needs a +/-1 day tolerance AND one-row-per-source
+    clustering, else back-to-back same-matchup games get merged.
+  - Windows PowerShell can't read the 47.9KB prd.json or 138KB SPEC listing in
+    one `view`; use ConvertFrom-Json / grep / view_range.
+  - ruff RUF002/RUF003 flag en-dashes (–) in docstrings/comments as ambiguous;
+    keep ml/ source ASCII (box-drawing ─ and § are fine, en/em dashes are not).
+  - No UI change; Playwright not applicable (ml/ is outside the Nx/web graph, so
+    `yarn nx affected` is empty for these changes). Live-client network paths are
+    covered only by MockTransport; a real ODDS_API_KEY smoke run needs manual
+    verification (quota-limited, so intentionally not automated).
 ---
