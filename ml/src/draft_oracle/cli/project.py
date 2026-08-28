@@ -13,6 +13,10 @@ from typing import Annotated
 import typer
 
 from draft_oracle import __version__
+from draft_oracle.ingest.league_drafts import (
+    DEFAULT_LEAGUE_DRAFTS_DIR,
+    build_league_drafts,
+)
 from draft_oracle.ingest.normalize import (
     DEFAULT_ARCHIVE_DIR,
     DEFAULT_NORMALIZED_DIR,
@@ -113,6 +117,21 @@ def odds(
     typer.echo(f"  source rows: {result.source_rows}")
     typer.echo(f"  games: {result.game_rows} priced/flagged")
     typer.echo(f"  priced: {result.covered_rows}  flagged: {result.uncovered_rows}")
+
+
+@app.command(name="league-drafts")
+def league_drafts(
+    league_dir: Annotated[
+        Path, typer.Option(help="Committed league-drafts snapshot directory.")
+    ] = DEFAULT_LEAGUE_DRAFTS_DIR,
+    out_dir: Annotated[
+        Path, typer.Option(help="Output directory for the league Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+) -> None:
+    """Parse the committed league draft-history snapshots into Parquet tables."""
+    result = build_league_drafts(league_dir=league_dir, out_dir=out_dir)
+    for line in result.report_lines():
+        typer.echo(line)
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -49,6 +49,7 @@ All commands run from the `ml/` directory.
 | List snapshots  | `uv run oracle snapshot --list`          |
 | Build odds      | `uv run oracle odds`                     |
 | Skip odds       | `uv run oracle odds --no-odds`           |
+| League drafts   | `uv run oracle league-drafts`            |
 
 ## Package layout
 
@@ -231,6 +232,55 @@ sources leave the underdog `null`), `favorite_side`, `both_sides`, `covered`,
   favorite-only) for individual future games; the same source as the committed
   2025-26 completion, so semantics match. ESPN 403s browser-like User-Agents, so
   the default httpx UA is used.
+
+## League drafts (`ingest/league_drafts.py`)
+
+Parses the committed league draft-history snapshots in
+`data/raw/league-drafts/` into two Parquet tables. **Read that directory's
+`SCHEMA.md` and `OPEN_QUESTIONS.md` in full before touching the parsers** — all
+interpretation of the raw sheets lives there.
+
+```bash
+uv run oracle league-drafts    # build data/normalized/league_{picks,champions}.parquet
+```
+
+**Sources** (all committed, offline):
+
+- Three Google-Sheet exports (`sheet1/2/3__*.csv`) — the 2026 / 2025 / 2024
+  seasons. Sheet-era seasons have **three** draft events (`R1`, `R2`, `R3_4`);
+  playoff rounds 3 and 4 were drafted together. `sheet1__round-3-4.csv` is a
+  stale 2025 duplicate and is deliberately **excluded** (SCHEMA §4.3).
+- `app-export-2026__*.csv` — the Supabase export of the in-app 2026 season (two
+  leagues: The Gemmell Cup + Press Play-offs). Preserves the true `pick_number`.
+  If absent, parsing proceeds on the sheets alone and the report says so.
+
+**`league_picks` table** — one row per drafted roster slot. Key columns:
+`season`, `source` (`sheet`/`app`), `league_name`, `draft_event`, `manager`
+(canonical id), `snake_slot` (1–4 from each tab's order list; null where a tab
+records none), `pick_number` (app only — sheets are **not** in pick order),
+`position` (F/D/G/IR_F/IR_D), `slot_label`, `player_or_team_name`,
+`corrected_name`, `points_for_round`/`points_when_drafted`/`current_total_points`,
+`status` (Dropped/Activated/Not playing), `points_excluded`, `ir_activated`,
+`swap_partner`, `note`, `is_scored` (false for the unscored 2026 sheet rosters).
+
+**Documented corrections applied** (OPEN_QUESTIONS.md):
+
+- The `Makar`/`Oilers` row (Levi, 2024 R3+4) is Evan Bouchard → `corrected_name`.
+- The Trouba→Kulikov row is parsed **as recorded** (Kulikov, +3 in `note`); the
+  simulator/optimizer must never model mid-round substitution as a mechanic.
+- The two formula-only IR swaps in `sheet2__round-3-4.csv` (Ben Reinhart→Verhaeghe,
+  Judah Hyman→Brown) are flagged `points_excluded` / `ir_activated` despite
+  carrying no text flag.
+- `Dropped` / `Not playing` starters are points-excluded and paired with the
+  same-position `Activated` IR row in the same block (`swap_partner`).
+- `Evi` folds to `levi`; app usernames map to canonical ids
+  (`nuttguy`=kyle, `bentunigold`=ben, `judah18`=judah, `gemmell.levi`=levi).
+
+**`league_champions` table** — `year`, `champion` for 2018–2026 (2026 Ben is
+owner-confirmed, scored in the app, not a sheet).
+
+Parsers **fail loudly** (`ValueError`) if a committed file's header, block count,
+or slot labels do not match `SCHEMA.md`.
 
 
 

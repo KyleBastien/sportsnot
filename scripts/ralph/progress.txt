@@ -69,6 +69,20 @@ Started: 08/27/2026 22:10:47
   `typer.echo` output — it crashes with UnicodeEncodeError. Use ASCII.
 - Typer options must use `Annotated[T, typer.Option(...)] = default` (NOT
   `x: T = typer.Option(default, ...)`) or ruff B008 fails on function-call-in-defaults.
+- League draft history goes through `draft_oracle.ingest.league_drafts` (US-006).
+  `ml/data/raw/league-drafts/SCHEMA.md` + `OPEN_QUESTIONS.md` (incl. "Kyle's answers")
+  are the BINDING interpretation of the raw CSVs — read them in full before editing.
+  Emits `league_picks.parquet` (one row/roster-slot) + `league_champions.parquet`.
+  Sheet-era seasons have THREE draft events R1/R2/R3_4 (rounds 3+4 drafted together);
+  `sheet1__round-3-4.csv` is a stale 2025 dup and is EXCLUDED. Sheet rows are NOT in
+  pick order so `pick_number` stays null (only the app export has it); `snake_slot`
+  comes from each tab's order list. Documented corrections are hardcoded: Makar->Bouchard
+  name override, the Trouba "+3" note (parse Kulikov as recorded, never model mid-round
+  substitution), and the two UNFLAGGED formula-only IR swaps in sheet2__round-3-4.csv
+  (Ben Reinhart->Verhaeghe, Judah Hyman->Brown). Managers canonicalize via
+  `canonical_manager` (Evi->levi; app usernames nuttguy/bentunigold/judah18/gemmell.levi).
+  When app/scoring/roster rules change (utils.ts/types.ts/rules.py), re-check the
+  correction tables here too. Run `uv run oracle league-drafts`.
 
 ## 2026-08-27 22:10 - US-001
 - Scaffolded the isolated uv-managed Python ML workspace under `ml/` for the
@@ -240,4 +254,47 @@ Started: 08/27/2026 22:10:47
     `yarn nx affected` is empty for these changes). Live-client network paths are
     covered only by MockTransport; a real ODDS_API_KEY smoke run needs manual
     verification (quota-limited, so intentionally not automated).
+---
+
+## 2026-08-27 23:25 - US-006
+- Implemented draft_oracle.ingest.league_drafts: parses the committed league
+  draft-history snapshots into a raw `league_picks` table (one row per drafted
+  roster slot) + a `league_champions` table, per SCHEMA.md / OPEN_QUESTIONS.md.
+- Files changed:
+  - ml/src/draft_oracle/ingest/league_drafts.py (new): canonical_manager (Evi->levi
+    + app usernames), slot_position, detect_draft_order (orientation-agnostic scan of
+    the annotation area for a 4-manager run -> snake_slot; None when absent),
+    parse_sheet_tab (block split via col-A merge, fail-loud header/block/label checks,
+    R1 col-F overload disambiguation, R2/R3_4 status-vs-note in col H), _pair_ir_swaps
+    (Dropped/Not-playing starter <-> same-position Activated IR), parse_wins_tab +
+    build_champions (folds Evi, adds owner-confirmed 2026 Ben), parse_app_draft_order +
+    parse_app_picks (preserve true pick_number; two leagues), build_league_drafts
+    (writes both parquet + ingestion report; app export optional).
+  - ml/src/draft_oracle/ingest/__init__.py: re-export the public API.
+  - ml/src/draft_oracle/cli/project.py: `oracle league-drafts` command.
+  - ml/tests/test_league_drafts.py (new): 35 tests vs committed snapshots asserting
+    exact per-tab pick + flag counts, all documented corrections, snake_slot detection
+    (vertical/horizontal/absent), champions, app pick_number/aliasing, fail-loud paths,
+    and the missing-app-export path.
+  - ml/README.md: "League drafts" section + command row.
+- Quality (from ml/): ruff check clean, ruff format --check clean, mypy --strict clean
+  (22 files), pytest 170 passed. `oracle league-drafts` => 552 total picks (312 sheet
+  + 240 app), 9 champion seasons; per-tab counts match SCHEMA §8
+  (36/36/36/44/44/44/36/36).
+- **Learnings for future iterations:**
+  - Column A is a MERGED cell per block: the manager name only on the first row. When
+    splitting blocks, remember to include that first row in the block (it holds Forward 1)
+    — off-by-one there silently drops one pick per block (caught: 32 vs 36).
+  - R1 tabs overload column F (index 5): it holds EITHER a status flag OR the Hyman
+    drafted-points mini-column. Disambiguate by content (numeric -> points, text -> flag).
+  - The two sheet2 R3_4 IR swaps carry NO text flag in the CSV — they exist only in the
+    xlsx Total formulas. They MUST be hardcoded (_UNFLAGGED_SWAPS) or the roster-as-scored
+    is wrong. Never model this as a mid-round substitution mechanic (owner: one-time favor).
+  - detect_draft_order scans the annotation area (col index >= 5) for a run of 4 manager
+    tokens, vertical OR horizontal — the order list orientation differs per tab. Column A
+    block labels are excluded by starting at col 5, so they can't be mistaken for an order.
+  - Empty roster slots (2026's retired IR rows, the stray "," at sheet1 R1 C24) are NOT
+    picks and are skipped, so sheet1 R1 = 36 picks (IR-less), not 44.
+  - No UI change; Playwright not applicable (ml/ is outside the Nx/web graph, so
+    `yarn nx affected` is empty for these changes).
 ---
