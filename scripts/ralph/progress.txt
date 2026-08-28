@@ -111,6 +111,22 @@ Started: 08/27/2026 22:10:47
   warnings, set a `degraded` flag — never raise; `--no-fetch` reuses that path without
   marking degraded. NEVER pull historical ESPN injuries (old summaries resolve `injuries`
   live vs today's rosters — leakage). `oracle injuries [--no-fetch]` -> injuries.parquet.
+- As-of skater features live in `draft_oracle.features` (`skater.py` + `leakage.py`,
+  US-009). HARD RULE (SPEC §6): a round-N feature may use ONLY games strictly before
+  the round start. Every game input passes through `features.leakage.as_of(df, cutoff)`
+  (EXCLUSIVE cutoff — game on the start date belongs to the round) and
+  `assert_no_leakage` raises `LeakageError` at/after cutoff (fails build). Each feature
+  is a tiny unit-tested pure fn (`per_game`/`shooting_pct`/`pp_point_share`/`age_years`/
+  `linemate_ppg`) with a docstring stating its as-of semantics. Feature matrices are
+  keyed by `FEATURE_SET_VERSION` ("skater-v1") and written to gitignored
+  `data/features/<version>/` via `write_feature_matrix`. DOCUMENTED PROXY: the archive
+  has NO power-play TOI column, so "PP time share" is proxied by PP production
+  (`pp_point_share` = pp_points/points) — never claim it is real PP TOI. Regular-season
+  rates use `game_type_id==2` only; the last-25 window uses most-recent games of ANY type
+  in-season before the cutoff. Goalies/None-position are dropped BEFORE linemate averaging
+  or they pollute the leave-one-out PPG. mypy-strict test gotcha: build fixture frames
+  with `pd.DataFrame([{...}])` NOT `pd.DataFrame.from_records([...])` (stub rejects
+  `Mapping[str, object]` records).
 
 ## 2026-08-27 22:10 - US-001
 - Scaffolded the isolated uv-managed Python ML workspace under `ml/` for the
@@ -401,4 +417,34 @@ Started: 08/27/2026 22:10:47
     the last-known parquet (relabel source espn->last_known), collect warnings,
     set a degraded flag — do NOT raise. `--no-fetch` reuses the same path
     without marking degraded.
+---
+
+## 2026-08-28 00:13 - US-009
+- Implemented as-of skater feature engineering with a hard leakage guard.
+- Files changed:
+  - ml/src/draft_oracle/features/leakage.py (new: as_of, assert_no_leakage, LeakageError, to_cutoff)
+  - ml/src/draft_oracle/features/skater.py (new: build_skater_features,
+    build_round_feature_matrix, write_feature_matrix, scalar primitives)
+  - ml/src/draft_oracle/features/__init__.py (re-exports public API)
+  - ml/tests/test_features.py (new, 15 tests: scalar primitives, leakage guard,
+    frame builder values, round stacking, parquet roundtrip)
+  - ml/README.md (Skater features section)
+- Quality (from ml/): ruff check clean, ruff format clean, mypy --strict clean
+  (29 files), pytest 265 passed. Python-only ml/ change => zero affected Nx
+  lint/typecheck/test/e2e targets (ml has no package.json); TS/Playwright gates
+  unaffected. No UI change => browser verification N/A.
+- **Learnings for future iterations:**
+  - Round-start dates are the EXCLUSIVE as-of cutoff. There is no round->date
+    mapping in the normalized tables (series has no dates), so build_* takes
+    round_start_dates as an explicit dict {round: 'YYYY-MM-DD'}. US-010/US-025
+    must supply these (derive from earliest playoff game date per round).
+  - Feature schema is FEATURE_COLUMNS keyed by FEATURE_SET_VERSION 'skater-v1';
+    US-010 (team/series features) should follow the same version-dir writer
+    pattern. A schema change = a NEW version dir, never in-place overwrite.
+  - Proxy honesty: no PP TOI in the archive, so pp_point_share proxies PP time.
+    avg_toi_seconds is the mean of the per-game toi_seconds field.
+  - Drop non-F/D positions BEFORE linemate leave-one-out averaging (goalies
+    with 0 PPG otherwise drag teammate-quality down — caught by a test).
+  - mypy-strict + pandas-stubs: build test fixtures with pd.DataFrame([{...}]),
+    NOT pd.DataFrame.from_records([...]) (from_records rejects Mapping[str, object]).
 ---

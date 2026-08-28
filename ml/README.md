@@ -376,6 +376,43 @@ new row. Ships empty.
 last-known `injuries.parquet` plus overrides and emits a warning instead of
 crashing (`InjuriesResult.degraded` / `.warnings`).
 
+## Skater features (`features/skater.py`, `features/leakage.py`)
+
+As-of skater feature engineering for the projection model (US-009). One row per
+skater per playoff round, computed **as of the round start** so no feature ever
+reads a game the model is about to project.
+
+```python
+from draft_oracle.features import build_round_feature_matrix, write_feature_matrix
+
+matrix = build_round_feature_matrix(
+    skater_games, players, team_games,
+    season_id=20232024,
+    round_start_dates={1: "2024-04-20", 2: "2024-05-05", 3: "2024-06-01", 4: "2024-06-08"},
+)
+write_feature_matrix(matrix)  # -> data/features/skater-v1/skater_features.parquet
+```
+
+**Leakage guard (SPEC §6, hard requirement)** — every game input funnels through
+`features/leakage.py`: `as_of(df, cutoff)` keeps only games *strictly before* the
+round start (the cutoff is exclusive — a game on the start date belongs to the
+round) and `assert_no_leakage` raises `LeakageError` on any game at/after the
+cutoff, failing the build. `test_features.py` asserts a future high-scoring game
+never moves an as-of rate.
+
+**Feature columns** (`FEATURE_COLUMNS`, keyed by feature-set version
+`skater-v1`): regular-season `goals/assists/points_per_game`, last-25-game rates
+(`*_l25`), `pp_points_per_game` + `pp_point_share`, `avg_toi_seconds`,
+`shots_per_game`, `shooting_pct`, `age_years`, `linemate_ppg` (leave-one-out
+teammate quality), and `team_goals_for_per_game`. Each is a unit-tested pure
+function with a docstring stating its as-of semantics.
+
+**Documented proxies** — the committed archive has no power-play *time* column,
+so "power-play time share" is proxied by power-play *production* (`pp_point_share`
+= PP points / total points). Regular-season aggregates use only
+`game_type_id == 2` games; the last-N window uses the most recent games of any
+type within the season before the cutoff.
+
 
 
 - `data/raw/` — gitignored **except** the committed `league-drafts/`, `odds-archive/`,
