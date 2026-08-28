@@ -1,0 +1,36 @@
+# draft_oracle .gitignore — keeps raw pulls, feature caches, and artifacts out of git.
+# See ml/SPEC.md §4 (directory contract) for what is committed vs. generated.
+
+# Raw ingested data is regenerated from the network; committed sources are the
+# exceptions re-included below.
+data/raw/*
+!data/raw/league-drafts/
+!data/raw/odds-archive/
+!data/raw/nhl-archive/
+
+# Generated feature matrices
+data/features/
+
+# Model artifacts, except committed backtest reports and manifests
+artifacts/*
+!artifacts/backtests/
+artifacts/backtests/*
+!artifacts/backtests/*/
+!artifacts/backtests/*/report.md
+!artifacts/backtests/*/manifest.json
+
+# Secrets / env
+.env
+.env.*
+
+# Virtualenvs
+.venv/
+venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/

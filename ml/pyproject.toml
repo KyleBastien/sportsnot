@@ -1,0 +1,71 @@
+[project]
+name = "draft-oracle"
+version = "0.1.0"
+description = "Draft Oracle — ML draft optimizer for the SportsNot NHL playoff fantasy league"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "SportsNot" }]
+dependencies = [
+    "pandas>=2.2",
+    "pyarrow>=16.0",
+    "numpy>=1.26",
+    "scikit-learn>=1.5",
+    "lightgbm>=4.3",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "typer>=0.12",
+    "rich>=13.7",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+oracle = "draft_oracle.cli.project:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/draft_oracle"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "hypothesis>=6.100",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pandas-stubs>=2.2",
+    "types-pyyaml>=6.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+# Committed raw-data helper scripts (e.g. data/raw/**/fetch_*.py) are provenance
+# artifacts, not part of the draft_oracle package; keep them out of lint/format.
+extend-exclude = ["data", "artifacts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["draft_oracle"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["lightgbm.*", "sklearn.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra"
+testpaths = ["tests"]
+pythonpath = ["src"]

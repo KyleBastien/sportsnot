@@ -1,0 +1,5 @@
+# Hand-maintained override files live here (SPEC §4/§5):
+#   injuries.yaml          — final authority for player injury status (US-008/015)
+#   name_overrides.yaml    — manual NHL entity-match corrections (US-007)
+#   manager_aliases.yaml   — league manager id aliases, e.g. evi -> levi (US-006)
+# These are added by their respective stories; this file keeps the directory tracked.
