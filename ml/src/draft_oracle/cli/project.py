@@ -76,6 +76,11 @@ from draft_oracle.models.skater_production import (
     SkaterProductionConfig,
     train_skater_production_from_normalized,
 )
+from draft_oracle.optimize.opponents import (
+    DEFAULT_OPPONENT_ARTIFACT_DIR,
+    OpponentFitConfig,
+    train_opponent_model_from_normalized,
+)
 from draft_oracle.projection_artifact import (
     DEFAULT_ARTIFACTS_ROOT,
     ProjectArtifactConfig,
@@ -413,6 +418,48 @@ def project_skaters(
         f"prev-round {result.test_spearman_baseline_prev:.4f}"
     )
     typer.echo(f"  beats both baselines: {'yes' if result.beats_both_baselines else 'no'}")
+
+
+@app.command(name="train-opponents")
+def train_opponents(
+    normalized_dir: Annotated[
+        Path, typer.Option(help="Directory holding normalized Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: Annotated[
+        Path, typer.Option(help="Output directory for the report + manifest.")
+    ] = DEFAULT_OPPONENT_ARTIFACT_DIR,
+    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+) -> None:
+    """Fit the league-history opponent model; write the validation report + manifest."""
+    result = train_opponent_model_from_normalized(
+        normalized_dir=normalized_dir,
+        artifact_dir=artifact_dir,
+        config=OpponentFitConfig(seed=seed),
+    )
+    fitted = result.fitted
+    evaluation = result.evaluation
+    typer.echo(f"Opponent model -> {artifact_dir}")
+    typer.echo(
+        f"  league coefficients: rank {fitted.league.rank:+.3f} / "
+        f"affinity {fitted.league.affinity:+.3f}"
+    )
+    typer.echo(
+        f"  per-manager models: {len(fitted.per_manager)} "
+        f"(min picks {fitted.config.min_manager_picks})"
+    )
+    for score in evaluation.membership:
+        typer.echo(
+            f"  {score.season} membership: fitted {score.fitted_accuracy:.3f} vs "
+            f"greedy {score.greedy_accuracy:.3f} "
+            f"({'beats' if score.fitted_beats_greedy else 'ties/loses'} fallback)"
+        )
+    if evaluation.per_pick is not None:
+        pp = evaluation.per_pick
+        typer.echo(f"  per-pick top-1: fitted {pp.fitted_top1:.3f} vs greedy {pp.greedy_top1:.3f}")
+    typer.echo(
+        f"  seasons beating fallback: "
+        f"{evaluation.seasons_beating_fallback}/{len(evaluation.membership)}"
+    )
 
 
 @app.command(name="project")

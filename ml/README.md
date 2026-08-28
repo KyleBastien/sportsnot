@@ -58,6 +58,7 @@ All commands run from the `ml/` directory.
 | Train shutout   | `uv run oracle train-shutout`            |
 | Eval series sim | `uv run oracle eval-series-sim`          |
 | Return-time     | `uv run oracle train-return-time`        |
+| Fit opponents   | `uv run oracle train-opponents`          |
 | Project skaters | `uv run oracle project-skaters`          |
 | Batch projection| `uv run oracle project --season 2026 --round 1` |
 | Projection + IR | `uv run oracle project --season 2026 --round 1 --managers 4 --ir` |
@@ -680,6 +681,63 @@ engine. `survival_probability(state, candidate, manager, model, rollouts, seed)`
 Monte-Carlos the opponents' picks between now and a manager's next turn and returns
 `P(candidate survives)` — ≥1000 rollouts run well under 5 s and are deterministic
 given `(state, seed)`.
+
+## Fitted opponent model (`optimize/opponents.py`)
+
+The greedy fallback assumes everyone drafts the best publicly-ranked player; real
+managers over-draft their favourite NHL teams and weight positions idiosyncratically.
+US-020 fits an opponent policy to *this* league's committed draft history so survival
+estimates reflect how these specific managers draft. It implements the same
+`OpponentModel` interface as the simulator, so a fitted model drops straight into
+`run_draft` / `survival_probability`, and `opponent_model_from_config("greedy" |
+"fitted", …)` swaps policies from one config string.
+
+**Approach and assumptions (owner-confirmed: the sheets record only final rosters plus
+the snake seat order — the pick *sequence* is not observable; only the 2026 app export
+carries a true `pick_number`).** We use the documented simpler approximation the story
+permits: a per-manager **player-selection propensity conditioned on positional need**,
+expressed as a conditional-logit (softmax) choice model. For each historical
+`(season, event, base position)` the assets drafted at that position across the whole
+league are the observed candidate pool, and each of a manager's picks is modelled as an
+independent softmax draw over that pool — an **order-free, with-replacement**
+approximation (we never condition on an observed pick index). The utility of an asset
+for a manager is
+
+```
+U = beta_rank · rank_z  +  beta_affinity · team_affinity(manager, asset_team)
+```
+
+- `rank_z` — the standardized **public ranking** within the pool, from
+  `points_when_drafted` (a *pre-draft* cumulative total, so no outcome leakage). The
+  sheet round-1 tabs carry no public ranking, so `rank_z` is zero there and the model
+  leans on affinity. At draft time the same coefficient reads the standardized
+  `DraftAsset.rank_value` (regular-season points) within the manager's legal assets at a
+  position — both are public quality signals on a z-scale, so the coefficient transfers.
+- `team_affinity` — the fraction of a manager's history spent drafting that NHL team,
+  the **own-team fandom** signal. Computed only from the *training* picks, so held-out
+  validation never sees the season it scores.
+- **positional need** is applied at draft time in `FittedOpponentModel.pick` as
+  `need_weight · (open_slots / limit)` — a quantity fixed by roster state, never by a
+  pick index. It governs which *position* a manager reaches for; the fitted coefficients
+  govern which *player* within a position.
+
+**Blending.** A league-level model is always fit (Newton-Raphson, L2-regularized). A
+manager also gets their own coefficients when they clear `min_manager_picks`; those are
+shrunk toward the league model by `n / (n + manager_blend_k)`, and the league model is
+in turn shrunk toward the greedy best-available fallback (`beta_rank = fallback_rank`,
+`beta_affinity = 0`) by `N / (N + league_fallback_k)`. Thin data degrades smoothly to
+the league average and then to the fallback (SPEC §8).
+
+**Validation (`uv run oracle train-opponents` → `artifacts/models/opponent/`).**
+Leave-one-season-out **roster-membership accuracy**: refit on the other seasons, replay
+each held-out event with the true snake order and drafted pool, and measure the fraction
+of each manager's actual roster the model reproduces — compared against the greedy
+fallback, per season. Where the true pick order exists (the 2026 app export), we also
+report teacher-forced per-pick top-1 / top-K accuracy. On the committed data the fitted
+model beats the fallback on membership in every season (2024 .269 vs .194, 2025 .261 vs
+.216, 2026 .180 vs .159) and on per-pick top-1 (.126 vs .112) — honest, modest gains
+driven almost entirely by the strong positive affinity coefficient the greedy model
+ignores.
 
 ## Data & artifact layout
 

@@ -1,0 +1,107 @@
+{
+  "model": {
+    "league_coefficients": {
+      "rank": 0.143167,
+      "affinity": 2.423254
+    },
+    "total_picks": 552,
+    "per_manager": {
+      "ben": {
+        "picks": 105,
+        "coefficients": {
+          "rank": -0.105518,
+          "affinity": 2.398692
+        }
+      },
+      "connor.fehr": {
+        "picks": 33,
+        "coefficients": {
+          "rank": 0.078448,
+          "affinity": 1.616498
+        }
+      },
+      "judah": {
+        "picks": 105,
+        "coefficients": {
+          "rank": -0.177975,
+          "affinity": 1.720035
+        }
+      },
+      "kyle": {
+        "picks": 138,
+        "coefficients": {
+          "rank": 0.214989,
+          "affinity": 2.36125
+        }
+      },
+      "levi": {
+        "picks": 105,
+        "coefficients": {
+          "rank": 0.17834,
+          "affinity": 1.373723
+        }
+      },
+      "paul.markhauser": {
+        "picks": 33,
+        "coefficients": {
+          "rank": 0.078448,
+          "affinity": 1.425274
+        }
+      },
+      "tobi": {
+        "picks": 33,
+        "coefficients": {
+          "rank": 0.078448,
+          "affinity": 1.103933
+        }
+      }
+    }
+  },
+  "config": {
+    "seed": 20260827,
+    "need_weight": 1.0,
+    "l2": 1.0,
+    "manager_blend_k": 40.0,
+    "league_fallback_k": 60.0,
+    "min_manager_picks": 20,
+    "fallback_rank": 1.5,
+    "top_k": 3
+  },
+  "evaluation": {
+    "membership": [
+      {
+        "season": 2024,
+        "events": 3,
+        "picks": 108,
+        "fitted_accuracy": 0.2685,
+        "greedy_accuracy": 0.1944,
+        "fitted_beats_greedy": true
+      },
+      {
+        "season": 2025,
+        "events": 2,
+        "picks": 88,
+        "fitted_accuracy": 0.2614,
+        "greedy_accuracy": 0.2159,
+        "fitted_beats_greedy": true
+      },
+      {
+        "season": 2026,
+        "events": 3,
+        "picks": 233,
+        "fitted_accuracy": 0.1803,
+        "greedy_accuracy": 0.1588,
+        "fitted_beats_greedy": true
+      }
+    ],
+    "seasons_beating_fallback": 3,
+    "per_pick": {
+      "picks": 143,
+      "k": 3,
+      "fitted_top1": 0.1259,
+      "greedy_top1": 0.1119,
+      "fitted_topk": 0.2168,
+      "greedy_topk": 0.2028
+    }
+  }
+}

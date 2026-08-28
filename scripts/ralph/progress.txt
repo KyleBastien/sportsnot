@@ -3,6 +3,16 @@ Started: 08/27/2026 22:10:47
 ---
 
 ## Codebase Patterns
+- Opponent modelling (US-020, `optimize/opponents.py`): pick SEQUENCE is unobservable
+  for sheet-era seasons (final rosters + snake seats only); only the 2026 app export has
+  true `pick_number`. Fit order-free (per-event/position pools, with-replacement softmax
+  choice) and validate with leave-one-season-out roster-membership accuracy + (where
+  order exists) teacher-forced per-pick accuracy. Use leakage-SAFE `points_when_drafted`
+  (pre-draft, R2/R3_4 only) as the public-rank feature — NEVER `current_total_points` /
+  `points_for_round` (post-draft outcomes). Model from `league_draft_picks.parquet`
+  (US-007 matched, has player_id/team_id), not `league_picks.parquet`. Any
+  FittedOpponentModel subclasses the US-019 `OpponentModel` and drops into run_draft /
+  survival_probability unchanged.
 - VOR / draft-board pattern (US-018, `optimize/vor.py`): replacement level is a PURE
   fn of league size N + roster shape (SPEC 1) — F=(5N+1)-th, D=(3N+1)-th,
   G/team=(N+1)-th; IR adds +1 F/+1 D per manager (6N+1 / 4N+1), never a goalie slot.
@@ -988,4 +998,41 @@ p.asarray(..., dtype=float) to avoid no-any-return.
   - Next (US-020) fits an opponent model from league draft history; it can subclass
     OpponentModel and drop into run_draft / survival_probability unchanged. US-021
     (recommend) will build DraftAssets from the projection artifact frames.
+---
+
+## 2026-08-28 11:10 - US-020
+- Implemented the league-history-fitted opponent model + held-out validation.
+- Files changed:
+  - ml/src/draft_oracle/optimize/opponents.py (new): conditional-logit choice model
+    (order-free, with-replacement over per-event position pools), team-affinity
+    (fandom) feature, Newton-Raphson L2 fit, sample-size blending (manager->league->
+    greedy-fallback), FittedOpponentModel(OpponentModel) with rank_assets/pick,
+    opponent_model_from_config swap, leave-one-season-out membership eval +
+    teacher-forced per-pick eval, train_opponent_model_from_normalized.
+  - ml/src/draft_oracle/optimize/__init__.py: re-export the opponents API.
+  - ml/src/draft_oracle/cli/project.py: `oracle train-opponents` command.
+  - ml/tests/test_opponents.py (new): 18 tests (affinity recovery, blending toward
+    league/fallback, interface drop-in to run_draft/survival, config swap, LOSO
+    membership beats fallback on a pure-affinity synthetic league, per-pick eval).
+  - ml/README.md: "Fitted opponent model" section (approach + assumptions) + CLI row.
+  - ml/artifacts/models/opponent/{report.md,manifest.json}: committed real run.
+- Quality (from ml/): ruff format clean, ruff check clean, mypy --strict (51 files) ok,
+  pytest 451 passed (+18 new). Real run: fitted beats greedy fallback on membership in
+  ALL 3 seasons (2024 .269 vs .194, 2025 .261 vs .216, 2026 .180 vs .159) and per-pick
+  top-1 (.126 vs .112). Python-only ml/ change -> zero affected Nx lint/typecheck/test/
+  Playwright targets, so those pass unaffected.
+- **Learnings for future iterations:**
+  - Pick SEQUENCE is not observable for sheet-era seasons (only final rosters + snake
+    seats); only the 2026 app export has real pick_number. Any opponent/order modelling
+    must marginalize/approximate order, never condition on a pick index.
+  - The entity-matched picks table is `league_draft_picks.parquet` (25 cols incl.
+    player_id/team_id/matched_name/pick_number/snake_slot) — US-007 output. The raw
+    US-006 table is `league_picks.parquet` (no NHL ids). Model from the matched one.
+  - `points_when_drafted` is a leakage-SAFE pre-draft public signal (only present for
+    R2/R3_4; R1 sheet tabs have none). `current_total_points`/`points_for_round` are
+    post-draft OUTCOMES — never use them as features.
+  - rules.RosterValidation attribute is `.valid` (not `.is_valid`).
+  - A FittedOpponentModel subclasses OpponentModel and works unchanged in run_draft /
+    survival_probability; pass a {manager: model} mapping via FittedLeagueOpponents
+    .as_mapping(managers). US-021 (recommend) can reuse this for realistic rollouts.
 ---
