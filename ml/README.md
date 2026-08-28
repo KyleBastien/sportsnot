@@ -62,6 +62,8 @@ All commands run from the `ml/` directory.
 | Project skaters | `uv run oracle project-skaters`          |
 | Batch projection| `uv run oracle project --season 2026 --round 1` |
 | Projection + IR | `uv run oracle project --season 2026 --round 1 --managers 4 --ir` |
+| Recommend pick  | `uv run oracle recommend --artifact-dir artifacts/2025-r1 --managers 6 --seat 3` |
+| Compare drafters| `uv run oracle compare-strategies`       |
 
 ## Package layout
 
@@ -738,6 +740,45 @@ model beats the fallback on membership in every season (2024 .269 vs .194, 2025 
 .216, 2026 .180 vs .159) and on per-pick top-1 (.126 vs .112) — honest, modest gains
 driven almost entirely by the strong positive affinity coefficient the greedy model
 ignores.
+
+## Multi-step pick recommendation (`optimize/recommend.py`)
+
+The cheat sheet ranks assets *in a vacuum*; US-021 answers the question on the clock:
+*which pick right now leaves the best final roster once the draft plays out against
+these opponents?* `recommend_pick(state, owner, opponent_model)` rolls the whole
+remaining draft forward with Monte-Carlo: the owner tentatively takes each candidate,
+the opponent model drafts through all of the owner's remaining turns, the owner's future
+slots are filled by a greedy value-over-replacement rollout policy, and the owner's
+total final-roster projection is averaged over `>=500` seeded rollouts. The recommended
+pick is the `argmax` of that expected final-roster value, so the engine automatically
+prefers a scarce-position asset that will not survive to the next turn over a safe one
+that will, times a goalie slot correctly, and respects forced picks.
+
+- **Explanations** — the top-5 carry VOR, `P(survives to next pick)`, expected delta vs.
+  the #2 option, and positional need (`open/limit`).
+- **Speed** — a full-depth 12-manager 11-pick recommendation runs in <10 s. The 500
+  rollouts are **vectorized** in numpy (the pick order is identical across rollouts, so
+  the whole batch advances in lockstep; only opponent draws differ) for the greedy path;
+  candidate pruning to the top VOR assets, an owner-full early stop, and **common random
+  numbers** across candidates (paired comparison, low-variance ranking) keep it there.
+- **`--depth` / `--rollouts`** trade accuracy for speed; depth bounds how many owner
+  turns are simulated against live opponents before a fast greedy tail fill.
+
+```
+uv run oracle recommend --artifact-dir artifacts/2025-r1 --managers 6 --seat 3
+uv run oracle recommend ... --rollouts 800 --depth 2   # tune accuracy/speed
+```
+
+**Committed comparison (`uv run oracle compare-strategies` →
+`artifacts/models/recommend/`).** Over `>=200` seeded, single-decision same-slot drafts:
+each draft is advanced to a shared decision slot with a greedy tail against fitted-league
+opponents, each strategy makes exactly one pick, and the draft finishes with an identical
+greedy-VOR tail. Two honest scenarios (SPEC §7 — report misses, never cherry-pick):
+against **balanced fitted opponents** multi-step *ties* greedy-VOR (fitted opponents
+draft positions evenly via within-position `rank_z`, so a static VOR board is already
+optimal) and edges one-step; against **positional-run opponents** (a run pushes a
+position below its pool-wide replacement, where a static board is blind) multi-step
+**beats both** baselines.
 
 ## Data & artifact layout
 

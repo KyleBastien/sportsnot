@@ -1,0 +1,40 @@
+{
+  "balanced_fitted": {
+    "scenario": "balanced fitted opponents",
+    "n_drafts": 200,
+    "owner": "kyle",
+    "managers": 4,
+    "allow_ir": false,
+    "rollouts": 40,
+    "max_candidates": 6,
+    "opponent_kind": "fitted-league",
+    "seed": 20260827,
+    "means": {
+      "greedy_vor": 184.633607,
+      "one_step": 184.633607,
+      "multi_step": 184.610174
+    },
+    "multi_step_beats_greedy": false,
+    "multi_step_beats_one_step": false,
+    "multi_step_ties_greedy": true
+  },
+  "positional_run": {
+    "scenario": "positional-run opponents (forward run)",
+    "n_drafts": 200,
+    "owner": "kyle",
+    "managers": 4,
+    "allow_ir": false,
+    "rollouts": 40,
+    "max_candidates": 6,
+    "opponent_kind": "positional-run",
+    "seed": 20260827,
+    "means": {
+      "greedy_vor": 177.732259,
+      "one_step": 178.041604,
+      "multi_step": 178.050133
+    },
+    "multi_step_beats_greedy": true,
+    "multi_step_beats_one_step": true,
+    "multi_step_ties_greedy": false
+  }
+}

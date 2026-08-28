@@ -527,5 +527,86 @@ def project(
         typer.echo(f"  warning: {warning}")
 
 
+@app.command()
+def recommend(
+    artifact_dir: Annotated[
+        Path, typer.Option(help="Projection artifact directory (has skaters/teams parquet).")
+    ],
+    managers: Annotated[int, typer.Option(help="League size (2-12).")] = 4,
+    seat: Annotated[int, typer.Option(help="Owner's snake seat (1-based).")] = 1,
+    ir: Annotated[
+        bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
+    ] = False,
+    rollouts: Annotated[int, typer.Option(help="Monte-Carlo rollouts per candidate.")] = 500,
+    depth: Annotated[
+        int, typer.Option(help="Owner turns simulated vs. opponents (0 = full depth).")
+    ] = 0,
+    temperature: Annotated[float, typer.Option(help="Greedy opponent softmax temperature.")] = 0.3,
+    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
+) -> None:
+    """Recommend the best pick right now via multi-step Monte-Carlo rollout (US-021).
+
+    Builds a fresh draft from a projection artifact, puts the owner on the clock at
+    ``seat``, and prints the top-5 explained recommendations (VOR, survival, need,
+    delta vs. #2). Opponents are the greedy fallback (vectorized fast path).
+    """
+    from draft_oracle.optimize.recommend import (
+        RecommendConfig,
+        build_pool_from_projection_artifact,
+        recommend_pick,
+    )
+    from draft_oracle.optimize.simulator import DraftState, GreedyOpponentModel
+
+    if not 1 <= seat <= managers:
+        raise typer.BadParameter(f"seat must be in 1..{managers}")
+    pool = build_pool_from_projection_artifact(artifact_dir)
+    manager_ids = [f"seat{i + 1}" for i in range(managers)]
+    owner = manager_ids[seat - 1]
+    state = DraftState.new(manager_ids, pool, allow_ir=ir)
+    # Advance to the owner's first turn (opponents ahead of the owner draft greedily).
+    model = GreedyOpponentModel(temperature=temperature, need_weight=4.0)
+    import random as _random
+
+    rng = _random.Random(seed)
+    while state.current_manager != owner:
+        current = state.current_manager
+        state.apply_pick(model.pick(state, current, rng))
+    config = RecommendConfig(rollouts=rollouts, depth=depth or None, seed=seed)
+    result = recommend_pick(state, owner, model, config=config, managers=managers)
+    typer.echo(f"Recommendation for {owner} (pick #{state.pick_index + 1}):")
+    for line in result.report_lines():
+        typer.echo(line)
+
+
+@app.command(name="compare-strategies")
+def compare_strategies_cmd(
+    normalized_dir: Annotated[
+        Path, typer.Option(help="Directory holding normalized Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    managers: Annotated[int, typer.Option(help="League size for the simulated drafts.")] = 4,
+    n_drafts: Annotated[int, typer.Option(help="Seeded simulated drafts (>=200).")] = 200,
+    rollouts: Annotated[int, typer.Option(help="Rollouts per recommendation.")] = 40,
+    max_candidates: Annotated[int, typer.Option(help="Candidates rolled out.")] = 6,
+    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
+) -> None:
+    """Run the committed multi-step vs. greedy-VOR vs. one-step comparison (US-021)."""
+    from draft_oracle.optimize.recommend import (
+        DEFAULT_RECOMMEND_ARTIFACT_DIR,
+        evaluate_recommendation_strategies_from_normalized,
+    )
+
+    result = evaluate_recommendation_strategies_from_normalized(
+        normalized_dir=normalized_dir,
+        managers=managers,
+        n_drafts=n_drafts,
+        rollouts=rollouts,
+        max_candidates=max_candidates,
+        seed=seed,
+    )
+    typer.echo(f"Strategy comparison -> {DEFAULT_RECOMMEND_ARTIFACT_DIR}")
+    for line in result.report_lines():
+        typer.echo(line)
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()
