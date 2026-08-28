@@ -64,6 +64,11 @@ src/draft_oracle/
 ## Pipeline stages
 
 1. **Rules engine** (`rules.py`) — mirrors the app's scoring and draft order exactly.
+   Public API: `player_points`, `goalie_series_points`, `goalie_game_points`,
+   `snake_order`, `redraft_order`, `roster_composition`, and `validate_roster`
+   (with `RosterSlot` / `RosterValidation`). These are the byte-for-byte mirror of
+   `packages/utils/src/lib/utils.ts`; golden vectors in `tests/test_rules.py` are
+   copied from `utils.test.ts` to catch cross-language drift.
 2. **Ingest** — pull and normalize NHL stats, betting odds, injuries, and league draft
    history into dated snapshots. Committed raw sources live under `data/raw/`; live
    pulls are cached and gitignored.
