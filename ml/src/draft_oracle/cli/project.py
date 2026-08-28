@@ -55,6 +55,13 @@ from draft_oracle.models.shutout import (
     ShutoutConfig,
     train_shutout_from_normalized,
 )
+from draft_oracle.models.skater_production import (
+    DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_SKATER_PRODUCTION_ARTIFACT_DIR,
+)
+from draft_oracle.models.skater_production import (
+    SkaterProductionConfig,
+    train_skater_production_from_normalized,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -271,6 +278,37 @@ def train_shutout(
         f"(rel err {result.calibration_rel_error:.1%})"
     )
     typer.echo(f"  within +/-25%: {'yes' if result.calibrated_within_tolerance else 'no'}")
+
+
+@app.command(name="train-skater-production")
+def train_skater_production(
+    normalized_dir: Annotated[
+        Path, typer.Option(help="Directory holding normalized Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: Annotated[
+        Path, typer.Option(help="Output directory for the report + manifest.")
+    ] = DEFAULT_SKATER_PRODUCTION_ARTIFACT_DIR,
+    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+) -> None:
+    """Train the skater per-game production model; write the report + manifest."""
+    result = train_skater_production_from_normalized(
+        normalized_dir=normalized_dir,
+        artifact_dir=artifact_dir,
+        config=SkaterProductionConfig(seed=seed),
+    )
+    typer.echo(f"Skater production model -> {artifact_dir}")
+    typer.echo(f"  chosen model: {result.chosen_model_type}")
+    typer.echo(
+        f"  test MAE: model {result.test_mae_model:.4f} / "
+        f"reg-ppg {result.test_mae_baseline_reg:.4f} / "
+        f"mean {result.test_mae_baseline_mean:.4f}"
+    )
+    typer.echo(
+        f"  test Spearman: model {result.test_spearman_model:.4f} / "
+        f"reg-ppg {result.test_spearman_baseline_reg:.4f}"
+    )
+    typer.echo(f"  beats reg-ppg baseline: {'yes' if result.beats_reg_baseline else 'no'}")
+    typer.echo(f"  cold cases (test): {result.n_cold_cases_test}")
 
 
 @app.command(name="eval-series-sim")

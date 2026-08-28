@@ -190,6 +190,30 @@ Started: 08/27/2026 22:10:47
   FEATURES from ALL games in one chronological pass (feature computation != training).
   The `series` parquet gives actual winner + length (top_seed_wins+bottom_seed_wins) +
   playoff_round; `series.year == team_games season_id % 10000` (season end year).
+- Playoff-round reconstruction (US-014 `models/skater_production.py`): the `series`
+  parquet has NO dates, so map each playoff game to a round by pairing its
+  order-independent {team_abbrev, opponent_team_abbrev} against
+  (top_seed_abbrev, bottom_seed_abbrev) per (season_id). Round START date =
+  earliest game_date of that (season, round); it is the EXCLUSIVE as-of cutoff.
+  ~18 games/archive don't map (2019-20 bubble round-robin, round 0) - drop them,
+  don't crash. Because the cutoff is derived from a round's OWN games, features
+  (strictly before cutoff) and labels (that round's games, >= cutoff) never overlap
+  regardless of the bubble's scrambled round numbering. Skater production LABEL =
+  observed (goals+assists)/GP in that round (rules.player_points weights G,A equally).
+- Cold-case / shrinkage pattern (reusable for skater-rate models): shrink a model
+  estimate toward a position+team prior by credibility `w=n/(n+k)`
+  (`shrink_to_prior`); priors (`fit_priors`) are fit on TRAIN rows only so the test
+  label never leaks into its own shrinkage target. Players with NO regular-season
+  games have no US-009 feature row (inner-joined out); price them from the prior via
+  `SkaterProductionModel.project_cold(position, team)` returning
+  `(prior, low_confidence=True)` - flagged, never a crash (SPEC 7). Report cold-case
+  COUNT for held-out seasons honestly.
+- Spearman rank correlation without scipy (`spearman_correlation`): average-rank both
+  vectors (ties share their mean rank via `_rankdata`), then Pearson of the ranks;
+  return nan for <2 points or zero rank variance. MAE via `mean_absolute_error`.
+- Regression sibling of the game_win pattern: choose between a Poisson GLM
+  (`PoissonRegressor` on `StandardScaler` features) and `LGBMRegressor(objective=
+  "poisson")` on validation MAE; both give non-negative rates (clip raw preds >=0).
 
 ## 2026-08-27 22:10 - US-001
 - Scaffolded the isolated uv-managed Python ML workspace under `ml/` for the
@@ -654,3 +678,33 @@ p.asarray(..., dtype=float) to avoid no-any-return.
     playoff_round; series.year == team_games season_id % 10000 (season end year) - join on that.
   - mypy --strict narrows a loop variable to its FIRST-seen dataclass type; reusing the same
     name `b` across two different-typed for-loops errors. Use distinct names per loop.
+
+## 2026-08-28 01:30 - US-014
+- Implemented the skater per-game production model: predicts E[G+A per game] for a
+  skater in the upcoming playoff round from the US-009 as-of skater feature matrix.
+- Files changed:
+  - NEW ml/src/draft_oracle/models/skater_production.py (model, round reconstruction,
+    priors, shrinkage, temporal train/eval, report+manifest, train_*_from_normalized)
+  - ml/src/draft_oracle/models/__init__.py (re-exports)
+  - ml/src/draft_oracle/cli/project.py (new "oracle train-skater-production" command)
+  - NEW ml/tests/test_skater_production.py (18 tests)
+  - NEW ml/artifacts/models/skater-production/{report.md,manifest.json} (committed)
+- Result on real archive (honest, PASSING): chosen model lightgbm(objective=poisson).
+  Held-out test seasons [2025, 2026]: model MAE 0.2449 vs reg-ppg baseline 0.2660 and
+  training-mean 0.3165 (beats BOTH); Spearman 0.5792 vs reg-ppg 0.5675. Per-season:
+  2025 MAE 0.2380/Spearman 0.6120, 2026 MAE 0.2516/Spearman 0.5479. 8 cold cases.
+- Quality: ml pytest 350 passed; ruff check + ruff format --check clean; mypy clean.
+  No Nx-affected TS targets (Python-only ml/ change, no package.json), so lint/
+  typecheck/e2e gates are empty for this change (established pattern).
+- Learnings for future iterations:
+  - The raw (unshrunk) model MAE (0.2421) is marginally lower than the shrunk
+    production MAE (0.2449) on this test set; shrinkage payoff is robustness on
+    low-sample players + cold cases, not headline MAE. Reported both honestly.
+  - mypy --strict rejects df.itertuples() attribute arithmetic AND unpacking a
+    groupby .items() MultiIndex key ((a,b) is Hashable, "not iterable"). Use
+    df[cols].to_dict("records") (or groupby(...).reset_index().to_dict("records"))
+    and index by string keys; wrap numeric extracts in int()/float().
+  - Feature games_played (regular-season count as-of the round) doubles as the
+    sample-size signal for shrinkage credibility - no extra column needed.
+  - See the new Codebase Patterns bullets for round reconstruction + cold-case shrink.
+---
