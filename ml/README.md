@@ -58,6 +58,7 @@ All commands run from the `ml/` directory.
 | Train shutout   | `uv run oracle train-shutout`            |
 | Eval series sim | `uv run oracle eval-series-sim`          |
 | Return-time     | `uv run oracle train-return-time`        |
+| Project skaters | `uv run oracle project-skaters`          |
 
 ## Package layout
 
@@ -571,6 +572,41 @@ median TOI). Calibration holds out the newest seasons and reports predicted-vs-o
 spell survival honestly. An `injuries.yaml` entry may pin `return_game` to override the
 model curve. `project_availability` yields per-player `p_available_g1..g7`,
 `expected_games_available`, and the `availability_multiplier` haircut.
+
+## Skater round-point projections (`models/projections.py`)
+
+Composes the per-game production rate (US-014), the best-of-7 series-length
+distribution (US-013), and the availability haircut (US-015) into a per-skater,
+per-round fantasy-point projection with an uncertainty band (US-016). Quantiles come
+from a **seeded Monte Carlo**: draw a series length from the team's length
+distribution, then per game draw availability (Bernoulli on the US-015 curve) and,
+when available, per-game points from `Poisson(pts_per_game)`.
+
+```python
+from draft_oracle.models import project_skater_round
+
+proj = project_skater_round(
+    pts_per_game=0.8,
+    length_probs={4: 0.1, 5: 0.3, 6: 0.35, 7: 0.25},  # from the series simulator
+    availability_curve=[0.0, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0],  # optional US-015 haircut
+    seed=20260827,
+)
+proj.expected_points, proj.p10, proj.p50, proj.p90
+proj.pts_per_game, proj.expected_games  # decomposition
+```
+
+```bash
+uv run oracle project-skaters   # evaluate on held-out seasons + write report/manifest
+```
+
+Each projection is reproducible from `(seed, season, round, player)` because the
+per-skater RNG is seeded deterministically from those keys. The committed report
+holds out the newest seasons, trains the sub-models only on earlier seasons
+(leakage-free, SPEC §6), and reports MAE + Spearman of the projected round points vs.
+actual against two fixed baselines: (a) reg-season points/game x 5.5 games and (b)
+the player's previous-round fantasy points. Misses are printed honestly (SPEC §7).
+Historical rounds have no injury feed, so the availability haircut is a no-op (1.0)
+in the backtest; it only bites at live projection time.
 
 ## Data & artifact layout
 

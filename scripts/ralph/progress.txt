@@ -235,6 +235,25 @@ Started: 08/27/2026 22:10:47
   normalize_name) and a pinned `return_game` yields a deterministic 0..0,1..1 curve
   that WINS over the model. When adding override-driven fields, extend the dataclass +
   loader only; keep them out of the ingested table to avoid schema churn.
+- Composed projection pattern (US-016, `models/projections.py`): round-point
+  projections COMPOSE three fitted sub-models, they do not learn a new estimator.
+  `project_skater_round(pts_per_game, length_probs, availability_curve=..., seed=...)`
+  Monte-Carlos total round points: draw series length L from the simulator's
+  `length_probs`, then per game k=1..L draw availability (Bernoulli on the US-015
+  curve; scalar `availability` multiplier if no curve) and, when available,
+  `Poisson(pts_per_game)` points. Returns mean (`expected_points`) + p10/p50/p90 +
+  decomposition (`pts_per_game`, `expected_games`). REPRODUCIBILITY: seed each
+  skater's RNG deterministically from `_row_seed(seed, season, round, player)` so a
+  projection is reproducible regardless of iteration order. Eval reuses series_sim's
+  private helpers `_predict_series`/`_matchup_key`/`reconstruct_series_matchups` to
+  get per-team length distributions, and `build_production_dataset` for the leakage-
+  free feature+label rows; sub-models train ONLY on non-held-out seasons. Historical
+  rounds have NO injury feed (ESPN leakage) => availability=1.0 in backtests; the
+  haircut only bites live. Baselines: (a) reg-ppg x `BASELINE_REG_GAMES=5.5`, (b)
+  previous-round actual points (round-1 falls back to (a)). Real 2025-2026 holdout:
+  model MAE 1.3725 < reg 1.4955 < prev 1.6474; Spearman 0.5941 > 0.5796 > 0.5032 —
+  beats BOTH. mypy: np.clip returns Any, assign to a `: np.ndarray` local then return
+  it (astype(float) still types Any). CLI `oracle project-skaters`.
 
 ## 2026-08-28 01:52 - US-015
 - Implemented the injury return-time model + availability adjustment
@@ -765,4 +784,42 @@ p.asarray(..., dtype=float) to avoid no-any-return.
   - Feature games_played (regular-season count as-of the round) doubles as the
     sample-size signal for shrinkage credibility - no extra column needed.
   - See the new Codebase Patterns bullets for round reconstruction + cold-case shrink.
+---
+
+## 2026-08-28 09:45 - US-016
+- Implemented skater round-point projections with uncertainty (models/projections.py,
+  PRD US-006 part 2). Composes per-game production (US-014), series-length distribution
+  (US-013), and availability haircut (US-015) into per-skater/per-round expected points
+  with p10/p50/p90 quantiles via seeded Monte Carlo, plus decomposition (pts_per_game,
+  expected_games).
+- Files changed:
+  - ml/src/draft_oracle/models/projections.py (new): pure primitives
+    (normalize_length_probs, expected_series_length, simulate_round_points),
+    project_skater_round (RoundProjection with quantiles + decomposition), and the
+    honest held-out evaluate_skater_projections / _from_normalized (report.md +
+    manifest.json) vs baselines (a) reg-ppg x 5.5 and (b) previous-round points.
+  - ml/src/draft_oracle/models/__init__.py: re-export the new public API.
+  - ml/src/draft_oracle/cli/project.py: `oracle project-skaters` command.
+  - ml/README.md: commands table row + projections section.
+  - ml/tests/test_projections.py (new): 15 tests (length normalization, expected
+    length, MC determinism + mean, quantile ordering incl. a hypothesis property,
+    availability curve vs multiplier, end-to-end eval + report/manifest consistency +
+    reproducibility + season guard).
+  - ml/artifacts/models/skater-projection/{report.md,manifest.json}: committed run.
+- Quality checks (from ml/): ruff check clean, ruff format --check clean, mypy --strict
+  clean (43 files), pytest 384 passed (15 new). `oracle project-skaters` on real data:
+  1096 skater-rounds (107 skipped, unsimulated series), held-out 2025-2026 model MAE
+  1.3725 vs reg-ppg 1.4955 / prev-round 1.6474; Spearman 0.5941 vs 0.5796 / 0.5032 —
+  BEATS BOTH baselines honestly.
+- **Learnings for future iterations:**
+  - Reuse series_sim's `_predict_series` + `reconstruct_series_matchups` for any team
+    length/outcome distribution; a team plays every game of its series so E[games] =
+    E[series length] before the availability haircut.
+  - `build_production_dataset` already yields leakage-free feature+label rows with
+    team_abbrev/points_per_game/round_games — the natural join point for downstream
+    optimizers (US-018+). Actual round points = LABEL_COLUMN * round_games.
+  - 107 real skater-rounds skip because their series pair does not reconstruct (2019-20
+    bubble / missing pre-series snapshots) — matches the series_sim skip behavior;
+    handled by counting, never crashing (SPEC 7).
+  - No UI change; browser/Playwright verification not applicable (Python-only ml/).
 ---

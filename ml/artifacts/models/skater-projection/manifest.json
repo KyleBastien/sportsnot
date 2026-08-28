@@ -1,0 +1,47 @@
+{
+  "model_version": "skater-projection-v1",
+  "seed": 20260827,
+  "n_sims": 4000,
+  "horizon": 7,
+  "baseline_reg_games": 5.5,
+  "test_years": [
+    2025,
+    2026
+  ],
+  "counts": {
+    "projected": 1096,
+    "skipped_no_series": 107
+  },
+  "test_mae": {
+    "model": 1.3725287408759124,
+    "baseline_reg_ppg_x_games": 1.4954942760008594,
+    "baseline_prev_round": 1.6473823957738911
+  },
+  "test_spearman": {
+    "model": 0.5941157062514615,
+    "baseline_reg_ppg_x_games": 0.5795835952986382,
+    "baseline_prev_round": 0.5032372107047298
+  },
+  "per_season": [
+    {
+      "season_end_year": 2025,
+      "n": 536,
+      "mae": 1.3319291044776118,
+      "spearman": 0.6216149686754632
+    },
+    {
+      "season_end_year": 2026,
+      "n": 560,
+      "mae": 1.411388392857143,
+      "spearman": 0.5700363299190419
+    }
+  ],
+  "uncertainty": {
+    "mean_expected_points": 2.3596482664233576,
+    "mean_p10": 0.5216240875912409,
+    "mean_p90": 4.4101277372262775
+  },
+  "beats_reg_baseline": true,
+  "beats_prev_baseline": true,
+  "beats_both_baselines": true
+}

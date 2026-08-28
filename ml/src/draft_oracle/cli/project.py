@@ -41,6 +41,13 @@ from draft_oracle.models.game_win import (
     GameWinConfig,
     train_game_win_from_normalized,
 )
+from draft_oracle.models.projections import (
+    DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_PROJECTION_ARTIFACT_DIR,
+)
+from draft_oracle.models.projections import (
+    ProjectionConfig,
+    evaluate_skater_projections_from_normalized,
+)
 from draft_oracle.models.returns import (
     DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_RETURN_TIME_ARTIFACT_DIR,
 )
@@ -367,6 +374,40 @@ def eval_series_sim(
         f"  series-winner Brier: model {result.brier_series:.4f} / "
         f"higher-seed {result.brier_higher_seed:.4f} / coin {result.brier_coin_flip:.4f}"
     )
+
+
+@app.command(name="project-skaters")
+def project_skaters(
+    normalized_dir: Annotated[
+        Path, typer.Option(help="Directory holding normalized Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: Annotated[
+        Path, typer.Option(help="Output directory for the report + manifest.")
+    ] = DEFAULT_PROJECTION_ARTIFACT_DIR,
+    seed: Annotated[int, typer.Option(help="Deterministic training/MC seed.")] = 20260827,
+) -> None:
+    """Evaluate skater round-point projections with uncertainty; write report + manifest."""
+    result = evaluate_skater_projections_from_normalized(
+        normalized_dir=normalized_dir,
+        artifact_dir=artifact_dir,
+        config=ProjectionConfig(seed=seed),
+    )
+    typer.echo(f"Skater round projections -> {artifact_dir}")
+    typer.echo(f"  held-out seasons: {list(result.test_years)}")
+    typer.echo(
+        f"  skater-rounds projected: {result.n_projected} (skipped {result.n_skipped_no_series})"
+    )
+    typer.echo(
+        f"  test MAE: model {result.test_mae_model:.4f} / "
+        f"reg-ppg {result.test_mae_baseline_reg:.4f} / "
+        f"prev-round {result.test_mae_baseline_prev:.4f}"
+    )
+    typer.echo(
+        f"  test Spearman: model {result.test_spearman_model:.4f} / "
+        f"reg-ppg {result.test_spearman_baseline_reg:.4f} / "
+        f"prev-round {result.test_spearman_baseline_prev:.4f}"
+    )
+    typer.echo(f"  beats both baselines: {'yes' if result.beats_both_baselines else 'no'}")
 
 
 if __name__ == "__main__":  # pragma: no cover
