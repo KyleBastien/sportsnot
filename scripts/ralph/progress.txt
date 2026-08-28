@@ -3,6 +3,21 @@ Started: 08/27/2026 22:10:47
 ---
 
 ## Codebase Patterns
+- VOR / draft-board pattern (US-018, `optimize/vor.py`): replacement level is a PURE
+  fn of league size N + roster shape (SPEC 1) — F=(5N+1)-th, D=(3N+1)-th,
+  G/team=(N+1)-th; IR adds +1 F/+1 D per manager (6N+1 / 4N+1), never a goalie slot.
+  `replacement_level(values, starters)` = sorted-desc[starters] or 0.0 when
+  demand>=supply (final round with 2 teams alive, tiny pools) — the "sensible
+  handling". VOR = expected_points - replacement, computed per position pool then the
+  skater+team rows are UNIONED and sorted by vor desc (tie: projection desc, name).
+  A team pick = a whole team's goaltending (projection = `e_goalie_points`, position
+  "G", no quantiles). `build_cheatsheet` -> `CheatSheet` with `.summary()` (manifest)
+  + `.report_lines()`/`render_cheatsheet_markdown` (ASCII, cp1252-safe). IR flag
+  changes BOTH replacement levels AND sheet layout (injured tagged `IR?` vs `OUT`).
+  Wired into `projection_artifact`: `ProjectArtifactConfig.managers/ir`, a
+  `cheatsheet` field on the result, `cheatsheet.md` written to the artifact dir, and
+  `--managers`/`--ir` on `oracle project`.
+
 - Predictive models live in `ml/src/draft_oracle/models/` (US-011+). Pattern: pure
   unit-tested primitives (`brier_score`, feature-row builders) + a dataclass result with
   `report_lines()` (ASCII Markdown) and `manifest()` (seed+splits+metrics), + a
@@ -276,6 +291,45 @@ Started: 08/27/2026 22:10:47
   feature row) are currently excluded (needs a round roster source); documented, not a
   crash. Injury flag comes from injuries.parquet status in {out,ir,day_to_day} and
   position!=G; availability haircut stays 1.0 for now (flag informs the drafter).
+
+## 2026-08-28 10:30 - US-018
+- Implemented VOR (value over replacement), positional scarcity, and the cheat sheet.
+  Projections are now priced against per-position replacement levels derived from
+  league size + roster shape, and exported as a readable draft board.
+- Files changed:
+  - `ml/src/draft_oracle/optimize/vor.py` (new): `replacement_level` primitive,
+    `roster_demand`/`RosterDemand`, `VorConfig`, `build_cheatsheet` -> `CheatSheet`
+    (with `.summary()` + `.report_lines()`), `render_cheatsheet_markdown`,
+    `write_cheatsheet`.
+  - `ml/src/draft_oracle/optimize/__init__.py`: re-export the public VOR API.
+  - `ml/src/draft_oracle/projection_artifact.py`: `ProjectArtifactConfig.managers/ir`
+    + `vor_config`, `cheatsheet` field on `ProjectArtifactResult`, `cheatsheet.md`
+    written by `write_projection_artifact`, scarcity summary added to the manifest.
+  - `ml/src/draft_oracle/cli/project.py`: `--managers` and `--ir/--no-ir` options on
+    `oracle project`; echoes the replacement levels.
+  - `ml/README.md`: VOR section + CLI table rows + artifact file list.
+  - `ml/tests/test_vor.py` (new): 22 tests incl. the required scarcity edge cases
+    (2-manager, 12-manager, final round with 2 teams alive), a hypothesis property
+    on `replacement_level`, IR demand shift, VOR math, sorting/columns, empty pools,
+    IR-driven layout, JSON summary.
+  - `ml/tests/test_projection_artifact.py`: assert `cheatsheet.md` is written + the
+    scarcity manifest block.
+- Quality checks (from ml/): ruff format clean, ruff check clean, mypy --strict clean
+  (47 files), pytest 414 passed (was 369; +45 new/updated). Real run
+  `oracle project --season 2025 --round 1 --no-refresh` -> 16 teams / 446 skaters,
+  replacement F 4.63 / D 2.90 / G 7.19; Makar/Kucherov/MacKinnon top the board, VGK
+  appears as a goalie-slot row.
+- **Learnings for future iterations:**
+  - Replacement "sensible handling" when demand>=supply is `0.0` (no free
+    replacement); every remaining asset then prices at its full projection. This is
+    what makes the final-round-2-teams and tiny-pool cases behave.
+  - The artifact dir `artifacts/<season>-r<round>/` is GITIGNORED, so `cheatsheet.md`
+    is generated, not committed. Tests write to tmp_path.
+  - Team rows have no p10/p50/p90 in the artifact -> render them as `-`; keep the
+    cheat-sheet DataFrame column set FIXED and branch only in the markdown renderer.
+  - No UI change; browser/Playwright verification not applicable (Python-only ml/).
+---
+
 
 ## 2026-08-28 01:52 - US-015
 - Implemented the injury return-time model + availability adjustment

@@ -13,7 +13,10 @@ artifact is a directory ``artifacts/<season>-r<round>/`` containing:
   ``e_goalie_points``, ``e_wins``, ``e_games``, ``p_series_win``, and the expected
   shutout wins.
 * ``run_manifest.json`` -- the data snapshot id, every sub-model version, the
-  feature-set version, the git SHA, the seeds, and a UTC timestamp.
+  feature-set version, the git SHA, the seeds, the VOR scarcity summary, and a UTC
+  timestamp.
+* ``cheatsheet.md`` -- the value-over-replacement (VOR) draft board (US-018): every
+  skater and team priced against its position's replacement level and sorted by VOR.
 
 Composition (no new estimator is learned here):
 
@@ -77,6 +80,12 @@ from draft_oracle.models.skater_production import (
     playoff_round_starts,
     train_skater_production_model,
 )
+from draft_oracle.optimize.vor import (
+    CheatSheet,
+    VorConfig,
+    build_cheatsheet,
+    write_cheatsheet,
+)
 
 __all__ = [
     "LIVE_PROJECTION_VERSION",
@@ -131,7 +140,14 @@ class ProjectArtifactConfig:
     seed: int = 20260827
     n_sims: int = DEFAULT_N_SIMS
     horizon: int = DEFAULT_HORIZON
+    managers: int = 4
+    ir: bool = False
     production_config: SkaterProductionConfig | None = field(default=None)
+
+    @property
+    def vor_config(self) -> VorConfig:
+        """League parameters that drive VOR replacement levels + cheat-sheet layout."""
+        return VorConfig(managers=self.managers, ir=self.ir)
 
 
 @dataclass
@@ -143,6 +159,7 @@ class ProjectArtifactResult:
     as_of_cutoff: str
     skaters: pd.DataFrame
     teams: pd.DataFrame
+    cheatsheet: CheatSheet
     manifest: dict[str, Any]
     warnings: list[str]
 
@@ -395,6 +412,7 @@ def build_projection_artifact(
 
     skaters = _finalize_skaters(skater_rows)
     teams = _finalize_teams(team_rows)
+    cheatsheet = build_cheatsheet(skaters, teams, config=config.vor_config)
 
     manifest = {
         "artifact_version": LIVE_PROJECTION_VERSION,
@@ -414,6 +432,7 @@ def build_projection_artifact(
         "git_sha": git_sha if git_sha is not None else _git_sha(),
         "seeds": {"base": config.seed, "n_sims": config.n_sims, "horizon": config.horizon},
         "generated_at": generated_at or datetime.now(UTC).isoformat(),
+        "scarcity": cheatsheet.summary(),
         "counts": {
             "eligible_series": int(len(teams) // 2),
             "eligible_teams": len(teams),
@@ -430,6 +449,7 @@ def build_projection_artifact(
         as_of_cutoff=cutoff,
         skaters=skaters,
         teams=teams,
+        cheatsheet=cheatsheet,
         manifest=manifest,
         warnings=warnings,
     )
@@ -475,6 +495,7 @@ def write_projection_artifact(result: ProjectArtifactResult, out_dir: Path) -> P
     result.skaters.to_csv(out_dir / "skaters.csv", index=False)
     result.teams.to_parquet(out_dir / "teams.parquet", index=False)
     result.teams.to_csv(out_dir / "teams.csv", index=False)
+    write_cheatsheet(result.cheatsheet, out_dir / "cheatsheet.md")
     (out_dir / "run_manifest.json").write_text(
         json.dumps(result.manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )

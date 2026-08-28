@@ -428,6 +428,13 @@ def project(
     snapshot: Annotated[
         str, typer.Option(help="Pin a frozen snapshot id (defaults to the live tables).")
     ] = "",
+    managers: Annotated[
+        int, typer.Option(help="League size (2-12); sets VOR replacement levels.")
+    ] = 4,
+    ir: Annotated[
+        bool,
+        typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D per manager)."),
+    ] = False,
     archive_dir: Annotated[
         Path, typer.Option(help="Committed NHL archive directory (for the ingest refresh).")
     ] = DEFAULT_ARCHIVE_DIR,
@@ -440,7 +447,7 @@ def project(
     """Precompute a self-contained projection artifact for one upcoming round.
 
     Refreshes ingest (idempotent, offline), builds as-of features, runs inference, and
-    writes skaters/teams Parquet + CSV and run_manifest.json under
+    writes skaters/teams Parquet + CSV, cheatsheet.md, and run_manifest.json under
     artifacts_root/<season>-r<round>/. Eliminated teams are excluded automatically.
     """
     if not no_refresh and not snapshot:
@@ -451,9 +458,10 @@ def project(
         normalized_dir=normalized_dir,
         artifacts_root=artifacts_root,
         snapshot=snapshot or None,
-        config=ProjectArtifactConfig(seed=seed),
+        config=ProjectArtifactConfig(seed=seed, managers=managers, ir=ir),
     )
     counts = result.manifest["counts"]
+    scarcity = result.manifest["scarcity"]
     typer.echo(f"Projection artifact -> {out_dir}")
     typer.echo(
         f"  season {result.season} round {result.playoff_round} (as of {result.as_of_cutoff})"
@@ -461,6 +469,11 @@ def project(
     typer.echo(
         f"  eligible: {counts['eligible_teams']} teams / "
         f"{counts['skaters_projected']} skaters ({counts['skaters_injured']} injured)"
+    )
+    repl = scarcity["replacement_level"]
+    typer.echo(
+        f"  VOR: {scarcity['managers']} managers, IR {'on' if scarcity['ir'] else 'off'}; "
+        f"replacement F {repl['F']:.2f} / D {repl['D']:.2f} / G {repl['G']:.2f}"
     )
     typer.echo(f"  snapshot id: {result.manifest['snapshot_id']}")
     for warning in result.warnings:

@@ -410,10 +410,18 @@ def test_from_normalized_writes_all_files(tmp_path: Path) -> None:
         "skaters.csv",
         "teams.parquet",
         "teams.csv",
+        "cheatsheet.md",
         "run_manifest.json",
     ):
         assert (out_dir / fname).exists()
     assert result.manifest["snapshot_id"] == "live"
+    assert not result.cheatsheet.rows.empty
+    assert result.manifest["scarcity"]["managers"] == 4
+    assert (
+        (out_dir / "cheatsheet.md")
+        .read_text(encoding="utf-8")
+        .startswith("# Draft Oracle cheat sheet")
+    )
 
 
 def test_cli_project_runs_offline(tmp_path: Path) -> None:

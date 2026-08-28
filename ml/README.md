@@ -60,6 +60,7 @@ All commands run from the `ml/` directory.
 | Return-time     | `uv run oracle train-return-time`        |
 | Project skaters | `uv run oracle project-skaters`          |
 | Batch projection| `uv run oracle project --season 2026 --round 1` |
+| Projection + IR | `uv run oracle project --season 2026 --round 1 --managers 4 --ir` |
 
 ## Package layout
 
@@ -620,7 +621,8 @@ frozen at the round start.
 
 ```bash
 uv run oracle project --season 2026 --round 1
-# writes artifacts/2026-r1/{skaters,teams}.{parquet,csv} + run_manifest.json
+# writes artifacts/2026-r1/{skaters,teams}.{parquet,csv} + cheatsheet.md + run_manifest.json
+uv run oracle project --season 2026 --round 1 --managers 4 --ir   # IR-slot league
 ```
 
 - `skaters.{parquet,csv}` — `player_id, player_name, team_abbrev, position (F/D),
@@ -629,13 +631,33 @@ uv run oracle project --season 2026 --round 1
 - `teams.{parquet,csv}` — `team_id, team_abbrev, opponent_abbrev, is_top_seed,
   playoff_round, p_series_win, e_wins, e_games, e_goalie_points (goalie slot),
   e_shutout_wins` (goalie slot = a whole team's goaltending, SPEC §1).
+- `cheatsheet.md` — the VOR draft board (US-018): every skater and team priced by
+  value over replacement, sorted descending. See below.
 - `run_manifest.json` — snapshot id, every sub-model version, feature version, git
-  SHA, seeds, and a UTC timestamp.
+  SHA, seeds, the VOR scarcity summary, and a UTC timestamp.
 
 The wall-clock timestamp and git SHA live **only** in `run_manifest.json`; the
 Parquet payload is byte-identical across reruns on the same snapshot (fixed seeds +
 deterministic ordering). `--no-refresh` skips the idempotent ingest step (offline);
 `--snapshot <id>` pins a frozen snapshot under `data/normalized/snapshots/`.
+
+## VOR, positional scarcity & cheat sheet (`optimize/vor.py`)
+
+Projections rank players *within* a position; VOR (value over replacement) puts a
+forward, a defenseman, and a goalie/team slot on one comparable axis so the draft
+board is cross-position (US-018). Replacement level is a pure function of league
+size `N` and the roster shape (SPEC §1 — `5F/3D/1G` active, `+1 IR_F/+1 IR_D` with
+IR):
+
+- Forwards: the `(5N + 1)`-th ranked F (`(6N + 1)`-th with `--ir`).
+- Defensemen: the `(3N + 1)`-th ranked D (`(4N + 1)`-th with `--ir`).
+- Goalie/team slot: the `(N + 1)`-th ranked team (IR adds no goalie slot).
+
+When demand exceeds supply (e.g. the final round with only two teams alive, or a
+tiny pool), there is no free replacement, so the level falls back to `0.0` and every
+asset prices at its full projection. `VOR = expected_points − replacement_level`.
+`--managers` (2–12) and `--ir/--no-ir` set the replacement levels and change the
+`cheatsheet.md` layout (injured skaters are tagged `IR?` with IR, `OUT` without).
 
 ## Data & artifact layout
 
