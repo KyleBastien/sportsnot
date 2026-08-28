@@ -1,0 +1,33 @@
+{
+  "total": 2,
+  "data": [
+    {
+      "seasonId": 20252026,
+      "gameTypeId": 3,
+      "gameId": 2025030111,
+      "gameDate": "2026-04-20",
+      "playerId": 8478403,
+      "skaterFullName": "Tage Thompson",
+      "positionCode": "C",
+      "teamAbbrev": "BUF",
+      "goals": 1,
+      "assists": 2,
+      "points": 3,
+      "shots": 5
+    },
+    {
+      "seasonId": 20252026,
+      "gameTypeId": 3,
+      "gameId": 2025030111,
+      "gameDate": "2026-04-20",
+      "playerId": 8480807,
+      "skaterFullName": "Rasmus Dahlin",
+      "positionCode": "D",
+      "teamAbbrev": "BUF",
+      "goals": 0,
+      "assists": 1,
+      "points": 1,
+      "shots": 2
+    }
+  ]
+}

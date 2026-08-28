@@ -1,0 +1,36 @@
+{
+  "forwards": [
+    {
+      "id": 8478403,
+      "firstName": { "default": "Tage" },
+      "lastName": { "default": "Thompson" },
+      "positionCode": "C",
+      "sweaterNumber": 72
+    },
+    {
+      "id": 8477933,
+      "firstName": { "default": "Alex" },
+      "lastName": { "default": "Tuch" },
+      "positionCode": "R",
+      "sweaterNumber": 89
+    }
+  ],
+  "defensemen": [
+    {
+      "id": 8480807,
+      "firstName": { "default": "Rasmus" },
+      "lastName": { "default": "Dahlin" },
+      "positionCode": "D",
+      "sweaterNumber": 26
+    }
+  ],
+  "goalies": [
+    {
+      "id": 8476434,
+      "firstName": { "default": "Ukko-Pekka" },
+      "lastName": { "default": "Luukkonen" },
+      "positionCode": "G",
+      "sweaterNumber": 1
+    }
+  ]
+}

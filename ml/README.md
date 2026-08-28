@@ -71,7 +71,7 @@ src/draft_oracle/
    copied from `utils.test.ts` to catch cross-language drift.
 2. **Ingest** — pull and normalize NHL stats, betting odds, injuries, and league draft
    history into dated snapshots. Committed raw sources live under `data/raw/`; live
-   pulls are cached and gitignored.
+   pulls are cached and gitignored. The NHL client is documented below.
 3. **Features** — build as-of feature matrices with automated leakage guards.
 4. **Models** — per-game win/shutout models compose into a best-of-7 series simulator;
    skater rate + return-time models produce per-round point projections.
@@ -79,6 +79,30 @@ src/draft_oracle/
    simulator, an opponent model, and a multi-step pick recommender.
 6. **Backtest** — replay past playoffs with a strict leakage guard and report against
    baselines and the league's real drafts.
+
+## NHL API client (`ingest/nhl_api.py`)
+
+`NHLApiClient` is the **only** place NHL URLs live (SPEC §5). It fetches politely
+(configurable delay), retries with exponential backoff, validates every response with
+pydantic, and caches raw JSON under `data/raw/nhl-api/` keyed by endpoint + params — a
+cache hit skips the network entirely, so ingestion is repeatable and tests never touch
+the wire (inject an `httpx.MockTransport` + fixtures).
+
+Typed adapter methods (hosts: `api-web.nhle.com/v1` and `api.nhle.com/stats/rest/en`):
+
+| Method | Endpoint | Returns |
+| --- | --- | --- |
+| `player_game_log(id, season, gameType)` | `/player/{id}/game-log/{season}/{gameType}` | `PlayerGameLog` |
+| `player_info(id)` | `/player/{id}/landing` | `PlayerLanding` (position, status) |
+| `team_roster(abbrev, season)` | `/roster/{abbrev}/{season}` | `TeamRoster` |
+| `club_schedule_season(abbrev, season)` | `/club-schedule-season/{abbrev}/{season}` | `ClubScheduleSeason` (results + scores) |
+| `scores_by_date(date)` | `/score/{YYYY-MM-DD}` | `DailyScores` |
+| `playoff_bracket(year)` | `/playoff-bracket/{year}` | `PlayoffBracket` (series metadata) |
+| `skater_summary(season, gameType)` | stats-rest `/skater/summary` | `SkaterSummaryResponse` (bulk; 10k row cap) |
+
+`season` is the concatenated form (e.g. `20252026`); `gameType` is `2` (regular) or `3`
+(playoffs). The client is a context manager and owns its `httpx.Client` unless one is
+injected. Endpoint knowledge must never leak outside this module.
 
 ## Data & artifacts
 

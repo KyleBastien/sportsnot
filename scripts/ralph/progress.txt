@@ -27,6 +27,14 @@ Started: 08/27/2026 22:10:47
   changes in `packages/utils/src/lib/utils.ts` or `packages/types/src/lib/types.ts`,
   update rules.py AND the golden vectors in `ml/tests/test_rules.py` (copied verbatim
   from `utils.test.ts`) so cross-language drift fails the build.
+- NHL ingestion goes through `draft_oracle.ingest.nhl_api.NHLApiClient` — the ONLY place
+  NHL URLs may appear (api-web base `.../v1`, stats-rest base `.../stats/rest/en`). Add
+  typed adapters there; pydantic models use `ConfigDict(extra="ignore",
+  populate_by_name=True)` + `Field(alias="camelCase")`. Test with an injected
+  `httpx.Client(transport=httpx.MockTransport(...))`, `delay=0.0`, `retry_backoff=0.0`,
+  `sleep=noop`, temp cache dir — no network, no real sleep. MockTransport route keys use
+  the FULL request path incl. `/stats/rest/en`. Raw JSON caches to gitignored
+  `data/raw/nhl-api/`; a cache hit skips the network entirely.
 
 ## 2026-08-27 22:10 - US-001
 - Scaffolded the isolated uv-managed Python ML workspace under `ml/` for the
@@ -76,4 +84,38 @@ Started: 08/27/2026 22:10:47
   - snake_order reverses on ODD 0-indexed rounds; round 0 uses input order as-is.
   - Position literals are exactly F/D/G/IR_F/IR_D; roster is 9 picks (no IR) or 11 (IR).
   - No UI change; no Playwright verification applicable to this Python-only story.
+---
+
+## 2026-08-27 22:30 - US-003
+- Implemented draft_oracle.ingest.nhl_api: typed, cached, polite NHL API client.
+- Files changed:
+  - ml/src/draft_oracle/ingest/nhl_api.py (new): NHLApiClient + ResponseCache +
+    NHLApiError, and pydantic response models (PlayerGameLog/GameLogEntry,
+    ClubScheduleSeason/ScheduleGame, DailyScores, PlayoffBracket/PlayoffSeries/SeedTeam,
+    TeamRoster/RosterPlayer, PlayerLanding, SkaterSummaryResponse/Row). Disk cache under
+    data/raw/nhl-api keyed by endpoint+params (sha1); cache hit skips network. Retry w/
+    exponential backoff, injectable httpx.Client + sleep for tests. Typed adapters:
+    player_game_log, player_info, team_roster, club_schedule_season, scores_by_date,
+    playoff_bracket, skater_summary. Both hosts (api-web + stats-rest) isolated here.
+  - ml/src/draft_oracle/ingest/__init__.py: re-export client + models.
+  - ml/tests/test_nhl_api.py (new): 15 tests via httpx.MockTransport + fixtures, no net.
+  - ml/tests/fixtures/nhl/*.json (new): recorded response fixtures. Bracket parsing test
+    reuses the committed data/raw/nhl-archive/bracket-2026.json as a real recorded resp.
+  - ml/README.md: NHL API client section + endpoint table.
+- Quality (from ml/): ruff check clean, ruff format --check clean, mypy --strict clean
+  (16 files), pytest 62 passed.
+- **Learnings for future iterations:**
+  - stats-rest base is https://api.nhle.com/stats/rest/en — MockTransport route keys must
+    use the FULL path incl. /stats/rest/en (e.g. /stats/rest/en/skater/summary), not just
+    /skater/summary. api-web base is https://api-web.nhle.com/v1.
+  - NHL responses carry huge field sets; pydantic models use ConfigDict(extra="ignore",
+    populate_by_name=True) with Field(alias="camelCase"). Add only the fields you need.
+  - The client is injectable for tests: pass client=httpx.Client(transport=MockTransport),
+    delay=0.0, retry_backoff=0.0, sleep=noop → zero network, zero real sleeping.
+  - Cache dir data/raw/nhl-api is already gitignored by the existing data/raw/* rule.
+  - Backoff schedule for retry_backoff=b over failures i=0,1,... is b*2**i (politeness
+    `delay` sleeps BEFORE each attempt; backoff sleeps AFTER a failure, skipped on last).
+  - fetch_nhl.py under data/raw/nhl-archive/ is the reference for real endpoint behavior
+    (10k row cap, month partitioning, 1 req/s, 4 attempts) — mirror its politeness.
+  - No UI change; Playwright not applicable (ml/ is outside the Nx/web graph).
 ---

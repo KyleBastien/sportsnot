@@ -1,0 +1,27 @@
+{
+  "previousSeason": 20242025,
+  "currentSeason": 20252026,
+  "clubTimezone": "America/New_York",
+  "games": [
+    {
+      "id": 2025030111,
+      "season": 20252026,
+      "gameType": 3,
+      "gameDate": "2026-04-20",
+      "gameState": "OFF",
+      "awayTeam": { "id": 6, "abbrev": "BOS", "score": 2 },
+      "homeTeam": { "id": 7, "abbrev": "BUF", "score": 3 },
+      "gameOutcome": { "lastPeriodType": "REG" }
+    },
+    {
+      "id": 2025030112,
+      "season": 20252026,
+      "gameType": 3,
+      "gameDate": "2026-04-22",
+      "gameState": "OFF",
+      "awayTeam": { "id": 6, "abbrev": "BOS", "score": 1 },
+      "homeTeam": { "id": 7, "abbrev": "BUF", "score": 0 },
+      "gameOutcome": { "lastPeriodType": "OT" }
+    }
+  ]
+}

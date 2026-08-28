@@ -1,0 +1,34 @@
+{
+  "seasonId": 20252026,
+  "gameTypeId": 3,
+  "gameLog": [
+    {
+      "gameId": 2025030111,
+      "gameDate": "2026-04-20",
+      "gameTypeId": 3,
+      "teamAbbrev": "BUF",
+      "opponentAbbrev": "BOS",
+      "homeRoadFlag": "H",
+      "goals": 1,
+      "assists": 2,
+      "points": 3,
+      "shots": 5,
+      "plusMinus": 2,
+      "toi": "21:14"
+    },
+    {
+      "gameId": 2025030112,
+      "gameDate": "2026-04-22",
+      "gameTypeId": 3,
+      "teamAbbrev": "BUF",
+      "opponentAbbrev": "BOS",
+      "homeRoadFlag": "H",
+      "goals": 0,
+      "assists": 1,
+      "points": 1,
+      "shots": 3,
+      "plusMinus": -1,
+      "toi": "19:02"
+    }
+  ]
+}
