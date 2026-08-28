@@ -81,6 +81,7 @@ from draft_oracle.optimize.opponents import (
     OpponentFitConfig,
     train_opponent_model_from_normalized,
 )
+from draft_oracle.optimize.slot_strategies import SlotStrategyConfig
 from draft_oracle.projection_artifact import (
     DEFAULT_ARTIFACTS_ROOT,
     ProjectArtifactConfig,
@@ -490,12 +491,23 @@ def project(
         typer.Option("--no-refresh", help="Skip the idempotent ingest refresh (offline)."),
     ] = False,
     seed: Annotated[int, typer.Option(help="Deterministic training/MC seed.")] = 20260827,
+    slot_strategies: Annotated[
+        bool,
+        typer.Option(
+            "--slot-strategies/--no-slot-strategies",
+            help="Emit slot_strategies.md (per-slot draft plan, US-023).",
+        ),
+    ] = True,
+    slot_rollouts: Annotated[
+        int, typer.Option(help="Monte-Carlo rollouts per turn in the slot report.")
+    ] = 60,
 ) -> None:
     """Precompute a self-contained projection artifact for one upcoming round.
 
     Refreshes ingest (idempotent, offline), builds as-of features, runs inference, and
-    writes skaters/teams Parquet + CSV, cheatsheet.md, and run_manifest.json under
-    artifacts_root/<season>-r<round>/. Eliminated teams are excluded automatically.
+    writes skaters/teams Parquet + CSV, cheatsheet.md, slot_strategies.md, and
+    run_manifest.json under artifacts_root/<season>-r<round>/. Eliminated teams are
+    excluded automatically.
     """
     if not no_refresh and not snapshot:
         normalize_archive(archive_dir=archive_dir, out_dir=normalized_dir)
@@ -505,7 +517,13 @@ def project(
         normalized_dir=normalized_dir,
         artifacts_root=artifacts_root,
         snapshot=snapshot or None,
-        config=ProjectArtifactConfig(seed=seed, managers=managers, ir=ir),
+        config=ProjectArtifactConfig(
+            seed=seed,
+            managers=managers,
+            ir=ir,
+            slot_strategies=slot_strategies,
+            slot_strategy_config=SlotStrategyConfig(seed=seed, rollouts=slot_rollouts),
+        ),
     )
     counts = result.manifest["counts"]
     scarcity = result.manifest["scarcity"]
@@ -523,6 +541,13 @@ def project(
         f"replacement F {repl['F']:.2f} / D {repl['D']:.2f} / G {repl['G']:.2f}"
     )
     typer.echo(f"  snapshot id: {result.manifest['snapshot_id']}")
+    slots = result.manifest.get("slot_strategies")
+    if slots:
+        typer.echo(
+            f"  slot strategies: {len(slots['slots'])} slots"
+            f" ({'fitted' if slots['fitted_opponents'] else 'greedy'} opponents);"
+            f" best slot {slots['best_slot']}"
+        )
     for warning in result.warnings:
         typer.echo(f"  warning: {warning}")
 

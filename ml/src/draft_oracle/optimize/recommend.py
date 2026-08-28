@@ -46,9 +46,12 @@ import random
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 from draft_oracle.optimize.opponents import (
     FittedLeagueOpponents,
@@ -74,6 +77,7 @@ __all__ = [
     "Recommendation",
     "StrategyComparison",
     "asset_value",
+    "build_pool_from_frames",
     "build_pool_from_projection_artifact",
     "build_synthetic_pool",
     "choose_pick",
@@ -1146,10 +1150,10 @@ def evaluate_recommendation_strategies_from_normalized(
     return fitted_comparison
 
 
-def build_pool_from_projection_artifact(
-    artifact_dir: Path, *, ir: bool = False
+def build_pool_from_frames(
+    skaters: pd.DataFrame, teams: pd.DataFrame, *, ir: bool = False
 ) -> list[DraftAsset]:
-    """Build a draftable pool from a US-017 projection artifact directory.
+    """Build a draftable pool from the two in-memory projection tables.
 
     Skater rows become F/D assets priced by ``expected_points``; team rows become the
     whole-team goalie (``G``) asset priced by ``e_goalie_points``. ``rank_value`` (the
@@ -1165,8 +1169,6 @@ def build_pool_from_projection_artifact(
 
     from draft_oracle.optimize.ir_value import reprice_pool_for_ir
 
-    skaters = pd.read_parquet(artifact_dir / "skaters.parquet")
-    teams = pd.read_parquet(artifact_dir / "teams.parquet")
     abbrev_to_id = {
         str(rec["team_abbrev"]): int(rec["team_id"]) for rec in teams.to_dict("records")
     }
@@ -1210,3 +1212,18 @@ def build_pool_from_projection_artifact(
         if stash_value_by_player:
             pool = reprice_pool_for_ir(pool, stash_value_by_player)
     return pool
+
+
+def build_pool_from_projection_artifact(
+    artifact_dir: Path, *, ir: bool = False
+) -> list[DraftAsset]:
+    """Build a draftable pool from a US-017 projection artifact directory.
+
+    Thin disk wrapper over :func:`build_pool_from_frames`: reads ``skaters.parquet`` and
+    ``teams.parquet`` from ``artifact_dir`` and delegates the asset construction.
+    """
+    import pandas as pd
+
+    skaters = pd.read_parquet(artifact_dir / "skaters.parquet")
+    teams = pd.read_parquet(artifact_dir / "teams.parquet")
+    return build_pool_from_frames(skaters, teams, ir=ir)

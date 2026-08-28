@@ -62,6 +62,7 @@ All commands run from the `ml/` directory.
 | Project skaters | `uv run oracle project-skaters`          |
 | Batch projection| `uv run oracle project --season 2026 --round 1` |
 | Projection + IR | `uv run oracle project --season 2026 --round 1 --managers 4 --ir` |
+| Slot strategies | `uv run oracle project --season 2026 --round 1 --managers 12` (emits `slot_strategies.md`) |
 | Recommend pick  | `uv run oracle recommend --artifact-dir artifacts/2025-r1 --managers 6 --seat 3` |
 | Compare drafters| `uv run oracle compare-strategies`       |
 
@@ -76,7 +77,7 @@ src/draft_oracle/
   ingest/        NHL API, odds, league drafts, entity match, injuries (US-003..008)
   features/      skater + team/series feature engineering, leakage guard (US-009/010)
   models/        win, shutout, series sim, skater rate, returns, projections (US-011..016)
-  optimize/      VOR, draft simulator, opponents, recommend, IR value (US-018..023)
+  optimize/      VOR, draft simulator, opponents, recommend, IR value, slot strategies (US-018..023)
   cli/           batch projection + interactive draft assistant (US-017/024)
   backtest/      replay engine + reporting (US-025/026)
 ```
@@ -624,8 +625,10 @@ frozen at the round start.
 
 ```bash
 uv run oracle project --season 2026 --round 1
-# writes artifacts/2026-r1/{skaters,teams}.{parquet,csv} + cheatsheet.md + run_manifest.json
+# writes artifacts/2026-r1/{skaters,teams}.{parquet,csv} + cheatsheet.md
+#   + slot_strategies.md + run_manifest.json
 uv run oracle project --season 2026 --round 1 --managers 4 --ir   # IR-slot league
+uv run oracle project --season 2026 --round 1 --managers 12 --no-slot-strategies  # skip US-023
 ```
 
 - `skaters.{parquet,csv}` — `player_id, player_name, team_abbrev, position (F/D),
@@ -636,8 +639,10 @@ uv run oracle project --season 2026 --round 1 --managers 4 --ir   # IR-slot leag
   e_shutout_wins` (goalie slot = a whole team's goaltending, SPEC §1).
 - `cheatsheet.md` — the VOR draft board (US-018): every skater and team priced by
   value over replacement, sorted descending. See below.
+- `slot_strategies.md` — the per-slot draft plan (US-023): one plan per snake slot
+  `1..N`. See below.
 - `run_manifest.json` — snapshot id, every sub-model version, feature version, git
-  SHA, seeds, the VOR scarcity summary, and a UTC timestamp.
+  SHA, seeds, the VOR scarcity summary, the per-slot summary, and a UTC timestamp.
 
 The wall-clock timestamp and git SHA live **only** in `run_manifest.json`; the
 Parquet payload is byte-identical across reruns on the same snapshot (fixed seeds +
@@ -806,6 +811,37 @@ draft positions evenly via within-position `rank_z`, so a static VOR board is al
 optimal) and edges one-step; against **positional-run opponents** (a run pushes a
 position below its pool-wide replacement, where a static board is blind) multi-step
 **beats both** baselines.
+
+## Per-slot draft strategy report (`optimize/slot_strategies.py`)
+
+Round-1 snake order is randomized and revealed only moments before the draft, so a
+drafter has no time to plan once their seat drops. `oracle project` therefore
+**precomputes a full plan for every slot `1..N`** (US-023) and writes it to
+`slot_strategies.md` in the artifact dir.
+
+Each slot's plan replays the whole draft from that seat against the **fitted opponent
+model** (US-020, loaded from `league_draft_picks.parquet`; the greedy fallback is used
+when no league history exists). At every owner turn the multi-step recommender (US-021)
+surfaces the recommended pick plus its top-3 alternatives; the plan follows the
+recommended line so later turns are conditioned on the picks already made.
+
+- **Expected pick numbers** — the deterministic snake positions the slot owns
+  (`slot_pick_numbers`).
+- **Contingency guidance** on the first two turns — the gap of opponent picks before
+  the owner's next turn is rolled out `contingency_rollouts` times, the most-likely
+  board states (which top targets survive) are clustered from those branches, and each
+  branch gets its own best pick.
+- **Projected final-roster total** per slot, plus a summary table comparing all slots.
+- Covers both **IR and no-IR** shapes (follows `--ir`).
+
+```
+uv run oracle project --season 2026 --round 1 --managers 12        # emits slot_strategies.md
+uv run oracle project --season 2026 --round 1 --slot-rollouts 40   # faster per-turn rollouts
+uv run oracle project --season 2026 --round 1 --no-slot-strategies # skip the report
+```
+
+A 12-slot league finishes well inside the 15-minute batch budget (greedy fallback in
+seconds via the vectorized kernel; the fitted-opponent path in a few minutes).
 
 ## Data & artifact layout
 

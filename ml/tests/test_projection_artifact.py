@@ -424,6 +424,37 @@ def test_from_normalized_writes_all_files(tmp_path: Path) -> None:
     )
 
 
+def test_slot_strategies_skipped_when_pool_too_small() -> None:
+    # The synthetic archive has only two eligible teams (a handful of assets), which
+    # cannot fill a 4-manager league -- the report is skipped gracefully, not crashed.
+    sk, tg, players, series = _archive()
+    result = build_projection_artifact(
+        sk, players, tg, series, season=2022, playoff_round=1, snapshot_id="snap", config=_config()
+    )
+    assert result.slot_strategies is None
+    assert result.manifest["slot_strategies"] is None
+    assert any("slot strategies skipped" in w for w in result.manifest["warnings"])
+
+
+def test_slot_strategies_disabled_writes_no_file(tmp_path: Path) -> None:
+    sk, tg, players, series = _archive()
+    config = ProjectArtifactConfig(
+        seed=20260827,
+        n_sims=300,
+        slot_strategies=False,
+        production_config=SkaterProductionConfig(
+            seed=20260827, n_val_seasons=1, n_test_seasons=1, min_confident_games=5
+        ),
+    )
+    result = build_projection_artifact(
+        sk, players, tg, series, season=2022, playoff_round=1, snapshot_id="snap", config=config
+    )
+    assert result.slot_strategies is None
+    assert result.manifest["slot_strategies"] is None
+    out = write_projection_artifact(result, tmp_path / "art")
+    assert not (out / "slot_strategies.md").exists()
+
+
 def test_cli_project_runs_offline(tmp_path: Path) -> None:
     normalized = tmp_path / "normalized"
     _write_normalized(normalized)

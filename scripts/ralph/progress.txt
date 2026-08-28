@@ -3,6 +3,27 @@ Started: 08/27/2026 22:10:47
 ---
 
 ## Codebase Patterns
+- Per-slot strategy report (US-023, `optimize/slot_strategies.py`): `oracle project`
+  additionally emits `slot_strategies.md` (gitignored artifact, like cheatsheet.md).
+  `build_slot_strategies(pool, managers, allow_ir, opponents=FittedLeagueOpponents|None)`
+  plays ONE full draft per slot 1..N: at each owner turn it calls US-021 `recommend_pick`
+  (top_n = top_alternatives+1, `compute_survival=False` for speed) for the recommended
+  pick + top-3 alts, then FOLLOWS the recommended line so later turns are conditioned on
+  prior picks. `slot_pick_numbers(slot, managers, rounds)` is the pure deterministic snake
+  math (even round -> seat, odd round -> managers-slot+1). Contingency (first 2 turns):
+  roll the opponent gap to the owner's NEXT turn K times, cluster by which top-K targets
+  survived (`_simulate_gap_taken` loops on live `current_manager` != owner -- NEVER trust a
+  precomputed gap list against apply_pick which uses current_manager), take most_common
+  branches, `greedy_vor_pick` the survivors. Opponents = fitted `as_mapping` (slow OO path)
+  when `league_draft_picks.parquet` exists, else `GreedyOpponentModel` (fast VECTORIZED
+  path -> 12 slots in ~4s). Fitted 12-slot IR real pool ~3min; greedy seconds -- both under
+  the 15-min bar. Determinism: RecommendConfig seed = config.seed+slot; realized line rng =
+  seed*7919+slot; contingency rng = seed*104729+slot*1009+turn. `_build_slot_report` in
+  projection_artifact.py SKIPS (warns, returns None, never crashes) when the pool can't fill
+  every roster (need F=Fcap*M/D/G) -- the small synthetic test archive always skips.
+  `ProjectArtifactConfig.slot_strategies`/`slot_strategy_config`; CLI `--slot-rollouts`,
+  `--no-slot-strategies`. Refactor: `recommend.build_pool_from_frames(skaters, teams, ir)`
+  is the in-memory pool builder (disk wrapper `build_pool_from_projection_artifact` calls it).
 - IR-stash valuation (US-022, `optimize/ir_value.py`): IR activation is a RETROACTIVE
   same-position swap (SPEC 1) - the stash's whole-round points REPLACE the swapped
   active starter's from the start of the round, so the slot yields
@@ -1169,4 +1190,54 @@ p.asarray(..., dtype=float) to avoid no-any-return.
   - Adding columns to `SKATER_COLUMNS` keeps `test_projection_artifact`'s exact-column
     assertion green as long as `_build_skater_rows` always emits them (NaN/"" default).
   - No UI change; browser/Playwright verification not applicable (Python-only ml/).
+---
+
+
+## 2026-08-28 12:44 - US-023
+- Implemented the per-slot draft strategy report. `oracle project` now additionally
+  emits `slot_strategies.md`: a precomputed plan for every snake slot 1..N so the owner
+  opens their seat's plan the instant the randomized round-1 order is revealed. Each
+  plan replays a full draft from that seat vs. the fitted opponent model (greedy fallback
+  when no league history), records the recommended pick + top-3 alternatives at every
+  turn (US-021 multi-step), contingency guidance on the first two turns (clustered from
+  gap-rollout board states), the deterministic expected pick numbers, and the projected
+  final-roster total; a summary table compares projected totals across all slots.
+- Files changed:
+  - `ml/src/draft_oracle/optimize/slot_strategies.py` (new): SlotStrategyConfig,
+    PickOption/Contingency/TurnPlan/SlotPlan/SlotStrategyReport, slot_pick_numbers,
+    _branch_contingencies/_simulate_gap_taken, build_slot_strategies, write_slot_strategies.
+  - `ml/src/draft_oracle/optimize/recommend.py`: extracted build_pool_from_frames
+    (in-memory pool builder) + TYPE_CHECKING pandas import; disk wrapper delegates to it.
+  - `ml/src/draft_oracle/optimize/__init__.py`: re-export the new public API.
+  - `ml/src/draft_oracle/projection_artifact.py`: ProjectArtifactConfig.slot_strategies/
+    slot_strategy_config, ProjectArtifactResult.slot_strategies, _build_slot_report (fits
+    opponents from league_draft_picks or greedy; skips-with-warning when pool too small),
+    slot_strategies.md written by write_projection_artifact, manifest slot_strategies block,
+    _load_league_picks in the from_normalized loader.
+  - `ml/src/draft_oracle/cli/project.py`: `--slot-strategies/--no-slot-strategies` +
+    `--slot-rollouts` on `oracle project`; echoes the slot summary.
+  - `ml/README.md`: slot-strategies section, command-table row, artifact file list,
+    package-layout note.
+  - `ml/tests/test_slot_strategies.py` (new): 22 tests (snake math incl. cover-once
+    property, config validation, turns/alternatives/contingency scoping, determinism, IR
+    coverage, fitted path, ASCII rendering, summary, write, tiny-league guard, 12-slot
+    time budget).
+  - `ml/tests/test_projection_artifact.py`: assert skip-when-pool-too-small + disabled path.
+- Quality checks (from ml/): ruff format clean (59 files), ruff check clean, mypy --strict
+  clean (57 files), pytest 519 passed (was 481; +38 new/updated). Real run
+  `oracle project --season 2025 --round 1 --managers 12 --slot-rollouts 40 --no-refresh`
+  finished the whole batch (model training + fitted 12-slot report) in ~7 min (< 15-min
+  bar): Makar #1, VGK goalie slot round 2, contingencies present, best slot 1 (39.74 pts).
+- **Learnings for future iterations:**
+  - The gap simulator MUST loop on the live `current_manager` (stop when == owner), not a
+    precomputed `picks_until_next` list: `apply_pick` places for current_manager, so a list
+    that ever drifts out of sync raises "manager X is full at position G".
+  - Fitted opponents force the recommend OO path (slow); greedy uses the vectorized numpy
+    kernel. For the report, low rollouts (40-60) + max_candidates 8 keep fitted 12-slot IR
+    ~3min. The greedy fallback is seconds.
+  - The artifact dir is gitignored, so slot_strategies.md is generated, not committed
+    (same as cheatsheet.md). Tests write to tmp_path; the synthetic archive's tiny pool
+    always trips the skip-with-warning guard, so artifact tests assert the skip.
+  - No UI change; the ml/ project is not in the Nx graph, so `yarn nx affected` is empty
+    and Playwright/browser verification is not applicable (Python-only ml/).
 ---

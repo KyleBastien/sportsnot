@@ -92,6 +92,19 @@ from draft_oracle.optimize.ir_value import (
     build_stash_valuations,
     render_ir_section,
 )
+from draft_oracle.optimize.opponents import (
+    FittedLeagueOpponents,
+    OpponentFitConfig,
+    fit_opponent_models,
+)
+from draft_oracle.optimize.recommend import build_pool_from_frames
+from draft_oracle.optimize.simulator import roster_capacity
+from draft_oracle.optimize.slot_strategies import (
+    SlotStrategyConfig,
+    SlotStrategyReport,
+    build_slot_strategies,
+    write_slot_strategies,
+)
 from draft_oracle.optimize.vor import (
     CheatSheet,
     VorConfig,
@@ -157,12 +170,19 @@ class ProjectArtifactConfig:
     horizon: int = DEFAULT_HORIZON
     managers: int = 4
     ir: bool = False
+    slot_strategies: bool = True
+    slot_strategy_config: SlotStrategyConfig | None = field(default=None)
     production_config: SkaterProductionConfig | None = field(default=None)
 
     @property
     def vor_config(self) -> VorConfig:
         """League parameters that drive VOR replacement levels + cheat-sheet layout."""
         return VorConfig(managers=self.managers, ir=self.ir)
+
+    @property
+    def resolved_slot_config(self) -> SlotStrategyConfig:
+        """The per-slot report config (seeded from the run seed when unset)."""
+        return self.slot_strategy_config or SlotStrategyConfig(seed=self.seed)
 
 
 @dataclass
@@ -177,6 +197,7 @@ class ProjectArtifactResult:
     cheatsheet: CheatSheet
     manifest: dict[str, Any]
     warnings: list[str]
+    slot_strategies: SlotStrategyReport | None = None
 
 
 def _git_sha() -> str | None:
@@ -446,6 +467,7 @@ def build_projection_artifact(
     playoff_round: int,
     snapshot_id: str,
     injuries: pd.DataFrame | None = None,
+    league_picks: pd.DataFrame | None = None,
     config: ProjectArtifactConfig | None = None,
     git_sha: str | None = None,
     generated_at: str | None = None,
@@ -532,6 +554,8 @@ def build_projection_artifact(
         skaters, cheatsheet, injuries, length_by_abbrev, train_sk, train_tg, config
     )
 
+    slot_report = _build_slot_report(skaters, teams, league_picks, warnings, config)
+
     manifest = {
         "artifact_version": LIVE_PROJECTION_VERSION,
         "package_version": __version__,
@@ -563,6 +587,7 @@ def build_projection_artifact(
             "candidates": len(ir_valuations),
             "stash_verdicts": sum(1 for v in ir_valuations if v.verdict == "stash"),
         },
+        "slot_strategies": slot_report.summary() if slot_report is not None else None,
         "warnings": warnings,
     }
 
@@ -575,6 +600,60 @@ def build_projection_artifact(
         cheatsheet=cheatsheet,
         manifest=manifest,
         warnings=warnings,
+        slot_strategies=slot_report,
+    )
+
+
+def _build_slot_report(
+    skaters: pd.DataFrame,
+    teams: pd.DataFrame,
+    league_picks: pd.DataFrame | None,
+    warnings: list[str],
+    config: ProjectArtifactConfig,
+) -> SlotStrategyReport | None:
+    """Build the per-slot strategy report (US-023), or ``None`` when disabled/empty.
+
+    Opponents are fitted from ``league_picks`` (the entity-matched draft history) when
+    available, else the greedy fallback. A tiny pool that cannot fill every roster is
+    skipped with a warning rather than crashing (SPEC section 7).
+    """
+    if not config.slot_strategies:
+        return None
+    if skaters.empty and teams.empty:
+        warnings.append("slot strategies skipped: no eligible assets in the pool")
+        return None
+    pool = build_pool_from_frames(skaters, teams, ir=config.ir)
+    capacity = roster_capacity(config.ir)
+    per_position = {
+        "F": sum(1 for a in pool if a.position == "F"),
+        "D": sum(1 for a in pool if a.position == "D"),
+        "G": sum(1 for a in pool if a.position == "G"),
+    }
+    need = {
+        "F": capacity.forwards * config.managers,
+        "D": capacity.defense * config.managers,
+        "G": capacity.goalies * config.managers,
+    }
+    if any(per_position[pos] < need[pos] for pos in ("F", "D", "G")):
+        warnings.append(
+            "slot strategies skipped: pool too small to fill every roster "
+            f"(have F{per_position['F']}/D{per_position['D']}/G{per_position['G']}, "
+            f"need F{need['F']}/D{need['D']}/G{need['G']})"
+        )
+        return None
+    fitted: FittedLeagueOpponents | None = None
+    if league_picks is not None and not league_picks.empty:
+        try:
+            fitted = fit_opponent_models(league_picks, OpponentFitConfig())
+        except (ValueError, KeyError) as exc:  # pragma: no cover - defensive
+            warnings.append(f"slot strategies: fitted opponents unavailable ({exc}); using greedy")
+            fitted = None
+    return build_slot_strategies(
+        pool,
+        managers=config.managers,
+        allow_ir=config.ir,
+        opponents=fitted,
+        config=config.resolved_slot_config,
     )
 
 
@@ -619,6 +698,8 @@ def write_projection_artifact(result: ProjectArtifactResult, out_dir: Path) -> P
     result.teams.to_parquet(out_dir / "teams.parquet", index=False)
     result.teams.to_csv(out_dir / "teams.csv", index=False)
     write_cheatsheet(result.cheatsheet, out_dir / "cheatsheet.md")
+    if result.slot_strategies is not None:
+        write_slot_strategies(result.slot_strategies, out_dir / "slot_strategies.md")
     (out_dir / "run_manifest.json").write_text(
         json.dumps(result.manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -641,6 +722,18 @@ def _load_tables(source_dir: Path) -> dict[str, pd.DataFrame]:
 def _load_injuries(normalized_dir: Path) -> pd.DataFrame | None:
     """Load the current-status injuries table if it has been ingested, else ``None``."""
     path = normalized_dir / "injuries.parquet"
+    if not path.exists():
+        return None
+    return pd.read_parquet(path)
+
+
+def _load_league_picks(normalized_dir: Path) -> pd.DataFrame | None:
+    """Load the entity-matched league draft history if present, else ``None``.
+
+    Feeds the fitted opponent model for the per-slot strategy report (US-023); absent
+    -> the report falls back to greedy opponents.
+    """
+    path = normalized_dir / "league_draft_picks.parquet"
     if not path.exists():
         return None
     return pd.read_parquet(path)
@@ -680,6 +773,7 @@ def build_projection_artifact_from_normalized(
     source_dir = normalized_dir / SNAPSHOTS_SUBDIR / snapshot if snapshot else normalized_dir
     tables = _load_tables(source_dir)
     injuries = _load_injuries(normalized_dir)
+    league_picks = _load_league_picks(source_dir)
     snapshot_id = _snapshot_id_for(source_dir, snapshot)
 
     result = build_projection_artifact(
@@ -691,6 +785,7 @@ def build_projection_artifact_from_normalized(
         playoff_round=playoff_round,
         snapshot_id=snapshot_id,
         injuries=injuries,
+        league_picks=league_picks,
         config=config,
     )
     out_dir = artifacts_root / f"{season}-r{playoff_round}"
