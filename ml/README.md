@@ -51,6 +51,8 @@ All commands run from the `ml/` directory.
 | Skip odds       | `uv run oracle odds --no-odds`           |
 | League drafts   | `uv run oracle league-drafts`            |
 | Match drafts    | `uv run oracle match-drafts`             |
+| Build injuries  | `uv run oracle injuries`                 |
+| Injuries offline| `uv run oracle injuries --no-fetch`      |
 
 ## Package layout
 
@@ -330,6 +332,49 @@ diagnostics (`match_method`, `match_confidence`, `needs_review`).
 The command prints a **per-season match-rate report** (matched/unmatched/review
 counts). Low-confidence or unresolved picks are written to
 `league_draft_picks_review.csv` for human review.
+
+## Injuries (`ingest/injuries.py`)
+
+Per-player injury status from ESPN's public NHL JSON, with a manual override
+file as the final authority (SPEC §5). Current status only — historical injury
+pulls are forbidden (ESPN resolves old `injuries` blocks against today's
+rosters; return-time calibration is derived from absence spells in US-015).
+
+```bash
+uv run oracle injuries              # fetch ESPN feed -> data/normalized/injuries.parquet
+uv run oracle injuries --no-fetch   # offline: last-known table + overrides only
+```
+
+**Source** — `EspnInjuriesClient` (cache + retry + injectable `httpx.Client`,
+mirrors `NHLApiClient`; no key, default httpx UA since ESPN 403s browser UAs):
+
+- **Injuries feed** —
+  `https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries`. Shape:
+  `{"injuries": [ {team group} ]}`; each team group has `id` / `displayName` /
+  `abbreviation` and a nested `injuries` list. Each injury entry carries
+  `status` (`"Out"` / `"Day-To-Day"` / `"Injured Reserve"`), `date`, an
+  `athlete` block (`id` / `fullName` / `position.abbreviation`), a `type`
+  object (`name` like `INJURY_STATUS_OUT`), and `details` (`type` body-part +
+  `returnDate`).
+- **Core athlete detail** —
+  `https://sports.core.api.espn.com/v2/sports/hockey/leagues/nhl/athletes/{id}`,
+  fetched only to fill a rare position/name gap (`client.core_athlete(id)`).
+
+**`injuries` table** — one row per player: `player_id` (ESPN athlete id),
+`player_name`, `position`, `team_id` (stable NHL id via `resolve_team_id`),
+`team_abbrev`, normalized `status` (`out` / `ir` / `day_to_day` / `healthy`),
+`status_raw`, `return_date`, `detail`, `as_of_date`, `source`
+(`espn` / `override` / `last_known`).
+
+**Overrides — final authority** — `data/overrides/injuries.yaml` merges *over*
+the source. Each `overrides:` entry matches by `espn_id` (exact) else `player`
+name (accent/punctuation-insensitive); a match rewrites status / return date /
+detail, `remove: true` deletes the row, and an unmatched entry is injected as a
+new row. Ships empty.
+
+**Graceful degradation** — a source failure (or `--no-fetch`) reuses the
+last-known `injuries.parquet` plus overrides and emits a warning instead of
+crashing (`InjuriesResult.degraded` / `.warnings`).
 
 
 

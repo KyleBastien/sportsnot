@@ -98,6 +98,19 @@ Started: 08/27/2026 22:10:47
   data/raw,features,normalized are, overrides are committed): `manager_aliases.yaml`
   (canonical->alias list, evi=levi) and `name_overrides.yaml` (players/teams raw-name->id;
   close gaps by ADDING here, never by dropping rows). Run `uv run oracle match-drafts`.
+- Injuries go through `draft_oracle.ingest.injuries` (US-008). ESPN public JSON is the
+  ONLY injury URL location: injuries feed `site.api.espn.com/.../nhl/injuries` (top-level
+  `injuries` = list of TEAM GROUPS, each with nested `injuries` list) + core athlete
+  detail `sports.core.api.espn.com/.../athletes/{id}`. `EspnInjuriesClient` mirrors
+  NHLApiClient (cache/retry/injectable httpx, no key, default UA — ESPN 403s browser UAs).
+  Manual-authority pattern (reusable): source rows + `apply_overrides` where
+  `data/overrides/injuries.yaml` (committed, ships empty) merges OVER the source — match
+  `espn_id` first then `normalize_name(player)`, then rewrite/`remove`/inject. Graceful
+  degradation contract (reusable for all live-source builds): catch NHLApiError in
+  build_*, fall back to last-known parquet (relabel source espn->last_known), collect
+  warnings, set a `degraded` flag — never raise; `--no-fetch` reuses that path without
+  marking degraded. NEVER pull historical ESPN injuries (old summaries resolve `injuries`
+  live vs today's rosters — leakage). `oracle injuries [--no-fetch]` -> injuries.parquet.
 
 ## 2026-08-27 22:10 - US-001
 - Scaffolded the isolated uv-managed Python ML workspace under `ml/` for the
@@ -349,4 +362,43 @@ Started: 08/27/2026 22:10:47
   - data/overrides/ is NOT gitignored (unlike data/raw,features,normalized), so the yaml
     config files are committed as intended by SPEC §4.
   - No UI change; Playwright not applicable (ml/ outside the Nx/web graph, affected empty).
+---
+
+## 2026-08-28 00:00 - US-008
+- Implemented ESPN injury ingestion with manual override authority.
+  New module draft_oracle.ingest.injuries: EspnInjuriesClient (cache/retry/
+  injectable httpx, mirrors NHLApiClient) hitting the ESPN injuries feed
+  (site.api.espn.com/.../nhl/injuries) + core athlete detail
+  (sports.core.api.espn.com/.../athletes/{id}); pydantic models for the
+  team-group -> nested-injury shape; normalize_status folding ESPN status +
+  INJURY_STATUS_* type names to out/ir/day_to_day/healthy;
+  injuries_response_to_rows -> normalized injuries.parquet;
+  load_injury_overrides + apply_overrides (final authority: espn_id-then-name
+  match, rewrite/remove/inject); build_injuries_table with graceful degradation
+  to last-known table on source failure or --no-fetch.
+- Files changed:
+  - ml/src/draft_oracle/ingest/injuries.py (new)
+  - ml/src/draft_oracle/cli/project.py (new `oracle injuries [--no-fetch]` cmd)
+  - ml/data/overrides/injuries.yaml (new, committed, ships empty)
+  - ml/tests/test_injuries.py (new, 22 tests) + tests/fixtures/injuries/injuries_feed.json
+  - ml/README.md (Commands table + Injuries section)
+- Quality (from ml/): ruff check clean, ruff format --check clean, mypy --strict
+  clean (26 files), pytest 250 passed.
+- **Learnings for future iterations:**
+  - ESPN injuries feed shape: top-level `injuries` is a list of TEAM GROUPS
+    (id/displayName/abbreviation + nested `injuries` list), NOT a flat list.
+    Each injury entry mirrors the summary-block shape (status/date/athlete/
+    type/details). `details.type` is the BODY PART ("Lower Body"); the
+    entry-level `type.name` is the status enum (INJURY_STATUS_*). ESPN ids are
+    strings; pydantic coerces to int.
+  - The env/network blocks the live ESPN feed (Access Denied) — the committed
+    espn-2025-26-completion summary .json.gz files carry real `injuries` blocks
+    and were used to derive the fixture shape.
+  - Overrides layer pattern: keyed list under `overrides:`; match espn_id first
+    then normalize_name(player); this same "source rows + final-authority
+    override merge" shape applies to future manual-authority tables.
+  - Graceful degradation contract: catch NHLApiError in build_*, fall back to
+    the last-known parquet (relabel source espn->last_known), collect warnings,
+    set a degraded flag — do NOT raise. `--no-fetch` reuses the same path
+    without marking degraded.
 ---

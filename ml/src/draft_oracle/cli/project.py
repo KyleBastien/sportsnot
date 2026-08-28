@@ -17,6 +17,10 @@ from draft_oracle.ingest.entity_match import (
     DEFAULT_OVERRIDES_DIR,
     build_league_draft_picks,
 )
+from draft_oracle.ingest.injuries import (
+    DEFAULT_INJURIES_OVERRIDES,
+    build_injuries_table,
+)
 from draft_oracle.ingest.league_drafts import (
     DEFAULT_LEAGUE_DRAFTS_DIR,
     build_league_drafts,
@@ -155,6 +159,32 @@ def match_drafts(
         normalized_dir=normalized_dir,
         overrides_dir=overrides_dir,
         out_dir=out_dir,
+    )
+    for line in result.report_lines():
+        typer.echo(line)
+
+
+@app.command()
+def injuries(
+    overrides_path: Annotated[
+        Path, typer.Option(help="Manual injury override YAML (final authority).")
+    ] = DEFAULT_INJURIES_OVERRIDES,
+    out_dir: Annotated[
+        Path, typer.Option(help="Output directory for injuries.parquet.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    no_fetch: Annotated[
+        bool,
+        typer.Option(
+            "--no-fetch",
+            help="Skip the ESPN feed; use last-known data + overrides (offline).",
+        ),
+    ] = False,
+) -> None:
+    """Ingest ESPN injuries into injuries.parquet; overrides win as final authority."""
+    result = build_injuries_table(
+        overrides_path=overrides_path,
+        out_dir=out_dir,
+        fetch=not no_fetch,
     )
     for line in result.report_lines():
         typer.echo(line)

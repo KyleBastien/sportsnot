@@ -1,0 +1,67 @@
+{
+  "injuries": [
+    {
+      "id": "6",
+      "displayName": "Boston Bruins",
+      "abbreviation": "BOS",
+      "injuries": [
+        {
+          "status": "Out",
+          "date": "2026-04-18T16:05Z",
+          "athlete": {
+            "id": "3904175",
+            "fullName": "Brandon Carlo",
+            "displayName": "Brandon Carlo",
+            "position": { "name": "Defense", "abbreviation": "D" }
+          },
+          "type": {
+            "id": "4",
+            "name": "INJURY_STATUS_OUT",
+            "description": "out",
+            "abbreviation": "O"
+          },
+          "details": { "type": "Lower Body", "returnDate": "2026-05-01" }
+        },
+        {
+          "status": "Day-To-Day",
+          "date": "2026-04-19T12:00Z",
+          "athlete": {
+            "id": "4233563",
+            "fullName": "Jeremy Swayman",
+            "position": { "name": "Goalie", "abbreviation": "G" }
+          },
+          "type": {
+            "id": "2",
+            "name": "INJURY_STATUS_DAY_TO_DAY",
+            "description": "day-to-day",
+            "abbreviation": "DTD"
+          },
+          "details": { "type": "Upper Body", "returnDate": null }
+        }
+      ]
+    },
+    {
+      "id": "22",
+      "displayName": "Edmonton Oilers",
+      "abbreviation": "EDM",
+      "injuries": [
+        {
+          "status": "Injured Reserve",
+          "date": "2026-04-10T00:00Z",
+          "athlete": {
+            "id": "8477934",
+            "fullName": "Leon Draisaitl",
+            "position": { "name": "Center", "abbreviation": "C" }
+          },
+          "type": {
+            "id": "3",
+            "name": "INJURY_STATUS_INJURED_RESERVE",
+            "description": "injured reserve",
+            "abbreviation": "IR"
+          },
+          "details": { "type": "Ankle", "returnDate": "2026-04-25" }
+        }
+      ]
+    }
+  ]
+}
