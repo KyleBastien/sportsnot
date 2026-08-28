@@ -44,6 +44,9 @@ All commands run from the `ml/` directory.
 | Format check    | `uv run ruff format --check .`            |
 | Type check      | `uv run mypy`                             |
 | CLI entry point | `uv run oracle version`                  |
+| Normalize data  | `uv run oracle normalize`                |
+| Freeze snapshot | `uv run oracle snapshot`                 |
+| List snapshots  | `uv run oracle snapshot --list`          |
 
 ## Package layout
 
@@ -104,10 +107,70 @@ Typed adapter methods (hosts: `api-web.nhle.com/v1` and `api.nhle.com/stats/rest
 (playoffs). The client is a context manager and owns its `httpx.Client` unless one is
 injected. Endpoint knowledge must never leak outside this module.
 
+## Normalized tables (`ingest/normalize.py`)
+
+Raw NHL responses fold into five documented Parquet tables under `data/normalized/`
+(gitignored, regenerated). Historical seasons **2015-16 … 2025-26** load from the
+committed archive in `data/raw/nhl-archive/` (read its `PROVENANCE.md` first); the live
+NHL API is reserved for the current season and gaps. Position codes collapse per SPEC §1:
+`C`/`L`/`R` → `F`, `D` → `D`, and goalies (`G`) are excluded from the skater pool.
+
+```
+uv run oracle normalize            # build/refresh data/normalized/*.parquet (idempotent)
+uv run oracle normalize --force    # rebuild even when sources are unchanged
+uv run oracle snapshot             # freeze a dated copy under snapshots/<id>/
+uv run oracle snapshot --list      # list frozen snapshot ids
+```
+
+Ingestion is **idempotent and incremental**: a `_manifest.json` records each source
+file's size, so a re-run with unchanged sources is a no-op, and every table dedups on
+its natural key (below). A **snapshot** copies the current tables into
+`data/normalized/snapshots/<snapshot_id>/` (id defaults to a UTC timestamp) so
+downstream stages can pin reproducible data.
+
+### `skater_games` — one row per skater-game (key: `game_id` + `player_id`)
+
+`season_id`, `game_type_id`, `game_id`, `game_date`, `player_id`, `player_name`,
+`position_code` (raw NHL code), `position` (`F`/`D`), `shoots_catches`, `team_abbrev`,
+`opponent_team_abbrev`, `home_road`, `goals`, `assists`, `points`, `shots`,
+`toi_seconds` (time on ice, **seconds**), `pp_goals`, `pp_points`, `sh_goals`,
+`sh_points`, `ev_goals`, `ev_points`, `plus_minus`, `penalty_minutes`,
+`game_winning_goals`, `ot_goals`, `shooting_pct`, `faceoff_win_pct`. Goalies excluded.
+
+### `team_games` — one row per team-game (key: `game_id` + `team_id`)
+
+`season_id`, `game_type_id`, `game_id`, `game_date`, `team_id`, `team_abbrev`,
+`team_full_name`, `opponent_team_abbrev`, `home_road`, `goals_for`, `goals_against`,
+`wins`, `losses`, `ot_losses`, `regulation_and_ot_wins`, `wins_in_regulation`,
+`wins_in_shootout`, `points`, `team_shutouts`, `win` (derived), `shutout_win` (derived:
+a win with `goals_against == 0`). The archive names a row's own team by `team_id` but the
+opponent by abbreviation (PROVENANCE §2), so `team_abbrev` is derived by pairing each
+game's two mirror rows.
+
+### `series` — one row per playoff series (key: `year` + `series_letter`)
+
+`year` (season ending year), `season_id`, `series_letter`, `series_abbrev`,
+`playoff_round`, `top_seed_team_id`, `top_seed_abbrev`, `top_seed_wins`,
+`bottom_seed_team_id`, `bottom_seed_abbrev`, `bottom_seed_wins`, `winning_team_id`,
+`losing_team_id`. Parsed from the committed `bracket-<year>.json` files.
+
+### `players` — one row per skater (key: `player_id`)
+
+`player_id`, `player_name`, `last_name`, `birth_date`, `position_code`, `position`,
+`shoots_catches`, `height`, `weight`, `birth_country_code`, `nationality_code`,
+`draft_year`, `draft_round`, `draft_overall`, `current_team_abbrev`, `last_season_id`.
+Goalies excluded; each player keeps the row from their most recent season.
+
+### `teams` — one row per team (key: `team_id`)
+
+`team_id`, `team_abbrev`, `team_full_name` (carries diacritics, e.g. `Montréal
+Canadiens`). Built from `team_games` (latest full name per id).
+
 ## Data & artifacts
 
 - `data/raw/` — gitignored **except** the committed `league-drafts/`, `odds-archive/`,
   and `nhl-archive/` snapshots described in `SPEC.md §5`.
+- `data/normalized/` — normalized Parquet tables + dated snapshots (gitignored).
 - `data/features/` — generated feature matrices (gitignored).
 - `data/overrides/` — hand-maintained YAML overrides (injuries, name/alias maps).
 - `artifacts/` — model artifacts (gitignored) except committed backtest

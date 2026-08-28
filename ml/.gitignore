@@ -11,6 +11,9 @@ data/raw/*
 # Generated feature matrices
 data/features/
 
+# Normalized Parquet tables + dated snapshots (regenerated from the archive)
+data/normalized/
+
 # Model artifacts, except committed backtest reports and manifests
 artifacts/*
 !artifacts/backtests/

@@ -35,6 +35,20 @@ Started: 08/27/2026 22:10:47
   `sleep=noop`, temp cache dir — no network, no real sleep. MockTransport route keys use
   the FULL request path incl. `/stats/rest/en`. Raw JSON caches to gitignored
   `data/raw/nhl-api/`; a cache hit skips the network entirely.
+- Normalized Parquet tables live in gitignored `ml/data/normalized/` via
+  `draft_oracle.ingest.normalize`. Position collapse is `map_position` (C/L/R->F, D->D,
+  G/other->None => dropped from skater pool). `team_games.team_abbrev` is DERIVED (not in
+  the source) by pairing a game's two mirror rows — the archive names own-team by id but
+  opponent by abbrev. Real archive normalizes to 522,185 skater_games / 29,016 team_games
+  / 173 series / 2,156 players / 34 teams — skater/team counts match PROVENANCE exactly.
+  Ingestion is idempotent via `_manifest.json` (source-size signature; unchanged => skip)
+  and every table dedups on its natural key. `oracle normalize [--force]` and
+  `oracle snapshot [--list]` are the CLI entry points; snapshots freeze a dated copy under
+  `data/normalized/snapshots/<id>/`.
+- Windows console is cp1252: NEVER print non-ASCII (`->` arrows, em-dashes) in
+  `typer.echo` output — it crashes with UnicodeEncodeError. Use ASCII.
+- Typer options must use `Annotated[T, typer.Option(...)] = default` (NOT
+  `x: T = typer.Option(default, ...)`) or ruff B008 fails on function-call-in-defaults.
 
 ## 2026-08-27 22:10 - US-001
 - Scaffolded the isolated uv-managed Python ML workspace under `ml/` for the
@@ -118,4 +132,43 @@ Started: 08/27/2026 22:10:47
   - fetch_nhl.py under data/raw/nhl-archive/ is the reference for real endpoint behavior
     (10k row cap, month partitioning, 1 req/s, 4 attempts) — mirror its politeness.
   - No UI change; Playwright not applicable (ml/ is outside the Nx/web graph).
+---
+
+## 2026-08-27 22:34 - US-004
+- Implemented draft_oracle.ingest.normalize: raw NHL archive -> five normalized
+  Parquet tables (skater_games, team_games, series, players, teams) with an
+  idempotent/incremental manifest and a dated snapshot mechanism.
+- Files changed:
+  - ml/src/draft_oracle/ingest/normalize.py (new): map_position (C/L/R->F, D->D, G
+    excluded), per-table normalizers (normalize_skater_games/team_games/players/teams/
+    series), build_team_abbrev_map (derives team_abbrev from mirror-row opponent
+    abbrev), season-label helpers, archive loaders (gz CSV + bracket JSON via the
+    existing PlayoffBracket pydantic model), normalize_archive (manifest-based skip on
+    unchanged sources; --force rebuild), create_snapshot/list_snapshots.
+  - ml/src/draft_oracle/ingest/__init__.py: re-export the normalize public API.
+  - ml/src/draft_oracle/cli/project.py: `oracle normalize` and `oracle snapshot`
+    (--list) commands using Annotated typer options; ASCII-only echo output.
+  - ml/tests/test_normalize.py (new): 30 tests — position map, dedup-on-rerun for
+    skaters/teams, team-abbrev map, players latest-season dedup + goalie drop, series
+    parse, end-to-end normalize on a tmp gz archive, idempotency/force, snapshot
+    create/list + frame-equality of frozen vs live tables. No network (SPEC §7).
+  - ml/.gitignore: ignore data/normalized/.
+  - ml/README.md: Commands rows + full "Normalized tables" section documenting all
+    five schemas, keys, position collapse, idempotency, and snapshots.
+- Quality (from ml/): ruff check clean, ruff format --check clean, mypy --strict clean
+  (18 files), pytest 92 passed. `oracle normalize --force` on the real committed
+  archive => 522,185 skater_games / 29,016 team_games / 173 series / 2,156 players /
+  34 teams (skater + team counts match nhl-archive/PROVENANCE.md exactly).
+- **Learnings for future iterations:**
+  - skater/summary already excludes goalies, so the archive skater CSVs have no G rows;
+    the map_position guard is still applied defensively and matters for the players/bios
+    table (bios positionCode never showed G in practice but the filter is there).
+  - series count 173 = 10 seasons x 15 + 2020's 23 (the COVID qualifying round) — matches
+    PROVENANCE §5. teams=34 reflects franchise/id churn 2015-2026 (Vegas, Seattle, ARI->UTA).
+  - Windows cp1252 console crashed on the `->` arrow in typer.echo — fixed to ASCII.
+    Any future CLI output must stay ASCII.
+  - Reused the existing PlayoffBracket pydantic model from nhl_api.py for bracket parsing
+    rather than re-deriving — keep bracket knowledge in one place.
+  - No UI change; Playwright not applicable (ml/ is outside the Nx/web graph, so
+    `yarn nx affected` is empty for these changes).
 ---
