@@ -291,6 +291,22 @@ Started: 08/27/2026 22:10:47
   feature row) are currently excluded (needs a round roster source); documented, not a
   crash. Injury flag comes from injuries.parquet status in {out,ir,day_to_day} and
   position!=G; availability haircut stays 1.0 for now (flag informs the drafter).
+- Draft simulator (US-019, `optimize/simulator.py`): `DraftState.new(managers, pool,
+  allow_ir, eliminated_team_ids)` builds the full `snake_order` sequence + a live
+  `available` dict keyed by `DraftAsset.key`; eliminated-team assets (skaters AND the
+  team's G slot) are dropped UP FRONT — never substituted mid-round. Per-position caps
+  come from `roster_capacity(allow_ir)` (5F/3D/1G, +1F/+1D with IR); `has_capacity`
+  gates legality so a full-at-F manager can only take D/G. `roster_slots()` maps the
+  extra F/D into IR_F/IR_D so `rules.validate_roster(allow_ir_slots=...)` (NOTE kwarg is
+  `allow_ir_slots`, not `allow_ir`) passes. Opponent policy is the pluggable
+  `OpponentModel` ABC; `GreedyOpponentModel(temperature, need_weight)` scores legal
+  assets `rank_value + need_weight*(open/limit)` then softmax-samples (temp 0 = argmax,
+  tie-break rank then key). `survival_probability(state, candidate, manager, model,
+  rollouts, seed)` copies state per rollout, plays only the gap of opponent picks before
+  `manager`'s next turn (via `picks_until_next`), counts non-captures. Determinism: full
+  draft threads ONE `random.Random(seed)`; survival derives per-rollout seed `seed*1_000_003+i`
+  (mypy-strict rejects a tuple seed to `random.Random`). Test feasibility trick: an EXACT
+  pool (supply == total capacity per position) provably forces valid full rosters.
 
 ## 2026-08-28 10:30 - US-018
 - Implemented VOR (value over replacement), positional scarcity, and the cheat sheet.
@@ -935,4 +951,41 @@ p.asarray(..., dtype=float) to avoid no-any-return.
   - The live artifact dir `artifacts/<season>-r<round>/` is gitignored (generated
     output); only backtests/models report.md+manifest.json are committed.
   - No UI change; browser/Playwright verification not applicable (Python-only ml/).
+---
+
+## 2026-08-28 10:34 - US-019
+- Implemented the rules-enforcing snake-draft simulator + fallback opponent model.
+- Files changed:
+  - ml/src/draft_oracle/optimize/simulator.py (new): DraftAsset, RosterCapacity/
+    roster_capacity, ManagerRoster, DraftState (snake order, per-position caps, no
+    duplicates, eliminated-team removal, roster_slots -> rules validation),
+    OpponentModel ABC, GreedyOpponentModel (perception + softmax temperature +
+    positional need), run_draft, validate_draft, survival_probability (Monte Carlo).
+  - ml/src/draft_oracle/optimize/__init__.py: re-export the simulator API.
+  - ml/tests/test_simulator.py (new): 19 tests — capacity/roster shape, rule
+    enforcement, greedy/softmax/need, survival (drafted=0, no-gap=1, top-pick rarely
+    survives, seed determinism, 1000 rollouts <5s), full 10-manager 11-pick valid
+    round-trip, full-draft determinism, no mid-round substitution.
+  - ml/README.md: "Draft simulator & fallback opponent" section.
+- Quality: uv run ruff format --check (51 ok), ruff check (all pass), mypy --strict
+  (49 files, no issues), pytest (433 passed incl. 19 new; 1000-rollout perf test
+  0.78s total run). Python-only ml/ change -> zero affected Nx lint/typecheck/test/
+  Playwright targets (Codebase Patterns), so those pass unaffected.
+- **Learnings for future iterations:**
+  - rules.validate_roster kwarg is `allow_ir_slots` (NOT `allow_ir`) — easy to miss;
+    the simulator's own flag is `allow_ir`.
+  - mypy --strict rejects a tuple seed to `random.Random`; derive an int per rollout
+    (`seed*1_000_003 + i`) to keep survival deterministic.
+  - For a provably-valid full-draft test, size the pool EXACTLY to total capacity per
+    position (e.g. 10 mgrs IR = 60F/40D/10G). Pigeonhole then forces each manager to
+    exactly their caps and no manager ever gets stuck without a legal needed asset.
+  - Give test skaters explicit UNIQUE player_ids across F and D pools — deriving id
+    from the numeric suffix collides (F12 vs D12) and trips validate_roster's
+    duplicate-player check.
+  - GreedyOpponentModel default temperature=0.0 is a deterministic best-available
+    baseline; set temperature>0 for softmax noise. need_weight urgency = open/limit is
+    ~uniform early (perception dominates) and floats needed positions up as they fill.
+  - Next (US-020) fits an opponent model from league draft history; it can subclass
+    OpponentModel and drop into run_draft / survival_probability unchanged. US-021
+    (recommend) will build DraftAssets from the projection artifact frames.
 ---

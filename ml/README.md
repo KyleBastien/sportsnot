@@ -659,6 +659,28 @@ asset prices at its full projection. `VOR = expected_points − replacement_leve
 `--managers` (2–12) and `--ir/--no-ir` set the replacement levels and change the
 `cheatsheet.md` layout (injured skaters are tagged `IR?` with IR, `OUT` without).
 
+## Draft simulator & fallback opponent (`optimize/simulator.py`)
+
+The optimizer needs an engine to roll out on: a faithful re-draft that lookahead
+can push picks through (US-019). `DraftState` enforces the full ruleset via
+`draft_oracle.rules` — snake order from `snake_order`, per-position limits
+(`5F/3D/1G`, `+1 IR_F/+1 IR_D` only when IR is enabled, so a manager with 5 F must
+take D or G), no duplicate assets, and eliminated teams (plus their skaters) removed
+from the pool up front with **no** mid-round substitution (SPEC §1). A `DraftAsset`
+is a skater (F/D, carries `player_id`) or a team's goaltending (G, carries
+`team_id`); `rank_value` is the public-perception score (regular-season points).
+
+`GreedyOpponentModel` is the pluggable fallback behind the `OpponentModel`
+interface: it drafts greedily by `rank_value` with softmax noise (a configurable
+`temperature`; `0` = deterministic argmax) and positional-need awareness (a
+still-open position gets a `need_weight × urgency` bump where
+`urgency = open_slots / limit`). `run_draft` plays a state to completion through a
+single seeded RNG; `validate_draft` checks every finished roster through the rules
+engine. `survival_probability(state, candidate, manager, model, rollouts, seed)`
+Monte-Carlos the opponents' picks between now and a manager's next turn and returns
+`P(candidate survives)` — ≥1000 rollouts run well under 5 s and are deterministic
+given `(state, seed)`.
+
 ## Data & artifact layout
 
 - `data/raw/` — gitignored **except** the committed `league-drafts/`, `odds-archive/`,
