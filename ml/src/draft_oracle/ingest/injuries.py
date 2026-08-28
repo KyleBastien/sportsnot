@@ -256,6 +256,9 @@ class InjuryOverride:
     detail: str | None = None
     team: str | None = None
     remove: bool = False
+    # Round game (1-based) a player is expected back; consumed by the return-time
+    # model (US-015) where it pins availability and overrides the model curve.
+    return_game: int | None = None
 
 
 def load_injury_overrides(
@@ -277,6 +280,7 @@ def load_injury_overrides(
             continue
         espn_id = item.get("espn_id")
         status = item.get("status")
+        return_game = item.get("return_game")
         overrides.append(
             InjuryOverride(
                 player=_as_str(item.get("player")),
@@ -286,6 +290,7 @@ def load_injury_overrides(
                 detail=_as_str(item.get("detail")),
                 team=_as_str(item.get("team")),
                 remove=bool(item.get("remove", False)),
+                return_game=int(return_game) if return_game is not None else None,
             )
         )
     return overrides

@@ -17,6 +17,8 @@
 #   detail:      free-text note, e.g. "Lower Body"
 #   team:        team name (only used when injecting a brand-new row)
 #   remove:      true to delete a matched row
+#   return_game: round game (1-based) the player is expected back; pins availability
+#                and OVERRIDES the return-time model curve (US-015)
 #
 # Example (commented out — ships empty; the ESPN feed is the routine source):
 # overrides:

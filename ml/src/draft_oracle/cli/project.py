@@ -41,6 +41,13 @@ from draft_oracle.models.game_win import (
     GameWinConfig,
     train_game_win_from_normalized,
 )
+from draft_oracle.models.returns import (
+    DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_RETURN_TIME_ARTIFACT_DIR,
+)
+from draft_oracle.models.returns import (
+    ReturnTimeConfig,
+    train_return_time_from_normalized,
+)
 from draft_oracle.models.series_sim import (
     DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_SERIES_SIM_ARTIFACT_DIR,
 )
@@ -309,6 +316,32 @@ def train_skater_production(
     )
     typer.echo(f"  beats reg-ppg baseline: {'yes' if result.beats_reg_baseline else 'no'}")
     typer.echo(f"  cold cases (test): {result.n_cold_cases_test}")
+
+
+@app.command(name="train-return-time")
+def train_return_time(
+    normalized_dir: Annotated[
+        Path, typer.Option(help="Directory holding normalized Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: Annotated[
+        Path, typer.Option(help="Output directory for the report + manifest.")
+    ] = DEFAULT_RETURN_TIME_ARTIFACT_DIR,
+    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+) -> None:
+    """Calibrate the injury return-time model on archive absence spells."""
+    result = train_return_time_from_normalized(
+        normalized_dir=normalized_dir,
+        artifact_dir=artifact_dir,
+        config=ReturnTimeConfig(seed=seed),
+    )
+    typer.echo(f"Return-time model -> {artifact_dir}")
+    typer.echo(f"  spells retained: {result.n_spells_total}")
+    typer.echo(
+        f"  spell length: mean {result.mean_spell:.2f} / "
+        f"median {result.median_spell:.1f} / p90 {result.p90_spell:.1f}"
+    )
+    typer.echo(f"  held-out seasons: {list(result.test_years)}")
+    typer.echo(f"  calibration MAE (survival): {result.calibration_mae:.4f}")
 
 
 @app.command(name="eval-series-sim")

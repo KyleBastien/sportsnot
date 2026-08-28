@@ -214,6 +214,64 @@ Started: 08/27/2026 22:10:47
 - Regression sibling of the game_win pattern: choose between a Poisson GLM
   (`PoissonRegressor` on `StandardScaler` features) and `LGBMRegressor(objective=
   "poisson")` on validation MAE; both give non-negative rates (clip raw preds >=0).
+- Availability / return-time pattern (US-015, `models/returns.py`): ESPN has NO
+  historical injuries (leakage), so return timing is calibrated on ABSENCE SPELLS
+  derived from the normalized archive - `derive_absence_spells(skater_games,
+  team_games)` finds, per (season, team, player), maximal BOOKENDED runs of missed
+  team games (`spells_from_sequence`: only gaps between two appearances count;
+  leading=pre-debut, trailing=season-end are excluded). Healthy-scratch guards are
+  documented config filters (min_spell=2, min_appearances=20, min_median_toi=600s).
+  DESIGN: the empirical spell distribution supplies the return-timing SHAPE; a
+  DOCUMENTED status->mean map (`STATUS_MEAN_GAMES` day_to_day=1/out=3/ir=8 games,
+  archive has no status label) rescales it for LOCATION. `availability_curve` =
+  empirical CDF of the (scaled, optionally games_missed-conditioned) remaining-games
+  distribution => P(available game k) is monotone non-decreasing in k by construction
+  (threshold k-1 rises). `availability_multiplier` = expected_games/horizon is the
+  haircut US-016 multiplies into expected games played. Real archive: 10,470 spells,
+  mean 6.19 games, temporal-holdout survival calibration MAE 0.023 (excellent).
+- Override precedence pattern (reusable): US-015 added `return_game: int|None` to
+  `InjuryOverride` + `load_injury_overrides` (NOT to the injuries parquet columns).
+  `project_availability` matches an override to each injury row (espn_id first, then
+  normalize_name) and a pinned `return_game` yields a deterministic 0..0,1..1 curve
+  that WINS over the model. When adding override-driven fields, extend the dataclass +
+  loader only; keep them out of the ingested table to avoid schema churn.
+
+## 2026-08-28 01:52 - US-015
+- Implemented the injury return-time model + availability adjustment
+  (`models/returns.py`, US-015 / PRD US-011 part 2). Outputs P(available for game k),
+  k=1..7, per injured skater; an availability multiplier haircuts expected games
+  played; injuries.yaml `return_game` overrides the model.
+- Files changed:
+  - `ml/src/draft_oracle/models/returns.py` (new): `derive_absence_spells` +
+    `spells_from_sequence` (bookended missed-game runs from the archive), the
+    `ReturnTimeModel` survival curve (status-scaled, games_missed-conditioned,
+    monotone), `project_availability` (override precedence + haircut),
+    `train_return_time_model` / `_from_normalized` (honest temporal calibration,
+    report.md + manifest.json).
+  - `ml/src/draft_oracle/ingest/injuries.py`: added `return_game` to `InjuryOverride`
+    + `load_injury_overrides`.
+  - `ml/src/draft_oracle/models/__init__.py`: re-export the new public API.
+  - `ml/src/draft_oracle/cli/project.py`: `oracle train-return-time` command.
+  - `ml/data/overrides/injuries.yaml`: documented the `return_game` field.
+  - `ml/README.md`: return-time table row + section.
+  - `ml/tests/test_returns.py` (new): 19 tests (spell bookending + filters, curve
+    monotonicity incl. a hypothesis property, severity ordering, override precedence
+    by name + espn_id, haircut, end-to-end honest calibration).
+  - `ml/artifacts/models/return-time/{report.md,manifest.json}`: committed run.
+- Quality checks (from ml/): ruff check clean, ruff format --check clean, mypy
+  --strict clean (41 files), pytest 369 passed (19 new). `oracle train-return-time`
+  produced 10,470 spells / calibration MAE 0.023 on held-out 2025-2026.
+- **Learnings for future iterations:**
+  - The archive is a rich, leakage-free injury proxy: 10k+ real absence spells over
+    11 seasons without any external feed. Reuse `derive_absence_spells` for any
+    future durability / games-played modeling.
+  - `pd.DataFrame.groupby([...])` yields a tuple key typed `Hashable` under mypy
+    --strict; casting `int(season)` needs `# type: ignore[call-overload]` (used once).
+  - `injuries.to_dict("records")` rows type as `dict[Hashable, Any]` -> a helper
+    consuming them must annotate `dict[Any, Any]`, not `dict[str, Any]`.
+  - No UI change; browser/Playwright verification not applicable (Python-only ml/).
+---
+
 
 ## 2026-08-27 22:10 - US-001
 - Scaffolded the isolated uv-managed Python ML workspace under `ml/` for the

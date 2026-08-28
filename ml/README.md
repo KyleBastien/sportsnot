@@ -57,6 +57,7 @@ All commands run from the `ml/` directory.
 | Win model (stat)| `uv run oracle train-game-win --no-odds` |
 | Train shutout   | `uv run oracle train-shutout`            |
 | Eval series sim | `uv run oracle eval-series-sim`          |
+| Return-time     | `uv run oracle train-return-time`        |
 
 ## Package layout
 
@@ -511,12 +512,11 @@ a seeded `simulate_series_monte_carlo` exists only to cross-check the enumeratio
 ```python
 from draft_oracle.models import simulate_series
 
-outcome = simulate_series(p_a_home=0.62, p_a_away=0.48,
-                          shutout_prob_a=0.12, shutout_prob_b=0.09)
-outcome.p_a_win_series      # P(higher seed wins the series)
-outcome.length_probs        # {4:.., 5:.., 6:.., 7:..}, sums to 1
-outcome.e_wins_a            # E[wins] for the higher seed
-outcome.e_goalie_points_a   # E[goalie-slot points] through the rules engine
+outcome = simulate_series(p_a_home=0.62, p_a_away=0.48, shutout_prob_a=0.12, shutout_prob_b=0.09)
+outcome.p_a_win_series  # P(higher seed wins the series)
+outcome.length_probs  # {4:.., 5:.., 6:.., 7:..}, sums to 1
+outcome.e_wins_a  # E[wins] for the higher seed
+outcome.e_goalie_points_a  # E[goalie-slot points] through the rules engine
 ```
 
 ```bash
@@ -540,6 +540,37 @@ predicted-vs-actual shutouts per round. Pre-series team snapshots are frozen in 
 single leakage-free chronological pass at each matchup's first playoff game.
 Metrics are reported **honestly** — the held-out sample is small (~30-40 series),
 so numbers are printed as measured (SPEC §7).
+
+## Injury return-time model (`models/returns.py`)
+
+Prices **availability** for injured skaters — `P(available for game k)`, k=1..7 of
+the upcoming best-of-7 round (US-015). ESPN cannot supply *historical* injuries
+(old game summaries resolve `injuries` against today's rosters — leakage, SPEC §5),
+so the model is calibrated on **absence spells** derived from the committed NHL
+archive: for each established skater, a maximal bookended run of consecutive team
+games missed *between two appearances* is one real missed-game spell.
+
+```python
+from draft_oracle.models import derive_absence_spells, fit_return_time_model, project_availability
+
+spells = derive_absence_spells(skater_games, team_games)  # 10k+ real spells, 11 seasons
+model = fit_return_time_model(spells)
+model.availability_curve("out")  # [P(avail g1), ..., P(avail g7)], non-decreasing
+model.availability_multiplier("ir")  # haircut in [0,1] applied to expected games played
+```
+
+```bash
+uv run oracle train-return-time   # calibrate on archive spells + write report/manifest
+```
+
+The archive supplies the return-timing **shape**; a documented status map
+(`STATUS_MEAN_GAMES`: day-to-day≈1, out≈3, IR≈8 games) supplies the **location**
+(the archive has no status label — an explicit assumption, SPEC §7). Healthy-scratch
+noise is filtered with documented guards (min spell length, min appearances, min
+median TOI). Calibration holds out the newest seasons and reports predicted-vs-observed
+spell survival honestly. An `injuries.yaml` entry may pin `return_game` to override the
+model curve. `project_availability` yields per-player `p_available_g1..g7`,
+`expected_games_available`, and the `availability_multiplier` haircut.
 
 ## Data & artifact layout
 
