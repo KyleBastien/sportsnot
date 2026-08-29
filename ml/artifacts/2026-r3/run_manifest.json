@@ -1,0 +1,169 @@
+{
+  "artifact_version": "live-projection-v1",
+  "as_of_cutoff": "2026-05-20",
+  "combined_event": {
+    "draft_event": "R3_4",
+    "draft_round": 3,
+    "scored_rounds": [
+      3,
+      4
+    ],
+    "teams": [
+      {
+        "e_goalie_points_combined": 12.200249,
+        "e_goalie_points_r3": 7.402427,
+        "e_goalie_points_r4": 6.947272,
+        "p_advance": 0.690605,
+        "team_abbrev": "CAR"
+      },
+      {
+        "e_goalie_points_combined": 7.001489,
+        "e_goalie_points_r3": 5.177872,
+        "e_goalie_points_r4": 5.894142,
+        "p_advance": 0.309395,
+        "team_abbrev": "MTL"
+      },
+      {
+        "e_goalie_points_combined": 12.420671,
+        "e_goalie_points_r3": 7.718985,
+        "e_goalie_points_r4": 6.538812,
+        "p_advance": 0.719043,
+        "team_abbrev": "COL"
+      },
+      {
+        "e_goalie_points_combined": 6.348534,
+        "e_goalie_points_r3": 4.938818,
+        "e_goalie_points_r4": 5.017548,
+        "p_advance": 0.280957,
+        "team_abbrev": "VGK"
+      }
+    ]
+  },
+  "counts": {
+    "eligible_series": 2,
+    "eligible_teams": 4,
+    "skaters_injured": 0,
+    "skaters_projected": 115
+  },
+  "eligible_team_abbrevs": [
+    "CAR",
+    "COL",
+    "MTL",
+    "VGK"
+  ],
+  "feature_version": "skater-v1",
+  "generated_at": "2026-08-29T04:56:34.099994+00:00",
+  "git_sha": "3bf153731382487adc116e3416f7ef29699fe4d3",
+  "ir_stash": {
+    "candidates": 0,
+    "enabled": false,
+    "stash_verdicts": 0
+  },
+  "model_versions": {
+    "game_win": "game-win-v1",
+    "projection": "skater-projection-v1",
+    "series_sim": "series-sim-v1",
+    "shutout": "shutout-v1",
+    "skater_production": "skater-production-v1"
+  },
+  "package_version": "0.1.0",
+  "playoff_round": 3,
+  "scarcity": {
+    "assets": 119,
+    "ir": false,
+    "managers": 4,
+    "replacement_level": {
+      "D": 2.97275,
+      "F": 5.171,
+      "G": 0.0
+    },
+    "roster_demand": {
+      "defense_per_manager": 3,
+      "forwards_per_manager": 5,
+      "goalies_per_manager": 1
+    }
+  },
+  "season": 2026,
+  "seeds": {
+    "base": 20260827,
+    "horizon": 7,
+    "n_sims": 4000
+  },
+  "slot_strategies": {
+    "best_slot": 1,
+    "fitted_opponents": true,
+    "ir": false,
+    "managers": 4,
+    "rollouts": 500,
+    "rounds": 9,
+    "seed": 20260827,
+    "slots": [
+      {
+        "first_pick": "Nathan MacKinnon",
+        "pick_numbers": [
+          1,
+          8,
+          9,
+          16,
+          17,
+          24,
+          25,
+          32,
+          33
+        ],
+        "projected_total": 60.352171,
+        "slot": 1
+      },
+      {
+        "first_pick": "Cale Makar",
+        "pick_numbers": [
+          2,
+          7,
+          10,
+          15,
+          18,
+          23,
+          26,
+          31,
+          34
+        ],
+        "projected_total": 58.632671,
+        "slot": 2
+      },
+      {
+        "first_pick": "Martin Necas",
+        "pick_numbers": [
+          3,
+          6,
+          11,
+          14,
+          19,
+          22,
+          27,
+          30,
+          35
+        ],
+        "projected_total": 58.728421,
+        "slot": 3
+      },
+      {
+        "first_pick": "Lane Hutson",
+        "pick_numbers": [
+          4,
+          5,
+          12,
+          13,
+          20,
+          21,
+          28,
+          29,
+          36
+        ],
+        "projected_total": 57.502921,
+        "slot": 4
+      }
+    ]
+  },
+  "snapshot_id": "live-44src-12769611b",
+  "warnings": []
+}

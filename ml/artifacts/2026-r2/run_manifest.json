@@ -1,0 +1,135 @@
+{
+  "artifact_version": "live-projection-v1",
+  "as_of_cutoff": "2026-05-02",
+  "counts": {
+    "eligible_series": 4,
+    "eligible_teams": 8,
+    "skaters_injured": 0,
+    "skaters_projected": 231
+  },
+  "eligible_team_abbrevs": [
+    "ANA",
+    "BUF",
+    "CAR",
+    "COL",
+    "MIN",
+    "MTL",
+    "PHI",
+    "VGK"
+  ],
+  "feature_version": "skater-v1",
+  "generated_at": "2026-08-29T03:29:04.055487+00:00",
+  "git_sha": "3bf153731382487adc116e3416f7ef29699fe4d3",
+  "ir_stash": {
+    "candidates": 0,
+    "enabled": false,
+    "stash_verdicts": 0
+  },
+  "model_versions": {
+    "game_win": "game-win-v1",
+    "projection": "skater-projection-v1",
+    "series_sim": "series-sim-v1",
+    "shutout": "shutout-v1",
+    "skater_production": "skater-production-v1"
+  },
+  "package_version": "0.1.0",
+  "playoff_round": 2,
+  "scarcity": {
+    "assets": 239,
+    "ir": false,
+    "managers": 4,
+    "replacement_level": {
+      "D": 2.19925,
+      "F": 3.70675,
+      "G": 6.028791059333532
+    },
+    "roster_demand": {
+      "defense_per_manager": 3,
+      "forwards_per_manager": 5,
+      "goalies_per_manager": 1
+    }
+  },
+  "season": 2026,
+  "seeds": {
+    "base": 20260827,
+    "horizon": 7,
+    "n_sims": 4000
+  },
+  "slot_strategies": {
+    "best_slot": 3,
+    "fitted_opponents": true,
+    "ir": false,
+    "managers": 4,
+    "rollouts": 500,
+    "rounds": 9,
+    "seed": 20260827,
+    "slots": [
+      {
+        "first_pick": "Nathan MacKinnon",
+        "pick_numbers": [
+          1,
+          8,
+          9,
+          16,
+          17,
+          24,
+          25,
+          32,
+          33
+        ],
+        "projected_total": 42.99426,
+        "slot": 1
+      },
+      {
+        "first_pick": "Quinn Hughes",
+        "pick_numbers": [
+          2,
+          7,
+          10,
+          15,
+          18,
+          23,
+          26,
+          31,
+          34
+        ],
+        "projected_total": 42.803636,
+        "slot": 2
+      },
+      {
+        "first_pick": "Cale Makar",
+        "pick_numbers": [
+          3,
+          6,
+          11,
+          14,
+          19,
+          22,
+          27,
+          30,
+          35
+        ],
+        "projected_total": 43.160798,
+        "slot": 3
+      },
+      {
+        "first_pick": "Nick Suzuki",
+        "pick_numbers": [
+          4,
+          5,
+          12,
+          13,
+          20,
+          21,
+          28,
+          29,
+          36
+        ],
+        "projected_total": 42.78801,
+        "slot": 4
+      }
+    ]
+  },
+  "snapshot_id": "live-44src-12769611b",
+  "warnings": []
+}

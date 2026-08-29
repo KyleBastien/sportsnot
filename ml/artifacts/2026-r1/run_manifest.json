@@ -1,0 +1,143 @@
+{
+  "artifact_version": "live-projection-v1",
+  "as_of_cutoff": "2026-04-18",
+  "counts": {
+    "eligible_series": 8,
+    "eligible_teams": 16,
+    "skaters_injured": 0,
+    "skaters_projected": 462
+  },
+  "eligible_team_abbrevs": [
+    "ANA",
+    "BOS",
+    "BUF",
+    "CAR",
+    "COL",
+    "DAL",
+    "EDM",
+    "LAK",
+    "MIN",
+    "MTL",
+    "OTT",
+    "PHI",
+    "PIT",
+    "TBL",
+    "UTA",
+    "VGK"
+  ],
+  "feature_version": "skater-v1",
+  "generated_at": "2026-08-29T03:17:35.415620+00:00",
+  "git_sha": "3bf153731382487adc116e3416f7ef29699fe4d3",
+  "ir_stash": {
+    "candidates": 0,
+    "enabled": false,
+    "stash_verdicts": 0
+  },
+  "model_versions": {
+    "game_win": "game-win-v1",
+    "projection": "skater-projection-v1",
+    "series_sim": "series-sim-v1",
+    "shutout": "shutout-v1",
+    "skater_production": "skater-production-v1"
+  },
+  "package_version": "0.1.0",
+  "playoff_round": 1,
+  "scarcity": {
+    "assets": 478,
+    "ir": false,
+    "managers": 4,
+    "replacement_level": {
+      "D": 3.5395,
+      "F": 4.7885,
+      "G": 6.707952353820153
+    },
+    "roster_demand": {
+      "defense_per_manager": 3,
+      "forwards_per_manager": 5,
+      "goalies_per_manager": 1
+    }
+  },
+  "season": 2026,
+  "seeds": {
+    "base": 20260827,
+    "horizon": 7,
+    "n_sims": 4000
+  },
+  "slot_strategies": {
+    "best_slot": 1,
+    "fitted_opponents": true,
+    "ir": false,
+    "managers": 4,
+    "rollouts": 500,
+    "rounds": 9,
+    "seed": 20260827,
+    "slots": [
+      {
+        "first_pick": "Connor McDavid",
+        "pick_numbers": [
+          1,
+          8,
+          9,
+          16,
+          17,
+          24,
+          25,
+          32,
+          33
+        ],
+        "projected_total": 48.948427,
+        "slot": 1
+      },
+      {
+        "first_pick": "Leon Draisaitl",
+        "pick_numbers": [
+          2,
+          7,
+          10,
+          15,
+          18,
+          23,
+          26,
+          31,
+          34
+        ],
+        "projected_total": 48.820677,
+        "slot": 2
+      },
+      {
+        "first_pick": "Nathan MacKinnon",
+        "pick_numbers": [
+          3,
+          6,
+          11,
+          14,
+          19,
+          22,
+          27,
+          30,
+          35
+        ],
+        "projected_total": 48.396427,
+        "slot": 3
+      },
+      {
+        "first_pick": "COL",
+        "pick_numbers": [
+          4,
+          5,
+          12,
+          13,
+          20,
+          21,
+          28,
+          29,
+          36
+        ],
+        "projected_total": 48.635927,
+        "slot": 4
+      }
+    ]
+  },
+  "snapshot_id": "live-44src-12769611b",
+  "warnings": []
+}
