@@ -41,6 +41,8 @@ environment, and never touch the wire in tests (fixtures only - SPEC §7).
 
 from __future__ import annotations
 
+import gzip
+import json
 import os
 import re
 import time
@@ -336,12 +338,18 @@ def devig_favorite_only(
     approximation (SPEC §5). Only probabilities are produced; no underdog
     American price is ever fabricated. The favorite is treated as the *home*
     side here; callers map the result to the true favored side.
+
+    The favorite is, by identification, at least a coin flip. Dividing a
+    marginal favorite's raw implied probability by the assumed two-way overround
+    can push prices in ``(-100, -110]`` fractionally below ``0.5`` - inverting
+    the sides so the "favorite" reads as an underdog (CODE_REVIEW m-5). We floor
+    the favorite at ``0.5`` so the identified favorite never de-vigs below even.
     """
     if overround <= 0:
         raise ValueError("overround must be positive")
     q_fav = american_to_implied_prob(favorite_ml)
     p_fav = q_fav / overround
-    p_fav = min(max(p_fav, 0.0), 1.0)
+    p_fav = min(max(p_fav, 0.5), 1.0)
     return DevigResult(
         home_prob=p_fav,
         away_prob=1.0 - p_fav,
@@ -747,25 +755,62 @@ def _is_placeholder_price(reject: frozenset[float] | None, fav_ml: float | None)
     return any(abs(fav_ml - value) < 1e-6 for value in reject)
 
 
+def _favorite_side_from_pair_spreads(
+    home_spread: float | None, away_spread: float | None
+) -> str | None:
+    """Favored side from a genuine *per-team* (opposite-signed) spread pair.
+
+    A trustworthy per-team spread encodes the favorite as the negative side and
+    the underdog as the positive side. The Kaggle ``nhl_data_extensive`` archive
+    instead stamps a single game-level spread on BOTH rows (identical in
+    29,415/29,417 games - CODE_REVIEW C-1), which encodes no favorite: return
+    ``None`` so those rows are left unattributed rather than guessed as home.
+    """
+    if home_spread is None or away_spread is None:
+        return None
+    if home_spread < 0 < away_spread:
+        return "home"
+    if away_spread < 0 < home_spread:
+        return "away"
+    return None
+
+
+def _kaggle_favorite_side(_game_id: object, home: pd.Series, away: pd.Series) -> str | None:
+    """Kaggle favorite resolver: trust only a genuine per-team spread pair."""
+    return _favorite_side_from_pair_spreads(
+        _american(home["spread"]), _american(away["spread"])
+    )
+
+
+# A resolver maps (game_id, home_row, away_row) -> favored side, or ``None``
+# when the source carries no trustworthy favorite signal for that game.
+FavoriteResolver = Callable[[object, pd.Series, pd.Series], "str | None"]
+
+
 def _favorite_rows_from_games(
     grouped: pd.DataFrame,
     *,
     source: str,
+    resolve_favorite: FavoriteResolver | None = None,
     placeholder_seasons: Mapping[int, frozenset[float] | None] | None = None,
 ) -> list[dict[str, Any]]:
     """Build favorite-only rows from a per-game two-row frame.
 
-    The favored side is identified from the home row's ``spread`` sign, which is
-    equivalent for both favorite-only layouts: ESPN's ``spread`` is
-    home-relative (§9), and Kaggle's per-team ``spread`` is negative on the
-    favorite's row (§8) - in both a home favorite means ``home spread < 0``.
+    ``resolve_favorite`` identifies the favored side per game (defaulting to the
+    Kaggle per-team-spread resolver). When it returns ``None`` the price has no
+    trustworthy favorite attribution, so the row is emitted ``covered=False``
+    (unattributed) rather than guessed - CODE_REVIEW C-1: the Kaggle home-row
+    spread sign is game-level and identical on both rows, so it must never be
+    used to attribute a favorite.
 
     When ``placeholder_seasons`` flags a season (CODE_REVIEW C-2), that season's
     fabricated constant prices are emitted as ``covered=False`` rows rather than
     genuine coverage - flagged, never imputed and never silently dropped.
     """
+    if resolve_favorite is None:
+        resolve_favorite = _kaggle_favorite_side
     rows: list[dict[str, Any]] = []
-    for _game_id, pair in grouped.groupby("game_id", sort=True):
+    for game_id, pair in grouped.groupby("game_id", sort=True):
         if len(pair) != 2:
             continue
         home_mask = pair["is_home"].astype(float) == 1
@@ -784,14 +829,13 @@ def _favorite_rows_from_games(
         if home_id is None or away_id is None:
             continue
         fav_ml = _american(home["favorite_moneyline"])
-        home_spread = _american(home["spread"])
-        favorite_side = "home" if (home_spread is not None and home_spread < 0) else "away"
+        favorite_side = resolve_favorite(game_id, home, away)
         is_placeholder = (
             placeholder_seasons is not None
             and season_end_year in placeholder_seasons
             and _is_placeholder_price(placeholder_seasons[season_end_year], fav_ml)
         )
-        if fav_ml is None or is_placeholder:
+        if fav_ml is None or is_placeholder or favorite_side is None:
             row = _uncovered_row(
                 source=source,
                 season_end_year=season_end_year,
@@ -804,6 +848,8 @@ def _favorite_rows_from_games(
             )
             if is_placeholder:
                 row["_placeholder"] = True
+            elif fav_ml is not None and favorite_side is None:
+                row["_unattributed"] = True
             rows.append(row)
             continue
         rows.append(
@@ -856,19 +902,89 @@ def parse_kaggle_extensive(path: Path) -> pd.DataFrame:
         raw, source=SOURCE_KAGGLE, placeholder_seasons=placeholder_seasons
     )
     placeholder_uncovered = sum(1 for row in rows if row.get("_placeholder"))
+    unattributed = sum(1 for row in rows if row.get("_unattributed"))
     frame = _finalize(rows)
     frame.attrs["placeholder_uncovered_rows"] = placeholder_uncovered
+    frame.attrs["unattributed_uncovered_rows"] = unattributed
     return frame
 
 
-def parse_espn_completion(path: Path) -> pd.DataFrame:
+def _pickcenter_favorite_side(pickcenter: Mapping[str, Any]) -> str | None:
+    """Favored side from an ESPN ``pickcenter`` entry's per-side favorite flags.
+
+    ``homeTeamOdds.favorite`` / ``awayTeamOdds.favorite`` are the authoritative
+    favorite encoding in the raw ESPN summaries (CODE_REVIEW C-1). Returns
+    ``None`` when neither side is flagged.
+    """
+    home = pickcenter.get("homeTeamOdds")
+    if isinstance(home, dict) and home.get("favorite"):
+        return "home"
+    away = pickcenter.get("awayTeamOdds")
+    if isinstance(away, dict) and away.get("favorite"):
+        return "away"
+    return None
+
+
+def _espn_completion_favorite_sides(
+    summary_dir: Path, game_ids: Iterable[int]
+) -> dict[int, str]:
+    """Read authoritative favorite sides from committed raw ESPN summaries.
+
+    Each ``{event_id}.json.gz`` under ``summary_dir`` carries a ``pickcenter``
+    block whose ``homeTeamOdds.favorite`` flag names the favorite directly
+    (CODE_REVIEW C-1). Missing/unreadable summaries are skipped so the caller
+    can fall back to the home-relative spread convention.
+    """
+    sides: dict[int, str] = {}
+    if not summary_dir.exists():
+        return sides
+    for game_id in game_ids:
+        path = summary_dir / f"{int(game_id)}.json.gz"
+        if not path.exists():
+            continue
+        try:
+            with gzip.open(path, "rt", encoding="utf-8") as handle:
+                summary = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            continue
+        pickcenter = summary.get("pickcenter") if isinstance(summary, Mapping) else None
+        if isinstance(pickcenter, list) and pickcenter and isinstance(pickcenter[0], dict):
+            side = _pickcenter_favorite_side(pickcenter[0])
+            if side is not None:
+                sides[int(game_id)] = side
+    return sides
+
+
+def parse_espn_completion(
+    path: Path, *, summary_dir: Path | None = None
+) -> pd.DataFrame:
     """Parse the ESPN 2025-26 completion ``games.csv`` favorite-only odds file.
 
-    ESPN's ``spread`` is home-relative (PROVENANCE §9): ``spread < 0`` ⇒ home
-    favorite. Season labels are ENDING years.
+    The favorite is read from the committed raw ESPN summaries'
+    ``homeTeamOdds.favorite`` flag (``raw/summary/{event_id}.json.gz`` beside the
+    CSV - CODE_REVIEW C-1). When a summary is absent the parser falls back to
+    ESPN's home-relative ``spread`` convention (``spread < 0`` ⇒ home favorite -
+    PROVENANCE §9), which the completion CSV documents per-game. Season labels
+    are ENDING years.
     """
     raw = pd.read_csv(path, usecols=list(_FAVORITE_CSV_COLUMNS))
-    rows = _favorite_rows_from_games(raw, source=SOURCE_ESPN_COMPLETION)
+    if summary_dir is None:
+        summary_dir = path.parent / "raw" / "summary"
+    game_ids = (
+        pd.to_numeric(raw["game_id"], errors="coerce").dropna().astype(int).unique()
+    )
+    favorite_sides = _espn_completion_favorite_sides(Path(summary_dir), game_ids)
+
+    def resolve(game_id: object, home: pd.Series, _away: pd.Series) -> str | None:
+        gid = _american(game_id)
+        if gid is not None and int(gid) in favorite_sides:
+            return favorite_sides[int(gid)]
+        home_spread = _american(home["spread"])
+        return "home" if (home_spread is not None and home_spread < 0) else "away"
+
+    rows = _favorite_rows_from_games(
+        raw, source=SOURCE_ESPN_COMPLETION, resolve_favorite=resolve
+    )
     return _finalize(rows)
 
 

@@ -38,8 +38,8 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "devig_favorite_only now floors the favorite at 0.5 (m-5): a marginal favorite (-101..-110) no longer de-vigs below even; property-tested across the full negative American range. Favorite attribution (C-1): _favorite_rows_from_games takes a FavoriteResolver; Kaggle uses _kaggle_favorite_side (trusts ONLY a genuine per-team opposite-signed spread pair via _favorite_side_from_pair_spreads) so the committed archive's identical-both-rows spread yields covered=False unattributed rows (attrs['unattributed_uncovered_rows']); real-file test asserts 0 attributed favorites. parse_espn_completion reads the authoritative homeTeamOdds.favorite flag from raw/summary/{event_id}.json.gz (_espn_completion_favorite_sides + _pickcenter_favorite_side), falling back to ESPN's home-relative spread when a summary is absent; real file -> 903 covered, 308 away favorites now correctly attributed (was 0). ruff+mypy clean, 577 ml tests pass. Downstream odds.parquet/game-win/backtest market artifacts regenerate under US-103/US-106 (need the date-normalization fix first)."
     },
     {
       "id": "US-103",

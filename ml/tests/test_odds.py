@@ -9,6 +9,7 @@ single committed SBR workbook to guard the count against PROVENANCE.
 from __future__ import annotations
 
 import gzip
+import json
 from datetime import date
 from pathlib import Path
 
@@ -103,6 +104,27 @@ def test_devig_favorite_only_uses_standard_overround() -> None:
 def test_devig_favorite_only_rejects_bad_overround() -> None:
     with pytest.raises(ValueError):
         devig_favorite_only(-150, overround=0.0)
+
+
+def test_devig_favorite_only_marginal_favorite_stays_at_least_even() -> None:
+    # A -105 favorite's raw implied (~0.512) divided by the standard overround
+    # lands just below 0.5, which would invert the sides (CODE_REVIEW m-5). The
+    # identified favorite must never de-vig to an underdog.
+    for price in (-101, -105, -108, -110):
+        result = devig_favorite_only(price)
+        assert result.home_prob >= 0.5
+        assert result.away_prob <= 0.5
+        assert result.home_prob + result.away_prob == pytest.approx(1.0, abs=1e-12)
+
+
+@given(favorite_ml=st.integers(min_value=-100000, max_value=-100))
+def test_devig_favorite_only_property_favorite_never_below_even(
+    favorite_ml: int,
+) -> None:
+    result = devig_favorite_only(favorite_ml)
+    assert result.home_prob >= 0.5
+    assert result.home_prob <= 1.0
+    assert result.home_prob + result.away_prob == pytest.approx(1.0, abs=1e-12)
 
 
 @given(
@@ -378,6 +400,100 @@ def test_parse_espn_completion_home_relative_spread(tmp_path: Path) -> None:
     assert row["away_implied"] > row["home_implied"]
 
 
+def test_parse_kaggle_extensive_unattributed_when_spreads_identical(
+    tmp_path: Path,
+) -> None:
+    # CODE_REVIEW C-1: the real Kaggle archive stamps a single game-level spread
+    # on BOTH rows (identical sign), so the home-row spread encodes no favorite.
+    # Genuine, varied prices (not a placeholder) must be emitted unattributed
+    # (covered=False) rather than guessed as home.
+    frame = _favorite_csv(
+        [
+            {
+                "game_id": 1,
+                "date": "2022-05-01 00:00:00+00:00",
+                "season": 2022,
+                "team_name": "Carolina Hurricanes",
+                "is_home": 1,
+                "spread": -1.5,  # identical on both rows -> no favorite signal
+                "favorite_moneyline": -160,
+            },
+            {
+                "game_id": 1,
+                "date": "2022-05-01 00:00:00+00:00",
+                "season": 2022,
+                "team_name": "Vegas Golden Knights",
+                "is_home": 0,
+                "spread": -1.5,
+                "favorite_moneyline": -160,
+            },
+        ]
+    )
+    path = tmp_path / "nhl_data_extensive.csv.gz"
+    _write_gz_csv(path, frame)
+    df = parse_kaggle_extensive(path)
+    assert len(df) == 1  # kept, never silently dropped
+    row = df.iloc[0]
+    assert not bool(row["covered"])
+    assert row["favorite_side"] is None
+    assert row["home_ml"] is None
+    assert row["away_ml"] is None
+    assert df.attrs["unattributed_uncovered_rows"] == 1
+    assert df.attrs["placeholder_uncovered_rows"] == 0
+
+
+def test_parse_espn_completion_reads_favorite_from_raw_summary(
+    tmp_path: Path,
+) -> None:
+    # CODE_REVIEW C-1: the authoritative favorite comes from the raw ESPN
+    # summary's homeTeamOdds.favorite flag, which here contradicts the CSV
+    # spread sign (home spread -1.5 would guess "home"). The summary wins.
+    frame = _favorite_csv(
+        [
+            {
+                "game_id": 401999001,
+                "date": "2026-06-15 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Florida Panthers",
+                "is_home": 1,
+                "spread": -1.5,  # spread would guess home favorite
+                "favorite_moneyline": -160,
+            },
+            {
+                "game_id": 401999001,
+                "date": "2026-06-15 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Edmonton Oilers",
+                "is_home": 0,
+                "spread": 1.5,
+                "favorite_moneyline": -160,
+            },
+        ]
+    )
+    path = tmp_path / "games.csv"
+    frame.to_csv(path, index=False)
+    summary_dir = tmp_path / "raw" / "summary"
+    summary_dir.mkdir(parents=True)
+    summary = {
+        "pickcenter": [
+            {
+                "homeTeamOdds": {"favorite": False},
+                "awayTeamOdds": {"favorite": True},
+            }
+        ]
+    }
+    with gzip.open(summary_dir / "401999001.json.gz", "wt", encoding="utf-8") as handle:
+        json.dump(summary, handle)
+
+    df = parse_espn_completion(path)
+    assert len(df) == 1
+    row = df.iloc[0]
+    assert row["favorite_side"] == "away"  # summary overrides the spread guess
+    assert row["away_ml"] == -160
+    assert row["home_ml"] is None
+    assert row["away_implied"] > row["home_implied"]
+
+
 # ── Consolidation ────────────────────────────────────────────────────────
 
 
@@ -609,6 +725,18 @@ def test_placeholder_guard_matches_committed_archive() -> None:
         y2026.loc[y2026["fm"] == -105.0, "date"], utc=True, errors="coerce"
     )
     assert ph_dates.max() < pd.Timestamp("2025-12-11", tz="UTC")
+
+
+def test_committed_kaggle_archive_has_no_attributed_favorites() -> None:
+    # CODE_REVIEW C-1: the committed Kaggle archive's spread is identical on both
+    # rows (29,415/29,417 games), so no favorite can be trusted. Every parsed row
+    # must be uncovered (unattributed or placeholder) - the honest outcome.
+    if not REAL_KAGGLE_EXTENSIVE.exists():
+        pytest.skip("committed Kaggle extensive archive not present")
+    df = parse_kaggle_extensive(REAL_KAGGLE_EXTENSIVE)
+    assert not bool(df["covered"].any())
+    assert df["favorite_side"].isna().all()
+    assert df.attrs["unattributed_uncovered_rows"] > 0
 
 
 def test_consolidate_xval_gate_flags_source_disagreement() -> None:
