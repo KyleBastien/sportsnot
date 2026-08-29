@@ -567,7 +567,7 @@ def evaluate_skater_projections(
     ).model
     shutout_model = train_shutout_model(train_tg, config=ShutoutConfig(seed=config.seed)).model
 
-    matchups = reconstruct_series_matchups(team_games)
+    matchups = reconstruct_series_matchups(team_games, series=series)
     length_by_team = _series_length_by_team(
         series, matchups, win_model, shutout_model, test_year_set
     )

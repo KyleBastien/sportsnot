@@ -549,6 +549,36 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   cutoff derivation breaks; `playoff_round_starts` gives each round's exclusive cutoff.
   ml is standalone Python: run `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy}
   src tests` (NO yarn nx target).
+- Playoff round from game_id (US-110, CODE_REVIEW m-6): the authoritative,
+  collision-free round for a playoff game is `_playoff_round_digit(game_id)` in
+  `models/skater_production.py` = char index 7 of the 10-digit id (`SSSS03RMGG`):
+  `1`-`4` for the best-of-7 rounds, `0` for the 2019-20 bubble qualifying round AND
+  seeding round-robin. `_assign_rounds` (used by `skater_round_production`,
+  `playoff_round_starts`, `round_game_ids`, `team_actual_goalie_points`,
+  `skater_actual_points`) returns `None` for digit-`0` games, so a round-robin game
+  whose team pair ALSO meets in a real later series is never mislabeled as that
+  series' round (previously corrupted the 2020 round-2 cutoff to Aug 1). Qualifying
+  games still feed Elo/regular-season state -- only round LABELING/matchup counting
+  excludes them.
+- Pre-series snapshot freeze at ROUND cutoff (US-110, CODE_REVIEW m-3):
+  `series_sim.reconstruct_series_matchups(team_games, *, series=None)`. Pass
+  `series=` (both production callers now do) to freeze each matchup's pre-series
+  win/shutout snapshot at its ROUND's `as_of_cutoff` (earliest round game via
+  `playoff_round_starts`) instead of the matchup's own first game -- `_matchup_cutoff_plan`
+  precomputes (cutoff, team ids) per real series and `_freeze_due_matchups` freezes
+  BEFORE applying the first game dated >= cutoff, so an overlapping slower series
+  can't absorb another series' post-cutoff games (only `elo` moves in that window;
+  reg counters are playoff-untouched). `series=None` keeps the legacy per-series
+  freeze for synthetic tests. GOTCHA: no import cycle -- series_sim may import
+  skater_production (skater_production imports only features.skater + game_win).
+- Backtest leakage guard + injuries (US-110, `backtest/replay.py`): the self-date
+  slice check in `assert_round_inputs_leakfree` is tautological; pass
+  `authoritative_dates=team_games` (the skater call does) so each sliced row's TRUE
+  game date (game_id->team_games date) is checked vs cutoff -- catches a
+  skater/team-table desync (m-2). `run_backtest` NO LONGER takes an `injuries` param:
+  every historical round runs with `injuries=None` and `run_backtest_from_normalized`
+  never loads the live `injuries.parquet` (m-4; no historical injury data exists per
+  SPEC §5, and today's snapshot would leak roster status into `ir=True` picks).
 
 ---
 
@@ -732,5 +762,47 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   - simulate_series needs TWO per-venue probs but a single pre-series game-1 line only
     gives one venue; applying it symmetrically (p_home=p_away) is the honest as-of-start
     choice (in-series away lines would leak future information).
+  - ml checks: `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy} src tests`.
+---
+
+## 2026-08-29 - US-110 (Close the leakage-edge findings: guard tautology, per-series snapshot cutoff, historical injuries, 2020 round-robin — m-2, m-3, m-4, m-6)
+- Fixed all four confirmed leakage-edge defects, each with a failing-then-passing
+  unit test. ruff + mypy clean; 609 ml tests pass (was 604 + 5 new).
+- m-2: `backtest/replay.py assert_round_inputs_leakfree` gained an
+  `authoritative_dates=` param (a `game_id -> game_date` frame/map). The skater-table
+  call now passes `team_games` so each sliced skater row's TRUE date is compared to
+  the cutoff — the self-date filter alone is tautological and blind to a skater/team
+  desync. `_authoritative_date_map` builds the lookup.
+- m-3: `models/series_sim.py reconstruct_series_matchups` takes an optional `series=`;
+  `_matchup_cutoff_plan` + `_freeze_due_matchups` freeze each matchup's pre-series
+  snapshot at its ROUND's `as_of_cutoff` (earliest round game), not the matchup's own
+  first game. Both production callers (`projection_artifact.py`, `models/projections.py`)
+  now pass `series=`. Overlapping rounds can no longer absorb post-cutoff games.
+- m-4: `run_backtest` dropped its `injuries` param — every historical round runs with
+  `injuries=None`; `run_backtest_from_normalized` no longer loads/reads the live
+  `injuries.parquet`. No historical injury snapshot exists (SPEC §5), and today's
+  snapshot would leak into `ir=True` picks.
+- m-6: `models/skater_production.py` added `_playoff_round_digit(game_id)` (char idx 7
+  of the 10-digit playoff id; `0` = 2019-20 qualifying/round-robin). `_assign_rounds`
+  returns `None` for digit-`0` games; `series_sim` excludes them from matchup
+  formation/shutout counting. A round-robin game whose pair also meets in a real
+  series is no longer mislabeled round 2 (2020 round-2 cutoff now Aug 22, not Aug 1).
+- Files changed: ml/src/draft_oracle/backtest/replay.py,
+  ml/src/draft_oracle/models/series_sim.py,
+  ml/src/draft_oracle/models/skater_production.py,
+  ml/src/draft_oracle/projection_artifact.py,
+  ml/src/draft_oracle/models/projections.py, ml/tests/test_backtest.py,
+  ml/tests/test_series_sim.py, ml/tests/test_skater_production.py
+- **Learnings for future iterations:**
+  - NHL playoff game_id encodes the round at char index 7 — the authoritative,
+    collision-free round source. Prefer it over team-pair maps for the 2020 bubble.
+  - Freezing series snapshots at the round cutoff only changes a team's `elo` (not the
+    reg-season counters) for games it plays in the [round_cutoff, its_series_start)
+    overlap window — assert on the `elo` field to detect the difference.
+  - The 2020 labels/snapshots are NON-committed intermediates recomputed by the fixed
+    code at build time; committed model-report evidence (series-sim, skater-production)
+    regenerates with US-111's HEAD rerun + the review's P2 evidence-regen pass, which
+    needs the full raw→normalized→train pipeline (not run here to avoid ML churn).
+  - Pure-Python ml change (no web/TS/e2e touched) → Playwright suite unaffected.
   - ml checks: `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy} src tests`.
 ---

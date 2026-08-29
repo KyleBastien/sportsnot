@@ -180,6 +180,27 @@ def _pair_key(team_a: Any, team_b: Any) -> tuple[str, str]:
     return (a, b) if a <= b else (b, a)
 
 
+#: Round digit of a 2019-20 bubble qualifying-round / round-robin game id.
+QUALIFYING_ROUND_GAME_DIGIT = "0"
+
+
+def _playoff_round_digit(game_id: Any) -> str | None:
+    """The round digit of a 10-char NHL playoff game id, or ``None`` if unparseable.
+
+    NHL playoff game ids are ``SSSS03RMGG`` where the 8th character (index 7) is the
+    round: ``1``-``4`` for the four best-of-seven rounds. The 2019-20 bubble's
+    qualifying round *and* seeding round-robin both carry digit ``0`` and must never
+    be attributed to a best-of-seven series — their team pairs collide with real
+    later-round matchups (e.g. a round-robin game between two teams that also meet in
+    round 2), which the team-pair round map would otherwise mislabel (CODE_REVIEW
+    m-6).
+    """
+    text = str(game_id).strip()
+    if len(text) != 10 or not text.isdigit():
+        return None
+    return text[7]
+
+
 def _series_round_map(series: pd.DataFrame) -> dict[tuple[int, tuple[str, str]], int]:
     """Map ``(season_id, {team_a, team_b}) -> playoff_round`` from the series table."""
     out: dict[tuple[int, tuple[str, str]], int] = {}
@@ -193,9 +214,22 @@ def _series_round_map(series: pd.DataFrame) -> dict[tuple[int, tuple[str, str]],
 def _assign_rounds(
     games: pd.DataFrame, round_map: dict[tuple[int, tuple[str, str]], int]
 ) -> list[int | None]:
-    """Look up each playoff game's round via its (season, team-pair); ``None`` if unknown."""
+    """Look up each playoff game's round via its (season, team-pair); ``None`` if unknown.
+
+    A 2019-20 qualifying-round / round-robin game (``game_id`` round digit ``0``) is
+    always ``None`` regardless of the team-pair map, so a round-robin game whose two
+    teams also meet in a real later series is never mislabeled as that series' round
+    (CODE_REVIEW m-6).
+    """
+    has_game_id = "game_id" in games.columns
+    read_cols = ["season_id", "team_abbrev", "opponent_team_abbrev"]
+    if has_game_id:
+        read_cols = ["game_id", *read_cols]
     result: list[int | None] = []
-    for rec in games[["season_id", "team_abbrev", "opponent_team_abbrev"]].to_dict("records"):
+    for rec in games[read_cols].to_dict("records"):
+        if has_game_id and _playoff_round_digit(rec["game_id"]) == QUALIFYING_ROUND_GAME_DIGIT:
+            result.append(None)
+            continue
         key = (int(rec["season_id"]), _pair_key(rec["team_abbrev"], rec["opponent_team_abbrev"]))
         result.append(round_map.get(key))
     return result

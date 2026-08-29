@@ -322,6 +322,34 @@ def test_skater_round_production_ignores_unmapped_pairs() -> None:
     assert labels.empty
 
 
+def test_playoff_round_digit_reads_the_round_from_the_game_id() -> None:
+    from draft_oracle.models.skater_production import _playoff_round_digit
+
+    assert _playoff_round_digit("2019030091") == "0"  # 2020 qualifying / round-robin
+    assert _playoff_round_digit("2021030111") == "1"
+    assert _playoff_round_digit(2021030421) == "4"
+    assert _playoff_round_digit("not-a-game") is None
+    assert _playoff_round_digit("202103021") is None  # too short
+
+
+def test_assign_rounds_excludes_2020_qualifying_and_round_robin() -> None:
+    from draft_oracle.models.skater_production import _assign_rounds
+
+    # A 2019-20 round-robin game (game_id round digit 0) between two teams that ALSO
+    # meet in a real round-2 series must never inherit that series' round via the
+    # team-pair map (CODE_REVIEW m-6).
+    round_map = {(20192020, ("AAA", "BBB")): 2}
+    games = pd.DataFrame(
+        [
+            {"game_id": "2019030091", "season_id": 20192020, "team_abbrev": "AAA",
+             "opponent_team_abbrev": "BBB"},
+            {"game_id": "2019030211", "season_id": 20192020, "team_abbrev": "AAA",
+             "opponent_team_abbrev": "BBB"},
+        ]
+    )
+    assert _assign_rounds(games, round_map) == [None, 2]
+
+
 # ── Dataset build ──────────────────────────────────────────────────────────
 
 

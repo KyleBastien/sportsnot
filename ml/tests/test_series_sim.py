@@ -321,6 +321,105 @@ def test_reconstruct_captures_pre_series_snapshots_and_shutouts() -> None:
     assert record.win_snapshots[top_id]["points_per_game"] > 0.0
 
 
+def _overlap_row(
+    *,
+    game_id: str,
+    game_date: str,
+    team: str,
+    team_id: int,
+    opp: str,
+    gf: int,
+    ga: int,
+    is_home: bool,
+    game_type_id: int = 3,
+) -> dict[str, object]:
+    won = gf > ga
+    return {
+        "season_id": 20212022,
+        "game_type_id": game_type_id,
+        "game_id": game_id,
+        "game_date": game_date,
+        "team_id": team_id,
+        "team_abbrev": team,
+        "opponent_team_abbrev": opp,
+        "home_road": "H" if is_home else "R",
+        "goals_for": gf,
+        "goals_against": ga,
+        "shots_against": SHOTS,
+        "points": 2 if won else 0,
+    }
+
+
+def _overlap_game(
+    *,
+    game_id: str,
+    game_date: str,
+    home: str,
+    home_id: int,
+    away: str,
+    away_id: int,
+    hg: int,
+    ag: int,
+) -> list[dict[str, object]]:
+    return [
+        _overlap_row(
+            game_id=game_id, game_date=game_date, team=home, team_id=home_id,
+            opp=away, gf=hg, ga=ag, is_home=True,
+        ),
+        _overlap_row(
+            game_id=game_id, game_date=game_date, team=away, team_id=away_id,
+            opp=home, gf=ag, ga=hg, is_home=False,
+        ),
+    ]
+
+
+def test_reconstruct_freezes_at_round_cutoff_not_matchup_first_game() -> None:
+    # Overlapping rounds (CODE_REVIEW m-3): round 2's declared cutoff is the earliest
+    # round-2 game (G/H on 05-01). Team E is still finishing round 1 on 05-01..05-03
+    # -- those games are on/after the round-2 cutoff. E's round-2 (E/F) snapshot must
+    # freeze at the cutoff (before E has played), never at E/F's later first game.
+    e_id, f_id, g_id, h_id, x_id = 11, 12, 13, 14, 15
+    rows: list[dict[str, object]] = []
+    # E's round-1 series (digit 1) overlaps the round-2 window; E wins all three.
+    for i, date in enumerate(("2022-05-01", "2022-05-02", "2022-05-03")):
+        rows += _overlap_game(
+            game_id=f"202103011{i + 1}", game_date=date,
+            home="E", home_id=e_id, away="X", away_id=x_id, hg=3, ag=0,
+        )
+    # Round-2 series P (G/H, digit 2) sets the round-2 cutoff at 05-01.
+    rows += _overlap_game(
+        game_id="2021030211", game_date="2022-05-01",
+        home="G", home_id=g_id, away="H", away_id=h_id, hg=3, ag=1,
+    )
+    # Round-2 series Q (E/F, digit 2) starts late, on 05-06.
+    rows += _overlap_game(
+        game_id="2021030221", game_date="2022-05-06",
+        home="E", home_id=e_id, away="F", away_id=f_id, hg=2, ag=1,
+    )
+    team_games = pd.DataFrame(rows)
+    series = pd.DataFrame(
+        [
+            {"season_id": 20212022, "top_seed_abbrev": "E",
+             "bottom_seed_abbrev": "X", "playoff_round": 1},
+            {"season_id": 20212022, "top_seed_abbrev": "G",
+             "bottom_seed_abbrev": "H", "playoff_round": 2},
+            {"season_id": 20212022, "top_seed_abbrev": "E",
+             "bottom_seed_abbrev": "F", "playoff_round": 2},
+        ]
+    )
+    q_key = (2022, min(e_id, f_id), max(e_id, f_id))
+
+    # Legacy per-series freeze (no series context): E/F snapshot is frozen at E/F's
+    # first game (05-06) and so absorbs E's post-cutoff round-1 wins -> elo != initial.
+    legacy = reconstruct_series_matchups(team_games)
+    assert legacy[q_key].win_snapshots[e_id]["elo"] != pytest.approx(1500.0)
+
+    # Round-cutoff freeze: E has played nothing before the 05-01 cutoff, so its E/F
+    # snapshot is the cold initial rating -- the overlapping round-1 games are excluded.
+    fixed = reconstruct_series_matchups(team_games, series=series)
+    assert fixed[q_key].win_snapshots[e_id]["elo"] == pytest.approx(1500.0)
+
+
 # ── End-to-end evaluation ──────────────────────────────────────────────────
 
 

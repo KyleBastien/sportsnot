@@ -686,7 +686,7 @@ def build_projection_artifact(
         train_sk, players, train_tg, series, config=prod_config
     ).model
 
-    matchups = reconstruct_series_matchups(team_games)
+    matchups = reconstruct_series_matchups(team_games, series=series)
     team_rows, length_by_abbrev = _build_team_rows(
         round_series, matchups, win_model, shutout_model, int(season), int(playoff_round), warnings
     )

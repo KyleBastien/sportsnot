@@ -9,6 +9,7 @@ offline.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -844,6 +845,56 @@ def test_leakage_guard_raises_when_round_games_leak() -> None:
     # A cutoff after the round has begun pulls round-1 games into the as-of slice.
     with pytest.raises(LeakageError, match="leaked into the as-of"):
         assert_round_inputs_leakfree(tables["team_games"], ids, "2022-05-01", label="team")
+
+
+def test_leakage_guard_catches_skater_team_date_desync() -> None:
+    # CODE_REVIEW m-2: a skater row can carry a stale (pre-cutoff) date for a game the
+    # authoritative team table dates on/after the cutoff. The self-date filter is blind
+    # to this (it already dropped every post-cutoff *self* date -- tautological), so the
+    # guard must compare against the authoritative team-games date source.
+    cutoff = "2022-05-01"
+    team_games = pd.DataFrame([{"game_id": 99, "game_date": "2022-05-10"}])
+    skater_games = pd.DataFrame([{"game_id": 99, "game_date": "2022-04-20", "player_id": 1}])
+    round_ids: set[int] = set()  # a future round, so the game-id identity check can't catch it
+
+    # Self-date check alone passes -- the desynced row survives the pre-cutoff filter.
+    assert_round_inputs_leakfree(skater_games, round_ids, cutoff, label="skater")
+
+    # The independent authoritative-date source catches the leak.
+    with pytest.raises(LeakageError, match="desynced past cutoff"):
+        assert_round_inputs_leakfree(
+            skater_games,
+            round_ids,
+            cutoff,
+            label="skater",
+            authoritative_dates=team_games,
+        )
+
+
+def _config_ir() -> BacktestConfig:
+    base = _config()
+    return replace(base, ir=True)
+
+
+def test_from_normalized_never_injects_live_injuries(tmp_path: Path) -> None:
+    # CODE_REVIEW m-4: historical rounds must run with an empty injuries input, never
+    # today's live snapshot. The backtest must not even read injuries.parquet -- an
+    # unreadable one is proof the loader is gone (the old path would raise here).
+    normalized = tmp_path / "normalized"
+    normalized.mkdir(parents=True, exist_ok=True)
+    tables = _tables()
+    for name, frame in tables.items():
+        frame.to_parquet(normalized / f"{name}.parquet", index=False)
+    (normalized / "injuries.parquet").write_bytes(b"not a parquet file")
+
+    result, out_dir = run_backtest_from_normalized(
+        seasons=[2022],
+        normalized_dir=normalized,
+        backtest_root=tmp_path / "backtests",
+        config=_config_ir(),
+    )
+    assert (out_dir / "manifest.json").exists()
+    assert result.rounds and result.rounds[0].leakage_ok
 
 
 # ── Persistence ─────────────────────────────────────────────────────────────

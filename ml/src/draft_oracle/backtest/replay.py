@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import json
 import random
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -70,7 +70,6 @@ from draft_oracle.projection_artifact import (
     DEFAULT_NORMALIZED_DIR,
     SNAPSHOTS_SUBDIR,
     ProjectArtifactConfig,
-    _load_injuries,
     _load_league_picks,
     _load_tables,
     _snapshot_id_for,
@@ -271,23 +270,41 @@ def assert_round_inputs_leakfree(
     *,
     date_col: str = "game_date",
     label: str = "games",
+    authoritative_dates: pd.DataFrame | Mapping[int, Any] | None = None,
 ) -> None:
     """Fail loudly if the as-of inputs for a round contain that round's data.
 
-    Two independent checks on the as-of training slice (``date < cutoff``):
+    Three independent checks on the as-of training slice (``date < cutoff``):
 
-    * no game is dated on/after the round-start ``cutoff`` (delegated to
-      :func:`draft_oracle.features.leakage.assert_no_leakage`); and
+    * an **independent date source** check — when ``authoritative_dates`` is given
+      (a ``game_id -> game_date`` map, or a frame with those columns), each sliced
+      row's authoritative date is compared to ``cutoff``. This catches a
+      skater/team-table *desync*: a row whose own ``game_date`` is stale/early (so it
+      survives the ``< cutoff`` filter) but whose true date is on/after the round —
+      the plain self-date check below cannot see it (CODE_REVIEW m-2);
+    * no game is dated on/after the round-start ``cutoff`` by its own ``date_col``
+      (delegated to :func:`draft_oracle.features.leakage.assert_no_leakage`); and
     * none of the round's own ``game_id`` values appear in the slice — a direct
       identity check that does not rely on date arithmetic.
 
-    Either violation raises :class:`~draft_oracle.features.leakage.LeakageError`,
-    which the backtest turns into a hard failure.
+    Any violation raises :class:`~draft_oracle.features.leakage.LeakageError`, which
+    the backtest turns into a hard failure.
     """
     cutoff_ts = pd.Timestamp(cutoff)
     frame = games.copy()
     frame[date_col] = pd.to_datetime(frame[date_col])
     train = frame.loc[frame[date_col] < cutoff_ts]
+    if authoritative_dates is not None and "game_id" in train.columns:
+        auth = _authoritative_date_map(authoritative_dates, date_col=date_col)
+        true_dates = train["game_id"].map(auth)
+        desynced = train.loc[true_dates.notna() & (true_dates >= cutoff_ts)]
+        if not desynced.empty:
+            latest = true_dates.loc[desynced.index].max()
+            raise LeakageError(
+                f"{len(desynced)} {label} row(s) desynced past cutoff {cutoff_ts.date()}: "
+                f"their own date is pre-cutoff but the authoritative game date is on/after "
+                f"it (latest authoritative date {pd.Timestamp(latest).date()})."
+            )
     assert_no_leakage(train, cutoff_ts, date_col=date_col)
     if "game_id" in train.columns and round_ids:
         leaked = {int(gid) for gid in train["game_id"].unique()} & round_ids
@@ -296,6 +313,19 @@ def assert_round_inputs_leakfree(
                 f"{len(leaked)} round game(s) leaked into the as-of {label} inputs "
                 f"before cutoff {cutoff_ts.date()} (e.g. game_id {sorted(leaked)[:3]})."
             )
+
+
+def _authoritative_date_map(
+    source: pd.DataFrame | Mapping[int, Any], *, date_col: str = "game_date"
+) -> dict[int, pd.Timestamp]:
+    """Build a ``game_id -> authoritative game date`` map from a frame or mapping."""
+    if isinstance(source, pd.DataFrame):
+        pairs = source[["game_id", date_col]].drop_duplicates(subset=["game_id"])
+        return {
+            int(gid): pd.Timestamp(dt)
+            for gid, dt in zip(pairs["game_id"], pd.to_datetime(pairs[date_col]), strict=True)
+        }
+    return {int(gid): pd.Timestamp(dt) for gid, dt in source.items()}
 
 
 # ── Result records ──────────────────────────────────────────────────────────
@@ -786,7 +816,13 @@ def replay_round(
             tables["team_games"], tables["series"], season_id=season_id, playoff_round=rnd
         )
     assert_round_inputs_leakfree(tables["team_games"], round_ids, cutoff, label="team")
-    assert_round_inputs_leakfree(tables["skater_games"], round_ids, cutoff, label="skater")
+    assert_round_inputs_leakfree(
+        tables["skater_games"],
+        round_ids,
+        cutoff,
+        label="skater",
+        authoritative_dates=tables["team_games"],
+    )
 
     fitted = _fit_opponents_for_season(league_picks, season, config)
     managers_list, opponent_model, opponents_kind = _managers_and_opponents(fitted, config)
@@ -1040,7 +1076,6 @@ def run_backtest(
     seasons: list[int],
     *,
     league_picks: pd.DataFrame | None = None,
-    injuries: pd.DataFrame | None = None,
     odds: pd.DataFrame | None = None,
     snapshot_id: str = "backtest",
     config: BacktestConfig | None = None,
@@ -1050,7 +1085,10 @@ def run_backtest(
     Builds the actual-result lookups once, then replays each round (as-of
     projections, drafts in every slot, actual scoring) under the leakage guard.
     ``odds`` (de-vigged historical betting lines) power the market-aware series-Brier
-    track and are never used to make a pick. Deterministic given ``(tables, seed)``.
+    track and are never used to make a pick. Every round runs with an **empty
+    injuries input**: no historical injury snapshot exists (SPEC §5), and injecting
+    today's live snapshot into a past round would leak future roster status into
+    picks under ``ir=True`` (CODE_REVIEW m-4). Deterministic given ``(tables, seed)``.
     """
     cfg = config or BacktestConfig()
     if not seasons:
@@ -1067,7 +1105,7 @@ def run_backtest(
                     season=season,
                     playoff_round=draft_round,
                     league_picks=league_picks,
-                    injuries=injuries,
+                    injuries=None,
                     odds=odds,
                     snapshot_id=snapshot_id,
                     skater_actual=skater_actual,
@@ -1139,16 +1177,16 @@ def run_backtest_from_normalized(
 
     source_dir = normalized_dir / SNAPSHOTS_SUBDIR / snapshot if snapshot else normalized_dir
     tables = _load_tables(source_dir)
-    injuries = _load_injuries(normalized_dir)
     league_picks = _load_league_picks(source_dir)
     odds = _load_odds(normalized_dir)
     snapshot_id = _snapshot_id_for(source_dir, snapshot)
 
+    # Historical rounds never receive the live injuries snapshot (CODE_REVIEW m-4);
+    # run_backtest forces an empty injuries input for every replayed round.
     result = run_backtest(
         tables,
         seasons,
         league_picks=league_picks,
-        injuries=injuries,
         odds=odds,
         snapshot_id=snapshot_id,
         config=config,
