@@ -806,3 +806,55 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   - Pure-Python ml change (no web/TS/e2e touched) → Playwright suite unaffected.
   - ml checks: `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy} src tests`.
 ---
+
+## 2026-08-29 - US-111 (Regenerate the backtest report at HEAD with combined R3_4 scoring, M-6)
+- Regenerated the committed `ml/artifacts/backtests/2023-2024-2025-seed20260827/`
+  report+manifest at HEAD, REPLACING the stale 3bf1537 run in place (run_id is the
+  deterministic `{seasons}-seed{seed}` string, so the run overwrites the same dir).
+- Ran `oracle backtest --seasons 2023 --seasons 2024 --seasons 2025` with all 4
+  strategies (oracle/greedy_vor/one_step/random_legal), seed 20260827, managers=4,
+  ir=false, n_drafts=1, rollouts=64 (4x the stale run's 16). ~8 min wall time.
+- League comparison now scores the combined `R3_4` event across BOTH rounds 3 AND 4
+  and reconciles EXACTLY with the review's independent hand-checked recompute:
+  **2024 R3_4 league mean 58.75, levi best 78.00**. (2025 R3_4 league mean is 59.75 at
+  HEAD -- the review's ~59.25 estimate shifted slightly under US-107's IR-swap scorer +
+  US-110's 2020/round-labeling fixes; HEAD is authoritative.)
+- Added an explicit **Run parameters** provenance paragraph to
+  `report._header_lines`: it states the config and says plainly that the whole-replay
+  run deliberately UNDER-SAMPLES the README recommend-command design targets
+  (>=500 rollouts / >=200 single-decision drafts -- those are single-fixed-state
+  targets, not backtest targets) to stay tractable, since every rollout is multiplied
+  by per-round model retraining. It notes the M-6 league headline is deterministic
+  (fixed real+oracle rosters through the rules engine) and unaffected by rollout count.
+- Market-aware series Brier track is honestly `n/a` (0 series covered by committed odds
+  after US-103/104 rejected the Kaggle placeholder seasons) -- consistent w/ US-105.
+- Files changed:
+  - `ml/src/draft_oracle/backtest/report.py` (Run parameters note in `_header_lines`)
+  - `ml/tests/test_backtest_report.py` (+assertion that the note renders)
+  - `ml/artifacts/backtests/2023-2024-2025-seed20260827/{report.md,manifest.json}`
+  - `scripts/ralph/prd.json` (US-111 passes=true + notes)
+- Quality: ruff format+check clean, mypy clean (34 files), 609 ml tests pass.
+- **Learnings for future iterations:**
+  - Backtest `run_id` = `{sorted-seasons-joined}-seed{seed}` (BacktestConfig.resolved_run_id);
+    a rerun with the same seasons+seed OVERWRITES the committed report.md+manifest.json
+    in place -- that IS how you "replace the stale report at HEAD". `rounds/` is gitignored.
+  - Only `report.md` + `manifest.json` per backtest run are git-tracked; the per-round
+    JSON under `rounds/` is gitignored (regenerable). Commit just the two files.
+  - The league-comparison numbers are DETERMINISTIC (fixed real+oracle rosters scored
+    through the rules engine); rollouts/n_drafts only tighten the oracle mean-points /
+    win-rate precision. So a small rollout budget is fine for the M-6 reconciliation --
+    the review's 58.75/levi-78 hand check matched even at rollouts=4 in a smoke run.
+  - Backtest compute is dominated by the per-round projection REBUILD (retrain every
+    model on pre-cutoff data), NOT the rollouts: 1-strategy rollouts=4 on one season was
+    71s; 4-strategy rollouts=16 was 98s; rollouts=64 was 206s. n_drafts multiplies the
+    draft count linearly and is the real budget killer (n_drafts=4 rollouts=64 blew past
+    8 min for ONE season). Keep n_drafts small, bump rollouts if you want more precision.
+  - README's >=500 rollouts / >=200 drafts are `oracle recommend` (single-state) design
+    targets, NOT backtest targets -- SPEC.md itself sets no backtest rollout floor. The
+    honest move is to state the backtest config + why it under-runs those numbers.
+  - The `datetime.now(UTC)` "Generated:" stamp in `_header_lines` makes report.md
+    non-deterministic across renders (the flaky `test_report_has_all_sections...`
+    round-trip races on it) -- that determinism nit is US-117/m-20 scope, left as-is.
+  - Untracked `ml/artifacts/backtests/2026-combined-r500-seed20260827/` is the 2026
+    projection artifact (m-14/m-18/US-118 scope) -- do NOT commit it with a backtest regen.
+---

@@ -1,14 +1,16 @@
 # Backtest report — run `2023-2024-2025-seed20260827`
 
 - Package version: 0.1.0
-- Generated: 2026-08-29T02:33:21.279195+00:00
+- Generated: 2026-08-29T22:27:15.104075+00:00
 - Seasons: 2023, 2024, 2025
-- Rounds replayed: 12
+- Rounds replayed: 9
 - League size: 4 managers; IR slots: False
-- Strategies: oracle, greedy_vor, one_step, random_legal; drafts/slot: 1; rollouts: 16; seed: 20260827
+- Strategies: oracle, greedy_vor, one_step, random_legal; drafts/slot: 1; rollouts: 64; seed: 20260827
 - Leakage guard (all rounds pass): **True**
 
 Projections drive every pick; the actual historical results only ever score a roster, never inform a pick. All numbers below are reported truthfully — a baseline the oracle fails to beat is printed with its honest value.
+
+**Run parameters.** Each of the 9 replayed rounds first rebuilds the full as-of projection artifact (retraining every model on only pre-cutoff data), then seats 4 strategies in each of the 4 snake slots for 1 seeded draft(s), each oracle pick averaged over 64 Monte-Carlo rollouts. The recommend-command design targets (>=500 rollouts / >=200 single-decision drafts, README) are measured at a single fixed state; applying them here would multiply the per-round retraining cost across every round and season, so this whole-replay run deliberately under-samples them at 64 rollouts / 1 draft(s) per slot to stay tractable. The league-comparison headline (M-6) scores fixed real and oracle rosters through the rules engine and is deterministic — unaffected by the rollout count; only the oracle mean-points / win-rate precision tightens with more rollouts.
 
 ## Projection accuracy
 
@@ -16,10 +18,10 @@ MAE is mean absolute error of projected vs. actual round fantasy points (lower i
 
 | Season | Skaters n | Skater MAE | Skater rho | Teams n | Team MAE | Team rho |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2023 | 806 | 1.529 | 0.512 | 30 | 2.480 | 0.165 |
-| 2024 | 790 | 1.368 | 0.557 | 30 | 2.118 | 0.454 |
-| 2025 | 827 | 1.459 | 0.521 | 30 | 2.513 | 0.012 |
-| ALL | 2423 | 1.453 | 0.530 | 90 | 2.371 | 0.207 |
+| 2023 | 751 | 1.672 | 0.495 | 28 | 2.740 | 0.189 |
+| 2024 | 742 | 1.511 | 0.542 | 28 | 2.774 | 0.440 |
+| 2025 | 773 | 1.593 | 0.493 | 28 | 2.920 | 0.155 |
+| ALL | 2266 | 1.593 | 0.510 | 84 | 2.811 | 0.242 |
 
 ## Series-model calibration (Brier score, lower is better)
 
@@ -27,23 +29,23 @@ Track 1 — **stat-only** (the probabilities the projection artifact actually dr
 
 | Season | Series n | Series model | Higher seed=1 | Coin flip=0.5 |
 | --- | --- | --- | --- | --- |
-| 2023 | 15 | 0.2628 | 0.2667 | 0.2500 |
-| 2024 | 15 | 0.2007 | 0.2667 | 0.2500 |
-| 2025 | 15 | 0.2533 | 0.6000 | 0.2500 |
-| ALL | 45 | 0.2390 | 0.3778 | 0.2500 |
+| 2023 | 14 | 0.2613 | 0.2857 | 0.2500 |
+| 2024 | 14 | 0.2032 | 0.2857 | 0.2500 |
+| 2025 | 14 | 0.2478 | 0.5714 | 0.2500 |
+| ALL | 42 | 0.2374 | 0.3810 | 0.2500 |
 
 Aggregate stat-only series model beats both baselines: **True**.
 
-Track 2 — **market-aware** (post-hoc de-vigged betting odds), scored where historical odds exist:
+Track 2 — **market-aware** (post-hoc, series' game-1 pre-series de-vigged betting line), scored where historical odds exist:
 
 | Season | Series n | Series model | Higher seed=1 | Coin flip=0.5 |
 | --- | --- | --- | --- | --- |
-| 2023 | 15 | 0.2786 | 0.2667 | 0.2500 |
-| 2024 | 15 | 0.2491 | 0.2667 | 0.2500 |
-| 2025 | 15 | 0.2494 | 0.6000 | 0.2500 |
-| ALL | 45 | 0.2590 | 0.3778 | 0.2500 |
+| 2023 | 0 | n/a | n/a | n/a |
+| 2024 | 0 | n/a | n/a | n/a |
+| 2025 | 0 | n/a | n/a | n/a |
+| ALL | 0 | n/a | n/a | n/a |
 
-The market-aware probability is derived post-hoc from de-vigged per-game betting lines for calibration only — it is never used to make a pick.
+No committed odds covered these series, so the market-aware track is empty.
 
 ## Draft strategy vs. baselines
 
@@ -51,34 +53,34 @@ Mean actual roster points and win rate (fraction of drafts where the roster stri
 
 | Strategy | Drafts | Mean points | Win rate |
 | --- | --- | --- | --- |
-| oracle | 36 | 51.11 | 88.9% |
-| greedy_vor | 36 | 49.06 | 77.8% |
-| one_step | 36 | 50.14 | 86.1% |
-| random_legal | 36 | 15.00 | 0.0% |
+| oracle | 36 | 58.31 | 80.6% |
+| greedy_vor | 36 | 56.94 | 88.9% |
+| one_step | 36 | 59.11 | 83.3% |
+| random_legal | 36 | 19.83 | 5.6% |
 
-Oracle mean-points beats: greedy_vor, one_step, random_legal.
+Oracle mean-points beats: greedy_vor, random_legal.
 
 ### Oracle by snake slot
 
 | Seat | Drafts | Mean points | Win rate |
 | --- | --- | --- | --- |
-| 1 | 9 | 52.56 | 77.8% |
-| 2 | 9 | 50.56 | 88.9% |
-| 3 | 9 | 50.78 | 100.0% |
-| 4 | 9 | 50.56 | 88.9% |
+| 1 | 9 | 58.67 | 88.9% |
+| 2 | 9 | 57.89 | 88.9% |
+| 3 | 9 | 56.78 | 66.7% |
+| 4 | 9 | 59.89 | 77.8% |
 
 ## League comparison
 
-Where a backtested season overlaps the league's real drafts, the oracle's simulated roster points (mean/best across snake slots) vs. what the league's managers actually drafted, all scored through the same rules engine. Rounds 3 and 4 both map to the league's combined `R3_4` redraft.
+Where a backtested season overlaps the league's real drafts, the oracle's simulated roster points (mean/best across snake slots) vs. what the league's managers actually drafted, all scored through the same rules engine. The combined `R3_4` draft is scored across both the conference final and the Cup Final, matching how the league drafts once for rounds 3+4.
 
 | Season | Round | Oracle mean | Oracle best | League mean | League best |
 | --- | --- | --- | --- | --- | --- |
-| 2024 | r1 (R1) | 64.25 | 68.00 | 48.25 | 58.00 |
-| 2024 | r2 (R2) | 65.25 | 68.00 | 48.75 | 61.00 |
-| 2024 | r3 (R3_4) | 43.50 | 45.00 | 35.00 | 47.00 |
-| 2025 | r1 (R1) | 60.25 | 61.00 | 54.25 | 59.00 |
-| 2025 | r2 (R2) | 43.00 | 43.00 | 37.75 | 41.00 |
-| 2025 | r3 (R3_4) | 49.25 | 51.00 | 34.50 | 43.00 |
+| 2024 | r1 (R1) | 62.75 | 65.00 | 48.25 | 58.00 |
+| 2024 | r2 (R2) | 52.25 | 56.00 | 48.75 | 61.00 |
+| 2024 | r3 (R3_4) | 63.75 | 65.00 | 58.75 | 78.00 |
+| 2025 | r1 (R1) | 62.50 | 64.00 | 55.00 | 59.00 |
+| 2025 | r2 (R2) | 43.00 | 43.00 | 36.75 | 41.00 |
+| 2025 | r3 (R3_4) | 85.00 | 88.00 | 59.75 | 72.00 |
 
 ### Real league rosters (actual points)
 
@@ -86,7 +88,7 @@ Where a backtested season overlaps the league's real drafts, the oracle's simula
 | --- | --- | --- |
 | 2024 | r1 | kyle 58.0; judah 52.0; levi 47.0; ben 36.0 |
 | 2024 | r2 | levi 61.0; judah 54.0; kyle 50.0; ben 30.0 |
-| 2024 | r3 | levi 47.0; judah 35.0; ben 31.0; kyle 27.0 |
-| 2025 | r1 | kyle 59.0; levi 56.0; ben 52.0; judah 50.0 |
-| 2025 | r2 | kyle 41.0; ben 40.0; levi 38.0; judah 32.0 |
-| 2025 | r3 | levi 43.0; judah 38.0; ben 34.0; kyle 23.0 |
+| 2024 | r3 | levi 78.0; ben 65.0; judah 52.0; kyle 40.0 |
+| 2025 | r1 | kyle 59.0; levi 59.0; ben 52.0; judah 50.0 |
+| 2025 | r2 | kyle 41.0; levi 38.0; ben 36.0; judah 32.0 |
+| 2025 | r3 | ben 72.0; levi 66.0; judah 53.0; kyle 48.0 |

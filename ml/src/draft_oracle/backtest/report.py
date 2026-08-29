@@ -177,9 +177,7 @@ def _strategy_summaries(result: BacktestResult) -> list[StrategySummary]:
     """Aggregate every strategy's roster points + win rate across all rounds/slots."""
     summaries: list[StrategySummary] = []
     for strategy in result.config.strategies:
-        slots = [
-            s for rnd in result.rounds for s in rnd.slot_results if s.strategy == strategy
-        ]
+        slots = [s for rnd in result.rounds for s in rnd.slot_results if s.strategy == strategy]
         if not slots:
             continue
         summaries.append(
@@ -254,6 +252,20 @@ def _header_lines(result: BacktestResult) -> list[str]:
         "Projections drive every pick; the actual historical results only ever score a "
         "roster, never inform a pick. All numbers below are reported truthfully — a "
         "baseline the oracle fails to beat is printed with its honest value.",
+        "",
+        f"**Run parameters.** Each of the {len(result.rounds)} replayed rounds first "
+        "rebuilds the full as-of projection artifact (retraining every model on only "
+        f"pre-cutoff data), then seats {len(cfg.strategies)} strategies in each of the "
+        f"{cfg.managers} snake slots for {cfg.n_drafts} seeded draft(s), each oracle "
+        f"pick averaged over {cfg.rollouts} Monte-Carlo rollouts. The recommend-command "
+        "design targets (>=500 rollouts / >=200 single-decision drafts, README) are "
+        "measured at a single fixed state; applying them here would multiply the "
+        "per-round retraining cost across every round and season, so this whole-replay "
+        f"run deliberately under-samples them at {cfg.rollouts} rollouts / {cfg.n_drafts} "
+        "draft(s) per slot to stay tractable. The league-comparison headline (M-6) scores "
+        "fixed real and oracle rosters through the rules engine and is deterministic — "
+        "unaffected by the rollout count; only the oracle mean-points / win-rate "
+        "precision tightens with more rollouts.",
     ]
 
 
@@ -412,9 +424,7 @@ def _league_section(result: BacktestResult) -> list[str]:
                 _fmt(comp.league_best_points, 2),
             ]
         )
-        managers = "; ".join(
-            f"{m.manager} {_fmt(m.actual_points, 1)}" for m in comp.managers
-        )
+        managers = "; ".join(f"{m.manager} {_fmt(m.actual_points, 1)}" for m in comp.managers)
         manager_rows.append([str(comp.season), f"r{comp.playoff_round}", managers])
     return [
         "## League comparison",

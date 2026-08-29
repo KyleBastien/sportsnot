@@ -189,6 +189,9 @@ def test_report_has_all_sections_and_league_comparison(tmp_path: Path) -> None:
     assert "## Draft strategy vs. baselines" in text
     assert "## League comparison" in text
     assert "kyle" in text and "ben" in text
+    # The run-parameter provenance note states rollouts/drafts and the honest under-run.
+    assert "**Run parameters.**" in text
+    assert "rollouts" in text and "under-samples" in text
     # The written file round-trips.
     path = write_report(result, tmp_path)
     assert path.exists()
