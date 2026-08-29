@@ -21,6 +21,7 @@ from draft_oracle.backtest.replay import (
     _draft_events,
     _score_league_roster,
     assert_round_inputs_leakfree,
+    replay_round,
     round_game_ids,
     run_backtest,
     run_backtest_from_normalized,
@@ -30,8 +31,14 @@ from draft_oracle.backtest.replay import (
 )
 from draft_oracle.cli.project import app
 from draft_oracle.features.leakage import LeakageError
-from draft_oracle.models.skater_production import SkaterProductionConfig
-from draft_oracle.projection_artifact import ProjectArtifactConfig
+from draft_oracle.models.skater_production import (
+    SkaterProductionConfig,
+    playoff_round_starts,
+)
+from draft_oracle.projection_artifact import (
+    ProjectArtifactConfig,
+    build_projection_artifact,
+)
 from draft_oracle.rules import goalie_series_points, player_points
 
 TEAMS = ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG", "HHH"]
@@ -131,7 +138,11 @@ def _team_rows(
     away: str,
     home_goals: int,
     away_goals: int,
+    team_ids: dict[str, int] | None = None,
 ) -> list[dict[str, object]]:
+    def _team_id(team: str) -> int:
+        return team_ids[team] if team_ids is not None else TEAMS.index(team) + 1
+
     rows: list[dict[str, object]] = []
     for team, opp, gf, ga, is_home in (
         (home, away, home_goals, away_goals, True),
@@ -144,7 +155,7 @@ def _team_rows(
                 "game_type_id": game_type_id,
                 "game_id": game_id,
                 "game_date": game_date,
-                "team_id": TEAMS.index(team) + 1,
+                "team_id": _team_id(team),
                 "team_abbrev": team,
                 "team_full_name": team,
                 "opponent_team_abbrev": opp,
@@ -264,6 +275,308 @@ def _synthetic_archive(
 def _tables(seed: int = 1) -> dict[str, pd.DataFrame]:
     sk, tg, players, series = _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=seed)
     return {"skater_games": sk, "players": players, "team_games": tg, "series": series}
+
+
+# ── Four-round fixture (M-8): a full 16-team bracket through the Cup Final ────
+#
+# Eight teams only reach a conference final (round 3); a genuine round-4 event and
+# the combined R3_4 draft need a sixteen-team first round. The lower-indexed seed
+# wins every series (SERIES_RESULT: 4-2 in six), so the survivors are deterministic:
+# R1 -> T01..T08, R2 -> T01..T04, R3 (conference finals) -> T01,T02, R4 -> T01.
+TEAMS16 = [f"T{i:02d}" for i in range(1, 17)]
+TEAM16_ID = {t: i + 1 for i, t in enumerate(TEAMS16)}
+STRENGTH16 = {t: 8.0 - 0.4 * i for i, t in enumerate(TEAMS16)}
+FORWARDS16 = 6
+DEFENSE16 = 4
+FOUR_ROUND_YEARS = [2019, 2020, 2021, 2022]
+FOUR_ROUND_TARGET = 2022
+
+# Bracket pairings per round; first-named (lower seed index) wins each series.
+ROUND_PAIRS: dict[int, list[tuple[str, str]]] = {
+    1: [(TEAMS16[i], TEAMS16[15 - i]) for i in range(8)],
+    2: [(TEAMS16[i], TEAMS16[7 - i]) for i in range(4)],
+    3: [(TEAMS16[0], TEAMS16[3]), (TEAMS16[1], TEAMS16[2])],
+    4: [(TEAMS16[0], TEAMS16[1])],
+}
+# Six strictly increasing game dates per round (round N is played after round N-1).
+ROUND_DATES: dict[int, list[str]] = {
+    1: [f"-04-{15 + o:02d}" for o in range(6)],
+    2: [f"-04-{24 + o:02d}" for o in range(6)],
+    3: [f"-05-{5 + o:02d}" for o in range(6)],
+    4: [f"-05-{15 + o:02d}" for o in range(6)],
+}
+
+
+def _players16() -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
+    players: dict[int, tuple[str, str, float]] = {}
+    rows: list[dict[str, object]] = []
+    pid = 1000
+    for team in TEAMS16:
+        for i in range(FORWARDS16 + DEFENSE16):
+            pos = "F" if i < FORWARDS16 else "D"
+            rate = 0.6 + 0.05 * STRENGTH16[team] - 0.03 * i
+            players[pid] = (team, pos, max(rate, 0.15))
+            rows.append(
+                {
+                    "player_id": pid,
+                    "player_name": f"{team}-{pid}",
+                    "last_name": f"L{pid}",
+                    "birth_date": "1996-01-01",
+                    "position_code": "C" if pos == "F" else "D",
+                    "position": pos,
+                    "shoots_catches": "L",
+                    "current_team_abbrev": team,
+                }
+            )
+            pid += 1
+    return pd.DataFrame(rows), players
+
+
+def _four_round_archive(
+    *, seed: int = 3, reg_cycles: int = 1
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Round-robin regular seasons plus a bracket that reaches the Cup Final.
+
+    Only :data:`FOUR_ROUND_TARGET` plays all four rounds; the earlier seasons play a
+    single round (enough history to train the sub-models) so the fixture stays small.
+    """
+    rng = np.random.default_rng(seed)
+    players_df, players = _players16()
+    sk_rows: list[dict[str, object]] = []
+    tg_rows: list[dict[str, object]] = []
+    series_rows: list[dict[str, object]] = []
+    gid = 7_000_000
+
+    for end_year in FOUR_ROUND_YEARS:
+        season_id = (end_year - 1) * 10000 + end_year
+        day, month = 1, 10
+        for _ in range(reg_cycles):
+            for i, home in enumerate(TEAMS16):
+                for away in TEAMS16[i + 1 :]:
+                    gid += 1
+                    date = f"{end_year - 1}-{month:02d}-{day:02d}"
+                    day += 1
+                    if day > 27:
+                        day = 1
+                        month = 11 if month == 10 else (12 if month == 11 else 10)
+                    diff = STRENGTH16[home] - STRENGTH16[away]
+                    home_win = rng.random() < 1.0 / (1.0 + np.exp(-0.5 * diff))
+                    if home_win:
+                        hg = int(rng.integers(2, 5))
+                        ag = int(rng.integers(0, hg))
+                    else:
+                        ag = int(rng.integers(2, 5))
+                        hg = int(rng.integers(0, ag))
+                    tg_rows.extend(
+                        _team_rows(gid, date, season_id, 2, home, away, hg, ag, team_ids=TEAM16_ID)
+                    )
+                    for team, opp in ((home, away), (away, home)):
+                        for p, (t, pos, rate) in players.items():
+                            if t != team:
+                                continue
+                            g, a = _draw_ga(rng, rate)
+                            sk_rows.append(
+                                _skater_row(p, pos, gid, date, season_id, 2, team, opp, g, a)
+                            )
+
+        rounds = [1, 2, 3, 4] if end_year == FOUR_ROUND_TARGET else [1]
+        for rnd in rounds:
+            pairs = ROUND_PAIRS[rnd]
+            dates = ROUND_DATES[rnd]
+            for letter_idx, (top, bottom) in enumerate(pairs):
+                for offset, (winner_side, wg, lg) in enumerate(SERIES_RESULT):
+                    gid += 1
+                    host = top if HOME_PATTERN[offset] == "top" else bottom
+                    visitor = bottom if host == top else top
+                    winner = top if winner_side == "top" else bottom
+                    hg, ag = (wg, lg) if winner == host else (lg, wg)
+                    date = f"{end_year}{dates[offset]}"
+                    tg_rows.extend(
+                        _team_rows(
+                            gid, date, season_id, 3, host, visitor, hg, ag, team_ids=TEAM16_ID
+                        )
+                    )
+                    for team, opp in ((top, bottom), (bottom, top)):
+                        for p, (t, pos, rate) in players.items():
+                            if t != team:
+                                continue
+                            g, a = _draw_ga(rng, rate)
+                            sk_rows.append(
+                                _skater_row(p, pos, gid, date, season_id, 3, team, opp, g, a)
+                            )
+                series_rows.append(
+                    {
+                        "year": end_year,
+                        "season_id": season_id,
+                        "series_letter": chr(ord("A") + letter_idx),
+                        "series_abbrev": f"{top}{bottom}",
+                        "playoff_round": rnd,
+                        "top_seed_team_id": TEAM16_ID[top],
+                        "top_seed_abbrev": top,
+                        "top_seed_wins": 4,
+                        "bottom_seed_team_id": TEAM16_ID[bottom],
+                        "bottom_seed_abbrev": bottom,
+                        "bottom_seed_wins": 2,
+                        "winning_team_id": TEAM16_ID[top],
+                        "losing_team_id": TEAM16_ID[bottom],
+                    }
+                )
+
+    return (
+        pd.DataFrame(sk_rows),
+        pd.DataFrame(tg_rows),
+        players_df,
+        pd.DataFrame(series_rows),
+    )
+
+
+def _four_round_tables() -> dict[str, pd.DataFrame]:
+    sk, tg, players, series = _four_round_archive()
+    return {"skater_games": sk, "players": players, "team_games": tg, "series": series}
+
+
+def _four_round_config() -> BacktestConfig:
+    # Smaller sims/rollouts than _config: this fixture replays three events across a
+    # sixteen-team archive, and the assertions are structural, not statistical.
+    project = ProjectArtifactConfig(
+        seed=20260827,
+        n_sims=60,
+        slot_strategies=False,
+        production_config=SkaterProductionConfig(
+            seed=20260827, n_val_seasons=1, n_test_seasons=1, min_confident_games=5
+        ),
+    )
+    return BacktestConfig(
+        seed=20260827,
+        managers=4,
+        n_drafts=1,
+        rollouts=4,
+        max_candidates=5,
+        strategies=("oracle",),
+        project_config=project,
+    )
+
+
+# ── Four-round end-to-end (M-8): rounds 2, 3 and the combined R3_4 event ─────
+
+
+def test_run_backtest_replays_rounds_2_and_combined_r3_r4() -> None:
+    tables = _four_round_tables()
+    result = run_backtest(tables, [FOUR_ROUND_TARGET], config=_four_round_config())
+    # Three draft events: R1, R2, and the combined R3_4 (rounds 3+4 share one draft).
+    by_round = {r.playoff_round: r for r in result.rounds}
+    assert sorted(by_round) == [1, 2, 3]
+
+    r2 = by_round[2]
+    assert r2.scored_rounds == [2]
+    # Round 2's survivors are the eight round-1 winners (T01..T08), four series.
+    assert set(r2.eligible_team_abbrevs) == {f"T{i:02d}" for i in range(1, 9)}
+    assert r2.leakage_ok is True
+    assert r2.slot_results  # the round was actually drafted, not skipped
+
+    combined = by_round[3]
+    # The combined event is drafted before round 3 but scored across rounds 3 AND 4.
+    assert combined.scored_rounds == [3, 4]
+    # Only the conference-final four (T01..T04) survive to be drafted.
+    assert set(combined.eligible_team_abbrevs) == {f"T{i:02d}" for i in range(1, 5)}
+    assert combined.leakage_ok is True
+    assert combined.slot_results
+
+    # Surviving-team narrowing: later rounds have strictly fewer eligible teams.
+    assert (
+        len(by_round[1].eligible_team_abbrevs)
+        > len(r2.eligible_team_abbrevs)
+        > len(combined.eligible_team_abbrevs)
+    )
+
+
+def test_build_projection_artifact_combined_event_folds_r3_and_r4() -> None:
+    # build_projection_artifact invoked with playoff_round=3 (not 1): the combined
+    # R3_4 valuation must populate the manifest and fold the conditional Cup Final in.
+    tables = _four_round_tables()
+    config = ProjectArtifactConfig(
+        seed=20260827,
+        n_sims=60,
+        slot_strategies=False,
+        production_config=SkaterProductionConfig(
+            seed=20260827, n_val_seasons=1, n_test_seasons=1, min_confident_games=5
+        ),
+    )
+    result = build_projection_artifact(
+        tables["skater_games"],
+        tables["players"],
+        tables["team_games"],
+        tables["series"],
+        season=FOUR_ROUND_TARGET,
+        playoff_round=3,
+        snapshot_id="four-round",
+        config=config,
+    )
+    combined = result.manifest["combined_event"]
+    assert combined is not None
+    assert combined["draft_event"] == "R3_4"
+    assert combined["draft_round"] == 3
+    assert combined["scored_rounds"] == [3, 4]
+    # Exactly the final four teams (two conference-final series) are diagnosed.
+    assert {d["team_abbrev"] for d in combined["teams"]} == {f"T{i:02d}" for i in range(1, 5)}
+    assert set(result.manifest["eligible_team_abbrevs"]) == {f"T{i:02d}" for i in range(1, 5)}
+
+
+def test_replay_round_two_scores_only_round_two() -> None:
+    # replay_round invoked with playoff_round=2 (not 1): a single-round R2 event.
+    tables = _four_round_tables()
+    config = _four_round_config()
+    skater_actual = skater_actual_points(tables["skater_games"], tables["series"])
+    team_actual = team_actual_goalie_points(tables["team_games"], tables["series"])
+    rnd = replay_round(
+        tables,
+        season=FOUR_ROUND_TARGET,
+        playoff_round=2,
+        league_picks=None,
+        injuries=None,
+        snapshot_id="four-round",
+        skater_actual=skater_actual,
+        team_actual=team_actual,
+        config=config,
+        scored_rounds=[2],
+    )
+    assert rnd.playoff_round == 2
+    assert rnd.scored_rounds == [2]
+    assert rnd.as_of_cutoff.startswith(f"{FOUR_ROUND_TARGET}-04")
+    assert rnd.leakage_ok is True
+    assert set(rnd.eligible_team_abbrevs) == {f"T{i:02d}" for i in range(1, 9)}
+    assert rnd.slot_results
+
+
+def test_leakage_guard_spans_the_combined_r3_r4_game_union() -> None:
+    tables = _four_round_tables()
+    season_id = (FOUR_ROUND_TARGET - 1) * 10000 + FOUR_ROUND_TARGET
+    r3_ids = round_game_ids(
+        tables["team_games"], tables["series"], season_id=season_id, playoff_round=3
+    )
+    r4_ids = round_game_ids(
+        tables["team_games"], tables["series"], season_id=season_id, playoff_round=4
+    )
+    assert r3_ids and r4_ids
+    union = r3_ids | r4_ids
+
+    starts = playoff_round_starts(tables["team_games"], tables["series"])
+    r3_start = starts[season_id][3]
+    # The combined event drafts before round 3, so neither round-3 nor round-4 games
+    # may appear in the as-of slice -- the guard is clean over the two-round union.
+    assert_round_inputs_leakfree(tables["team_games"], union, r3_start, label="team")
+    assert_round_inputs_leakfree(tables["skater_games"], union, r3_start, label="skater")
+
+    # A cutoff after the final has begun pulls both rounds of the union into the slice.
+    leaked_cutoff = f"{FOUR_ROUND_TARGET}-06-01"
+    with pytest.raises(LeakageError, match="leaked into the as-of"):
+        assert_round_inputs_leakfree(
+            tables["team_games"], union, leaked_cutoff, label="team"
+        )
+    with pytest.raises(LeakageError, match="leaked into the as-of"):
+        assert_round_inputs_leakfree(
+            tables["skater_games"], union, leaked_cutoff, label="skater"
+        )
 
 
 def _config(strategies: tuple[str, ...] = ("oracle",), n_drafts: int = 1) -> BacktestConfig:

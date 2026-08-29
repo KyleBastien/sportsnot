@@ -530,8 +530,66 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   GOTCHA: 2025 is the only IR season (5 activations); regenerating the committed
   2023-2024-2025 backtest report at HEAD is US-110's job (M-6), separate from the
   scorer fix itself.
+- Backtest test fixtures (US-108, `tests/test_backtest.py`): the ORIGINAL
+  `_synthetic_archive`/`_tables` is an 8-team, ROUND-1-ONLY archive (8 teams reach
+  only a conference final, so it CANNOT exercise round 4 or the combined R3_4 event).
+  For multi-round/combined-event coverage use the separate `_four_round_archive`/
+  `_four_round_tables` (16 teams `TEAMS16`, `TEAM16_ID`, full bracket via
+  `ROUND_PAIRS`; lower-seed wins EVERY series so survivors are deterministic:
+  R1->T01..T08, R2->T01..T04, R3->T01,T02, R4->T01). Only the target season 2022
+  plays all 4 rounds; earlier seasons play round 1 (enough history to train the
+  3 sub-models -- production split needs >=3 seasons before the replayed round). Round
+  results/eligibility are read from the `series` table (`playoff_round` col) matched to
+  games by team-pair (`_series_round_map`+`_assign_rounds`), so a round is "present"
+  iff BOTH its series rows AND its games exist. Combined R3_4 requires EXACTLY 2
+  conference-final series (final four) with pre-round `win_snapshots` -> needs 16 teams.
+  `_team_rows(..., team_ids=)` takes an optional abbrev->id map (defaults to
+  `TEAMS.index+1`) so non-8-team fixtures get valid `team_id`s. GOTCHA: round dates
+  must be strictly increasing across rounds (R1<R2<R3<R4) or the leakage guard /
+  cutoff derivation breaks; `playoff_round_starts` gives each round's exclusive cutoff.
+  ml is standalone Python: run `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy}
+  src tests` (NO yarn nx target).
 
 ---
+
+## 2026-08-29 - US-108 (End-to-end tests for rounds 2-4 and the combined R3_4 event, M-8)
+- Closed the review's exact blind spot (all prior backtest tests used
+  `playoff_round=1`, so combined-event folding / `scored_rounds=[3,4]` / surviving-team
+  narrowing never ran under test -- where M-6/M-7 lived).
+- Added a self-contained 16-team, 4-round synthetic archive to
+  `tests/test_backtest.py` (`_four_round_archive`, `_four_round_tables`,
+  `_four_round_config`, `_players16`, plus `TEAMS16`/`TEAM16_ID`/`STRENGTH16`/
+  `ROUND_PAIRS`/`ROUND_DATES`). Lower-seed wins every series -> deterministic bracket
+  through the Cup Final; only target season 2022 plays all 4 rounds.
+- Generalized `_team_rows` with an optional `team_ids` map (existing 8-team calls
+  unchanged; defaults to `TEAMS.index+1`).
+- Five new tests:
+  - `test_run_backtest_replays_rounds_2_and_combined_r3_r4`: run_backtest replays
+    R1/R2/combined-R3_4; asserts `scored_rounds==[3,4]`, eligibility narrowing
+    16>8>4, `leakage_ok`, non-empty slot_results.
+  - `test_build_projection_artifact_combined_event_folds_r3_and_r4`:
+    build_projection_artifact(playoff_round=3) populates manifest `combined_event`
+    (draft_event R3_4, scored_rounds [3,4], final-four diagnostics + eligibility).
+  - `test_replay_round_two_scores_only_round_two`: replay_round(playoff_round=2) as a
+    single-round event over the 8 round-1 winners.
+  - `test_leakage_guard_spans_the_combined_r3_r4_game_union`: guard is clean over the
+    R3|R4 game-id union at the R3 start cutoff, raises at a post-final cutoff.
+- Files changed: `ml/tests/test_backtest.py`, `scripts/ralph/prd.json`,
+  `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - The 8-team `_synthetic_archive` is round-1 only BY DESIGN; don't try to bolt
+    rounds 3/4 onto it -- use `_four_round_tables` (16 teams) for combined-event work.
+  - Rounds are discovered from the `series` table joined to games by team-pair; to
+    "add a round" you must add BOTH the series row AND its games with strictly-later
+    dates than the prior round.
+  - Combined R3_4 valuation needs EXACTLY two conference-final series (final four) and
+    pre-round win snapshots; fewer teams silently returns `combined_event=None`.
+  - Keep new-fixture sims/rollouts small (`n_sims=60`, `rollouts=4`): a 16-team
+    3-event replay is structural, not statistical, and full sims are slow.
+  - ruff+mypy clean, 601 ml tests pass. Playwright unaffected (Python-only change; no
+    web/e2e files touched).
+---
+
 
 ## 2026-08-29 - US-101 (Reject placeholder odds: per-season variance guard + xval_delta gate, C-2)
 - Implemented the CODE_REVIEW C-2 fix in the odds ingest layer.
