@@ -38,6 +38,7 @@ import pandas as pd
 
 from draft_oracle import __version__
 from draft_oracle.features.leakage import LeakageError, assert_no_leakage
+from draft_oracle.models.series_sim import simulate_series
 from draft_oracle.models.skater_production import (
     PLAYOFF_GAME_TYPE,
     _assign_rounds,
@@ -81,7 +82,11 @@ __all__ = [
     "STRATEGIES",
     "BacktestConfig",
     "BacktestResult",
+    "LeagueComparison",
+    "LeagueManagerRoster",
+    "ProjectionEval",
     "RoundResult",
+    "SeriesEval",
     "SlotResult",
     "Strategy",
     "assert_round_inputs_leakfree",
@@ -91,6 +96,9 @@ __all__ = [
     "skater_actual_points",
     "team_actual_goalie_points",
 ]
+
+# Playoff round -> the league's redraft event covering it (rounds 3+4 share R3_4).
+ROUND_TO_DRAFT_EVENT: dict[int, str] = {1: "R1", 2: "R2", 3: "R3_4", 4: "R3_4"}
 
 DEFAULT_BACKTEST_ROOT = Path("artifacts/backtests")
 
@@ -286,6 +294,57 @@ def assert_round_inputs_leakfree(
 
 
 @dataclass(frozen=True)
+class SeriesEval:
+    """One backtested series: the model's win probability vs. the actual winner.
+
+    ``p_top_stat`` is the stat-only series-model probability the top seed wins its
+    round (the number the projection artifact actually drafted from). ``p_top_market``
+    is a market-aware probability derived from de-vigged per-game betting odds for the
+    same series, or ``None`` where no historical odds cover it. Both are scored against
+    ``top_won`` (1 if the top seed won the series) via the Brier score in reporting.
+    """
+
+    top_id: int
+    bottom_id: int
+    top_seed_abbrev: str
+    bottom_seed_abbrev: str
+    top_won: int
+    p_top_stat: float
+    p_top_market: float | None
+
+    def manifest(self) -> dict[str, Any]:
+        return {
+            "top_id": self.top_id,
+            "bottom_id": self.bottom_id,
+            "top": self.top_seed_abbrev,
+            "bottom": self.bottom_seed_abbrev,
+            "top_won": self.top_won,
+            "p_top_stat": round(self.p_top_stat, 6),
+            "p_top_market": None if self.p_top_market is None else round(self.p_top_market, 6),
+        }
+
+
+@dataclass(frozen=True)
+class ProjectionEval:
+    """As-of projections paired with the realized outcome for one round.
+
+    ``skaters`` is ``(player_id, projected_points, actual_points)`` for every eligible
+    skater; ``teams`` is ``(team_id, projected_goalie_points, actual_goalie_points)``
+    for every eligible team. Reporting turns these into projection MAE and rank
+    correlation per season and in aggregate — actuals only ever score, never a pick.
+    """
+
+    skaters: list[tuple[int, float, float]] = field(default_factory=list)
+    teams: list[tuple[int, float, float]] = field(default_factory=list)
+
+    def manifest(self) -> dict[str, Any]:
+        return {
+            "skaters": [[pid, round(p, 6), round(a, 6)] for pid, p, a in self.skaters],
+            "teams": [[tid, round(p, 6), round(a, 6)] for tid, p, a in self.teams],
+        }
+
+
+@dataclass(frozen=True)
 class SlotResult:
     """One seeded draft of one strategy seated at one snake slot."""
 
@@ -296,6 +355,13 @@ class SlotResult:
     oracle_points: float
     opponent_points: dict[str, float]
     roster_keys: list[str]
+
+    @property
+    def is_win(self) -> bool:
+        """Whether the oracle roster strictly outscored every opponent this draft."""
+        if not self.opponent_points:
+            return False
+        return self.oracle_points > max(self.opponent_points.values())
 
     def manifest(self) -> dict[str, Any]:
         return {
@@ -322,6 +388,8 @@ class RoundResult:
     leakage_ok: bool
     slot_results: list[SlotResult] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    projection_eval: ProjectionEval | None = None
+    series_evals: list[SeriesEval] = field(default_factory=list)
 
     def manifest(self) -> dict[str, Any]:
         return {
@@ -334,6 +402,63 @@ class RoundResult:
             "leakage_ok": self.leakage_ok,
             "slot_results": [s.manifest() for s in self.slot_results],
             "warnings": self.warnings,
+            "projection_eval": (
+                self.projection_eval.manifest() if self.projection_eval is not None else None
+            ),
+            "series_evals": [s.manifest() for s in self.series_evals],
+        }
+
+
+@dataclass(frozen=True)
+class LeagueManagerRoster:
+    """A real league manager's actual active-roster points for a backtested round."""
+
+    manager: str
+    actual_points: float
+
+    def manifest(self) -> dict[str, Any]:
+        return {"manager": self.manager, "actual_points": round(self.actual_points, 6)}
+
+
+@dataclass(frozen=True)
+class LeagueComparison:
+    """Oracle simulated rosters vs. what the league's managers actually drafted.
+
+    Populated only where a backtested season/round overlaps the committed league draft
+    history. ``oracle_mean_points`` / ``oracle_best_points`` aggregate the oracle policy
+    across the snake slots for the round; ``managers`` are the league's real active-
+    roster scores through the same rules engine.
+    """
+
+    season: int
+    playoff_round: int
+    draft_event: str
+    managers: list[LeagueManagerRoster]
+    oracle_mean_points: float
+    oracle_best_points: float
+
+    @property
+    def league_mean_points(self) -> float:
+        if not self.managers:
+            return float("nan")
+        return sum(m.actual_points for m in self.managers) / len(self.managers)
+
+    @property
+    def league_best_points(self) -> float:
+        if not self.managers:
+            return float("nan")
+        return max(m.actual_points for m in self.managers)
+
+    def manifest(self) -> dict[str, Any]:
+        return {
+            "season": self.season,
+            "playoff_round": self.playoff_round,
+            "draft_event": self.draft_event,
+            "oracle_mean_points": round(self.oracle_mean_points, 6),
+            "oracle_best_points": round(self.oracle_best_points, 6),
+            "league_mean_points": round(self.league_mean_points, 6),
+            "league_best_points": round(self.league_best_points, 6),
+            "managers": [m.manifest() for m in self.managers],
         }
 
 
@@ -346,6 +471,7 @@ class BacktestResult:
     config: BacktestConfig
     rounds: list[RoundResult]
     generated_at: str
+    league_comparisons: list[LeagueComparison] = field(default_factory=list)
 
     def manifest(self) -> dict[str, Any]:
         return {
@@ -376,6 +502,7 @@ class BacktestResult:
                 }
                 for r in self.rounds
             ],
+            "league_comparisons": [c.manifest() for c in self.league_comparisons],
             "leakage_ok": all(r.leakage_ok for r in self.rounds),
         }
 
@@ -476,6 +603,114 @@ def _play_oracle_draft(
     return state
 
 
+# ── As-of projection & series evaluation capture (US-026) ───────────────────
+
+
+def _round_series(series: pd.DataFrame, season: int, playoff_round: int) -> pd.DataFrame:
+    """The ``series`` rows for one backtested season+round."""
+    return series.loc[
+        (series["year"].astype(int) == int(season))
+        & (series["playoff_round"].astype("Int64") == int(playoff_round))
+    ]
+
+
+def _market_series_prob(
+    odds: pd.DataFrame | None, top_id: int, bottom_id: int, season: int
+) -> float | None:
+    """Market-implied ``P(top seed wins the series)`` from de-vigged per-game odds.
+
+    Locates the historical playoff games between the two teams that season, reads the
+    de-vigged implied win probability for the top seed at home and away, and runs those
+    per-venue probabilities through the exact best-of-7 series model. ``None`` when no
+    committed odds cover the matchup. This is a *post-hoc* calibration measurement of
+    the series model under market inputs — it is never used to make a pick.
+    """
+    if odds is None or odds.empty:
+        return None
+    scoped = odds.loc[
+        (odds["season_end_year"].astype(int) == int(season))
+        & odds["is_playoff"].astype(bool)
+        & (
+            ((odds["home_team_id"] == top_id) & (odds["away_team_id"] == bottom_id))
+            | ((odds["home_team_id"] == bottom_id) & (odds["away_team_id"] == top_id))
+        )
+    ].dropna(subset=["home_implied", "away_implied"])
+    if scoped.empty:
+        return None
+    top_home = scoped.loc[scoped["home_team_id"] == top_id, "home_implied"].astype(float)
+    top_away = scoped.loc[scoped["away_team_id"] == top_id, "away_implied"].astype(float)
+    home_mean = float(top_home.mean()) if not top_home.empty else None
+    away_mean = float(top_away.mean()) if not top_away.empty else None
+    if home_mean is None and away_mean is None:
+        return None
+    p_home = home_mean if home_mean is not None else away_mean
+    p_away = away_mean if away_mean is not None else home_mean
+    assert p_home is not None and p_away is not None
+    return simulate_series(p_home, p_away).p_a_win_series
+
+
+def _build_projection_eval(
+    result: Any,
+    skater_actual: dict[tuple[int, int, int], int],
+    team_actual: dict[tuple[int, int, int], int],
+    *,
+    season_id: int,
+    playoff_round: int,
+) -> ProjectionEval:
+    """Pair every as-of projection with its realized round outcome."""
+    skaters: list[tuple[int, float, float]] = []
+    for rec in result.skaters.to_dict("records"):
+        pid = int(rec["player_id"])
+        projected = float(rec["expected_points"])
+        actual = float(skater_actual.get((season_id, playoff_round, pid), 0))
+        skaters.append((pid, projected, actual))
+    teams: list[tuple[int, float, float]] = []
+    for rec in result.teams.to_dict("records"):
+        tid = int(rec["team_id"])
+        projected = float(rec["e_goalie_points"])
+        actual = float(team_actual.get((season_id, playoff_round, tid), 0))
+        teams.append((tid, projected, actual))
+    return ProjectionEval(skaters=skaters, teams=teams)
+
+
+def _build_series_evals(
+    result: Any,
+    round_series: pd.DataFrame,
+    odds: pd.DataFrame | None,
+    *,
+    season: int,
+) -> list[SeriesEval]:
+    """Per-series stat-only + market-aware win probabilities vs. the actual winner."""
+    stat_by_team = {
+        int(rec["team_id"]): float(rec["p_series_win"])
+        for rec in result.teams.to_dict("records")
+    }
+    evals: list[SeriesEval] = []
+    for row in round_series.to_dict("records"):
+        top_raw = row.get("top_seed_team_id")
+        bottom_raw = row.get("bottom_seed_team_id")
+        winner_raw = row.get("winning_team_id")
+        if pd.isna(top_raw) or pd.isna(bottom_raw) or pd.isna(winner_raw):
+            continue
+        top_id = int(top_raw)
+        bottom_id = int(bottom_raw)
+        if top_id not in stat_by_team:
+            continue
+        top_won = 1 if int(winner_raw) == top_id else 0
+        evals.append(
+            SeriesEval(
+                top_id=top_id,
+                bottom_id=bottom_id,
+                top_seed_abbrev=str(row.get("top_seed_abbrev", "")),
+                bottom_seed_abbrev=str(row.get("bottom_seed_abbrev", "")),
+                top_won=top_won,
+                p_top_stat=stat_by_team[top_id],
+                p_top_market=_market_series_prob(odds, top_id, bottom_id, season),
+            )
+        )
+    return evals
+
+
 # ── Round / season / run orchestration ─────────────────────────────────────
 
 
@@ -486,6 +721,7 @@ def replay_round(
     playoff_round: int,
     league_picks: pd.DataFrame | None,
     injuries: pd.DataFrame | None,
+    odds: pd.DataFrame | None = None,
     snapshot_id: str,
     skater_actual: dict[tuple[int, int, int], int],
     team_actual: dict[tuple[int, int, int], int],
@@ -506,6 +742,12 @@ def replay_round(
     )
     season_id = _season_id_for(tables["series"], season)
     cutoff = result.as_of_cutoff
+
+    round_series = _round_series(tables["series"], season, playoff_round)
+    projection_eval = _build_projection_eval(
+        result, skater_actual, team_actual, season_id=season_id, playoff_round=playoff_round
+    )
+    series_evals = _build_series_evals(result, round_series, odds, season=season)
 
     round_ids = round_game_ids(
         tables["team_games"], tables["series"], season_id=season_id, playoff_round=playoff_round
@@ -535,6 +777,8 @@ def replay_round(
             leakage_ok=True,
             slot_results=[],
             warnings=warnings,
+            projection_eval=projection_eval,
+            series_evals=series_evals,
         )
 
     base_state = DraftState.new(managers_list, pool, allow_ir=config.ir)
@@ -591,6 +835,8 @@ def replay_round(
         leakage_ok=True,
         slot_results=slot_results,
         warnings=warnings,
+        projection_eval=projection_eval,
+        series_evals=series_evals,
     )
 
 
@@ -632,12 +878,107 @@ def _season_rounds(series: pd.DataFrame, season: int) -> list[int]:
     return rounds
 
 
+def _score_league_roster(
+    picks: pd.DataFrame,
+    skater_actual: dict[tuple[int, int, int], int],
+    team_actual: dict[tuple[int, int, int], int],
+    *,
+    season_id: int,
+    playoff_round: int,
+) -> float:
+    """Actual active-roster points of one league manager's real picks for a round.
+
+    Scores F/D via :data:`skater_actual` and the goalie slot via :data:`team_actual`,
+    skipping IR slots and de-duplicating by asset so a manager is scored the same way
+    the oracle rosters are (SPEC section 8).
+    """
+    total = 0.0
+    seen: set[tuple[str, int]] = set()
+    for rec in picks.to_dict("records"):
+        position = str(rec.get("position", ""))
+        if position in ("IR_F", "IR_D"):
+            continue
+        pid = rec.get("player_id")
+        tid = rec.get("team_id")
+        if position == "G" and not pd.isna(tid):
+            key = ("team", int(tid))
+            if key in seen:
+                continue
+            seen.add(key)
+            total += team_actual.get((season_id, playoff_round, int(tid)), 0)
+        elif not pd.isna(pid):
+            key = ("player", int(pid))
+            if key in seen:
+                continue
+            seen.add(key)
+            total += skater_actual.get((season_id, playoff_round, int(pid)), 0)
+    return total
+
+
+def _league_comparisons(
+    rounds: list[RoundResult],
+    league_picks: pd.DataFrame | None,
+    skater_actual: dict[tuple[int, int, int], int],
+    team_actual: dict[tuple[int, int, int], int],
+) -> list[LeagueComparison]:
+    """Compare oracle simulated rosters to real league rosters where seasons overlap.
+
+    For each backtested round whose ``(season, draft_event)`` appears in the committed
+    league draft history, score every real manager's active roster through the rules
+    engine and pair it with the oracle policy's mean/best simulated points that round.
+    Rounds without league overlap are simply omitted.
+    """
+    if league_picks is None or league_picks.empty or "season" not in league_picks.columns:
+        return []
+    comparisons: list[LeagueComparison] = []
+    for rnd in rounds:
+        event = ROUND_TO_DRAFT_EVENT.get(rnd.playoff_round)
+        if event is None:
+            continue
+        scoped = league_picks.loc[
+            (league_picks["season"].astype(int) == int(rnd.season))
+            & (league_picks["draft_event"].astype(str) == event)
+        ]
+        if scoped.empty:
+            continue
+        oracle_points = [
+            s.oracle_points for s in rnd.slot_results if s.strategy == "oracle"
+        ]
+        if not oracle_points:
+            continue
+        managers = [
+            LeagueManagerRoster(
+                manager=str(manager),
+                actual_points=_score_league_roster(
+                    picks,
+                    skater_actual,
+                    team_actual,
+                    season_id=rnd.season_id,
+                    playoff_round=rnd.playoff_round,
+                ),
+            )
+            for manager, picks in scoped.groupby("manager")
+        ]
+        comparisons.append(
+            LeagueComparison(
+                season=rnd.season,
+                playoff_round=rnd.playoff_round,
+                draft_event=event,
+                managers=sorted(managers, key=lambda m: (-m.actual_points, m.manager)),
+                oracle_mean_points=sum(oracle_points) / len(oracle_points),
+                oracle_best_points=max(oracle_points),
+            )
+        )
+    return comparisons
+
+
 def run_backtest(
     tables: dict[str, pd.DataFrame],
     seasons: list[int],
     *,
     league_picks: pd.DataFrame | None = None,
     injuries: pd.DataFrame | None = None,
+    odds: pd.DataFrame | None = None,
     snapshot_id: str = "backtest",
     config: BacktestConfig | None = None,
 ) -> BacktestResult:
@@ -645,7 +986,8 @@ def run_backtest(
 
     Builds the actual-result lookups once, then replays each round (as-of
     projections, drafts in every slot, actual scoring) under the leakage guard.
-    Deterministic given ``(tables, seed)``.
+    ``odds`` (de-vigged historical betting lines) power the market-aware series-Brier
+    track and are never used to make a pick. Deterministic given ``(tables, seed)``.
     """
     cfg = config or BacktestConfig()
     if not seasons:
@@ -663,6 +1005,7 @@ def run_backtest(
                     playoff_round=playoff_round,
                     league_picks=league_picks,
                     injuries=injuries,
+                    odds=odds,
                     snapshot_id=snapshot_id,
                     skater_actual=skater_actual,
                     team_actual=team_actual,
@@ -670,12 +1013,15 @@ def run_backtest(
                 )
             )
 
+    comparisons = _league_comparisons(rounds, league_picks, skater_actual, team_actual)
+
     return BacktestResult(
         run_id=cfg.resolved_run_id(seasons),
         seasons=list(seasons),
         config=cfg,
         rounds=rounds,
         generated_at=datetime.now(UTC).isoformat(),
+        league_comparisons=comparisons,
     )
 
 
@@ -699,6 +1045,17 @@ def write_backtest(result: BacktestResult, root: Path = DEFAULT_BACKTEST_ROOT) -
     return out_dir
 
 
+def _load_odds(normalized_dir: Path) -> pd.DataFrame | None:
+    """Load committed de-vigged betting odds if present, else ``None``.
+
+    Powers the market-aware series-Brier track in reporting; never used to make a pick.
+    """
+    path = normalized_dir / "odds.parquet"
+    if not path.exists():
+        return None
+    return pd.read_parquet(path)
+
+
 def run_backtest_from_normalized(
     *,
     seasons: list[int],
@@ -710,13 +1067,17 @@ def run_backtest_from_normalized(
     """Load normalized tables, run the backtest, and persist it to disk.
 
     When ``snapshot`` is pinned the tables are read from the frozen snapshot copy;
-    otherwise the live normalized tables are used. Returns the result and the run
-    directory under ``backtest_root/<run-id>/``.
+    otherwise the live normalized tables are used. Writes ``manifest.json`` and a
+    committed ``report.md`` under ``backtest_root/<run-id>/`` and returns the result
+    and that run directory.
     """
+    from draft_oracle.backtest.report import write_report
+
     source_dir = normalized_dir / SNAPSHOTS_SUBDIR / snapshot if snapshot else normalized_dir
     tables = _load_tables(source_dir)
     injuries = _load_injuries(normalized_dir)
     league_picks = _load_league_picks(source_dir)
+    odds = _load_odds(normalized_dir)
     snapshot_id = _snapshot_id_for(source_dir, snapshot)
 
     result = run_backtest(
@@ -724,8 +1085,10 @@ def run_backtest_from_normalized(
         seasons,
         league_picks=league_picks,
         injuries=injuries,
+        odds=odds,
         snapshot_id=snapshot_id,
         config=config,
     )
     out_dir = write_backtest(result, backtest_root)
+    write_report(result, out_dir)
     return result, out_dir

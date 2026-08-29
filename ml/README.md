@@ -898,7 +898,31 @@ round-N game leaks into the as-of inputs for round N — both a date check and a
 `game_id` identity check. Runs are seeded and reproducible: `(snapshot, seed)` fully
 determines every roster and score. The run manifest and per-round intermediates are
 written under `artifacts/backtests/<run-id>/` (manifest committed, per-round JSON
-regenerable) so reporting (US-026) can run separately.
+regenerable) so reporting can run separately.
+
+## Backtest reporting (`backtest/report.py`)
+
+`oracle backtest` also writes a committed, self-contained
+`artifacts/backtests/<run-id>/report.md` (via `build_backtest_report` /
+`write_report`) so the tool's edge is *inspected*, not assumed:
+
+- **Projection accuracy** — skater and team projection MAE + Spearman rank correlation
+  vs. the realized round points, per season and in aggregate.
+- **Series-model calibration** — the series win model's Brier score on **two tracks**:
+  *stat-only* (the probabilities the artifact actually drafted from, scored on every
+  series) and *market-aware* (a post-hoc probability from de-vigged per-game betting
+  odds, scored only where historical odds exist), each vs. the higher-seed and
+  coin-flip baselines.
+- **Draft strategy vs. baselines** — the multi-step oracle's actual roster points and
+  win rate against `greedy_vor`, `one_step`, and `random_legal`, broken out per snake
+  slot.
+- **League comparison** — where a backtested season overlaps the committed league draft
+  history, the oracle's simulated roster points vs. what the league's managers actually
+  drafted (rounds 3+4 map to the league's combined `R3_4` redraft).
+
+Every metric is reported truthfully (SPEC §7): a baseline the oracle fails to beat, or
+a projection that misses, is printed with its honest value. The committed
+`2023-2024-2025-seed20260827` run demonstrates all four sections over three seasons.
 
 ## Data & artifact layout
 

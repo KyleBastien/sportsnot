@@ -698,6 +698,7 @@ def backtest(
         config=config,
     )
     typer.echo(f"Backtest run {result.run_id} -> {out_dir}")
+    typer.echo(f"  report: {out_dir / 'report.md'}")
     typer.echo(f"  seasons: {', '.join(str(s) for s in result.seasons)}")
     typer.echo(f"  rounds replayed: {len(result.rounds)}")
     typer.echo(f"  strategies: {', '.join(config.strategies)}; drafts/slot: {n_drafts}")

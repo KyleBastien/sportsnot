@@ -3,7 +3,27 @@ Started: 08/27/2026 22:10:47
 ---
 
 ## Codebase Patterns
-- Interactive draft assistant (US-024, `cli/draft.py`): `oracle draft --artifact <dir>
+- Backtest reporting (US-026, `backtest/report.py`): pure metric aggregation over an
+  in-memory `BacktestResult` (never fetches/trains) -> committed `report.md` via
+  `build_backtest_report(result)` (has `.markdown()`) + `write_report(result, out_dir)`.
+  `oracle backtest` writes report.md automatically (report import is LAZY inside
+  `run_backtest_from_normalized` to avoid a replay<->report import cycle). The replay
+  engine (`backtest/replay.py`) now CAPTURES the eval inputs during each round so the
+  report needs no re-derivation: `RoundResult.projection_eval` (ProjectionEval: skater
+  (pid,proj,actual) + team (tid,e_goalie_pts,actual) pairs) and `RoundResult.series_evals`
+  (SeriesEval: p_top_stat from `result.teams['p_series_win']`, p_top_market from
+  `_market_series_prob` = de-vigged per-game odds -> `simulate_series`, top_won from
+  `series['winning_team_id']==top_seed_team_id`). Reuse existing metric primitives:
+  `mean_absolute_error`/`spearman_correlation` (models/skater_production), `brier_score`
+  (models/game_win). Series Brier has TWO tracks: stat-only (every series) + market-aware
+  (only where committed odds cover the matchup; empty -> reported "n/a", honest per SPEC
+  §7). `run_backtest(..., odds=, league_picks=)`; odds/market are calibration-only, NEVER
+  a pick. League comparison: `ROUND_TO_DRAFT_EVENT={1:R1,2:R2,3:R3_4,4:R3_4}` maps
+  playoff round -> the league's redraft event; `_score_league_roster` scores real
+  managers' active F/D/G (skip IR, de-dup by asset) with the SAME actual lookups as the
+  oracle. GITIGNORE: `artifacts/backtests/*/rounds/` is now ignored (regenerable);
+  only `report.md`+`manifest.json` per run are committed. Committed demo run:
+  `ml/artifacts/backtests/2023-2024-2025-seed20260827/` (3 seasons, all 4 strategies).
   --managers <n> --slot <k> [--ir]`. Reads ONLY the US-017 artifact (no net, no training
   at draft time). Design = small PURE helpers + one mutable session, all unit-testable
   without disk/stdin: `parse_command(line)->ParsedCommand` (tokenizer; pick name = whole
@@ -1323,4 +1343,40 @@ p.asarray(..., dtype=float) to avoid no-any-return.
     Environmental slowness only -- passes on faster CI hardware.
   - Unrelated untracked file packages/supabase-db/migrations/20260707230547_disable_offseason_supabase_jobs.sql
     was left in the tree by another process; NOT staged in the US-025 commit (kept focused).
+---
+
+## 2026-08-28 - US-026 (Backtest reporting with baselines and league comparison)
+- Implemented backtest reporting on top of the US-025 replay engine.
+- New module `ml/src/draft_oracle/backtest/report.py`: pure metric aggregation over a
+  BacktestResult -> committed `report.md` (build_backtest_report/write_report). Sections:
+  projection MAE + Spearman (skaters & teams, per season + aggregate); series-model Brier
+  on two tracks (stat-only everywhere; market-aware where de-vigged odds exist) vs.
+  higher-seed and coin-flip baselines; oracle roster actual points + win rate vs.
+  greedy_vor/one_step/random_legal baselines, broken out per snake slot; league
+  comparison vs. the managers' real rosters where seasons overlap.
+- Extended `backtest/replay.py`: RoundResult now captures ProjectionEval + SeriesEval
+  (new dataclasses) during each round; BacktestResult carries LeagueComparison list;
+  SlotResult.is_win; run_backtest/run_backtest_from_normalized take `odds` and write
+  report.md; _market_series_prob (odds -> simulate_series) + _league_comparisons +
+  _score_league_roster helpers; ROUND_TO_DRAFT_EVENT map.
+- Files: backtest/report.py (new), backtest/replay.py, backtest/__init__.py,
+  cli/project.py (echo report path), ml/.gitignore (ignore rounds/ intermediates),
+  ml/README.md (reporting section), tests/test_backtest_report.py (new, 7 tests).
+- Committed real 3-season report: ml/artifacts/backtests/2023-2024-2025-seed20260827/
+  {report.md,manifest.json}. Honest results: skater MAE 1.453 / rho 0.530; series
+  stat-only Brier 0.239 BEATS both baselines; oracle mean 51.1 pts / 88.9% win rate
+  beats all baselines; oracle beats the league mean each overlapping round.
+- Quality: mypy clean, ruff clean, full ml suite 562 passed.
+- **Learnings for future iterations:**
+  - Report import must be LAZY inside replay to avoid a replay<->report import cycle.
+  - The projection artifact trains its win model with `odds=None` (stat-only) — the
+    market-aware series track is post-hoc from committed odds.parquet, calibration only.
+  - League draft history covers seasons 2024/2025/2026 only; 2023 has no overlap (its
+    league section is correctly omitted). Rounds 3+4 both map to the combined R3_4 event.
+  - `data/normalized/` is gitignored but PRESENT on disk — real backtests run locally
+    without re-normalizing. One season ~74s at rollouts=8; ~4-5 min for 3 seasons.
+  - Per-round JSON under artifacts/backtests/*/rounds/ was NOT actually gitignored before
+    (the US-025 comment was aspirational); added the ignore rule so only report.md +
+    manifest.json are committed.
+  - Playwright/web e2e untouched by these Python-only ml changes; verify in CI.
 ---

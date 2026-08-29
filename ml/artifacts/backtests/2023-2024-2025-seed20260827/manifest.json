@@ -1,0 +1,301 @@
+{
+  "run_id": "2023-2024-2025-seed20260827",
+  "package_version": "0.1.0",
+  "seasons": [
+    2023,
+    2024,
+    2025
+  ],
+  "generated_at": "2026-08-29T02:33:21.264552+00:00",
+  "config": {
+    "seed": 20260827,
+    "managers": 4,
+    "ir": false,
+    "n_drafts": 1,
+    "rollouts": 16,
+    "max_candidates": 6,
+    "opponent_temperature": 0.75,
+    "depth": null,
+    "strategies": [
+      "oracle",
+      "greedy_vor",
+      "one_step",
+      "random_legal"
+    ]
+  },
+  "rounds": [
+    {
+      "season": 2023,
+      "playoff_round": 1,
+      "as_of_cutoff": "2023-04-17",
+      "opponents_kind": "greedy",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 16
+    },
+    {
+      "season": 2023,
+      "playoff_round": 2,
+      "as_of_cutoff": "2023-05-02",
+      "opponents_kind": "greedy",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 16
+    },
+    {
+      "season": 2023,
+      "playoff_round": 3,
+      "as_of_cutoff": "2023-05-18",
+      "opponents_kind": "greedy",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 16
+    },
+    {
+      "season": 2023,
+      "playoff_round": 4,
+      "as_of_cutoff": "2023-06-03",
+      "opponents_kind": "greedy",
+      "leakage_ok": true,
+      "slots": 0,
+      "drafts": 0
+    },
+    {
+      "season": 2024,
+      "playoff_round": 1,
+      "as_of_cutoff": "2024-04-20",
+      "opponents_kind": "fitted-league",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 16
+    },
+    {
+      "season": 2024,
+      "playoff_round": 2,
+      "as_of_cutoff": "2024-05-05",
+      "opponents_kind": "fitted-league",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 16
+    },
+    {
+      "season": 2024,
+      "playoff_round": 3,
+      "as_of_cutoff": "2024-05-22",
+      "opponents_kind": "fitted-league",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 16
+    },
+    {
+      "season": 2024,
+      "playoff_round": 4,
+      "as_of_cutoff": "2024-06-08",
+      "opponents_kind": "fitted-league",
+      "leakage_ok": true,
+      "slots": 0,
+      "drafts": 0
+    },
+    {
+      "season": 2025,
+      "playoff_round": 1,
+      "as_of_cutoff": "2025-04-19",
+      "opponents_kind": "fitted-league",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 16
+    },
+    {
+      "season": 2025,
+      "playoff_round": 2,
+      "as_of_cutoff": "2025-05-05",
+      "opponents_kind": "fitted-league",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 16
+    },
+    {
+      "season": 2025,
+      "playoff_round": 3,
+      "as_of_cutoff": "2025-05-20",
+      "opponents_kind": "fitted-league",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 16
+    },
+    {
+      "season": 2025,
+      "playoff_round": 4,
+      "as_of_cutoff": "2025-06-04",
+      "opponents_kind": "fitted-league",
+      "leakage_ok": true,
+      "slots": 0,
+      "drafts": 0
+    }
+  ],
+  "league_comparisons": [
+    {
+      "season": 2024,
+      "playoff_round": 1,
+      "draft_event": "R1",
+      "oracle_mean_points": 64.25,
+      "oracle_best_points": 68.0,
+      "league_mean_points": 48.25,
+      "league_best_points": 58.0,
+      "managers": [
+        {
+          "manager": "kyle",
+          "actual_points": 58.0
+        },
+        {
+          "manager": "judah",
+          "actual_points": 52.0
+        },
+        {
+          "manager": "levi",
+          "actual_points": 47.0
+        },
+        {
+          "manager": "ben",
+          "actual_points": 36.0
+        }
+      ]
+    },
+    {
+      "season": 2024,
+      "playoff_round": 2,
+      "draft_event": "R2",
+      "oracle_mean_points": 65.25,
+      "oracle_best_points": 68.0,
+      "league_mean_points": 48.75,
+      "league_best_points": 61.0,
+      "managers": [
+        {
+          "manager": "levi",
+          "actual_points": 61.0
+        },
+        {
+          "manager": "judah",
+          "actual_points": 54.0
+        },
+        {
+          "manager": "kyle",
+          "actual_points": 50.0
+        },
+        {
+          "manager": "ben",
+          "actual_points": 30.0
+        }
+      ]
+    },
+    {
+      "season": 2024,
+      "playoff_round": 3,
+      "draft_event": "R3_4",
+      "oracle_mean_points": 43.5,
+      "oracle_best_points": 45.0,
+      "league_mean_points": 35.0,
+      "league_best_points": 47.0,
+      "managers": [
+        {
+          "manager": "levi",
+          "actual_points": 47.0
+        },
+        {
+          "manager": "judah",
+          "actual_points": 35.0
+        },
+        {
+          "manager": "ben",
+          "actual_points": 31.0
+        },
+        {
+          "manager": "kyle",
+          "actual_points": 27.0
+        }
+      ]
+    },
+    {
+      "season": 2025,
+      "playoff_round": 1,
+      "draft_event": "R1",
+      "oracle_mean_points": 60.25,
+      "oracle_best_points": 61.0,
+      "league_mean_points": 54.25,
+      "league_best_points": 59.0,
+      "managers": [
+        {
+          "manager": "kyle",
+          "actual_points": 59.0
+        },
+        {
+          "manager": "levi",
+          "actual_points": 56.0
+        },
+        {
+          "manager": "ben",
+          "actual_points": 52.0
+        },
+        {
+          "manager": "judah",
+          "actual_points": 50.0
+        }
+      ]
+    },
+    {
+      "season": 2025,
+      "playoff_round": 2,
+      "draft_event": "R2",
+      "oracle_mean_points": 43.0,
+      "oracle_best_points": 43.0,
+      "league_mean_points": 37.75,
+      "league_best_points": 41.0,
+      "managers": [
+        {
+          "manager": "kyle",
+          "actual_points": 41.0
+        },
+        {
+          "manager": "ben",
+          "actual_points": 40.0
+        },
+        {
+          "manager": "levi",
+          "actual_points": 38.0
+        },
+        {
+          "manager": "judah",
+          "actual_points": 32.0
+        }
+      ]
+    },
+    {
+      "season": 2025,
+      "playoff_round": 3,
+      "draft_event": "R3_4",
+      "oracle_mean_points": 49.25,
+      "oracle_best_points": 51.0,
+      "league_mean_points": 34.5,
+      "league_best_points": 43.0,
+      "managers": [
+        {
+          "manager": "levi",
+          "actual_points": 43.0
+        },
+        {
+          "manager": "judah",
+          "actual_points": 38.0
+        },
+        {
+          "manager": "ben",
+          "actual_points": 34.0
+        },
+        {
+          "manager": "kyle",
+          "actual_points": 23.0
+        }
+      ]
+    }
+  ],
+  "leakage_ok": true
+}

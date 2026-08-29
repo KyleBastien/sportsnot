@@ -21,6 +21,8 @@ artifacts/backtests/*
 !artifacts/backtests/*/
 !artifacts/backtests/*/report.md
 !artifacts/backtests/*/manifest.json
+# Per-round intermediates are regenerable — keep them out of git.
+artifacts/backtests/*/rounds/
 !artifacts/models/
 artifacts/models/*
 !artifacts/models/*/
