@@ -1289,3 +1289,38 @@ p.asarray(..., dtype=float) to avoid no-any-return.
     --strict, and the full pytest suite green manually. ml/ is not an nx JS project, so the
     affected JS gates are no-ops for these files anyway.
 ---
+
+## 08/28/2026 19:07:35 - US-025
+- Backtest replay engine (US-025) implemented in ml/src/draft_oracle/backtest/replay.py:
+  oracle backtest --seasons <list> replays every playoff round of each season -- rebuilds
+  as-of US-017 projection artifact (cutoff = round start), seats the oracle in EVERY snake
+  slot vs. fitted league-history opponents (leave-one-season-out; greedy fallback where
+  history omits the season), scores every roster with ACTUAL results through rules.py.
+  Hard leakage guard (date check + game_id identity check) fails loudly on any round-N
+  leak. Seeded/reproducible; per-round intermediates + manifest persisted under
+  artifacts/backtests/<run-id>/ for separate US-026 reporting.
+- Files changed: ml/src/draft_oracle/backtest/replay.py (new), backtest/__init__.py,
+  cli/project.py (backtest command), cli/draft.py (ruff line-length reflow only),
+  ml/tests/test_backtest.py (new, 10 tests), ml/README.md (command table + section).
+- Quality: ruff check + format clean, mypy --strict clean (61 files), test_backtest.py
+  10/10 pass. Full ml suite 554/555 pass.
+- **Learnings for future iterations:**
+  - Backtest replay reads the SAME building blocks as the live pipeline: build_projection_artifact
+    (as-of cutoff enforced), build_pool_from_frames, DraftState/apply_pick, recommend.choose_pick,
+    fit_opponent_models. No new modeling -- it ORCHESTRATES existing US-017..021 code.
+  - Actual scoring goes through rules.py only (player_points for skaters,
+    goalie_series_points for the team goalie slot). IR retroactive swaps are NOT simulated
+    in backtest (needs in-round injury timing) -- score the ACTIVE roster only, documented.
+  - Late playoff rounds can't seat a full league (Cup Final = 2 goalie teams < 4 needed) --
+    _draft_shortfall skips the round honestly with a warning (SPEC 7), never crashes.
+  - Leave-one-season-out opponent fit: exclude the backtested season from training so it
+    never informs its own opponents (SPEC 6). Greedy fallback when league history omits it.
+  - Persisted split: manifest.json committed (gitignore whitelists artifacts/backtests/*/manifest.json
+    + report.md); per-round rounds/*.json are regenerable intermediates (gitignored).
+  - GOTCHA (environmental, pre-existing): tests/test_recommend.py::test_full_depth_12_manager_recommendation_under_10s
+    (US-021) fails on this shared Windows/OneDrive host (~13s vs 10s bar). NOT caused by
+    US-025 (independent module); weakening the threshold would violate SPEC 7 honesty rules.
+    Environmental slowness only -- passes on faster CI hardware.
+  - Unrelated untracked file packages/supabase-db/migrations/20260707230547_disable_offseason_supabase_jobs.sql
+    was left in the tree by another process; NOT staged in the US-025 commit (kept focused).
+---

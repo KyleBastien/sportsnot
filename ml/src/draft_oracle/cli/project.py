@@ -13,6 +13,13 @@ from typing import Annotated
 import typer
 
 from draft_oracle import __version__
+from draft_oracle.backtest.replay import (
+    DEFAULT_BACKTEST_ROOT,
+    STRATEGIES,
+    BacktestConfig,
+    Strategy,
+    run_backtest_from_normalized,
+)
 from draft_oracle.cli.draft import draft as draft_command
 from draft_oracle.ingest.entity_match import (
     DEFAULT_OVERRIDES_DIR,
@@ -635,6 +642,79 @@ def compare_strategies_cmd(
 
 
 app.command(name="draft")(draft_command)
+
+
+@app.command()
+def backtest(
+    seasons: Annotated[
+        list[int], typer.Option("--seasons", help="Playoff end years to replay, e.g. 2022.")
+    ],
+    normalized_dir: Annotated[
+        Path, typer.Option(help="Directory holding normalized Parquet tables.")
+    ] = DEFAULT_NORMALIZED_DIR,
+    backtest_root: Annotated[
+        Path, typer.Option(help="Root directory for the written backtest run.")
+    ] = DEFAULT_BACKTEST_ROOT,
+    snapshot: Annotated[
+        str, typer.Option(help="Pin a frozen snapshot id (defaults to the live tables).")
+    ] = "",
+    managers: Annotated[int, typer.Option(help="League size (2-12).")] = 4,
+    ir: Annotated[
+        bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
+    ] = False,
+    n_drafts: Annotated[int, typer.Option(help="Seeded drafts per (round, slot).")] = 1,
+    rollouts: Annotated[int, typer.Option(help="Monte-Carlo rollouts per oracle pick.")] = 40,
+    strategies: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--strategy",
+            help="Oracle policies to seat (oracle/greedy_vor/one_step/random_legal).",
+        ),
+    ] = None,
+    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
+) -> None:
+    """Replay historical playoff rounds end-to-end and score against actuals (US-025).
+
+    Rebuilds as-of projections for every round, seats the oracle in each snake slot
+    vs. the fitted (league-history) or greedy opponent model, and scores every roster
+    with the real results through the rules engine. A hard leakage guard fails loudly
+    if any round-N game leaks into the as-of inputs. Per-round intermediates and the
+    run manifest are written under backtest_root/<run-id>/.
+    """
+    resolved: tuple[Strategy, ...] = tuple(_coerce_strategy(s) for s in (strategies or ["oracle"]))
+    config = BacktestConfig(
+        seed=seed,
+        managers=managers,
+        ir=ir,
+        n_drafts=n_drafts,
+        rollouts=rollouts,
+        strategies=resolved,
+    )
+    result, out_dir = run_backtest_from_normalized(
+        seasons=seasons,
+        normalized_dir=normalized_dir,
+        backtest_root=backtest_root,
+        snapshot=snapshot or None,
+        config=config,
+    )
+    typer.echo(f"Backtest run {result.run_id} -> {out_dir}")
+    typer.echo(f"  seasons: {', '.join(str(s) for s in result.seasons)}")
+    typer.echo(f"  rounds replayed: {len(result.rounds)}")
+    typer.echo(f"  strategies: {', '.join(config.strategies)}; drafts/slot: {n_drafts}")
+    for round_result in result.rounds:
+        drafts = len(round_result.slot_results)
+        typer.echo(
+            f"  {round_result.season} r{round_result.playoff_round} "
+            f"(as of {round_result.as_of_cutoff}, {round_result.opponents_kind}): "
+            f"{drafts} draft(s), leakage_ok={round_result.leakage_ok}"
+        )
+    typer.echo(f"  leakage_ok (all rounds): {all(r.leakage_ok for r in result.rounds)}")
+
+
+def _coerce_strategy(value: str) -> Strategy:
+    if value not in STRATEGIES:
+        raise typer.BadParameter(f"unknown strategy {value!r}; choose from {list(STRATEGIES)}")
+    return value
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -66,6 +66,7 @@ All commands run from the `ml/` directory.
 | Recommend pick  | `uv run oracle recommend --artifact-dir artifacts/2025-r1 --managers 6 --seat 3` |
 | Compare drafters| `uv run oracle compare-strategies`       |
 | Draft assistant | `uv run oracle draft --artifact artifacts/2025-r1 --managers 4 --slot 1 [--ir]` |
+| Backtest replay | `uv run oracle backtest --seasons 2022` |
 
 ## Package layout
 
@@ -875,6 +876,29 @@ in under 10 s at any state with full-depth rollouts (under 5 s with `--depth 1`)
 session autosaves to a replayable JSON log after every pick (default
 `<artifact>/draft-session.json`, override with `--session`), so a draft can be
 replayed for post-hoc analysis.
+
+## Backtest replay engine (`backtest/replay.py`)
+
+*"Measure the edge on past playoffs — don't assume it."* `oracle backtest` replays
+every playoff round of each requested season end-to-end: it rebuilds the US-017
+projection artifact using **only** games played before the round started, seats the
+oracle in **every** snake slot against the fitted league-history opponent model
+(leave-one-season-out; greedy fallback where history omits the season), and scores
+every drafted roster with the **actual** historical results through the rules engine.
+Projections drive the decisions; actuals only ever drive the score.
+
+```
+uv run oracle backtest --seasons 2022                          # one season, greedy fallback
+uv run oracle backtest --seasons 2022 --seasons 2023           # multiple seasons
+uv run oracle backtest --seasons 2022 --strategy oracle --strategy greedy_vor  # + baselines
+```
+
+A hard leakage guard (`assert_round_inputs_leakfree`) fails the run loudly if any
+round-N game leaks into the as-of inputs for round N — both a date check and a direct
+`game_id` identity check. Runs are seeded and reproducible: `(snapshot, seed)` fully
+determines every roster and score. The run manifest and per-round intermediates are
+written under `artifacts/backtests/<run-id>/` (manifest committed, per-round JSON
+regenerable) so reporting (US-026) can run separately.
 
 ## Data & artifact layout
 

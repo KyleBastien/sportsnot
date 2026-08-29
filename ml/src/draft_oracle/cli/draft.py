@@ -172,9 +172,7 @@ def _ratio(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
-def resolve_asset(
-    pool: list[DraftAsset], query: str, *, limit: int = 5
-) -> AssetResolution:
+def resolve_asset(pool: list[DraftAsset], query: str, *, limit: int = 5) -> AssetResolution:
     """Resolve a fuzzy ``query`` to a single pool asset (pure, deterministic).
 
     Resolution order: exact (case-insensitive) name, then substring, then a
@@ -633,9 +631,7 @@ def draft(
     ir: Annotated[
         bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
     ] = False,
-    eliminated: Annotated[
-        str, typer.Option(help="Comma-separated eliminated team abbrevs.")
-    ] = "",
+    eliminated: Annotated[str, typer.Option(help="Comma-separated eliminated team abbrevs.")] = "",
     session: Annotated[
         Path | None, typer.Option(help="Session-log path (autosaved after each pick).")
     ] = None,
