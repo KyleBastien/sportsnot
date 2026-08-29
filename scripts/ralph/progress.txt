@@ -3,6 +3,26 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
 ---
 
 ## Codebase Patterns
+- Odds ingest guards (US-101, `ingest/odds.py`): the Kaggle `nhl_data_extensive`
+  archive backfills seasons with a constant -105 puck-line placeholder. Guard =
+  `_placeholder_prices_by_season(raw)` -> `{season_end_year: None | frozenset(prices)}`
+  (None = reject whole season; frozenset = reject that modal price only), gated by
+  `PLACEHOLDER_MIN_SEASON_ROWS` (10) so tiny synthetic fixtures aren't judged.
+  `_favorite_rows_from_games(..., placeholder_seasons=)` emits rejected rows via
+  `_uncovered_row` (covered=False, kept -- never dropped) and tags them `_placeholder`
+  (a dict key `_finalize` ignores since it builds with `columns=_ODDS_COLUMNS`).
+  `parse_kaggle_extensive` records `frame.attrs["placeholder_uncovered_rows"]`.
+  `consolidate_odds` consumes `xval_delta` as a gate (`XVAL_DELTA_THRESHOLD`): when
+  covering sources disagree on fav-prob beyond it, `_blank_market_fields` flags the
+  consolidated row uncovered (keeps xval_delta/source_count for audit) and counts
+  `out.attrs["xval_flagged_rows"]`. Both counts surface via `OddsResult` +
+  `oracle odds` CLI. GOTCHA: `_attach_market` (game_win) filters on `home_implied`
+  not-null, so any "exclude from market" flag MUST null the implied/ml/devig fields,
+  not just set covered=False. pandas `.attrs` survive sort/reset_index/to_parquet on
+  the in-memory frame but NOT a parquet round-trip -- read them before writing.
+  Run ml checks with `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy} src tests`
+  (ml is a standalone Python project, NOT an nx package -- no `yarn nx` target).
+
 - Backtest reporting (US-026, `backtest/report.py`): pure metric aggregation over an
   in-memory `BacktestResult` (never fetches/trains) -> committed `report.md` via
   `build_backtest_report(result)` (has `.markdown()`) + `write_report(result, out_dir)`.
@@ -419,4 +439,19 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   position below its pool-wide replacement, where a static VOR board is blind) — the
   committed `artifacts/models/recommend/report.md` runs BOTH scenarios and reports both.
 
+---
+
+## 2026-08-29 - US-101 (Reject placeholder odds: per-season variance guard + xval_delta gate, C-2)
+- Implemented the CODE_REVIEW C-2 fix in the odds ingest layer.
+- Files changed:
+  - ml/src/draft_oracle/ingest/odds.py: added PLACEHOLDER_STD_EPSILON / PLACEHOLDER_MODAL_FRACTION / PLACEHOLDER_MIN_SEASON_ROWS / XVAL_DELTA_THRESHOLD constants + guard notes; _placeholder_prices_by_season, _is_placeholder_price, _blank_market_fields helpers; placeholder_seasons param on _favorite_rows_from_games; parse_kaggle_extensive computes+applies the guard and records placeholder_uncovered_rows; consolidate_odds consumes xval_delta as a gate; build_source_odds propagates the count; OddsResult gained placeholder_uncovered_rows + xval_flagged_rows.
+  - ml/src/draft_oracle/cli/project.py: oracle odds prints both guard counts.
+  - ml/tests/test_odds.py: 5 new tests (constant-placeholder season rejected, dominated season keeps genuine prices, varied season untouched, real committed-file assertions reject 2004-2018+2025/98.73% of 2019/pre-Dec-11 2026, xval gate flags source disagreement).
+- Verification: ruff clean, mypy clean (63 files), full ml suite 572 passed. Real-file test not skipped (committed archive present).
+- **Learnings for future iterations:**
+  - The placeholder is specifically -105 puck-line juice; a statistical near-constant guard (modal fraction >= 0.5, or nunique<=2 / std<1.0) reproduces the review's targets without hardcoding -105. Needs a min-sample floor (PLACEHOLDER_MIN_SEASON_ROWS) or it false-positives on single-price test fixtures.
+  - Season labels in the Kaggle file are ENDING years: season 2025 == 2024-25 (all -105 => 2024-25 has NO real historical market, which is the honest outcome). Real markets begin season 2020.
+  - _attach_market (models/game_win.py) joins on non-null home_implied and exact game_date (no tolerance) -- so flagging a row uncovered must null implied/ml/devig fields, and the ~2/3 attach loss is the separate UTC-vs-local M-2/US-103 bug (do NOT try to fix coverage attachment here).
+  - Downstream committed market reports/manifests are stale but their regeneration is deferred to US-103 (date normalize + game-win manifest) and US-106 (backtest evidence); regenerating them before the date fix would bake in wrong attachment numbers.
+  - ml/ is a standalone Python project (own .venv, ruff+mypy+pytest via pyproject) -- it is NOT wired into nx, so use ml/.venv/Scripts/python.exe directly, not yarn nx.
 ---

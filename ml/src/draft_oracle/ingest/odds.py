@@ -84,6 +84,38 @@ STANDARD_OVERROUND = 1.045
 DEVIG_PROPORTIONAL = "proportional"
 DEVIG_STANDARD_OVERROUND = "standard_overround"
 
+# ── Placeholder / cross-source guards (CODE_REVIEW C-2) ──────────────────
+
+# The Kaggle ``nhl_data_extensive`` archive backfills seasons it has no win
+# price for with a constant puck-line juice value (-105), then labels every one
+# of those rows as a real favourite moneyline. A season whose favourite-price
+# column is *near-constant* is therefore a fabricated placeholder, not genuine
+# coverage. We reject such rows (flag ``covered=False``) instead of ingesting
+# them. Two independent detectors, documented here:
+#
+#   * a season is WHOLLY placeholder-filled when its priced rows collapse to
+#     <=2 distinct values or an (almost) zero standard deviation, and
+#   * a season is placeholder-DOMINATED (real prices mixed with a big constant
+#     block) when a single modal price covers >= ``PLACEHOLDER_MODAL_FRACTION``
+#     of its priced rows.
+#
+# Measured against the committed file these thresholds reject 100% of 2004-2018
+# and 2025, 98.7% of 2019, and the pre-Dec-11 2026 rows, while leaving the real
+# 2020-2024 markets (top modal price <= 18%) untouched.
+PLACEHOLDER_STD_EPSILON = 1.0
+PLACEHOLDER_MODAL_FRACTION = 0.50
+# A season needs at least this many priced rows before its price column can be
+# judged near-constant; a handful of games is too small a sample to call a
+# placeholder (and would false-positive on legitimate single-price fixtures).
+PLACEHOLDER_MIN_SEASON_ROWS = 10
+
+# ``xval_delta`` (max-min de-vigged favourite probability across the sources
+# covering a game) is now a *consumed* cross-source sanity gate: when covering
+# sources disagree on the favourite's win probability by more than this many
+# points the consolidated price is untrustworthy, so it is flagged uncovered
+# (excluded from covered market probabilities) rather than silently published.
+XVAL_DELTA_THRESHOLD = 0.15
+
 # Consolidation priority (higher wins) when several sources cover a game.
 _SOURCE_PRIORITY: dict[str, int] = {
     "sbr_close": 30,
@@ -632,6 +664,24 @@ def _uncovered_row(
     }
 
 
+def _blank_market_fields(row: dict[str, Any]) -> None:
+    """Flag a consolidated row uncovered in place (xval gate, CODE_REVIEW C-2).
+
+    Clears every priced field so the row is excluded from covered market
+    probabilities while its identity, ``xval_delta`` and ``source_count`` remain
+    for audit - flagged, never silently dropped.
+    """
+    row["covered"] = False
+    row["away_ml"] = None
+    row["home_ml"] = None
+    row["favorite_side"] = None
+    row["both_sides"] = False
+    row["away_implied"] = None
+    row["home_implied"] = None
+    row["devig_method"] = None
+    row["overround"] = None
+
+
 def parse_sbr_archive(archive_dir: Path) -> pd.DataFrame:
     """Parse every committed SBR workbook under ``archive_dir``."""
     frames = [parse_sbr_workbook(p) for p in sorted(archive_dir.glob("nhl-odds-*.xlsx"))]
@@ -652,10 +702,56 @@ def _parse_utc_date(value: object) -> date | None:
     return result
 
 
+def _placeholder_prices_by_season(frame: pd.DataFrame) -> dict[int, frozenset[float] | None]:
+    """Detect near-constant placeholder favourite prices per season (C-2).
+
+    Returns a mapping ``season_end_year -> reject`` where ``reject is None`` means
+    the whole season is placeholder-filled (reject every priced row) and a
+    ``frozenset`` names the dominant modal price(s) to reject while keeping the
+    season's genuine prices. Seasons with real, varied markets are absent.
+
+    A season is flagged when its priced favourite column is *near-constant*: at
+    most two distinct values or a standard deviation below
+    :data:`PLACEHOLDER_STD_EPSILON` (wholly placeholder), or a single modal price
+    covering at least :data:`PLACEHOLDER_MODAL_FRACTION` of the priced rows
+    (placeholder-dominated). See the module-level guard notes for the empirical
+    thresholds this reproduces on the committed archive.
+    """
+    result: dict[int, frozenset[float] | None] = {}
+    if "season" not in frame.columns or "favorite_moneyline" not in frame.columns:
+        return result
+    prices_all = pd.to_numeric(frame["favorite_moneyline"], errors="coerce")
+    for season, positions in frame.groupby("season").groups.items():
+        prices = prices_all.loc[positions].dropna()
+        n = len(prices)
+        if n < PLACEHOLDER_MIN_SEASON_ROWS:
+            continue
+        season_year = int(cast("int", season))
+        std = float(prices.std(ddof=0)) if n > 1 else 0.0
+        counts = prices.value_counts()
+        modal_value = float(counts.index[0])
+        modal_fraction = float(counts.iloc[0]) / n
+        if prices.nunique() <= 2 or std < PLACEHOLDER_STD_EPSILON:
+            result[season_year] = None
+        elif modal_fraction >= PLACEHOLDER_MODAL_FRACTION:
+            result[season_year] = frozenset({modal_value})
+    return result
+
+
+def _is_placeholder_price(reject: frozenset[float] | None, fav_ml: float | None) -> bool:
+    """True if ``fav_ml`` is a rejected placeholder for its (flagged) season."""
+    if reject is None:
+        return True
+    if fav_ml is None:
+        return False
+    return any(abs(fav_ml - value) < 1e-6 for value in reject)
+
+
 def _favorite_rows_from_games(
     grouped: pd.DataFrame,
     *,
     source: str,
+    placeholder_seasons: Mapping[int, frozenset[float] | None] | None = None,
 ) -> list[dict[str, Any]]:
     """Build favorite-only rows from a per-game two-row frame.
 
@@ -663,6 +759,10 @@ def _favorite_rows_from_games(
     equivalent for both favorite-only layouts: ESPN's ``spread`` is
     home-relative (§9), and Kaggle's per-team ``spread`` is negative on the
     favorite's row (§8) - in both a home favorite means ``home spread < 0``.
+
+    When ``placeholder_seasons`` flags a season (CODE_REVIEW C-2), that season's
+    fabricated constant prices are emitted as ``covered=False`` rows rather than
+    genuine coverage - flagged, never imputed and never silently dropped.
     """
     rows: list[dict[str, Any]] = []
     for _game_id, pair in grouped.groupby("game_id", sort=True):
@@ -686,19 +786,25 @@ def _favorite_rows_from_games(
         fav_ml = _american(home["favorite_moneyline"])
         home_spread = _american(home["spread"])
         favorite_side = "home" if (home_spread is not None and home_spread < 0) else "away"
-        if fav_ml is None:
-            rows.append(
-                _uncovered_row(
-                    source=source,
-                    season_end_year=season_end_year,
-                    game_date=game_date,
-                    away_id=away_id,
-                    home_id=home_id,
-                    away_name=str(away["team_name"]),
-                    home_name=str(home["team_name"]),
-                    neutral=False,
-                )
+        is_placeholder = (
+            placeholder_seasons is not None
+            and season_end_year in placeholder_seasons
+            and _is_placeholder_price(placeholder_seasons[season_end_year], fav_ml)
+        )
+        if fav_ml is None or is_placeholder:
+            row = _uncovered_row(
+                source=source,
+                season_end_year=season_end_year,
+                game_date=game_date,
+                away_id=away_id,
+                home_id=home_id,
+                away_name=str(away["team_name"]),
+                home_name=str(home["team_name"]),
+                neutral=False,
             )
+            if is_placeholder:
+                row["_placeholder"] = True
+            rows.append(row)
             continue
         rows.append(
             _favorite_only_row(
@@ -733,14 +839,26 @@ def parse_kaggle_extensive(path: Path) -> pd.DataFrame:
 
     Season labels are ENDING years; the favorite's row carries the negative
     ``spread`` (PROVENANCE §8). Rows with no ``favorite_moneyline`` are flagged.
+
+    A per-season placeholder guard (CODE_REVIEW C-2) rejects the archive's
+    fabricated constant prices: seasons whose favourite-price column is
+    near-constant are emitted as ``covered=False`` rather than genuine coverage.
+    The count of rejected rows is recorded on ``frame.attrs`` under
+    ``"placeholder_uncovered_rows"``.
     """
     raw = pd.read_csv(
         path,
         compression="gzip" if path.suffix == ".gz" else None,
         usecols=list(_FAVORITE_CSV_COLUMNS),
     )
-    rows = _favorite_rows_from_games(raw, source=SOURCE_KAGGLE)
-    return _finalize(rows)
+    placeholder_seasons = _placeholder_prices_by_season(raw)
+    rows = _favorite_rows_from_games(
+        raw, source=SOURCE_KAGGLE, placeholder_seasons=placeholder_seasons
+    )
+    placeholder_uncovered = sum(1 for row in rows if row.get("_placeholder"))
+    frame = _finalize(rows)
+    frame.attrs["placeholder_uncovered_rows"] = placeholder_uncovered
+    return frame
 
 
 def parse_espn_completion(path: Path) -> pd.DataFrame:
@@ -771,8 +889,13 @@ def build_source_odds(archive_dir: Path = DEFAULT_ODDS_ARCHIVE_DIR) -> pd.DataFr
     non_empty = [f for f in frames if not f.empty]
     if not non_empty:
         return _empty_odds_frame()
+    placeholder_uncovered = sum(
+        int(f.attrs.get("placeholder_uncovered_rows", 0)) for f in non_empty
+    )
     out = pd.concat(non_empty, ignore_index=True)
-    return out.reset_index(drop=True)
+    out = out.reset_index(drop=True)
+    out.attrs["placeholder_uncovered_rows"] = placeholder_uncovered
+    return out
 
 
 def consolidate_odds(source_odds: pd.DataFrame) -> pd.DataFrame:
@@ -790,6 +913,7 @@ def consolidate_odds(source_odds: pd.DataFrame) -> pd.DataFrame:
     keep = [*list(_ODDS_COLUMNS), "xval_delta", "source_count"]
     if source_odds.empty:
         out = pd.DataFrame(columns=keep)
+        out.attrs["xval_flagged_rows"] = 0
         return out
 
     raw_records = source_odds.to_dict("records")
@@ -819,6 +943,7 @@ def consolidate_odds(source_odds: pd.DataFrame) -> pd.DataFrame:
 
     order = sorted(records, key=lambda r: (-int(r["_priority"]), not bool(r["covered"]), r["_pos"]))
     out_rows: list[dict[str, Any]] = []
+    xval_flagged = 0
     for anchor in order:
         if anchor["_used"]:
             continue
@@ -840,13 +965,19 @@ def consolidate_odds(source_odds: pd.DataFrame) -> pd.DataFrame:
             if bool(m["covered"]) and m["_fav_prob"] is not None and not pd.isna(m["_fav_prob"])
         ]
         best = {col: anchor[col] for col in _ODDS_COLUMNS}
-        best["xval_delta"] = (max(fav_probs) - min(fav_probs)) if len(fav_probs) > 1 else 0.0
+        xval_delta = (max(fav_probs) - min(fav_probs)) if len(fav_probs) > 1 else 0.0
+        best["xval_delta"] = xval_delta
         best["source_count"] = len(members)
+        if bool(best["covered"]) and xval_delta > XVAL_DELTA_THRESHOLD:
+            _blank_market_fields(best)
+            xval_flagged += 1
         out_rows.append(best)
 
     out = pd.DataFrame.from_records(out_rows, columns=keep)
     out = out.sort_values(["season_end_year", "game_date", "game_key"], kind="stable")
-    return out.reset_index(drop=True)
+    out = out.reset_index(drop=True)
+    out.attrs["xval_flagged_rows"] = xval_flagged
+    return out
 
 
 def _cluster_members(anchor: dict[str, Any], bucket: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -905,6 +1036,8 @@ class OddsResult:
     game_rows: int
     covered_rows: int
     uncovered_rows: int
+    placeholder_uncovered_rows: int = 0
+    xval_flagged_rows: int = 0
 
 
 def build_odds_table(
@@ -930,6 +1063,8 @@ def build_odds_table(
         game_rows=len(consolidated),
         covered_rows=covered,
         uncovered_rows=len(consolidated) - covered,
+        placeholder_uncovered_rows=int(source_odds.attrs.get("placeholder_uncovered_rows", 0)),
+        xval_flagged_rows=int(consolidated.attrs.get("xval_flagged_rows", 0)),
     )
 
 

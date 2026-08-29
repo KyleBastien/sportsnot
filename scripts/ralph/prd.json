@@ -19,8 +19,8 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added a documented per-season placeholder guard in ingest/odds.py: _placeholder_prices_by_season flags a season whole (nunique<=2 or std<PLACEHOLDER_STD_EPSILON) or dominant-modal (modal fraction>=PLACEHOLDER_MODAL_FRACTION) with a PLACEHOLDER_MIN_SEASON_ROWS floor; parse_kaggle_extensive emits those rows covered=False (kept, never dropped) and records placeholder_uncovered_rows on frame.attrs. consolidate_odds now consumes xval_delta as a gate (XVAL_DELTA_THRESHOLD=0.15) via _blank_market_fields, recording xval_flagged_rows. OddsResult + `oracle odds` CLI surface both counts. Real-file test asserts reject-all 2004-2018+2025, 98.73% of 2019, pre-Dec-11 2026. Placeholder covered=False -> honest coverage (2024-25 has none). ruff+mypy clean, 572 ml tests pass. Downstream manifest regeneration deferred to US-103/US-106 (needs the market-date fix first)."
     },
     {
       "id": "US-102",

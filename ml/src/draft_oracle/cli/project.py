@@ -184,6 +184,10 @@ def odds(
     typer.echo(f"  source rows: {result.source_rows}")
     typer.echo(f"  games: {result.game_rows} priced/flagged")
     typer.echo(f"  priced: {result.covered_rows}  flagged: {result.uncovered_rows}")
+    typer.echo(
+        f"  guards: {result.placeholder_uncovered_rows} placeholder rows rejected, "
+        f"{result.xval_flagged_rows} cross-source-disagreement rows flagged"
+    )
 
 
 @app.command(name="league-drafts")
