@@ -7,9 +7,9 @@ self-contained ``report.md`` so the tool's edge can be *inspected*, not assumed:
    MAE and Spearman rank correlation against the realized round points.
 2. **Series-model calibration** — the series win model's Brier score on two tracks:
    *stat-only* (the probabilities the artifact actually drafted from, scored on every
-   series) and *market-aware* (a post-hoc probability from de-vigged per-game betting
-   odds, scored only where historical odds exist), each against the higher-seed and
-   coin-flip baselines.
+   series) and *market-aware* (a post-hoc probability from the series' game-1 pre-series
+   de-vigged betting line, scored only where historical odds exist), each against the
+   higher-seed and coin-flip baselines.
 3. **Draft strategy vs. baselines** — the multi-step oracle's actual roster points and
    win rate against the greedy-VOR, one-step-lookahead, and random-legal baselines,
    broken out per snake slot.
@@ -323,8 +323,9 @@ def _series_section(result: BacktestResult) -> list[str]:
         "No committed odds covered these series, so the market-aware track is empty."
         if aggregate.market_n == 0
         else (
-            "The market-aware probability is derived post-hoc from de-vigged per-game "
-            "betting lines for calibration only — it is never used to make a pick."
+            "The market-aware probability is derived post-hoc from the series' game-1 "
+            "pre-series de-vigged betting line (an as-of-round-start benchmark) for "
+            "calibration only — it is never used to make a pick."
         )
     )
     stat_header = ["Season", "Series n", "Series model", "Higher seed=1", "Coin flip=0.5"]
@@ -338,8 +339,8 @@ def _series_section(result: BacktestResult) -> list[str]:
         "",
         f"Aggregate stat-only series model beats both baselines: **{beats_stat}**.",
         "",
-        "Track 2 — **market-aware** (post-hoc de-vigged betting odds), scored where "
-        "historical odds exist:",
+        "Track 2 — **market-aware** (post-hoc, series' game-1 pre-series de-vigged "
+        "betting line), scored where historical odds exist:",
         "",
         *_table(stat_header, market_rows),
         "",

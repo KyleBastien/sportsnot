@@ -712,3 +712,25 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
     focused unit assertion (SPEC section 7: synthetic in-memory dicts, no
     committed data needed for this path).
 ---
+
+
+## 2026-08-29 - US-109 (M-5)
+- Rewrote `_market_series_prob` (backtest/replay.py) to use ONLY the series' game-1
+  pre-series de-vigged line (earliest game_date between the two teams that season),
+  applied symmetrically across venues via simulate_series(p, p). Previously it averaged
+  de-vigged home/away implied probs across ALL playoff games in the series (mid-series
+  closing lines) -> not an as-of-round-start benchmark. Now genuinely as-of round start.
+- Relabeled the market-aware track descriptions in backtest/report.py and the SeriesEval
+  docstring to say "game-1 pre-series line" instead of "per-game odds".
+- Added 3 unit tests in tests/test_backtest.py pinning the semantics: game-1-only
+  (ignores blowout mid-series lines), top-seed-as-away game-1 read, and None-when-uncovered.
+- Files changed: ml/src/draft_oracle/backtest/replay.py,
+  ml/src/draft_oracle/backtest/report.py, ml/tests/test_backtest.py
+- **Learnings for future iterations:**
+  - `game_date` in odds.parquet is an ISO string -> lexical `.min()` == chronological;
+    NHL higher seed hosts game 1, so earliest game's home team is normally the top seed.
+  - simulate_series needs TWO per-venue probs but a single pre-series game-1 line only
+    gives one venue; applying it symmetrically (p_home=p_away) is the honest as-of-start
+    choice (in-series away lines would leak future information).
+  - ml checks: `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy} src tests`.
+---

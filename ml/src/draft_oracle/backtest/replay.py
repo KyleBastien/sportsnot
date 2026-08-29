@@ -307,9 +307,10 @@ class SeriesEval:
 
     ``p_top_stat`` is the stat-only series-model probability the top seed wins its
     round (the number the projection artifact actually drafted from). ``p_top_market``
-    is a market-aware probability derived from de-vigged per-game betting odds for the
-    same series, or ``None`` where no historical odds cover it. Both are scored against
-    ``top_won`` (1 if the top seed won the series) via the Brier score in reporting.
+    is a market-aware probability derived from the series' game-1 (pre-series) de-vigged
+    betting line for the same series, or ``None`` where no historical odds cover it. Both
+    are scored against ``top_won`` (1 if the top seed won the series) via the Brier score
+    in reporting.
     """
 
     top_id: int
@@ -627,13 +628,18 @@ def _round_series(series: pd.DataFrame, season: int, playoff_round: int) -> pd.D
 def _market_series_prob(
     odds: pd.DataFrame | None, top_id: int, bottom_id: int, season: int
 ) -> float | None:
-    """Market-implied ``P(top seed wins the series)`` from de-vigged per-game odds.
+    """Market-implied ``P(top seed wins the series)`` from the series' game-1 line.
 
-    Locates the historical playoff games between the two teams that season, reads the
-    de-vigged implied win probability for the top seed at home and away, and runs those
-    per-venue probabilities through the exact best-of-7 series model. ``None`` when no
-    committed odds cover the matchup. This is a *post-hoc* calibration measurement of
-    the series model under market inputs — it is never used to make a pick.
+    Locates the *first* (pre-series) playoff game between the two teams that season,
+    reads the de-vigged implied win probability for the top seed from that single
+    game-1 moneyline, and runs it through the exact best-of-7 series model. Only the
+    game-1 line — set before any series game is played — informs the number, so this is
+    a genuine *as-of-round-start* benchmark: in-series (game 2+) closing lines are never
+    averaged in (CODE_REVIEW M-5). The game-1 probability is applied symmetrically to
+    both venues because only one venue's line (the top seed's home opener) exists before
+    the series starts. ``None`` when no committed odds cover the matchup. This is a
+    post-hoc calibration measurement of the series model under market inputs — it is
+    never used to make a pick.
     """
     if odds is None or odds.empty:
         return None
@@ -647,16 +653,22 @@ def _market_series_prob(
     ].dropna(subset=["home_implied", "away_implied"])
     if scoped.empty:
         return None
-    top_home = scoped.loc[scoped["home_team_id"] == top_id, "home_implied"].astype(float)
-    top_away = scoped.loc[scoped["away_team_id"] == top_id, "away_implied"].astype(float)
-    home_mean = float(top_home.mean()) if not top_home.empty else None
-    away_mean = float(top_away.mean()) if not top_away.empty else None
-    if home_mean is None and away_mean is None:
+    # Game 1 is the earliest-dated game between the two teams; ``game_date`` is an ISO
+    # string so a lexical minimum is chronological. Restricting to that date drops every
+    # mid-series closing line.
+    game_one_date = scoped["game_date"].min()
+    game_one = scoped.loc[scoped["game_date"] == game_one_date]
+    top_home = game_one.loc[game_one["home_team_id"] == top_id, "home_implied"].astype(
+        float
+    )
+    top_away = game_one.loc[game_one["away_team_id"] == top_id, "away_implied"].astype(
+        float
+    )
+    top_probs = pd.concat([top_home, top_away])
+    if top_probs.empty:
         return None
-    p_home = home_mean if home_mean is not None else away_mean
-    p_away = away_mean if away_mean is not None else home_mean
-    assert p_home is not None and p_away is not None
-    return simulate_series(p_home, p_away).p_a_win_series
+    p_top_game_one = float(top_probs.mean())
+    return simulate_series(p_top_game_one, p_top_game_one).p_a_win_series
 
 
 def _build_projection_eval(

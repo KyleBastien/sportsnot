@@ -19,6 +19,7 @@ from typer.testing import CliRunner
 from draft_oracle.backtest.replay import (
     BacktestConfig,
     _draft_events,
+    _market_series_prob,
     _score_league_roster,
     assert_round_inputs_leakfree,
     replay_round,
@@ -31,6 +32,7 @@ from draft_oracle.backtest.replay import (
 )
 from draft_oracle.cli.project import app
 from draft_oracle.features.leakage import LeakageError
+from draft_oracle.models.series_sim import simulate_series
 from draft_oracle.models.skater_production import (
     SkaterProductionConfig,
     playoff_round_starts,
@@ -746,6 +748,77 @@ def test_score_league_roster_no_swap_counts_starter_benches_ir() -> None:
     )
     # No activation: starter (7) counts, bench IR (4) scores zero, goalie (6): 13.
     assert total == 13.0
+
+
+# ── Market-series benchmark (US-109, CODE_REVIEW M-5) ───────────────────────
+
+
+def _series_odds_frame(rows: list[dict[str, object]]) -> pd.DataFrame:
+    """Minimal odds frame with the columns ``_market_series_prob`` reads."""
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "season_end_year",
+            "game_date",
+            "is_playoff",
+            "home_team_id",
+            "away_team_id",
+            "home_implied",
+            "away_implied",
+        ],
+    )
+
+
+def test_market_series_prob_uses_only_game_one_line() -> None:
+    top_id, bottom_id, season = 10, 20, 2024
+    # Game 1 (top seed at home) prices the top seed at 0.55. Later in-series games swing
+    # the closing line hard toward the bottom seed; an as-of-round-start benchmark must
+    # ignore them entirely.
+    odds = _series_odds_frame(
+        [
+            {"season_end_year": season, "game_date": "2024-04-20", "is_playoff": True,
+             "home_team_id": top_id, "away_team_id": bottom_id,
+             "home_implied": 0.55, "away_implied": 0.45},
+            {"season_end_year": season, "game_date": "2024-04-22", "is_playoff": True,
+             "home_team_id": top_id, "away_team_id": bottom_id,
+             "home_implied": 0.05, "away_implied": 0.95},
+            {"season_end_year": season, "game_date": "2024-04-24", "is_playoff": True,
+             "home_team_id": bottom_id, "away_team_id": top_id,
+             "home_implied": 0.95, "away_implied": 0.05},
+        ]
+    )
+    got = _market_series_prob(odds, top_id, bottom_id, season)
+    # Only the game-1 line (0.55) feeds the best-of-7 model, applied symmetrically.
+    expected = simulate_series(0.55, 0.55).p_a_win_series
+    assert got is not None
+    assert got == pytest.approx(expected)
+    # A 0.55 per-game edge yields a clear (>0.5) series favorite, not the sub-0.5 number
+    # the old mid-series averaging would have produced from the late blowout lines.
+    assert got > 0.5
+
+
+def test_market_series_prob_reads_game_one_when_top_seed_is_away() -> None:
+    top_id, bottom_id, season = 10, 20, 2024
+    # Defensive: if the earliest game has the top seed on the road, read its away line.
+    odds = _series_odds_frame(
+        [
+            {"season_end_year": season, "game_date": "2024-05-01", "is_playoff": True,
+             "home_team_id": bottom_id, "away_team_id": top_id,
+             "home_implied": 0.40, "away_implied": 0.60},
+            {"season_end_year": season, "game_date": "2024-05-03", "is_playoff": True,
+             "home_team_id": top_id, "away_team_id": bottom_id,
+             "home_implied": 0.99, "away_implied": 0.01},
+        ]
+    )
+    got = _market_series_prob(odds, top_id, bottom_id, season)
+    expected = simulate_series(0.60, 0.60).p_a_win_series
+    assert got == pytest.approx(expected)
+
+
+def test_market_series_prob_none_when_uncovered() -> None:
+    odds = _series_odds_frame([])
+    assert _market_series_prob(odds, 10, 20, 2024) is None
+    assert _market_series_prob(None, 10, 20, 2024) is None
 
 
 # ── Leakage guard ───────────────────────────────────────────────────────────
