@@ -639,7 +639,7 @@ def _market_series_prob(
         return None
     scoped = odds.loc[
         (odds["season_end_year"].astype(int) == int(season))
-        & odds["is_playoff"].astype(bool)
+        & odds["is_playoff"].fillna(False).astype(bool)
         & (
             ((odds["home_team_id"] == top_id) & (odds["away_team_id"] == bottom_id))
             | ((odds["home_team_id"] == bottom_id) & (odds["away_team_id"] == top_id))

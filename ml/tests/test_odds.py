@@ -37,6 +37,7 @@ from draft_oracle.ingest.odds import (
     espn_summary_to_rows,
     is_playoff_game,
     is_preseason_game,
+    load_archive_game_types,
     load_local_game_dates,
     odds_api_events_to_rows,
     parse_espn_completion,
@@ -741,6 +742,204 @@ def test_market_join_attaches_genuine_covered_odds() -> None:
 
     _, control_rate = attach_rate(consolidate_odds(source))  # no normalization
     assert control_rate < rate  # the local-date fix is what closes the gap
+
+
+# ── Playoff labeling by gameTypeId (CODE_REVIEW M-4, m-12) ────────────────
+
+
+def test_load_archive_game_types_indexes_gametypeid(tmp_path: Path) -> None:
+    """The loader maps each matchup date to its archive gameTypeId, both ways."""
+    archive = tmp_path / "nhl-archive"
+    archive.mkdir()
+    frame = pd.DataFrame(
+        [
+            {"seasonId": 20212022, "gameTypeId": 2, "gameId": 111, "teamId": 10,
+             "homeRoad": "H", "gameDate": "2022-04-29"},
+            {"seasonId": 20212022, "gameTypeId": 2, "gameId": 111, "teamId": 6,
+             "homeRoad": "R", "gameDate": "2022-04-29"},
+            {"seasonId": 20212022, "gameTypeId": 3, "gameId": 222, "teamId": 10,
+             "homeRoad": "H", "gameDate": "2022-05-10"},
+            {"seasonId": 20212022, "gameTypeId": 3, "gameId": 222, "teamId": 6,
+             "homeRoad": "R", "gameDate": "2022-05-10"},
+        ]
+    )
+    frame.to_csv(archive / "team-games-2021-22.csv.gz", index=False, compression="gzip")
+    index = load_archive_game_types(archive)
+    assert index[(2022, 10, 6)][date(2022, 4, 29)] == 2
+    assert index[(2022, 10, 6)][date(2022, 5, 10)] == 3
+    # Stored in both orientations so a reversed odds row still resolves.
+    assert index[(2022, 6, 10)][date(2022, 5, 10)] == 3
+
+
+def _sbr_late_april_regular(*, home: str, away: str, price: int) -> list[dict[str, object]]:
+    """A late-April (post Apr-1) two-sided SBR-style row for season 2022."""
+    from draft_oracle.ingest.odds import _two_sided_row
+
+    home_id = resolve_team_id(home)
+    away_id = resolve_team_id(away)
+    assert home_id is not None and away_id is not None
+    return [
+        _two_sided_row(
+            source=SOURCE_SBR,
+            season_end_year=2022,
+            game_date=date(2022, 4, 29),
+            away_id=away_id,
+            home_id=home_id,
+            away_name=away,
+            home_name=home,
+            away_ml=float(-price + 20),
+            home_ml=float(price),
+            neutral=False,
+        )
+    ]
+
+
+def test_consolidate_labels_late_april_regular_as_non_playoff() -> None:
+    """A 29 April regular-season game (inside the old April window) is not playoff."""
+    from draft_oracle.ingest.odds import _finalize
+
+    source = _finalize(
+        _sbr_late_april_regular(home="Toronto Maple Leafs", away="Boston Bruins", price=-140)
+    )
+    # The fixed-window heuristic mislabels it (April 29 > April 1 window start).
+    assert bool(source.iloc[0]["is_playoff"]) is True
+
+    home_id = resolve_team_id("Toronto Maple Leafs")
+    away_id = resolve_team_id("Boston Bruins")
+    assert home_id is not None and away_id is not None
+    dates = {(2022, home_id, away_id): (date(2022, 4, 29),)}
+    types = {(2022, home_id, away_id): {date(2022, 4, 29): 2}}
+    out = consolidate_odds(source, local_game_dates=dates, local_game_types=types)
+    row = out.iloc[0]
+    assert bool(row["is_playoff"]) is False  # archive gameTypeId=2 wins
+    assert bool(row["covered"]) is True
+
+
+def test_consolidate_labels_playoff_from_gametypeid() -> None:
+    """An archive gameTypeId=3 game is flagged is_playoff even out of window."""
+    from draft_oracle.ingest.odds import _finalize, _two_sided_row
+
+    home_id = resolve_team_id("Toronto Maple Leafs")
+    away_id = resolve_team_id("Boston Bruins")
+    assert home_id is not None and away_id is not None
+    source = _finalize(
+        [
+            _two_sided_row(
+                source=SOURCE_SBR,
+                season_end_year=2022,
+                game_date=date(2022, 5, 10),
+                away_id=away_id,
+                home_id=home_id,
+                away_name="Boston Bruins",
+                home_name="Toronto Maple Leafs",
+                away_ml=120.0,
+                home_ml=-140.0,
+                neutral=False,
+            )
+        ]
+    )
+    dates = {(2022, home_id, away_id): (date(2022, 5, 10),)}
+    types = {(2022, home_id, away_id): {date(2022, 5, 10): 3}}
+    out = consolidate_odds(source, local_game_dates=dates, local_game_types=types)
+    assert bool(out.iloc[0]["is_playoff"]) is True
+
+
+def test_consolidate_excludes_rows_with_no_archive_game() -> None:
+    """A priced row absent from the archive (e.g. preseason) is flagged uncovered."""
+    from draft_oracle.ingest.odds import _finalize, _two_sided_row
+
+    home_id = resolve_team_id("Toronto Maple Leafs")
+    away_id = resolve_team_id("Boston Bruins")
+    assert home_id is not None and away_id is not None
+    source = _finalize(
+        [
+            _two_sided_row(
+                source=SOURCE_SBR,
+                season_end_year=2022,
+                game_date=date(2021, 10, 3),  # early-October preseason
+                away_id=away_id,
+                home_id=home_id,
+                away_name="Boston Bruins",
+                home_name="Toronto Maple Leafs",
+                away_ml=120.0,
+                home_ml=-140.0,
+                neutral=False,
+            )
+        ]
+    )
+    # No archive game covers this matchup date -> excluded, kept, counted.
+    out = consolidate_odds(source, local_game_types={})
+    assert len(out) == 1  # not dropped silently
+    assert out.attrs["unmatched_uncovered_rows"] == 0  # empty index = no labeling
+
+    types: dict[tuple[int, int, int], dict[date, int]] = {(2022, home_id, away_id): {}}
+    out = consolidate_odds(source, local_game_types=types)
+    row = out.iloc[0]
+    assert row["is_playoff"] is None
+    assert bool(row["covered"]) is False
+    assert row["home_implied"] is None
+    assert out.attrs["unmatched_uncovered_rows"] == 1
+
+
+def test_playoff_labels_match_committed_archive_gametypeid() -> None:
+    """CODE_REVIEW M-4/m-12 against committed data: labels follow gameTypeId.
+
+    Builds the covered odds universe (SBR + ESPN completion) and the archive
+    gameTypeId index from committed files, consolidates with archive labeling,
+    then asserts NO regular-season (gameTypeId=2) game is flagged is_playoff and
+    NO playoff (gameTypeId=3) game is flagged non-playoff. The fixed-window
+    control demonstrates the mislabels the join removes, and every covered row
+    resolves to a real archive game (closing the preseason leak).
+    """
+    from draft_oracle.ingest.normalize import DEFAULT_ARCHIVE_DIR
+    from draft_oracle.ingest.odds import DEFAULT_ODDS_ARCHIVE_DIR, _lookup_game_type
+
+    sbr = parse_sbr_archive(DEFAULT_ODDS_ARCHIVE_DIR)
+    espn = parse_espn_completion(
+        DEFAULT_ODDS_ARCHIVE_DIR / "espn-2025-26-completion" / "games.csv"
+    )
+    source = pd.concat([sbr, espn], ignore_index=True)
+    dates = load_local_game_dates(DEFAULT_ARCHIVE_DIR)
+    types = load_archive_game_types(DEFAULT_ARCHIVE_DIR)
+
+    out = consolidate_odds(source, local_game_dates=dates, local_game_types=types)
+
+    def archive_type(row: pd.Series) -> int | None:
+        parsed = date.fromisoformat(str(row["game_date"]))
+        return _lookup_game_type(
+            types,
+            int(row["season_end_year"]),
+            int(row["home_team_id"]),
+            int(row["away_team_id"]),
+            parsed,
+        )
+
+    wrong_regular = 0
+    wrong_playoff = 0
+    for _, row in out.iterrows():
+        type_id = archive_type(row)
+        if type_id is None:
+            continue
+        flagged = bool(row["is_playoff"])
+        if type_id == 2 and flagged:
+            wrong_regular += 1
+        if type_id == 3 and not flagged:
+            wrong_playoff += 1
+    assert wrong_regular == 0, f"{wrong_regular} regular-season games flagged playoff"
+    assert wrong_playoff == 0, f"{wrong_playoff} playoff games flagged non-playoff"
+
+    # Control: the fixed April windows DO mislabel regular-season games as playoff.
+    old = consolidate_odds(source, local_game_dates=dates)
+    old_wrong = 0
+    for _, row in old.iterrows():
+        if archive_type(row) == 2 and bool(row["is_playoff"]):
+            old_wrong += 1
+    assert old_wrong > 0, "control must reproduce the fixed-window mislabels"
+
+    # Preseason leak (m-12): every covered row resolves to a real archive game.
+    covered = out.loc[out["covered"].astype(bool)]
+    unmatched_covered = sum(1 for _, row in covered.iterrows() if archive_type(row) is None)
+    assert unmatched_covered == 0, f"{unmatched_covered} covered rows have no archive game"
 
 
 # ── Placeholder guard + xval gate (CODE_REVIEW C-2) ──────────────────────

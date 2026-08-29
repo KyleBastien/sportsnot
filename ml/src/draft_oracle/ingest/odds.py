@@ -359,6 +359,17 @@ def devig_favorite_only(
     )
 
 
+# ── Playoff labeling (CODE_REVIEW M-4) ───────────────────────────────────
+
+# NHL archive gameTypeId values (SPEC §4): 2 = regular season, 3 = playoffs.
+# These are the authoritative source of a game's playoff status - the fixed
+# April-window heuristic below mislabels late-April regular-season games (M-4)
+# and misses early-October preseason games (m-12), so consolidation joins each
+# priced row to the archive's gameTypeId whenever the archive index is supplied.
+REGULAR_SEASON_GAME_TYPE = 2
+PLAYOFF_GAME_TYPE = 3
+
+
 # ── Playoff windows (PROVENANCE §5) ──────────────────────────────────────
 
 # Real per-season playoff windows keyed by season ENDING year, as inclusive
@@ -1018,6 +1029,7 @@ def build_source_odds(archive_dir: Path = DEFAULT_ODDS_ARCHIVE_DIR) -> pd.DataFr
 def consolidate_odds(
     source_odds: pd.DataFrame,
     local_game_dates: Mapping[tuple[int, int, int], tuple[date, ...]] | None = None,
+    local_game_types: Mapping[tuple[int, int, int], Mapping[date, int]] | None = None,
 ) -> pd.DataFrame:
     """Collapse the per-source table to one best row per game.
 
@@ -1036,11 +1048,22 @@ def consolidate_odds(
     (CODE_REVIEW M-2). This gives the written table ONE documented convention -
     the NHL-archive local date - so ``game_win._attach_market``'s exact-date
     join actually lands on the game instead of dropping UTC-stamped prices.
+
+    When ``local_game_types`` is supplied (the archive's ``gameTypeId`` index,
+    :func:`load_archive_game_types`), ``is_playoff`` is set from the archive's
+    authoritative gameTypeId (2 = regular, 3 = playoff) rather than the fixed
+    April windows that mislabel late-April regular-season games (CODE_REVIEW
+    M-4). A priced row that matches no archive game is flagged ``is_playoff=None``
+    and blanked to uncovered (kept and counted in ``attrs["unmatched_uncovered_rows"]``,
+    never dropped silently) so it leaves the covered market universe - this also
+    closes the early-October preseason leak (m-12), since preseason games are
+    absent from the archive's regular-season set.
     """
     keep = [*list(_ODDS_COLUMNS), "xval_delta", "source_count"]
     if source_odds.empty:
         out = pd.DataFrame(columns=keep)
         out.attrs["xval_flagged_rows"] = 0
+        out.attrs["unmatched_uncovered_rows"] = 0
         return out
 
     raw_records = source_odds.to_dict("records")
@@ -1071,6 +1094,7 @@ def consolidate_odds(
     order = sorted(records, key=lambda r: (-int(r["_priority"]), not bool(r["covered"]), r["_pos"]))
     out_rows: list[dict[str, Any]] = []
     xval_flagged = 0
+    unmatched_uncovered = 0
     for anchor in order:
         if anchor["_used"]:
             continue
@@ -1096,6 +1120,9 @@ def consolidate_odds(
         best["xval_delta"] = xval_delta
         best["source_count"] = len(members)
         _snap_to_local_date(best, local_game_dates)
+        if _label_playoff_from_archive(best, local_game_types) and bool(best["covered"]):
+            _blank_market_fields(best)
+            unmatched_uncovered += 1
         if bool(best["covered"]) and xval_delta > XVAL_DELTA_THRESHOLD:
             _blank_market_fields(best)
             xval_flagged += 1
@@ -1105,6 +1132,7 @@ def consolidate_odds(
     out = out.sort_values(["season_end_year", "game_date", "game_key"], kind="stable")
     out = out.reset_index(drop=True)
     out.attrs["xval_flagged_rows"] = xval_flagged
+    out.attrs["unmatched_uncovered_rows"] = unmatched_uncovered
     return out
 
 
@@ -1215,6 +1243,107 @@ def _accumulate_local_dates(
         accumulator.setdefault((int(season) % 10000, int(home_id), int(away_id)), set()).add(local)
 
 
+def load_archive_game_types(
+    archive_dir: Path = DEFAULT_NHL_ARCHIVE_DIR,
+) -> dict[tuple[int, int, int], dict[date, int]]:
+    """Index NHL-archive ``gameTypeId`` by ``(season_end_year, home_id, away_id)``.
+
+    The committed archive (``team-games-*.csv.gz``) stamps each game with its
+    authoritative ``gameTypeId`` (2 = regular season, 3 = playoffs). This index
+    lets :func:`consolidate_odds` label ``is_playoff`` from the archive instead
+    of the fixed April windows that mislabel late-April regular-season games as
+    playoffs (CODE_REVIEW M-4). Each key maps its local game dates to the
+    matching ``gameTypeId``; the key is stored in both home/away orientations so
+    a game whose odds row has the sides reversed still resolves.
+    """
+    accumulator: dict[tuple[int, int, int], dict[date, int]] = {}
+    for path in sorted(archive_dir.glob("team-games-*.csv.gz")):
+        _accumulate_game_types(pd.read_csv(path), accumulator)
+    return accumulator
+
+
+def _accumulate_game_types(
+    frame: pd.DataFrame, accumulator: dict[tuple[int, int, int], dict[date, int]]
+) -> None:
+    required = {"gameId", "seasonId", "teamId", "homeRoad", "gameDate", "gameTypeId"}
+    if frame.empty or not required.issubset(frame.columns):
+        return
+    home = frame.loc[
+        frame["homeRoad"] == "H",
+        ["gameId", "seasonId", "teamId", "gameDate", "gameTypeId"],
+    ]
+    away = frame.loc[frame["homeRoad"] == "R", ["gameId", "teamId"]]
+    merged = home.merge(away, on="gameId", suffixes=("_home", "_away"))
+    seasons = merged["seasonId"].astype(int).tolist()
+    homes = merged["teamId_home"].astype(int).tolist()
+    aways = merged["teamId_away"].astype(int).tolist()
+    dates = merged["gameDate"].astype(str).tolist()
+    types = merged["gameTypeId"].astype(int).tolist()
+    for season, home_id, away_id, raw_date, type_id in zip(
+        seasons, homes, aways, dates, types, strict=True
+    ):
+        local = _parse_date_str(str(raw_date)[:10])
+        if local is None:
+            continue
+        season_end = int(season) % 10000
+        accumulator.setdefault((season_end, int(home_id), int(away_id)), {})[local] = int(type_id)
+        accumulator.setdefault((season_end, int(away_id), int(home_id)), {})[local] = int(type_id)
+
+
+def _lookup_game_type(
+    game_types: Mapping[tuple[int, int, int], Mapping[date, int]],
+    season_end_year: int,
+    home_id: int,
+    away_id: int,
+    game_date: date,
+) -> int | None:
+    """Archive ``gameTypeId`` for a matchup on ``game_date`` (exact, else ±1 day)."""
+    by_date = game_types.get((season_end_year, home_id, away_id))
+    if not by_date:
+        return None
+    exact = by_date.get(game_date)
+    if exact is not None:
+        return exact
+    near = sorted(
+        (d for d in by_date if abs((d - game_date).days) <= 1),
+        key=lambda d: (abs((d - game_date).days), d.toordinal()),
+    )
+    return by_date[near[0]] if near else None
+
+
+def _label_playoff_from_archive(
+    row: dict[str, Any],
+    game_types: Mapping[tuple[int, int, int], Mapping[date, int]] | None,
+) -> bool:
+    """Set ``is_playoff`` from the archive ``gameTypeId``; return True if unmatched.
+
+    Joins the (already local-date-snapped) row to the NHL archive's authoritative
+    ``gameTypeId`` on ``(season, home, away)`` within ±1 day: playoff → ``True``,
+    regular → ``False`` (CODE_REVIEW M-4). A priced row that matches no archive
+    game gets ``is_playoff=None`` and is reported so the caller can exclude it
+    from covered market consumers - preseason games are absent from the archive's
+    regular-season set, so this also closes the early-October preseason leak
+    (m-12). Rows are never relabeled when no archive index is supplied.
+    """
+    if not game_types:
+        return False
+    home_id = row.get("home_team_id")
+    away_id = row.get("away_team_id")
+    if home_id is None or away_id is None or pd.isna(home_id) or pd.isna(away_id):
+        return False
+    game_date = _parse_date_str(str(row["game_date"]))
+    if game_date is None:
+        return False
+    type_id = _lookup_game_type(
+        game_types, int(row["season_end_year"]), int(home_id), int(away_id), game_date
+    )
+    if type_id is None:
+        row["is_playoff"] = None
+        return True
+    row["is_playoff"] = type_id == PLAYOFF_GAME_TYPE
+    return False
+
+
 def _max_prob(home_imp: object, away_imp: object) -> float | None:
     values: list[float] = []
     for v in (home_imp, away_imp):
@@ -1238,6 +1367,7 @@ class OddsResult:
     uncovered_rows: int
     placeholder_uncovered_rows: int = 0
     xval_flagged_rows: int = 0
+    unmatched_uncovered_rows: int = 0
 
 
 def build_odds_table(
@@ -1254,11 +1384,18 @@ def build_odds_table(
 
     ``nhl_archive_dir`` supplies the NHL archive's local game dates so
     consolidation normalizes Kaggle/ESPN UTC dates onto the local convention the
-    market join expects (CODE_REVIEW M-2).
+    market join expects (CODE_REVIEW M-2), and its authoritative ``gameTypeId``
+    so ``is_playoff`` is labeled from the archive rather than fixed April windows
+    (CODE_REVIEW M-4, m-12).
     """
     source_odds = build_source_odds(archive_dir)
     local_game_dates = load_local_game_dates(nhl_archive_dir)
-    consolidated = consolidate_odds(source_odds, local_game_dates=local_game_dates)
+    local_game_types = load_archive_game_types(nhl_archive_dir)
+    consolidated = consolidate_odds(
+        source_odds,
+        local_game_dates=local_game_dates,
+        local_game_types=local_game_types,
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
     source_odds.to_parquet(out_dir / f"{ODDS_BY_SOURCE_TABLE_NAME}.parquet", index=False)
     consolidated.to_parquet(out_dir / f"{ODDS_TABLE_NAME}.parquet", index=False)
@@ -1271,6 +1408,7 @@ def build_odds_table(
         uncovered_rows=len(consolidated) - covered,
         placeholder_uncovered_rows=int(source_odds.attrs.get("placeholder_uncovered_rows", 0)),
         xval_flagged_rows=int(consolidated.attrs.get("xval_flagged_rows", 0)),
+        unmatched_uncovered_rows=int(consolidated.attrs.get("unmatched_uncovered_rows", 0)),
     )
 
 

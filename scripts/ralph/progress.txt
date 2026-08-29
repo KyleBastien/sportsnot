@@ -57,6 +57,24 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   (those whose matchup exists in the archive within +-1 day) attach; the residual
   ~8% are phantom rows pricing games absent from the archive (source noise, out of
   M-2 scope). Metric = attachment among GENUINE covered rows, not all covered.
+- Playoff labeling by gameTypeId (US-104, `ingest/odds.py`, CODE_REVIEW M-4/m-12):
+  the fixed April `_PLAYOFF_WINDOWS` heuristic mislabels late-April regular-season
+  games (window opens Apr 1; regular seasons run to ~May 1) and misses early-Oct
+  preseason. AUTHORITATIVE source = archive `gameTypeId` (2=regular, 3=playoff;
+  archive has NO preseason type-1 rows -> preseason = "no archive match").
+  `load_archive_game_types(archive_dir)` -> `{(season_end_year, home_id, away_id):
+  {local_date: gameTypeId}}`, keyed in BOTH home/away orientations (a game is
+  playoff regardless of side). `consolidate_odds(..., local_game_types=...)` labels
+  is_playoff AFTER `_snap_to_local_date` (so the row date already matches the
+  archive local date) via `_label_playoff_from_archive`: type3->True, type2->False,
+  NO match->is_playoff=None AND `_blank_market_fields` (covered=False), kept+counted
+  in `out.attrs["unmatched_uncovered_rows"]` + `OddsResult.unmatched_uncovered_rows`
+  (never dropped silently). GOTCHA: labeling only runs when local_game_types is
+  supplied, so the M-2 `test_market_join_*` (dates-only) is unaffected. is_playoff
+  column is now object dtype (bool | None); playoff CONSUMERS must use
+  `.fillna(False).astype(bool)` NOT bare `.astype(bool)` to exclude None (fixed
+  `backtest/replay.py:642` series-market lookup). `build_odds_table` loads BOTH the
+  dates and types index from `nhl_archive_dir`.
 
 - Backtest reporting (US-026, `backtest/report.py`): pure metric aggregation over an
   in-memory `BacktestResult` (never fetches/trains) -> committed `report.md` via
@@ -516,4 +534,17 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   - After US-101, 2024/2025 Kaggle is fully placeholder-rejected -> 0 covered; the 2023-2026 covered universe is SBR(2023)+espn_completion(2026). A fast test builds just those two parsers (~3s) instead of the 22s full `build_source_odds` (Kaggle CSV parse dominates).
   - `consolidate_odds` writes the anchor row's date; SBR is already local so its clusters need no snap. Snapping only matters where the anchor is a UTC source (Kaggle/ESPN) with no SBR member in the cluster (all of 2023-2026 target seasons).
   - US-104 (gameTypeId playoff labels) will re-touch `is_playoff` on these same rows; US-105 does the comprehensive odds+backtest regen. Leaving phantom-covered rows as-is is intentional (out of M-2 scope).
+---
+
+## 2026-08-29 - US-104
+- Labeled `is_playoff` from the archive's authoritative `gameTypeId` (2=regular, 3=playoff) instead of fixed April date windows (CODE_REVIEW M-4), and extended preseason exclusion to early-October games via archive absence (m-12).
+- `ingest/odds.py`: added `load_archive_game_types` (+`_accumulate_game_types`, `_lookup_game_type`, `_label_playoff_from_archive`), constants `REGULAR_SEASON_GAME_TYPE`/`PLAYOFF_GAME_TYPE`. `consolidate_odds` gained `local_game_types`: after the M-2 date snap it sets is_playoff=True/False from gameTypeId, or is_playoff=None + covered=False (blanked, kept, counted in `attrs["unmatched_uncovered_rows"]`) for rows matching no archive game. Wired both indexes through `build_odds_table`; added `OddsResult.unmatched_uncovered_rows` surfaced by the `oracle odds` CLI.
+- `backtest/replay.py`: the series-market lookup now filters `is_playoff` with `.fillna(False).astype(bool)` so the new None (unmatched) rows are excluded from playoff consumers.
+- Tests (`tests/test_odds.py`, +5): loader indexing (both orientations); late-April regular game labeled non-playoff despite the old window; gameTypeId=3 labeled playoff; unmatched row excluded/kept/counted; committed-data property test asserting 0 gameTypeId=2 flagged playoff and 0 gameTypeId=3 flagged non-playoff, with a fixed-window control reproducing the mislabels and every covered row resolving to a real archive game (preseason leak closed).
+- Files: ml/src/draft_oracle/ingest/odds.py, ml/src/draft_oracle/backtest/replay.py, ml/src/draft_oracle/cli/project.py, ml/tests/test_odds.py.
+- Checks: ruff clean, mypy clean (63 files), full pytest 587 passed. odds.parquet is gitignored (rebuilt by code) -- honest regeneration of the committed parquet + market reports is US-105's scope. Playwright unaffected (ml-only Python change, no web/UI code touched).
+- **Learnings for future iterations:**
+  - is_playoff is now object dtype (bool | None) in the consolidated odds table -- ALL playoff consumers must use `.fillna(False).astype(bool)`, never bare `.astype(bool)`.
+  - Archive labeling only runs when `local_game_types` is passed, keeping the M-2 dates-only tests untouched; `build_odds_table` supplies both indexes from `nhl_archive_dir`.
+  - The committed nhl-archive (team-games-*.csv.gz) contains only gameTypeId 2 and 3 -- no preseason (type 1) -- so preseason odds rows fall out naturally as "no archive match".
 ---
