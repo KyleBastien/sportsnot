@@ -521,6 +521,15 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   (ben/judah/levi=87, kyle=87 Gemmell + 33 Press=120, press managers=33). Refit the
   artifact with `train_opponent_model_from_normalized()` (writes
   `artifacts/models/opponent/{manifest.json,report.md}`) after any pick-table change.
+- Retroactive IR swap in scoring (US-107, `backtest/replay.py`, SPEC section 1):
+  league picks carry parser-emitted bool columns `points_excluded` (Dropped/Not
+  playing) and `ir_activated` (Activated). ANY scorer over league picks must honor
+  BOTH: `points_excluded` row scores 0, an `ir_activated` IR_F/IR_D row scores as an
+  active skater via `skater_actual` (NOT `team_actual` -- that's the goalie/team
+  slot), a non-activated IR slot scores 0. `_score_league_roster` is the reference.
+  GOTCHA: 2025 is the only IR season (5 activations); regenerating the committed
+  2023-2024-2025 backtest report at HEAD is US-110's job (M-6), separate from the
+  scorer fix itself.
 
 ---
 
@@ -616,4 +625,32 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
     pick table or dedupe logic changes.
   - ml is a standalone Python project (run `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy} src tests`),
     unrelated to the web/e2e Playwright suite.
+---
+
+## 2026-08-29 - US-107
+- Honored the league's retroactive IR swap in the backtest league scorer
+  (CODE_REVIEW M-7, SPEC section 1). `_score_league_roster` previously skipped
+  all IR rows AND counted the excluded starter -> returned 13 where league rules
+  give 10. Now: `points_excluded` row => 0, `ir_activated` IR_F/IR_D => scored as
+  an active skater via `skater_actual`, non-activated IR slot => 0.
+- Files changed:
+  - `ml/src/draft_oracle/backtest/replay.py`: `_score_league_roster` consumes the
+    `points_excluded` / `ir_activated` bool columns the parser already emits.
+  - `ml/tests/test_backtest.py`: imported `_score_league_roster`; added
+    `test_score_league_roster_honors_retroactive_ir_swap` (starter 7 excluded +
+    IR_F 4 activated + goalie 6 => 10.0) and
+    `test_score_league_roster_no_swap_counts_starter_benches_ir` (control => 13.0).
+  - `scripts/ralph/prd.json`: US-107 passes=true + notes.
+- **Learnings for future iterations:**
+  - The parser (`ingest/league_drafts.py`, `ingest/entity_match.py`) already emits
+    `points_excluded` (status Dropped/Not playing) and `ir_activated` (status
+    Activated) bool columns per pick; nothing outside the parser consumed them
+    until now. Any scorer that touches league picks must honor BOTH.
+  - IR_F/IR_D activated players are skaters -> score via `skater_actual`, not
+    `team_actual` (that's the goalie/team slot only).
+  - The full 2023-2024-2025 committed backtest report regen at HEAD is US-110's
+    scope (M-6), not US-107 -- keep the scorer fix + tests here, regen there.
+  - `_score_league_roster` is module-private but imported directly in tests for a
+    focused unit assertion (SPEC section 7: synthetic in-memory dicts, no
+    committed data needed for this path).
 ---

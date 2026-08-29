@@ -929,14 +929,24 @@ def _score_league_roster(
 
     Scores F/D via :data:`skater_actual` and the goalie slot via :data:`team_actual`,
     summed across every round in ``scored_rounds`` (both the conference final and the
-    Cup Final for the combined ``R3_4`` draft), skipping IR slots and de-duplicating by
-    asset so a manager is scored the same way the oracle rosters are (SPEC section 8).
+    Cup Final for the combined ``R3_4`` draft), and de-duplicating by asset so a manager
+    is scored the same way the oracle rosters are (SPEC section 8).
+
+    Honors the league's retroactive IR swap (SPEC section 1): a starter flagged
+    ``points_excluded`` contributes nothing, while an ``IR_F``/``IR_D`` player flagged
+    ``ir_activated`` is scored as an active skater in the excluded starter's place. An
+    IR slot that was never activated stays on the bench and scores zero.
     """
     total = 0.0
     seen: set[tuple[str, int]] = set()
     for rec in picks.to_dict("records"):
         position = str(rec.get("position", ""))
-        if position in ("IR_F", "IR_D"):
+        points_excluded = bool(rec.get("points_excluded"))
+        ir_activated = bool(rec.get("ir_activated"))
+        is_ir_slot = position in ("IR_F", "IR_D")
+        if is_ir_slot and not ir_activated:
+            continue
+        if points_excluded:
             continue
         pid = rec.get("player_id")
         tid = rec.get("team_id")

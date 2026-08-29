@@ -19,6 +19,7 @@ from typer.testing import CliRunner
 from draft_oracle.backtest.replay import (
     BacktestConfig,
     _draft_events,
+    _score_league_roster,
     assert_round_inputs_leakfree,
     round_game_ids,
     run_backtest,
@@ -381,6 +382,57 @@ def test_skater_actual_points_use_player_points() -> None:
     rows = po[po["player_id"] == pid]
     expected = player_points(int(rows["goals"].sum()), int(rows["assists"].sum()))
     assert lookup[(season_id, 1, pid)] == expected
+
+
+# ── League roster scoring: retroactive IR swap (M-7, SPEC section 1) ─────────
+
+
+def _ir_swap_lookups() -> tuple[
+    dict[tuple[int, int, int], int], dict[tuple[int, int, int], int]
+]:
+    """The review's executed scenario: excluded starter 7, activated IR_F 4, goalie 6."""
+    season_id = 100
+    skater_actual = {(season_id, 1, 1): 7, (season_id, 1, 2): 4}
+    team_actual = {(season_id, 1, 10): 6}
+    return skater_actual, team_actual
+
+
+def test_score_league_roster_honors_retroactive_ir_swap() -> None:
+    skater_actual, team_actual = _ir_swap_lookups()
+    picks = pd.DataFrame(
+        [
+            {"position": "F", "player_id": 1, "team_id": None,
+             "points_excluded": True, "ir_activated": False},
+            {"position": "IR_F", "player_id": 2, "team_id": None,
+             "points_excluded": False, "ir_activated": True},
+            {"position": "G", "player_id": None, "team_id": 10,
+             "points_excluded": False, "ir_activated": False},
+        ]
+    )
+    total = _score_league_roster(
+        picks, skater_actual, team_actual, season_id=100, scored_rounds=[1]
+    )
+    # Excluded starter (7) drops, activated IR_F (4) counts, goalie (6): 10, not 13.
+    assert total == 10.0
+
+
+def test_score_league_roster_no_swap_counts_starter_benches_ir() -> None:
+    skater_actual, team_actual = _ir_swap_lookups()
+    picks = pd.DataFrame(
+        [
+            {"position": "F", "player_id": 1, "team_id": None,
+             "points_excluded": False, "ir_activated": False},
+            {"position": "IR_F", "player_id": 2, "team_id": None,
+             "points_excluded": False, "ir_activated": False},
+            {"position": "G", "player_id": None, "team_id": 10,
+             "points_excluded": False, "ir_activated": False},
+        ]
+    )
+    total = _score_league_roster(
+        picks, skater_actual, team_actual, season_id=100, scored_rounds=[1]
+    )
+    # No activation: starter (7) counts, bench IR (4) scores zero, goalie (6): 13.
+    assert total == 13.0
 
 
 # ── Leakage guard ───────────────────────────────────────────────────────────
