@@ -420,8 +420,9 @@ def _league_section(result: BacktestResult) -> list[str]:
         "",
         "Where a backtested season overlaps the league's real drafts, the oracle's "
         "simulated roster points (mean/best across snake slots) vs. what the league's "
-        "managers actually drafted, all scored through the same rules engine. Rounds 3 "
-        "and 4 both map to the league's combined `R3_4` redraft.",
+        "managers actually drafted, all scored through the same rules engine. The "
+        "combined `R3_4` draft is scored across both the conference final and the Cup "
+        "Final, matching how the league drafts once for rounds 3+4.",
         "",
         *_table(
             ["Season", "Round", "Oracle mean", "Oracle best", "League mean", "League best"], rows

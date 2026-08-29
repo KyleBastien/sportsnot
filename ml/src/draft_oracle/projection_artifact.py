@@ -61,6 +61,7 @@ from draft_oracle.models.projections import (
     DEFAULT_N_SIMS,
     PROJECTION_VERSION,
     _row_seed,
+    project_skater_combined,
     project_skater_round,
 )
 from draft_oracle.models.returns import (
@@ -74,6 +75,7 @@ from draft_oracle.models.series_sim import (
     _matchup_key,
     _predict_series,
     reconstruct_series_matchups,
+    simulate_series,
 )
 from draft_oracle.models.shutout import (
     SHUTOUT_MODEL_VERSION,
@@ -171,6 +173,7 @@ class ProjectArtifactConfig:
     managers: int = 4
     ir: bool = False
     slot_strategies: bool = True
+    combine_final_rounds: bool = True
     slot_strategy_config: SlotStrategyConfig | None = field(default=None)
     production_config: SkaterProductionConfig | None = field(default=None)
 
@@ -237,6 +240,150 @@ def _team_meta(team_games: pd.DataFrame) -> dict[int, str]:
     """Map ``team_id -> team_abbrev`` from the team-games table."""
     pairs = team_games[["team_id", "team_abbrev"]].drop_duplicates()
     return {int(rec["team_id"]): str(rec["team_abbrev"]) for rec in pairs.to_dict("records")}
+
+
+_COMBINED_DRAFT_ROUND = 3
+_COMBINED_SCORED_ROUNDS = (3, 4)
+_EMPTY_LENGTH_PROBS: dict[int, float] = {4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0}
+
+
+def _predict_hypothetical_series(
+    win_model: Any,
+    shutout_model: Any,
+    win_x: dict[str, float],
+    sho_x: dict[str, float],
+    win_y: dict[str, float],
+    sho_y: dict[str, float],
+) -> tuple[float, dict[int, float]]:
+    """Goalie points + length distribution for team X in a hypothetical X-vs-Y series.
+
+    Uses each team's leakage-free pre-round snapshot; home ice goes to the higher
+    regular-season points-per-game team (the NHL Cup-Final seeding rule). Returns the
+    outcome oriented to X (its expected goalie-slot points and the series-length
+    distribution, which is symmetric between the teams).
+    """
+    x_home = float(win_x.get("points_per_game", 0.0)) >= float(win_y.get("points_per_game", 0.0))
+    if x_home:
+        top_win, bottom_win, top_sho, bottom_sho = win_x, win_y, sho_x, sho_y
+    else:
+        top_win, bottom_win, top_sho, bottom_sho = win_y, win_x, sho_y, sho_x
+    p_top_home = win_model.predict_matchup(top_win, bottom_win, is_playoff=True)
+    p_top_away = 1.0 - win_model.predict_matchup(bottom_win, top_win, is_playoff=True)
+    shutout_top = shutout_model.predict_matchup(top_sho, bottom_sho)
+    shutout_bottom = shutout_model.predict_matchup(bottom_sho, top_sho)
+    outcome = simulate_series(
+        p_top_home,
+        p_top_away,
+        shutout_prob_a=shutout_top,
+        shutout_prob_b=shutout_bottom,
+    )
+    if x_home:
+        return outcome.e_goalie_points_a, dict(outcome.length_probs)
+    return outcome.e_goalie_points_b, dict(outcome.length_probs)
+
+
+def _apply_combined_valuation(
+    team_rows: list[dict[str, Any]],
+    round_series: pd.DataFrame,
+    matchups: dict[tuple[int, int, int], Any],
+    win_model: Any,
+    shutout_model: Any,
+    season: int,
+    warnings: list[str],
+) -> tuple[dict[str, tuple[float, dict[int, float]]], list[dict[str, Any]]] | None:
+    """Fold conditional next-round (Cup Final) value into a combined R3+R4 draft.
+
+    The league's third draft is the combined ``R3_4`` event: a roster scores across
+    both the conference final and the Cup Final, so an asset's value must add its
+    expected next-round production, weighted by the probability its team advances and
+    marginalized over every possible finals opponent (each weighted by *that* team's
+    conference-final win probability). This is leakage-free: hypothetical finals are
+    simulated from the same pre-round snapshots, never from the actual finals result.
+
+    Mutates each team row's ``e_goalie_points`` to the combined value and returns a
+    ``{team_abbrev: (p_advance, next_round_length_probs)}`` map plus a per-team
+    diagnostic, or ``None`` when the bracket is not the two-series final four.
+    """
+    groups: list[list[dict[str, Any]]] = []
+    for row in round_series.to_dict("records"):
+        top_id_raw = row["top_seed_team_id"]
+        bottom_id_raw = row["bottom_seed_team_id"]
+        if pd.isna(top_id_raw) or pd.isna(bottom_id_raw):
+            return None
+        top_id = int(top_id_raw)
+        bottom_id = int(bottom_id_raw)
+        matchup = matchups.get(_matchup_key(season, top_id, bottom_id))
+        if (
+            matchup is None
+            or top_id not in matchup.win_snapshots
+            or bottom_id not in matchup.win_snapshots
+        ):
+            return None
+        group: list[dict[str, Any]] = []
+        for team_id, abbrev in (
+            (top_id, str(row["top_seed_abbrev"])),
+            (bottom_id, str(row["bottom_seed_abbrev"])),
+        ):
+            group.append(
+                {
+                    "team_id": team_id,
+                    "abbrev": abbrev,
+                    "win_snapshot": matchup.win_snapshots[team_id],
+                    "sho_snapshot": matchup.shutout_snapshots[team_id],
+                }
+            )
+        groups.append(group)
+
+    if len(groups) != 2:
+        warnings.append(
+            "combined R3+R4 valuation skipped: expected exactly two conference-final series"
+        )
+        return None
+
+    row_by_abbrev = {str(r["team_abbrev"]): r for r in team_rows}
+    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] = {}
+    diagnostics: list[dict[str, Any]] = []
+
+    for team_group, opponent_group in ((groups[0], groups[1]), (groups[1], groups[0])):
+        for team in team_group:
+            abbrev = team["abbrev"]
+            team_row = row_by_abbrev.get(abbrev)
+            if team_row is None:
+                continue
+            p_advance = float(team_row["p_series_win"])
+            e_goalie_r3 = float(team_row["e_goalie_points"])
+            e_goalie_r4 = 0.0
+            length_r4: dict[int, float] = dict(_EMPTY_LENGTH_PROBS)
+            for opponent in opponent_group:
+                opp_row = row_by_abbrev.get(opponent["abbrev"])
+                if opp_row is None:
+                    continue
+                weight = float(opp_row["p_series_win"])
+                goalie_points, length_probs = _predict_hypothetical_series(
+                    win_model,
+                    shutout_model,
+                    team["win_snapshot"],
+                    team["sho_snapshot"],
+                    opponent["win_snapshot"],
+                    opponent["sho_snapshot"],
+                )
+                e_goalie_r4 += weight * goalie_points
+                for length, prob in length_probs.items():
+                    length_r4[length] = length_r4.get(length, 0.0) + weight * prob
+            combined = e_goalie_r3 + p_advance * e_goalie_r4
+            team_row["e_goalie_points"] = combined
+            combined_by_abbrev[abbrev] = (p_advance, length_r4)
+            diagnostics.append(
+                {
+                    "team_abbrev": abbrev,
+                    "p_advance": round(p_advance, 6),
+                    "e_goalie_points_r3": round(e_goalie_r3, 6),
+                    "e_goalie_points_r4": round(e_goalie_r4, 6),
+                    "e_goalie_points_combined": round(combined, 6),
+                }
+            )
+
+    return combined_by_abbrev, diagnostics
 
 
 def _build_team_rows(
@@ -320,8 +467,14 @@ def _build_skater_rows(
     season_id: int,
     playoff_round: int,
     config: ProjectArtifactConfig,
+    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Project each eligible skater's round points with a seeded Monte Carlo."""
+    """Project each eligible skater's round points with a seeded Monte Carlo.
+
+    When ``combined_by_abbrev`` supplies a ``(p_advance, next_round_length_probs)``
+    entry for the skater's team, the projection spans the combined R3+R4 draft event
+    (US: combined-round valuation) rather than a single round.
+    """
     rows: list[dict[str, Any]] = []
     for rec in projected.to_dict("records"):
         team_abbrev = str(rec["team_abbrev"])
@@ -330,13 +483,26 @@ def _build_skater_rows(
             continue
         player_id = int(rec["player_id"])
         ppg = float(rec["projected_points_per_game"])
-        projection = project_skater_round(
-            ppg,
-            length_probs,
-            seed=_row_seed(config.seed, season_id, playoff_round, player_id),
-            n_sims=config.n_sims,
-            horizon=config.horizon,
-        )
+        combined = combined_by_abbrev.get(team_abbrev) if combined_by_abbrev else None
+        if combined is not None:
+            p_advance, next_length_probs = combined
+            projection = project_skater_combined(
+                ppg,
+                length_probs,
+                p_advance,
+                next_length_probs,
+                seed=_row_seed(config.seed, season_id, playoff_round, player_id),
+                n_sims=config.n_sims,
+                horizon=config.horizon,
+            )
+        else:
+            projection = project_skater_round(
+                ppg,
+                length_probs,
+                seed=_row_seed(config.seed, season_id, playoff_round, player_id),
+                n_sims=config.n_sims,
+                horizon=config.horizon,
+            )
         rows.append(
             {
                 "player_id": player_id,
@@ -525,6 +691,20 @@ def build_projection_artifact(
         round_series, matchups, win_model, shutout_model, int(season), int(playoff_round), warnings
     )
 
+    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None = None
+    combined_diagnostics: list[dict[str, Any]] | None = None
+    if config.combine_final_rounds and int(playoff_round) == _COMBINED_DRAFT_ROUND:
+        combined = _apply_combined_valuation(
+            team_rows, round_series, matchups, win_model, shutout_model, int(season), warnings
+        )
+        if combined is not None:
+            combined_by_abbrev, combined_diagnostics = combined
+            if config.ir:
+                warnings.append(
+                    "combined R3+R4 valuation covers active-roster projections only; "
+                    "IR-stash values remain single-round (R3)"
+                )
+
     injured_ids = _injured_player_ids(injuries)
     feats = build_skater_features(
         skater_games,
@@ -545,11 +725,17 @@ def build_projection_artifact(
             season_id=season_id,
             playoff_round=int(playoff_round),
             config=config,
+            combined_by_abbrev=combined_by_abbrev,
         )
 
     skaters = _finalize_skaters(skater_rows)
     teams = _finalize_teams(team_rows)
     cheatsheet = build_cheatsheet(skaters, teams, config=config.vor_config)
+    if combined_diagnostics is not None:
+        cheatsheet.note = (
+            "Combined R3+R4 draft: projections span the conference final and the "
+            "conditional Cup Final (weighted by each team's advance probability)."
+        )
     ir_valuations = _apply_ir_stash(
         skaters, cheatsheet, injuries, length_by_abbrev, train_sk, train_tg, config
     )
@@ -588,6 +774,16 @@ def build_projection_artifact(
             "stash_verdicts": sum(1 for v in ir_valuations if v.verdict == "stash"),
         },
         "slot_strategies": slot_report.summary() if slot_report is not None else None,
+        "combined_event": (
+            {
+                "draft_event": "R3_4",
+                "draft_round": _COMBINED_DRAFT_ROUND,
+                "scored_rounds": list(_COMBINED_SCORED_ROUNDS),
+                "teams": combined_diagnostics,
+            }
+            if combined_diagnostics is not None
+            else None
+        ),
         "warnings": warnings,
     }
 

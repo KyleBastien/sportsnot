@@ -255,6 +255,15 @@ def test_build_projection_artifact_shapes_and_columns() -> None:
     assert result.manifest["counts"]["eligible_series"] == 1
 
 
+def test_round_one_has_no_combined_event() -> None:
+    sk, tg, players, series = _archive()
+    result = build_projection_artifact(
+        sk, players, tg, series, season=2022, playoff_round=1, snapshot_id="snap", config=_config()
+    )
+    # Combined R3+R4 valuation only applies to the round-3 draft event.
+    assert result.manifest["combined_event"] is None
+
+
 def test_ineligible_teams_and_players_are_excluded() -> None:
     sk, tg, players, series = _archive()
     result = build_projection_artifact(

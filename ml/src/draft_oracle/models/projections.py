@@ -72,6 +72,7 @@ __all__ = [
     "evaluate_skater_projections_from_normalized",
     "expected_series_length",
     "normalize_length_probs",
+    "project_skater_combined",
     "project_skater_round",
     "simulate_round_points",
 ]
@@ -221,6 +222,79 @@ def project_skater_round(
         p50=p50,
         p90=p90,
         pts_per_game=max(float(pts_per_game), 0.0),
+        expected_games=expected_games,
+        availability_multiplier=multiplier,
+    )
+
+
+def project_skater_combined(
+    pts_per_game: float,
+    length_probs_first: dict[int, float],
+    p_advance: float,
+    length_probs_second: dict[int, float],
+    *,
+    availability_curve: list[float] | tuple[float, ...] | None = None,
+    availability: float = 1.0,
+    seed: int = 20260827,
+    n_sims: int = DEFAULT_N_SIMS,
+    horizon: int = DEFAULT_HORIZON,
+) -> RoundProjection:
+    """Project a skater's fantasy points across two back-to-back series (a combined draft).
+
+    Models a draft event that spans the team's current series (``length_probs_first``)
+    and a *conditional* next series it plays only if it advances (probability
+    ``p_advance``, opponent-marginalized ``length_probs_second``). Each sim plays every
+    game of the first series, then — with probability ``p_advance`` — every game of the
+    second series; per game the skater is available per the (continuous) availability
+    curve and, when available, scores ``Poisson(pts_per_game)`` fantasy points. Reduces
+    exactly to :func:`project_skater_round` when ``p_advance == 0``. Deterministic given
+    ``seed``.
+    """
+    rate = max(float(pts_per_game), 0.0)
+    p_adv = min(max(float(p_advance), 0.0), 1.0)
+    span = 2 * int(horizon)
+    avail_per_game = _availability_per_game(availability_curve, availability, span)
+    rng = np.random.default_rng(seed)
+
+    first = normalize_length_probs(length_probs_first)
+    second = normalize_length_probs(length_probs_second)
+    lengths_first = np.asarray(list(first.keys()), dtype=int)
+    weights_first = np.asarray(list(first.values()), dtype=float)
+    lengths_second = np.asarray(list(second.keys()), dtype=int)
+    weights_second = np.asarray(list(second.values()), dtype=float)
+
+    n = int(n_sims)
+    len_first = rng.choice(lengths_first, size=n, p=weights_first)
+    len_second = rng.choice(lengths_second, size=n, p=weights_second)
+    advanced = rng.random(n) < p_adv
+
+    game_index = np.arange(span)[np.newaxis, :]
+    first_played = game_index < len_first[:, np.newaxis]
+    second_played = (
+        (game_index >= len_first[:, np.newaxis])
+        & (game_index < (len_first + len_second)[:, np.newaxis])
+        & advanced[:, np.newaxis]
+    )
+    avail_draw = rng.random((n, span)) < avail_per_game[np.newaxis, :]
+    played = (first_played | second_played) & avail_draw
+    points_draw = rng.poisson(rate, size=(n, span)).astype(float)
+    samples = (points_draw * played).sum(axis=1)
+
+    avail_first = avail_per_game[:horizon]
+    expected_games = _expected_games(length_probs_first, avail_first) + p_adv * _expected_games(
+        length_probs_second, avail_first
+    )
+    e_length = expected_series_length(length_probs_first) + p_adv * expected_series_length(
+        length_probs_second
+    )
+    multiplier = expected_games / e_length if e_length > 0 else 1.0
+    p10, p50, p90 = (float(np.quantile(samples, q)) for q in (0.10, 0.50, 0.90))
+    return RoundProjection(
+        expected_points=float(np.mean(samples)),
+        p10=p10,
+        p50=p50,
+        p90=p90,
+        pts_per_game=rate,
         expected_games=expected_games,
         availability_multiplier=multiplier,
     )

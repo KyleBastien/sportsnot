@@ -189,6 +189,7 @@ class CheatSheet:
     replacement_goalie: float
     rows: pd.DataFrame
     ir_section: list[str] = field(default_factory=list)
+    note: str = ""
 
     def summary(self) -> dict[str, Any]:
         """JSON-serialisable scarcity summary for the run manifest."""
@@ -304,9 +305,13 @@ def render_cheatsheet_markdown(sheet: CheatSheet) -> str:
         "Sorted by value over replacement (VOR). The G rows are whole-team goalie",
         "slots and carry no per-game quantiles.",
         "",
+    ]
+    if sheet.note:
+        lines.extend([f"> {sheet.note}", ""])
+    lines.extend([
         "| Rank | Pos | Player | Team | Proj | p10 | p50 | p90 | Repl | VOR | Status |",
         "| ---: | :-- | :----- | :--- | ---: | --: | --: | --: | ---: | --: | :----- |",
-    ]
+    ])
 
     for rec in sheet.rows.to_dict("records"):
         injured = bool(rec["injured"])

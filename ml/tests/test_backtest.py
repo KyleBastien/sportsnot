@@ -18,6 +18,7 @@ from typer.testing import CliRunner
 
 from draft_oracle.backtest.replay import (
     BacktestConfig,
+    _draft_events,
     assert_round_inputs_leakfree,
     round_game_ids,
     run_backtest,
@@ -285,6 +286,16 @@ def _config(strategies: tuple[str, ...] = ("oracle",), n_drafts: int = 1) -> Bac
 
 
 # ── Replay loop ─────────────────────────────────────────────────────────────
+
+
+def test_draft_events_collapse_r3_and_r4_into_one_combined_draft() -> None:
+    # Rounds 1 and 2 are their own events; rounds 3 and 4 share the combined R3_4
+    # draft (drafted before round 3, scored across both).
+    assert _draft_events([1, 2, 3, 4]) == [(1, [1]), (2, [2]), (3, [3, 4])]
+    # A single-round season stays a single event.
+    assert _draft_events([1]) == [(1, [1])]
+    # A season that only reached round 3 still combines the reachable rounds.
+    assert _draft_events([1, 2, 3]) == [(1, [1]), (2, [2]), (3, [3])]
 
 
 def test_run_backtest_replays_round_and_scores() -> None:

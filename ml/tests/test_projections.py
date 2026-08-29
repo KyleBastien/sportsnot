@@ -27,6 +27,7 @@ from draft_oracle.models import (
     project_skater_round,
     simulate_round_points,
 )
+from draft_oracle.models.projections import project_skater_combined
 from draft_oracle.models.series_sim import HOME_ICE_PATTERN
 
 # ── Pure primitives ────────────────────────────────────────────────────────
@@ -87,6 +88,47 @@ def test_project_skater_round_quantiles_are_ordered() -> None:
     proj = project_skater_round(0.6, {5: 0.5, 6: 0.5}, seed=42, n_sims=3000)
     assert proj.p10 <= proj.p50 <= proj.p90
     assert proj.expected_points == pytest.approx(proj.pts_per_game * proj.expected_games, rel=0.1)
+
+
+# ── Combined R3+R4 round sampling ──────────────────────────────────────────
+
+
+def test_project_skater_combined_reduces_to_single_round_when_no_advance() -> None:
+    length_probs = {4: 0.1, 5: 0.3, 6: 0.35, 7: 0.25}
+    single = project_skater_round(0.7, length_probs, seed=99, n_sims=6000)
+    combined = project_skater_combined(
+        0.7, length_probs, 0.0, {6: 1.0}, seed=99, n_sims=6000
+    )
+    # p_advance == 0 never plays the second series, so the totals match the single
+    # round (same seed drives the first-series draws identically).
+    assert combined.expected_points == pytest.approx(single.expected_points, rel=0.05)
+    assert combined.expected_games == pytest.approx(single.expected_games, rel=1e-9)
+
+
+def test_project_skater_combined_adds_conditional_next_round() -> None:
+    first = {5: 0.5, 6: 0.5}
+    second = {5: 0.5, 6: 0.5}
+    p_advance = 0.6
+    r3 = project_skater_round(0.8, first, seed=7, n_sims=8000)
+    r4 = project_skater_round(0.8, second, seed=7, n_sims=8000)
+    combined = project_skater_combined(
+        0.8, first, p_advance, second, seed=7, n_sims=8000
+    )
+    # Expected points and games are additive: R3 + p_advance * R4.
+    assert combined.expected_points == pytest.approx(
+        r3.expected_points + p_advance * r4.expected_points, rel=0.05
+    )
+    assert combined.expected_games == pytest.approx(
+        r3.expected_games + p_advance * r4.expected_games, rel=1e-9
+    )
+    # Spanning a possible second series widens the ceiling.
+    assert combined.p90 >= r3.p90
+
+
+def test_project_skater_combined_is_reproducible_under_seed() -> None:
+    a = project_skater_combined(0.6, {6: 1.0}, 0.5, {6: 1.0}, seed=5, n_sims=1000)
+    b = project_skater_combined(0.6, {6: 1.0}, 0.5, {6: 1.0}, seed=5, n_sims=1000)
+    assert a == b
 
 
 def test_project_skater_round_availability_curve_wins_over_multiplier() -> None:

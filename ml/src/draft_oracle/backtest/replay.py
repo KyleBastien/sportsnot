@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -219,22 +220,29 @@ def _score_active_roster(
     team_actual: dict[tuple[int, int, int], int],
     *,
     season_id: int,
-    playoff_round: int,
+    scored_rounds: Sequence[int],
 ) -> float:
     """Actual points of ``manager``'s *active* roster (F/D/G; IR slots excluded).
 
-    IR retroactive swaps depend on in-round injuries the replay does not simulate, so
-    the honest baseline scores the active roster only; a skater or team with no
-    observed round production contributes 0.
+    Sums realized production across every round in ``scored_rounds`` — a single round
+    for R1/R2, but both the conference final and the Cup Final for the combined
+    ``R3_4`` draft, so a roster keeps scoring for as long as its assets advance. IR
+    retroactive swaps depend on in-round injuries the replay does not simulate, so the
+    honest baseline scores the active roster only; an asset with no observed
+    production contributes 0.
     """
     total = 0.0
     for slot in state.roster_slots(manager):
         if slot.position in ("IR_F", "IR_D"):
             continue
         if slot.player_id is not None:
-            total += skater_actual.get((season_id, playoff_round, slot.player_id), 0)
+            total += sum(
+                skater_actual.get((season_id, rnd, slot.player_id), 0) for rnd in scored_rounds
+            )
         elif slot.team_id is not None:
-            total += team_actual.get((season_id, playoff_round, slot.team_id), 0)
+            total += sum(
+                team_actual.get((season_id, rnd, slot.team_id), 0) for rnd in scored_rounds
+            )
     return total
 
 
@@ -386,6 +394,7 @@ class RoundResult:
     opponents_kind: str
     eligible_team_abbrevs: list[str]
     leakage_ok: bool
+    scored_rounds: list[int] = field(default_factory=list)
     slot_results: list[SlotResult] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     projection_eval: ProjectionEval | None = None
@@ -396,6 +405,7 @@ class RoundResult:
             "season": self.season,
             "season_id": self.season_id,
             "playoff_round": self.playoff_round,
+            "scored_rounds": self.scored_rounds or [self.playoff_round],
             "as_of_cutoff": self.as_of_cutoff,
             "opponents_kind": self.opponents_kind,
             "eligible_team_abbrevs": self.eligible_team_abbrevs,
@@ -655,20 +665,20 @@ def _build_projection_eval(
     team_actual: dict[tuple[int, int, int], int],
     *,
     season_id: int,
-    playoff_round: int,
+    scored_rounds: Sequence[int],
 ) -> ProjectionEval:
-    """Pair every as-of projection with its realized round outcome."""
+    """Pair every as-of projection with its realized outcome across the scored rounds."""
     skaters: list[tuple[int, float, float]] = []
     for rec in result.skaters.to_dict("records"):
         pid = int(rec["player_id"])
         projected = float(rec["expected_points"])
-        actual = float(skater_actual.get((season_id, playoff_round, pid), 0))
+        actual = float(sum(skater_actual.get((season_id, rnd, pid), 0) for rnd in scored_rounds))
         skaters.append((pid, projected, actual))
     teams: list[tuple[int, float, float]] = []
     for rec in result.teams.to_dict("records"):
         tid = int(rec["team_id"])
         projected = float(rec["e_goalie_points"])
-        actual = float(team_actual.get((season_id, playoff_round, tid), 0))
+        actual = float(sum(team_actual.get((season_id, rnd, tid), 0) for rnd in scored_rounds))
         teams.append((tid, projected, actual))
     return ProjectionEval(skaters=skaters, teams=teams)
 
@@ -726,8 +736,17 @@ def replay_round(
     skater_actual: dict[tuple[int, int, int], int],
     team_actual: dict[tuple[int, int, int], int],
     config: BacktestConfig,
+    scored_rounds: Sequence[int] | None = None,
 ) -> RoundResult:
-    """Replay one playoff round: as-of projections, drafts in every slot, scoring."""
+    """Replay one draft event: as-of projections, drafts in every slot, scoring.
+
+    ``playoff_round`` is the round whose as-of projection drives the draft;
+    ``scored_rounds`` is every round the resulting roster is scored across (just
+    ``playoff_round`` for R1/R2, but both the conference final and Cup Final for the
+    combined ``R3_4`` draft). The projection artifact folds the conditional next-round
+    value in automatically when it is a combined event.
+    """
+    scored = list(scored_rounds) if scored_rounds else [playoff_round]
     result = build_projection_artifact(
         tables["skater_games"],
         tables["players"],
@@ -745,13 +764,15 @@ def replay_round(
 
     round_series = _round_series(tables["series"], season, playoff_round)
     projection_eval = _build_projection_eval(
-        result, skater_actual, team_actual, season_id=season_id, playoff_round=playoff_round
+        result, skater_actual, team_actual, season_id=season_id, scored_rounds=scored
     )
     series_evals = _build_series_evals(result, round_series, odds, season=season)
 
-    round_ids = round_game_ids(
-        tables["team_games"], tables["series"], season_id=season_id, playoff_round=playoff_round
-    )
+    round_ids: set[int] = set()
+    for rnd in scored:
+        round_ids |= round_game_ids(
+            tables["team_games"], tables["series"], season_id=season_id, playoff_round=rnd
+        )
     assert_round_inputs_leakfree(tables["team_games"], round_ids, cutoff, label="team")
     assert_round_inputs_leakfree(tables["skater_games"], round_ids, cutoff, label="skater")
 
@@ -775,6 +796,7 @@ def replay_round(
             opponents_kind=opponents_kind,
             eligible_team_abbrevs=list(result.manifest["eligible_team_abbrevs"]),
             leakage_ok=True,
+            scored_rounds=scored,
             slot_results=[],
             warnings=warnings,
             projection_eval=projection_eval,
@@ -799,7 +821,7 @@ def replay_round(
                         skater_actual,
                         team_actual,
                         season_id=season_id,
-                        playoff_round=playoff_round,
+                        scored_rounds=scored,
                     )
                     for manager in managers_list
                     if manager != oracle
@@ -810,7 +832,7 @@ def replay_round(
                     skater_actual,
                     team_actual,
                     season_id=season_id,
-                    playoff_round=playoff_round,
+                    scored_rounds=scored,
                 )
                 roster_keys = [a.key for a in final.rosters[oracle].all_assets()]
                 slot_results.append(
@@ -833,6 +855,7 @@ def replay_round(
         opponents_kind=opponents_kind,
         eligible_team_abbrevs=list(result.manifest["eligible_team_abbrevs"]),
         leakage_ok=True,
+        scored_rounds=scored,
         slot_results=slot_results,
         warnings=warnings,
         projection_eval=projection_eval,
@@ -878,19 +901,36 @@ def _season_rounds(series: pd.DataFrame, season: int) -> list[int]:
     return rounds
 
 
+def _draft_events(rounds: list[int]) -> list[tuple[int, list[int]]]:
+    """Group playoff rounds into the league's draft events.
+
+    Returns ``(draft_round, scored_rounds)`` per event, where ``draft_round`` is the
+    earliest round of the event (whose as-of projection drives the draft) and
+    ``scored_rounds`` is every round the drafted roster is scored across. Rounds 3 and
+    4 collapse into the single combined ``R3_4`` event (:data:`ROUND_TO_DRAFT_EVENT`).
+    """
+    by_event: dict[str, list[int]] = {}
+    for rnd in rounds:
+        event = ROUND_TO_DRAFT_EVENT.get(rnd, f"R{rnd}")
+        by_event.setdefault(event, []).append(rnd)
+    events = [(min(grouped), sorted(grouped)) for grouped in by_event.values()]
+    return sorted(events)
+
+
 def _score_league_roster(
     picks: pd.DataFrame,
     skater_actual: dict[tuple[int, int, int], int],
     team_actual: dict[tuple[int, int, int], int],
     *,
     season_id: int,
-    playoff_round: int,
+    scored_rounds: Sequence[int],
 ) -> float:
-    """Actual active-roster points of one league manager's real picks for a round.
+    """Actual active-roster points of one league manager's real picks for a draft event.
 
     Scores F/D via :data:`skater_actual` and the goalie slot via :data:`team_actual`,
-    skipping IR slots and de-duplicating by asset so a manager is scored the same way
-    the oracle rosters are (SPEC section 8).
+    summed across every round in ``scored_rounds`` (both the conference final and the
+    Cup Final for the combined ``R3_4`` draft), skipping IR slots and de-duplicating by
+    asset so a manager is scored the same way the oracle rosters are (SPEC section 8).
     """
     total = 0.0
     seen: set[tuple[str, int]] = set()
@@ -905,13 +945,13 @@ def _score_league_roster(
             if key in seen:
                 continue
             seen.add(key)
-            total += team_actual.get((season_id, playoff_round, int(tid)), 0)
+            total += sum(team_actual.get((season_id, rnd, int(tid)), 0) for rnd in scored_rounds)
         elif not pd.isna(pid):
             key = ("player", int(pid))
             if key in seen:
                 continue
             seen.add(key)
-            total += skater_actual.get((season_id, playoff_round, int(pid)), 0)
+            total += sum(skater_actual.get((season_id, rnd, int(pid)), 0) for rnd in scored_rounds)
     return total
 
 
@@ -935,6 +975,7 @@ def _league_comparisons(
         event = ROUND_TO_DRAFT_EVENT.get(rnd.playoff_round)
         if event is None:
             continue
+        scored = rnd.scored_rounds or [rnd.playoff_round]
         scoped = league_picks.loc[
             (league_picks["season"].astype(int) == int(rnd.season))
             & (league_picks["draft_event"].astype(str) == event)
@@ -954,7 +995,7 @@ def _league_comparisons(
                     skater_actual,
                     team_actual,
                     season_id=rnd.season_id,
-                    playoff_round=rnd.playoff_round,
+                    scored_rounds=scored,
                 ),
             )
             for manager, picks in scoped.groupby("manager")
@@ -997,12 +1038,12 @@ def run_backtest(
 
     rounds: list[RoundResult] = []
     for season in seasons:
-        for playoff_round in _season_rounds(tables["series"], season):
+        for draft_round, scored_rounds in _draft_events(_season_rounds(tables["series"], season)):
             rounds.append(
                 replay_round(
                     tables,
                     season=season,
-                    playoff_round=playoff_round,
+                    playoff_round=draft_round,
                     league_picks=league_picks,
                     injuries=injuries,
                     odds=odds,
@@ -1010,6 +1051,7 @@ def run_backtest(
                     skater_actual=skater_actual,
                     team_actual=team_actual,
                     config=cfg,
+                    scored_rounds=scored_rounds,
                 )
             )
 
