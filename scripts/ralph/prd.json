@@ -228,8 +228,8 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added playoff_round_cutoffs (skater_production.py): extends playoff_round_starts with a PRE-round cutoff for the round after the latest played round = day after that round's last game (round-1 = day after regular-season end when no playoff games yet). Played rounds keep their own first-game cutoff untouched, so backtests are byte-identical. build_projection_artifact + series_sim._matchup_cutoff_plan now consume playoff_round_cutoffs; reconstruct_series_matchups adds a final _freeze_due_matchups(as_of=Timestamp.max) pass so a pending round-N matchup (cutoff after every played game) freezes at the post-round-(N-1) state instead of never freezing / skipping the series. New tests build a round-2 artifact from a round-1-only archive (eligibility = the 2 bracket teams; cutoff = day after round-1's last game) and assert leak-safety. 10 leakage tests + 611 ml tests pass; ruff+mypy clean."
     },
     {
       "id": "US-113",

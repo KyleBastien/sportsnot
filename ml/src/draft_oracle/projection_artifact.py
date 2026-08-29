@@ -25,8 +25,12 @@ Composition (no new estimator is learned here):
    their players are excluded automatically (SPEC section 1).
 2. The per-game **win** (US-011) and **shutout** (US-012) models plus the **skater
    production** model (US-014) are trained only on games strictly *before* the round
-   start (the as-of cutoff). Leakage-free pre-series team snapshots are frozen at the
-   round start via :func:`reconstruct_series_matchups` (SPEC section 6).
+   start (the as-of cutoff). For a genuine pre-round build (round N has no games yet)
+   the cutoff derives from the previous round's completion / bracket-announcement
+   boundary via :func:`playoff_round_cutoffs`, so the tool runs at the moment it is
+   used -- after round N-1 ends, before round N begins (CODE_REVIEW M-1).
+   Leakage-free pre-series team snapshots are frozen at that boundary via
+   :func:`reconstruct_series_matchups` (SPEC section 6).
 3. Each matchup runs through the best-of-7 **series simulator** (US-013) for
    ``E[wins]``, ``E[games]``, ``P(series win)``, goalie-slot points, and the series
    length distribution; each eligible skater runs through the seeded round-point
@@ -85,7 +89,7 @@ from draft_oracle.models.shutout import (
 from draft_oracle.models.skater_production import (
     SKATER_PRODUCTION_VERSION,
     SkaterProductionConfig,
-    playoff_round_starts,
+    playoff_round_cutoffs,
     train_skater_production_model,
 )
 from draft_oracle.optimize.ir_value import (
@@ -660,12 +664,12 @@ def build_projection_artifact(
         )
     season_id = _resolve_season_id(round_series, season)
 
-    starts = playoff_round_starts(team_games, series)
+    starts = playoff_round_cutoffs(team_games, series)
     cutoff = starts.get(season_id, {}).get(int(playoff_round))
     if cutoff is None:
         raise ValueError(
             f"cannot derive the round-start cutoff for season {season} round {playoff_round}; "
-            "the round has no games in the archive yet"
+            "the previous round has no games in the archive yet"
         )
     cutoff_ts = pd.Timestamp(cutoff)
 

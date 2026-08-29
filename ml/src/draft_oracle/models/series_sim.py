@@ -69,7 +69,7 @@ from draft_oracle.models.skater_production import (
     QUALIFYING_ROUND_GAME_DIGIT,
     _playoff_round_digit,
     _series_round_map,
-    playoff_round_starts,
+    playoff_round_cutoffs,
 )
 from draft_oracle.rules import SHUTOUT_POINTS, WIN_POINTS
 
@@ -356,10 +356,12 @@ def _matchup_cutoff_plan(
 
     Freezing a matchup's pre-series snapshot at the *round's* start (not the
     matchup's own first game) keeps a slower series from absorbing games played on
-    or after the declared ``as_of_cutoff`` when rounds overlap (CODE_REVIEW m-3).
+    or after the declared ``as_of_cutoff`` when rounds overlap (CODE_REVIEW m-3). A
+    round with no games yet (a genuine pre-round build) freezes at the previous
+    round's completion boundary instead of its own first game (CODE_REVIEW M-1).
     """
     round_map = _series_round_map(series)
-    round_starts = playoff_round_starts(team_games, series)
+    round_starts = playoff_round_cutoffs(team_games, series)
 
     abbrev_to_id: dict[tuple[int, str], int] = {}
     tg = team_games[["season_id", "team_abbrev", "team_id"]]
@@ -538,6 +540,21 @@ def reconstruct_series_matchups(
                 shots_against=int(record["away_shots_against"]),
                 won=not home_won,
             )
+
+    if plans is not None:
+        # Freeze any matchup whose declared cutoff is after every played game -- a
+        # genuine pre-round build (round N has no games yet) freezes at the state
+        # reached after the previous round, the correct pre-round-N snapshot
+        # (CODE_REVIEW M-1). In backtests over complete seasons no such matchup
+        # exists, so this pass is a no-op.
+        _freeze_due_matchups(
+            plans,
+            records,
+            win_states,
+            sho_states,
+            pd.Timestamp.max,
+            initial_elo=elo_config.initial,
+        )
 
     return records
 

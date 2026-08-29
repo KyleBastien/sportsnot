@@ -239,6 +239,127 @@ def _archive() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return _synthetic_archive([2018, 2019, 2020, 2021, 2022], seed=1)
 
 
+def _round1_series_games(
+    gid_start: int,
+    top: str,
+    bottom: str,
+    end_year: int,
+    season_id: int,
+    rng: np.random.Generator,
+    players: dict[int, tuple[str, float, str]],
+) -> tuple[list[dict[str, object]], list[dict[str, object]], int]:
+    """Emit a completed best-of-7 round-1 series (top wins 4-2) + its skater rows."""
+    results = [(top, 3, 0), (top, 4, 2), (bottom, 3, 1), (bottom, 2, 1), (top, 3, 2), (top, 2, 1)]
+    tg_rows: list[dict[str, object]] = []
+    sk_rows: list[dict[str, object]] = []
+    gid = gid_start
+    for offset, (winner, wg, lg) in enumerate(results):
+        gid += 1
+        host = top if HOME_ICE_PATTERN[offset] == "A" else bottom
+        visitor = bottom if host == top else top
+        hg, ag = (wg, lg) if winner == host else (lg, wg)
+        date = f"{end_year}-04-{20 + offset:02d}"
+        tg_rows.extend(_team_rows(gid, date, season_id, 3, host, visitor, hg, ag))
+        for team, opp in ((top, bottom), (bottom, top)):
+            for p, (t, rate, pos) in players.items():
+                if t != team:
+                    continue
+                g, a = _draw_ga(rng, rate)
+                sk_rows.append(_skater_row(p, pos, gid, date, season_id, 3, team, opp, g, a))
+    return tg_rows, sk_rows, gid
+
+
+def _pre_round_archive(
+    end_years: list[int], *, seed: int = 3
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Archive with completed round-1 (two series) and a round-2 bracket but NO round-2 games.
+
+    Each season: a round-robin regular season, round-1 series AAA-over-DDD and
+    BBB-over-CCC, and (target-season only) a round-2 AAA-vs-BBB series row with zero
+    games -- the genuine pre-round decision point (CODE_REVIEW M-1).
+    """
+    rng = np.random.default_rng(seed)
+    players_df, players = _players()
+    sk_rows: list[dict[str, object]] = []
+    tg_rows: list[dict[str, object]] = []
+    series_rows: list[dict[str, object]] = []
+    gid = 7_000_000
+    target = end_years[-1]
+
+    for end_year in end_years:
+        season_id = (end_year - 1) * 10000 + end_year
+        day, month = 1, 11
+        for _ in range(36 // (len(TEAMS) - 1)):
+            for i, home in enumerate(TEAMS):
+                for away in TEAMS[i + 1 :]:
+                    gid += 1
+                    date = f"{end_year - 1}-{month:02d}-{day:02d}"
+                    day += 1
+                    if day > 27:
+                        day, month = 1, (12 if month == 11 else 11)
+                    home_win = STRENGTH[home] + 0.3 >= STRENGTH[away]
+                    hg, ag = (3, 1) if home_win else (1, 3)
+                    tg_rows.extend(_team_rows(gid, date, season_id, 2, home, away, hg, ag))
+                    for team, opp in ((home, away), (away, home)):
+                        for p, (t, rate, pos) in players.items():
+                            if t != team:
+                                continue
+                            g, a = _draw_ga(rng, rate)
+                            sk_rows.append(
+                                _skater_row(p, pos, gid, date, season_id, 2, team, opp, g, a)
+                            )
+
+        for top, bottom in (("AAA", "DDD"), ("BBB", "CCC")):
+            new_tg, new_sk, gid = _round1_series_games(
+                gid, top, bottom, end_year, season_id, rng, players
+            )
+            tg_rows.extend(new_tg)
+            sk_rows.extend(new_sk)
+            series_rows.append(
+                {
+                    "year": end_year,
+                    "season_id": season_id,
+                    "series_letter": top,
+                    "series_abbrev": top + bottom,
+                    "playoff_round": 1,
+                    "top_seed_team_id": TEAMS.index(top) + 1,
+                    "top_seed_abbrev": top,
+                    "top_seed_wins": 4,
+                    "bottom_seed_team_id": TEAMS.index(bottom) + 1,
+                    "bottom_seed_abbrev": bottom,
+                    "bottom_seed_wins": 2,
+                    "winning_team_id": TEAMS.index(top) + 1,
+                    "losing_team_id": TEAMS.index(bottom) + 1,
+                }
+            )
+
+        if end_year == target:
+            series_rows.append(
+                {
+                    "year": end_year,
+                    "season_id": season_id,
+                    "series_letter": "R2",
+                    "series_abbrev": "AAABBB",
+                    "playoff_round": 2,
+                    "top_seed_team_id": TEAMS.index("AAA") + 1,
+                    "top_seed_abbrev": "AAA",
+                    "top_seed_wins": 0,
+                    "bottom_seed_team_id": TEAMS.index("BBB") + 1,
+                    "bottom_seed_abbrev": "BBB",
+                    "bottom_seed_wins": 0,
+                    "winning_team_id": None,
+                    "losing_team_id": None,
+                }
+            )
+
+    return (
+        pd.DataFrame(sk_rows),
+        pd.DataFrame(tg_rows),
+        players_df,
+        pd.DataFrame(series_rows),
+    )
+
+
 # ── Core assembly ──────────────────────────────────────────────────────────
 
 
@@ -325,6 +446,47 @@ def test_missing_round_raises() -> None:
         build_projection_artifact(
             sk, players, tg, series, season=2099, playoff_round=1, snapshot_id="x", config=_config()
         )
+
+
+# ── Pre-round (M-1): build round N before round N starts ─────────────────────
+
+
+def test_pre_round_artifact_builds_before_round_starts() -> None:
+    # Archive has completed round-1 games (two series) and a round-2 bracket, but
+    # NO round-2 games -- the moment the league actually drafts round 2. The cutoff
+    # must derive from round-1's completion, not round-2's (absent) first game.
+    sk, tg, players, series = _pre_round_archive([2018, 2019, 2020, 2021, 2022])
+    result = build_projection_artifact(
+        sk, players, tg, series, season=2022, playoff_round=2, snapshot_id="snap", config=_config()
+    )
+    # Exactly the two round-2 bracket teams are eligible.
+    assert set(result.teams["team_abbrev"]) == {"AAA", "BBB"}
+    assert set(result.skaters["team_abbrev"]).issubset({"AAA", "BBB"})
+    assert result.manifest["counts"]["eligible_series"] == 1
+    # The as-of cutoff is the day AFTER round-1's last game (2022-04-25), i.e. before
+    # round 2 would start -- and no round-2 game exists in the archive at all.
+    cutoff = pd.Timestamp(result.manifest["as_of_cutoff"])
+    assert cutoff == pd.Timestamp("2022-04-26")
+    played = tg.loc[
+        (tg["season_id"] == 20212022) & (tg["game_type_id"] == 3), "game_date"
+    ]
+    assert cutoff > pd.to_datetime(played).max()
+
+
+def test_pre_round_cutoff_is_leak_safe() -> None:
+    # The pre-round cutoff must remain strictly after every game used for training
+    # (no round-2 leakage possible because none exists) and must exclude nothing that
+    # belongs to round 1.
+    sk, tg, players, series = _pre_round_archive([2018, 2019, 2020, 2021, 2022])
+    result = build_projection_artifact(
+        sk, players, tg, series, season=2022, playoff_round=2, snapshot_id="snap", config=_config()
+    )
+    cutoff = pd.Timestamp(result.manifest["as_of_cutoff"])
+    round1_dates = pd.to_datetime(
+        tg.loc[(tg["season_id"] == 20212022) & (tg["game_type_id"] == 3), "game_date"]
+    )
+    # Every round-1 game is available (strictly before the cutoff).
+    assert (round1_dates < cutoff).all()
 
 
 # ── Manifest ───────────────────────────────────────────────────────────────

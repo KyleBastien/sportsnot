@@ -75,6 +75,21 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   `.fillna(False).astype(bool)` NOT bare `.astype(bool)` to exclude None (fixed
   `backtest/replay.py:642` series-market lookup). `build_odds_table` loads BOTH the
   dates and types index from `nhl_archive_dir`.
+- Pre-round as-of cutoff (US-112, `models/skater_production.py` +
+  `models/series_sim.py`, CODE_REVIEW M-1): `playoff_round_starts` = each round's
+  OWN first game (only works retroactively). `playoff_round_cutoffs(team_games,
+  series)` = starts PLUS a pre-round cutoff for the round after the latest PLAYED
+  round (= day after that round's last game; round 1 = day after regular-season end
+  when no playoff games yet), via `setdefault` so played rounds are untouched and
+  backtests stay byte-identical. `build_projection_artifact` +
+  `series_sim._matchup_cutoff_plan` consume `playoff_round_cutoffs`. GOTCHA:
+  `reconstruct_series_matchups` freezes a matchup only when the replay loop reaches a
+  game dated >= its cutoff; a pending round-N matchup's cutoff is AFTER every played
+  game, so it needs the post-loop `_freeze_due_matchups(plans, ..., pd.Timestamp.max)`
+  pass -- without it the series is silently skipped (the M-1 symptom). Leak-safe: a
+  genuine pre-round archive has ZERO round-N games so "freeze at final state" ==
+  post-round-(N-1) state; when round N has games (backtest) it keeps its first-game
+  cutoff and freezes mid-loop, final pass is a no-op.
 
 - Backtest reporting (US-026, `backtest/report.py`): pure metric aggregation over an
   in-memory `BacktestResult` (never fetches/trains) -> committed `report.md` via
@@ -857,4 +872,33 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
     round-trip races on it) -- that determinism nit is US-117/m-20 scope, left as-is.
   - Untracked `ml/artifacts/backtests/2026-combined-r500-seed20260827/` is the 2026
     projection artifact (m-14/m-18/US-118 scope) -- do NOT commit it with a backtest regen.
+---
+
+## 2026-08-29 - US-112 (Pre-round as-of cutoff, CODE_REVIEW M-1)
+- What: `oracle project` can now build a round-N artifact BEFORE round N starts.
+  Previously the cutoff = round-N's own first game, so at real draft time (round N
+  not yet played) it failed closed / skipped every series.
+- Files changed:
+  - `ml/src/draft_oracle/models/skater_production.py` (+`playoff_round_cutoffs`,
+    +`REGULAR_SEASON_GAME_TYPE`, `__all__`)
+  - `ml/src/draft_oracle/models/__init__.py` (re-export)
+  - `ml/src/draft_oracle/models/series_sim.py` (`_matchup_cutoff_plan` uses cutoffs;
+    final `_freeze_due_matchups(as_of=Timestamp.max)` pass in reconstruct_series_matchups)
+  - `ml/src/draft_oracle/projection_artifact.py` (consume playoff_round_cutoffs; docstring)
+  - `ml/tests/test_projection_artifact.py` (+`_pre_round_archive`, 2 pre-round tests)
+  - `scripts/ralph/prd.json` (US-112 passes=true)
+- Quality: ruff+mypy clean, 611 ml tests pass, 10 leakage tests pass.
+- **Learnings for future iterations:**
+  - The pre-round cutoff is derived ONLY for the round immediately after the latest
+    PLAYED round (setdefault, so played rounds keep their real first-game cutoff and
+    backtests stay byte-identical). A phantom "round 5" is added per complete season
+    but never referenced (no series pairs map to it).
+  - GOTCHA: `reconstruct_series_matchups` freezes a matchup only when the replay loop
+    reaches a game dated >= its cutoff. A pending round-N matchup's cutoff is AFTER
+    every played game, so it needs the post-loop `_freeze_due_matchups(Timestamp.max)`
+    pass -- without it the series is silently skipped (the original M-1 symptom).
+  - Leak-safety holds because a genuine pre-round archive contains ZERO round-N games;
+    "freeze at final state" == post-round-(N-1) state. When round N HAS games (backtest)
+    the round stays in `playoff_round_starts`, keeps its first-game cutoff, and freezes
+    mid-loop -- the final pass is a no-op.
 ---

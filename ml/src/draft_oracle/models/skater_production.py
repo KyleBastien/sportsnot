@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -66,6 +66,7 @@ __all__ = [
     "credibility_weight",
     "fit_priors",
     "mean_absolute_error",
+    "playoff_round_cutoffs",
     "playoff_round_starts",
     "shrink_to_prior",
     "skater_round_production",
@@ -77,6 +78,7 @@ __all__ = [
 SKATER_PRODUCTION_VERSION = "skater-production-v1"
 
 PLAYOFF_GAME_TYPE = 3
+REGULAR_SEASON_GAME_TYPE = 2
 LABEL_COLUMN = "actual_points_per_game"
 
 # Numeric predictors drawn from the US-009 skater-v1 matrix, plus a derived
@@ -256,6 +258,47 @@ def playoff_round_starts(
         season = int(rec["season_id"])
         rnd = int(rec["playoff_round"])
         starts.setdefault(season, {})[rnd] = pd.Timestamp(rec["game_date"]).strftime("%Y-%m-%d")
+    return starts
+
+
+def playoff_round_cutoffs(
+    team_games: pd.DataFrame, series: pd.DataFrame
+) -> dict[int, dict[int, str]]:
+    """As-of cutoffs per round, extended with a *pre-round* cutoff for the next round.
+
+    Returns ``{season_id: {playoff_round: "YYYY-MM-DD"}}`` like
+    :func:`playoff_round_starts`, but so a genuinely pre-round artifact can be built
+    (CODE_REVIEW M-1): the round drafts *before* it starts, so its own first game does
+    not exist yet. For every season the round *after* the latest played playoff round
+    gets a cutoff of the day AFTER that round's final game -- the previous round's
+    completion / bracket-announcement boundary. When no playoff games exist yet, round
+    1 gets the day after the regular season's final game.
+
+    Rounds that have already been played keep their own first-game cutoff untouched,
+    so backtests over complete seasons are byte-for-byte identical: the only added
+    entries are for rounds with no games in the archive.
+    """
+    starts = playoff_round_starts(team_games, series)
+    tg = team_games.copy()
+    tg["game_date"] = pd.to_datetime(tg["game_date"])
+
+    def _next_day(value: pd.Timestamp) -> str:
+        return (pd.Timestamp(value) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+    for season_id, group in tg.groupby("season_id"):
+        season = int(cast(Any, season_id))
+        played = starts.setdefault(season, {})
+        if played:
+            latest_round = max(played)
+            po = group.loc[group["game_type_id"] == PLAYOFF_GAME_TYPE]
+            if po.empty:
+                continue
+            played.setdefault(latest_round + 1, _next_day(po["game_date"].max()))
+        else:
+            reg = group.loc[group["game_type_id"] == REGULAR_SEASON_GAME_TYPE]
+            if reg.empty:
+                continue
+            played.setdefault(1, _next_day(reg["game_date"].max()))
     return starts
 
 
