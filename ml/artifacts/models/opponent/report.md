@@ -2,19 +2,19 @@
 
 ## Fitted opponent model
 
-- total historical picks: 552
-- league coefficients: rank +0.143, affinity +2.423
+- total historical picks: 480
+- league coefficients: rank +0.160, affinity +2.850
 - per-manager models: 7 (min picks 20)
 
 | manager | picks | rank beta | affinity beta |
 | --- | ---: | ---: | ---: |
-| ben | 105 | -0.106 | +2.399 |
-| connor.fehr | 33 | +0.078 | +1.616 |
-| judah | 105 | -0.178 | +1.720 |
-| kyle | 138 | +0.215 | +2.361 |
-| levi | 105 | +0.178 | +1.374 |
-| paul.markhauser | 33 | +0.078 | +1.425 |
-| tobi | 33 | +0.078 | +1.104 |
+| ben | 87 | -0.083 | +2.424 |
+| connor.fehr | 33 | +0.088 | +1.770 |
+| judah | 87 | -0.150 | +1.538 |
+| kyle | 120 | +0.232 | +1.448 |
+| levi | 87 | +0.185 | +1.168 |
+| paul.markhauser | 33 | +0.088 | +1.807 |
+| tobi | 33 | +0.088 | +1.773 |
 
 ## Held-out validation
 
@@ -22,14 +22,14 @@ Roster-membership accuracy (leave-one-season-out): the fraction of each manager'
 
 | season | events | picks | fitted | greedy | fitted wins |
 | --- | ---: | ---: | ---: | ---: | :---: |
-| 2024 | 3 | 108 | 0.269 | 0.194 | yes |
-| 2025 | 2 | 88 | 0.261 | 0.216 | yes |
-| 2026 | 3 | 233 | 0.180 | 0.159 | yes |
+| 2024 | 3 | 108 | 0.222 | 0.194 | yes |
+| 2025 | 2 | 88 | 0.273 | 0.216 | yes |
+| 2026 | 6 | 240 | 0.308 | 0.292 | yes |
 
 Seasons where fitted beats the fallback: 3/3.
 
 ### Per-pick accuracy (true-order app export)
 
-- picks scored: 143
-- top-1: fitted 0.126 vs greedy 0.112
-- top-3: fitted 0.217 vs greedy 0.203
+- picks scored: 240
+- top-1: fitted 0.113 vs greedy 0.104
+- top-3: fitted 0.208 vs greedy 0.204

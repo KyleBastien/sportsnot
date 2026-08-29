@@ -89,6 +89,7 @@ __all__ = [
     "PerPickScore",
     "base_position",
     "build_team_affinity",
+    "dedupe_duplicate_events",
     "evaluate_opponents",
     "fit_opponent_models",
     "opponent_model_from_config",
@@ -216,9 +217,54 @@ class _Choice:
     chosen: int
 
 
-def _prepare_picks(picks: pd.DataFrame) -> pd.DataFrame:
-    """Attach base position + asset key and drop rows we cannot model."""
+# Prefer the authoritative in-app export over the hand-kept sheet copy when the same
+# real draft is recorded under two ``source`` values.
+_SOURCE_PRIORITY: dict[str, int] = {"app": 0, "sheet": 1}
+
+
+def _event_keys(frame: pd.DataFrame) -> list[str]:
+    """Grouping keys that isolate one real draft event, league-aware when possible.
+
+    Real data carries ``league_name`` so two leagues drafting in the same season/round
+    (2026 Gemmell Cup vs Press Play-offs) never pool their assets into one choice set.
+    Synthetic fixtures without the column fall back to ``(season, draft_event)``.
+    """
+    keys = ["season"]
+    if "league_name" in frame.columns:
+        keys.append("league_name")
+    keys.append("draft_event")
+    return keys
+
+
+def dedupe_duplicate_events(picks: pd.DataFrame) -> pd.DataFrame:
+    """Drop duplicated copies of the same real draft, preferring ``source='app'``.
+
+    A single physical draft can appear twice: an authoritative in-app export
+    (``source='app'``) and a hand-maintained spreadsheet copy (``source='sheet'``). The
+    2026 Gemmell Cup is recorded both ways (32/32 identical round-1 player ids), so
+    fitting on the raw table double-counts every Gemmell pick. Keep exactly one copy per
+    ``(season, league_name, draft_event)``, preferring ``app`` over ``sheet``. Frames
+    lacking ``source``/``league_name`` (synthetic fixtures) are returned unchanged.
+    """
+    if "source" not in picks.columns or "league_name" not in picks.columns:
+        return picks
     frame = picks.copy()
+    frame["_source_priority"] = frame["source"].map(
+        lambda s: _SOURCE_PRIORITY.get(str(s), len(_SOURCE_PRIORITY))
+    )
+    keys = ["season", "league_name", "draft_event"]
+    best = frame.groupby(keys)["_source_priority"].transform("min")
+    kept = frame.loc[frame["_source_priority"] == best].drop(columns="_source_priority")
+    return kept.reset_index(drop=True)
+
+
+def _prepare_picks(picks: pd.DataFrame) -> pd.DataFrame:
+    """Attach base position + asset key and drop rows we cannot model.
+
+    Deduplicates same-draft ``app``/``sheet`` copies first so no downstream count,
+    choice pool, or validation event double-counts a duplicated draft.
+    """
+    frame = dedupe_duplicate_events(picks).copy()
     frame["base_position"] = frame["position"].map(lambda p: base_position(str(p)))
     keys: list[str | None] = []
     for _, row in frame.iterrows():
@@ -262,7 +308,7 @@ def _build_choices(
     rows (order-free, with-replacement approximation).
     """
     choices: list[_Choice] = []
-    grouped = picks.groupby(["season", "draft_event", "base_position"], sort=True)
+    grouped = picks.groupby([*_event_keys(picks), "base_position"], sort=True)
     for _, pool in grouped:
         unique = pool.drop_duplicates(subset="asset_key")
         if len(unique) < 2:
@@ -702,7 +748,7 @@ def _membership_for_season(
     greedy_hits = 0.0
     fitted_total = 0
     greedy_total = 0
-    for _, pool in prepared.groupby(["season", "draft_event"], sort=True):
+    for _, pool in prepared.groupby(_event_keys(prepared), sort=True):
         managers = [str(m) for m in pool["manager"].unique()]
         actual = _actual_rosters(pool)
         fitted_models = fitted.as_mapping(managers)
@@ -757,7 +803,7 @@ def _per_pick_accuracy(
     fitted_topk = 0
     greedy_topk = 0
     prepared = _prepare_picks(ordered)
-    for _, pool in prepared.groupby(["season", "draft_event"], sort=True):
+    for _, pool in prepared.groupby(_event_keys(prepared), sort=True):
         order = _event_order(pool)
         if order is None:
             continue

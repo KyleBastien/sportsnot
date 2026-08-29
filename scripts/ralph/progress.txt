@@ -506,6 +506,21 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   `_select_shrinkage_weight`, ShutoutModel.shrinkage_weight/base_rate applied inside
   predict_shutout_prob so ALL consumers -- series_sim, projections -- inherit it); on real
   data w=1.0 (pure model) wins validation so shrinkage is evaluated-but-not-adopted.
+- Opponent fit dedupe + league isolation (US-106, `optimize/opponents.py`, M-3): the
+  committed `league_draft_picks.parquet` records the SAME real 2026 Gemmell draft twice
+  (`source='sheet'` + `source='app'`, 32/32 identical R1 ids) and also carries the
+  separate `Press Play-offs` league. `dedupe_duplicate_events(picks)` keeps one row per
+  `(season, league_name, draft_event)` preferring `app` over `sheet`
+  (`_SOURCE_PRIORITY`); a NO-OP when `source`/`league_name` columns are absent (synthetic
+  fixtures). `_prepare_picks` runs it FIRST, so counts/choices/validation all see deduped
+  data. Event pooling is league-aware via `_event_keys(frame)` ->
+  `[season, (league_name if present), draft_event]`, used by `_build_choices`,
+  `_membership_for_season`, `_per_pick_accuracy` -- two leagues in the same season/round
+  never merge into one cross-league choice set. GOTCHA: `manager_pick_counts` comes from
+  `prepared.groupby("manager").size()`, so it reflects the DEDUPED modelable inventory
+  (ben/judah/levi=87, kyle=87 Gemmell + 33 Press=120, press managers=33). Refit the
+  artifact with `train_opponent_model_from_normalized()` (writes
+  `artifacts/models/opponent/{manifest.json,report.md}`) after any pick-table change.
 
 ---
 
@@ -575,4 +590,30 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   - ShutoutModel now carries shrinkage_weight+base_rate applied inside predict_shutout_prob, so series_sim / projections inherit shrinkage automatically with no call-site changes (w=1.0 is a no-op).
   - Model/hyperparameter selection (incl. shrinkage) is done on the validation fold, NEVER the held-out test seasons.
   - Pre-existing FLAKY test: tests/test_backtest_report.py::test_report_has_all_sections_and_league_comparison compares a report built twice with datetime.now() generated-at stamps -- occasionally fails on a microsecond race, passes on rerun. Unrelated to US-105 (backtest report is M-6/M-8 scope).
+---
+
+## 2026-08-29 - US-106 (Opponent model: dedupe sheet/app copies, fit within league, refit artifact, M-3)
+- Fixed the double-counted 2026 Gemmell (sheet+app copies of one real draft) and the
+  cross-league pooling of Gemmell + Press Play-offs into fictitious 7-manager drafts.
+- Files changed:
+  - `ml/src/draft_oracle/optimize/opponents.py`: added `dedupe_duplicate_events` (keeps
+    one row per (season, league_name, draft_event), app > sheet; no-op without those
+    cols) called first in `_prepare_picks`; added `_event_keys` and used it to make
+    `_build_choices`, `_membership_for_season`, `_per_pick_accuracy` league-aware; added
+    `dedupe_duplicate_events` to `__all__`.
+  - `ml/tests/test_opponents.py`: real-file regression `test_fitted_counts_match_real_league_truth`
+    (ben/judah/levi=87, kyle=120, press=33 off the committed parquet) + synthetic dedupe /
+    league-isolation / no-op-column tests.
+  - `ml/artifacts/models/opponent/{manifest.json,report.md}`: refit + recommitted
+    (total_picks 480, honest membership 3/3 beat greedy).
+- **Learnings for future iterations:**
+  - `league_draft_picks.parquet` carries the same physical draft twice under `source`;
+    always dedupe (app>sheet) per (season, league_name, draft_event) before fitting.
+  - Any per-event groupby in opponents.py must include `league_name` when present or two
+    leagues in the same season/round silently pool their assets/managers together.
+  - `manager_pick_counts` is derived from the deduped modelable rows -> matches the
+    hand-counted truth (87 / 120 / 33); regenerate the committed artifact whenever the
+    pick table or dedupe logic changes.
+  - ml is a standalone Python project (run `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy} src tests`),
+    unrelated to the web/e2e Playwright suite.
 ---

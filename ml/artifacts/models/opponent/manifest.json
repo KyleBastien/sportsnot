@@ -1,58 +1,58 @@
 {
   "model": {
     "league_coefficients": {
-      "rank": 0.143167,
-      "affinity": 2.423254
+      "rank": 0.160244,
+      "affinity": 2.850097
     },
-    "total_picks": 552,
+    "total_picks": 480,
     "per_manager": {
       "ben": {
-        "picks": 105,
+        "picks": 87,
         "coefficients": {
-          "rank": -0.105518,
-          "affinity": 2.398692
+          "rank": -0.082789,
+          "affinity": 2.423837
         }
       },
       "connor.fehr": {
         "picks": 33,
         "coefficients": {
-          "rank": 0.078448,
-          "affinity": 1.616498
+          "rank": 0.087805,
+          "affinity": 1.770369
         }
       },
       "judah": {
-        "picks": 105,
+        "picks": 87,
         "coefficients": {
-          "rank": -0.177975,
-          "affinity": 1.720035
+          "rank": -0.149964,
+          "affinity": 1.53797
         }
       },
       "kyle": {
-        "picks": 138,
+        "picks": 120,
         "coefficients": {
-          "rank": 0.214989,
-          "affinity": 2.36125
+          "rank": 0.231759,
+          "affinity": 1.447621
         }
       },
       "levi": {
-        "picks": 105,
+        "picks": 87,
         "coefficients": {
-          "rank": 0.17834,
-          "affinity": 1.373723
+          "rank": 0.185481,
+          "affinity": 1.168306
         }
       },
       "paul.markhauser": {
         "picks": 33,
         "coefficients": {
-          "rank": 0.078448,
-          "affinity": 1.425274
+          "rank": 0.087805,
+          "affinity": 1.806506
         }
       },
       "tobi": {
         "picks": 33,
         "coefficients": {
-          "rank": 0.078448,
-          "affinity": 1.103933
+          "rank": 0.087805,
+          "affinity": 1.773062
         }
       }
     }
@@ -73,7 +73,7 @@
         "season": 2024,
         "events": 3,
         "picks": 108,
-        "fitted_accuracy": 0.2685,
+        "fitted_accuracy": 0.2222,
         "greedy_accuracy": 0.1944,
         "fitted_beats_greedy": true
       },
@@ -81,27 +81,27 @@
         "season": 2025,
         "events": 2,
         "picks": 88,
-        "fitted_accuracy": 0.2614,
+        "fitted_accuracy": 0.2727,
         "greedy_accuracy": 0.2159,
         "fitted_beats_greedy": true
       },
       {
         "season": 2026,
-        "events": 3,
-        "picks": 233,
-        "fitted_accuracy": 0.1803,
-        "greedy_accuracy": 0.1588,
+        "events": 6,
+        "picks": 240,
+        "fitted_accuracy": 0.3083,
+        "greedy_accuracy": 0.2917,
         "fitted_beats_greedy": true
       }
     ],
     "seasons_beating_fallback": 3,
     "per_pick": {
-      "picks": 143,
+      "picks": 240,
       "k": 3,
-      "fitted_top1": 0.1259,
-      "greedy_top1": 0.1119,
-      "fitted_topk": 0.2168,
-      "greedy_topk": 0.2028
+      "fitted_top1": 0.1125,
+      "greedy_top1": 0.1042,
+      "fitted_topk": 0.2083,
+      "greedy_topk": 0.2042
     }
   }
 }

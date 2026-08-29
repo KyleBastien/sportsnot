@@ -12,6 +12,7 @@ a tiny synthetic league. All fixtures are in-memory -- no committed data, no net
 from __future__ import annotations
 
 import random
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -23,6 +24,7 @@ from draft_oracle.optimize.opponents import (
     OpponentFitConfig,
     base_position,
     build_team_affinity,
+    dedupe_duplicate_events,
     evaluate_opponents,
     fit_opponent_models,
     opponent_model_from_config,
@@ -349,3 +351,84 @@ def test_membership_report_and_manifest_shapes() -> None:
     assert "seasons_beating_fallback" in manifest
     lines = result.report_lines()
     assert any("Held-out validation" in line for line in lines)
+
+
+# ── Duplicate-event dedupe + league isolation (US-106) ─────────────────────
+
+_REAL_LEAGUE_PICKS = Path("data/normalized/league_draft_picks.parquet")
+
+
+def _dup_row(
+    league: str, source: str, manager: str, slot: int, player_id: int, team_id: int
+) -> dict[str, object]:
+    return {
+        "season": 2026,
+        "league_name": league,
+        "draft_event": "R1",
+        "source": source,
+        "manager": manager,
+        "snake_slot": slot,
+        "pick_number": None,
+        "position": "F",
+        "player_id": player_id,
+        "team_id": team_id,
+        "points_when_drafted": 1.0,
+        "matched_name": f"P{player_id}",
+        "player_or_team_name": f"P{player_id}",
+    }
+
+
+def _dup_frame() -> pd.DataFrame:
+    """One real 2026 Gemmell draft recorded twice (sheet + app) plus a second league."""
+    rows: list[dict[str, object]] = []
+    for source in ("sheet", "app"):
+        for slot, manager in enumerate(("ben", "kyle"), start=1):
+            rows.append(_dup_row("The Gemmell Cup", source, manager, slot, 100 + slot, 5))
+    for slot, manager in enumerate(("tobi", "kyle"), start=1):
+        rows.append(_dup_row("Press Play-offs", "app", manager, slot, 200 + slot, 9))
+    return pd.DataFrame(rows)
+
+
+def test_dedupe_prefers_app_over_sheet_copy() -> None:
+    deduped = dedupe_duplicate_events(_dup_frame())
+    gemmell = deduped[deduped["league_name"] == "The Gemmell Cup"]
+    assert set(gemmell["source"]) == {"app"}  # the sheet copy is dropped
+    assert len(gemmell) == 2  # not double-counted
+    # the separate league (app only) is untouched
+    assert len(deduped[deduped["league_name"] == "Press Play-offs"]) == 2
+
+
+def test_dedupe_is_noop_without_source_or_league_columns() -> None:
+    frame = _affinity_league((2024,))
+    pd.testing.assert_frame_equal(dedupe_duplicate_events(frame), frame)
+
+
+def test_fitted_counts_are_deduped_and_within_league() -> None:
+    """Per-manager choice counts match hand-counted truth after the app/sheet dedupe."""
+    fitted = fit_opponent_models(_dup_frame(), OpponentFitConfig(min_manager_picks=1))
+    # sheet Gemmell copy dropped -> ben once; kyle plays both leagues -> twice.
+    assert fitted.manager_pick_counts["ben"] == 1
+    assert fitted.manager_pick_counts["tobi"] == 1
+    assert fitted.manager_pick_counts["kyle"] == 2
+
+
+def test_fitted_counts_match_real_league_truth() -> None:
+    """Regression against the committed table: no double-counted Gemmell rows.
+
+    Before US-106 the duplicated 2026 Gemmell sheet+app copies inflated ben/judah/levi
+    to 105 and kyle to 138. Hand-counted truth after preferring source='app': the three
+    Gemmell-only managers hold 87 picks each across 2024-26, kyle also plays the separate
+    Press Play-offs league (+33 -> 120), and the Press-only managers hold 33 each.
+    """
+    if not _REAL_LEAGUE_PICKS.exists():
+        pytest.skip("committed league_draft_picks parquet not present")
+    picks = pd.read_parquet(_REAL_LEAGUE_PICKS)
+    counts = fit_opponent_models(picks, OpponentFitConfig()).manager_pick_counts
+    assert counts["ben"] == 87
+    assert counts["judah"] == 87
+    assert counts["levi"] == 87
+    assert counts["kyle"] == 87 + 33
+    for press_manager in ("tobi", "paul.markhauser", "connor.fehr"):
+        assert counts[press_manager] == 33
+    # the old double-count pushed a manager to 105/138; the true ceiling is kyle at 120.
+    assert max(counts.values()) == 120
