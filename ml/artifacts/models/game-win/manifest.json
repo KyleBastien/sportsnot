@@ -28,18 +28,18 @@
     "test": 2421
   },
   "validation_brier": {
-    "logistic_regression": 0.23732408960777812,
-    "lightgbm": 0.2401142468552719
+    "logistic_regression": 0.23825863979573023,
+    "lightgbm": 0.24019199281665227
   },
   "test_brier": {
-    "market_plus_stats": 0.24217113633574336,
+    "market_plus_stats": 0.24099596089079658,
     "stats_only": 0.2412556356002993,
     "coin_flip": 0.25,
     "higher_points": 0.44496076001652207
   },
-  "test_market_coverage": 0.315572077653862,
+  "test_market_coverage": 0.34324659231722426,
   "beats_coin_flip": true,
   "beats_higher_points": true,
   "beats_both_baselines": true,
-  "market_helps": false
+  "market_helps": true
 }

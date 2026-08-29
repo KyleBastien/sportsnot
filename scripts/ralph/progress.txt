@@ -41,6 +41,22 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   the in-memory frame but NOT a parquet round-trip -- read them before writing.
   Run ml checks with `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy} src tests`
   (ml is a standalone Python project, NOT an nx package -- no `yarn nx` target).
+- Odds local-date normalization (US-103, `ingest/odds.py`, CODE_REVIEW M-2):
+  Kaggle/ESPN stamp UTC calendar dates (evening game -> next day); the NHL
+  archive + SBR use LOCAL dates; `game_win._attach_market` joins on EXACT
+  `game_date`. `consolidate_odds(source, local_game_dates=...)` snaps each row's
+  `game_date` (and `game_key`) onto the archive local date within +-1 day via
+  `_snap_to_local_date`; `load_local_game_dates(nhl_archive_dir)` builds the
+  index `{(season_end_year, home_id, away_id) -> sorted local dates}` from
+  `team-games-*.csv.gz` (season_end_year = seasonId % 10000). `build_odds_table`
+  now takes `nhl_archive_dir` and passes the index through; the `odds` CLI adds a
+  matching option. GOTCHA: after US-101 the Kaggle 2024/2025 placeholder seasons
+  are fully rejected (0 covered), so the honest 2023-2026 covered universe is SBR
+  (2023) + espn_completion (2026) only -- a fast M-2 test builds just those two
+  sources. ~92% of ALL covered rows attach, but 100% of "genuine" covered rows
+  (those whose matchup exists in the archive within +-1 day) attach; the residual
+  ~8% are phantom rows pricing games absent from the archive (source noise, out of
+  M-2 scope). Metric = attachment among GENUINE covered rows, not all covered.
 
 - Backtest reporting (US-026, `backtest/report.py`): pure metric aggregation over an
   in-memory `BacktestResult` (never fetches/trains) -> committed `report.md` via
@@ -487,4 +503,17 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   - ESPN summary homeTeamOdds/awayTeamOdds already correspond to the game's home/away team, so favorite side needs no team-id matching.
   - The live espn_summary_to_rows path still uses the spread sign; if a future story hardens live odds, reuse _pickcenter_favorite_side there too.
   - Downstream odds.parquet / game-win / backtest market artifacts remain stale by design; regenerate under US-103 (date normalize) then US-106.
+---
+
+## 2026-08-29 - US-103
+- Normalized odds dates to the NHL local-date convention before the market join (CODE_REVIEW M-2).
+- `consolidate_odds` gained `local_game_dates` + `_snap_to_local_date`: each consolidated row's `game_date`/`game_key` snaps onto the archive local date within +-1 day. Added `load_local_game_dates` (indexes `team-games-*.csv.gz` by season+home+away) and wired `nhl_archive_dir` through `build_odds_table` and the `odds` CLI.
+- Regenerated `artifacts/models/game-win/{manifest.json,report.md}`: test market coverage 31.6% -> 34.3%, market now marginally helps (Brier 0.2410 vs stats-only 0.2413). odds.parquet is gitignored (rebuilt by code), so the committed change is the game-win artifact.
+- Files: ml/src/draft_oracle/ingest/odds.py, ml/src/draft_oracle/cli/project.py, ml/tests/test_odds.py (+6 tests), ml/artifacts/models/game-win/manifest.json, ml/artifacts/models/game-win/report.md.
+- Checks: ruff clean, mypy --strict clean, full pytest 582 passed.
+- **Learnings for future iterations:**
+  - Attachment metric is % of GENUINE covered rows (matchup in archive +-1 day), which is 100% post-fix; raw all-covered attach is ~92% because SBR 2022-23 + a few ESPN rows price games the archive lacks.
+  - After US-101, 2024/2025 Kaggle is fully placeholder-rejected -> 0 covered; the 2023-2026 covered universe is SBR(2023)+espn_completion(2026). A fast test builds just those two parsers (~3s) instead of the 22s full `build_source_odds` (Kaggle CSV parse dominates).
+  - `consolidate_odds` writes the anchor row's date; SBR is already local so its clusters need no snap. Snapping only matters where the anchor is a UTC source (Kaggle/ESPN) with no SBR member in the cluster (all of 2023-2026 target seasons).
+  - US-104 (gameTypeId playoff labels) will re-touch `is_playoff` on these same rows; US-105 does the comprehensive odds+backtest regen. Leaving phantom-covered rows as-is is intentional (out of M-2 scope).
 ---

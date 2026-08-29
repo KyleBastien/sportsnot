@@ -170,6 +170,10 @@ def odds(
     out_dir: Annotated[
         Path, typer.Option(help="Output directory for the odds Parquet tables.")
     ] = DEFAULT_NORMALIZED_DIR,
+    nhl_archive_dir: Annotated[
+        Path,
+        typer.Option(help="Committed NHL archive (supplies local game dates for the market join)."),
+    ] = DEFAULT_ARCHIVE_DIR,
     no_odds: Annotated[
         bool,
         typer.Option("--no-odds", help="Skip odds ingestion entirely (stat-only path)."),
@@ -179,7 +183,9 @@ def odds(
     if no_odds:
         typer.echo("Odds ingestion skipped (--no-odds); stat-only path is unaffected.")
         return
-    result = build_odds_table(archive_dir=archive_dir, out_dir=out_dir)
+    result = build_odds_table(
+        archive_dir=archive_dir, out_dir=out_dir, nhl_archive_dir=nhl_archive_dir
+    )
     typer.echo(f"Odds tables -> {out_dir}")
     typer.echo(f"  source rows: {result.source_rows}")
     typer.echo(f"  games: {result.game_rows} priced/flagged")

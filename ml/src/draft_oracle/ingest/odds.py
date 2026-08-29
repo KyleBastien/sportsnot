@@ -67,6 +67,7 @@ from draft_oracle.ingest.nhl_api import (
 # ── Directory contract (SPEC §4) ─────────────────────────────────────────
 
 DEFAULT_ODDS_ARCHIVE_DIR = Path("data/raw/odds-archive")
+DEFAULT_NHL_ARCHIVE_DIR = Path("data/raw/nhl-archive")
 DEFAULT_NORMALIZED_DIR = Path("data/normalized")
 DEFAULT_ODDS_CACHE_DIR = Path("data/raw/odds-api")
 DEFAULT_ESPN_CACHE_DIR = Path("data/raw/espn-odds")
@@ -1014,7 +1015,10 @@ def build_source_odds(archive_dir: Path = DEFAULT_ODDS_ARCHIVE_DIR) -> pd.DataFr
     return out
 
 
-def consolidate_odds(source_odds: pd.DataFrame) -> pd.DataFrame:
+def consolidate_odds(
+    source_odds: pd.DataFrame,
+    local_game_dates: Mapping[tuple[int, int, int], tuple[date, ...]] | None = None,
+) -> pd.DataFrame:
     """Collapse the per-source table to one best row per game.
 
     Rows are clustered into real games on (season, away id, home id): rows from
@@ -1025,6 +1029,13 @@ def consolidate_odds(source_odds: pd.DataFrame) -> pd.DataFrame:
     adjacent days are never merged. The highest-priority covering source wins
     (SBR Close preferred); the de-vigged favorite probability of every covering
     source is cross-validated and the disagreement recorded in ``xval_delta``.
+
+    When ``local_game_dates`` is supplied (the NHL archive's local game dates,
+    keyed by ``(season_end_year, home_id, away_id)``), each consolidated row's
+    ``game_date`` is snapped onto the matching archive local date within ±1 day
+    (CODE_REVIEW M-2). This gives the written table ONE documented convention -
+    the NHL-archive local date - so ``game_win._attach_market``'s exact-date
+    join actually lands on the game instead of dropping UTC-stamped prices.
     """
     keep = [*list(_ODDS_COLUMNS), "xval_delta", "source_count"]
     if source_odds.empty:
@@ -1084,6 +1095,7 @@ def consolidate_odds(source_odds: pd.DataFrame) -> pd.DataFrame:
         xval_delta = (max(fav_probs) - min(fav_probs)) if len(fav_probs) > 1 else 0.0
         best["xval_delta"] = xval_delta
         best["source_count"] = len(members)
+        _snap_to_local_date(best, local_game_dates)
         if bool(best["covered"]) and xval_delta > XVAL_DELTA_THRESHOLD:
             _blank_market_fields(best)
             xval_flagged += 1
@@ -1131,6 +1143,78 @@ def _parse_date_str(value: str) -> date | None:
         return None
 
 
+def _snap_to_local_date(
+    row: dict[str, Any],
+    local_game_dates: Mapping[tuple[int, int, int], tuple[date, ...]] | None,
+) -> None:
+    """Rewrite ``game_date`` to the NHL-archive local date (CODE_REVIEW M-2).
+
+    Kaggle/ESPN stamp UTC calendar dates (an evening game lands on the next
+    day); the NHL archive and SBR use local dates. When an archive game with the
+    same matchup sits within ±1 day, snap ``game_date`` (and ``game_key``) onto
+    it so the exact-date market join attaches. Rows already on a local date, or
+    with no archive match, are left untouched - one documented convention, never
+    a fabricated date.
+    """
+    if not local_game_dates:
+        return
+    home_id = row.get("home_team_id")
+    away_id = row.get("away_team_id")
+    if home_id is None or away_id is None or pd.isna(home_id) or pd.isna(away_id):
+        return
+    key = (int(row["season_end_year"]), int(home_id), int(away_id))
+    candidates = local_game_dates.get(key)
+    if not candidates:
+        return
+    current = _parse_date_str(str(row["game_date"]))
+    if current is None or current in candidates:
+        return
+    within = [d for d in candidates if abs((d - current).days) <= 1]
+    if not within:
+        return
+    nearest = min(within, key=lambda d: (abs((d - current).days), d.toordinal()))
+    row["game_date"] = nearest.isoformat()
+    row["game_key"] = _game_key(key[0], nearest, int(away_id), int(home_id))
+
+
+def load_local_game_dates(
+    archive_dir: Path = DEFAULT_NHL_ARCHIVE_DIR,
+) -> dict[tuple[int, int, int], tuple[date, ...]]:
+    """Index NHL-archive local game dates by ``(season_end_year, home_id, away_id)``.
+
+    The committed archive (``team-games-*.csv.gz``) stamps each game with its
+    LOCAL calendar date. ``consolidate_odds`` snaps Kaggle/ESPN UTC dates onto
+    these so the market join in
+    :func:`~draft_oracle.models.game_win._attach_market` lands on the game
+    (CODE_REVIEW M-2). A matchup can recur within a season, so each key maps to
+    the sorted tuple of its local dates.
+    """
+    accumulator: dict[tuple[int, int, int], set[date]] = {}
+    for path in sorted(archive_dir.glob("team-games-*.csv.gz")):
+        _accumulate_local_dates(pd.read_csv(path), accumulator)
+    return {key: tuple(sorted(values)) for key, values in accumulator.items()}
+
+
+def _accumulate_local_dates(
+    frame: pd.DataFrame, accumulator: dict[tuple[int, int, int], set[date]]
+) -> None:
+    required = {"gameId", "seasonId", "teamId", "homeRoad", "gameDate"}
+    if frame.empty or not required.issubset(frame.columns):
+        return
+    home = frame.loc[frame["homeRoad"] == "H", ["gameId", "seasonId", "teamId", "gameDate"]]
+    away = frame.loc[frame["homeRoad"] == "R", ["gameId", "teamId"]]
+    merged = home.merge(away, on="gameId", suffixes=("_home", "_away"))
+    seasons = merged["seasonId"].astype(int).tolist()
+    homes = merged["teamId_home"].astype(int).tolist()
+    aways = merged["teamId_away"].astype(int).tolist()
+    dates = merged["gameDate"].astype(str).tolist()
+    for season, home_id, away_id, raw_date in zip(seasons, homes, aways, dates, strict=True):
+        local = _parse_date_str(str(raw_date)[:10])
+        if local is None:
+            continue
+        accumulator.setdefault((int(season) % 10000, int(home_id), int(away_id)), set()).add(local)
+
+
 def _max_prob(home_imp: object, away_imp: object) -> float | None:
     values: list[float] = []
     for v in (home_imp, away_imp):
@@ -1159,6 +1243,7 @@ class OddsResult:
 def build_odds_table(
     archive_dir: Path = DEFAULT_ODDS_ARCHIVE_DIR,
     out_dir: Path = DEFAULT_NORMALIZED_DIR,
+    nhl_archive_dir: Path = DEFAULT_NHL_ARCHIVE_DIR,
 ) -> OddsResult:
     """Build the odds tables from committed archives and write them to Parquet.
 
@@ -1166,9 +1251,14 @@ def build_odds_table(
     ``odds.parquet`` (one consolidated best row per game). Offline and
     deterministic - no network. Games absent from every archive simply do not
     appear; games present but priceless are flagged (``covered=False``).
+
+    ``nhl_archive_dir`` supplies the NHL archive's local game dates so
+    consolidation normalizes Kaggle/ESPN UTC dates onto the local convention the
+    market join expects (CODE_REVIEW M-2).
     """
     source_odds = build_source_odds(archive_dir)
-    consolidated = consolidate_odds(source_odds)
+    local_game_dates = load_local_game_dates(nhl_archive_dir)
+    consolidated = consolidate_odds(source_odds, local_game_dates=local_game_dates)
     out_dir.mkdir(parents=True, exist_ok=True)
     source_odds.to_parquet(out_dir / f"{ODDS_BY_SOURCE_TABLE_NAME}.parquet", index=False)
     consolidated.to_parquet(out_dir / f"{ODDS_TABLE_NAME}.parquet", index=False)

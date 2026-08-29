@@ -37,9 +37,11 @@ from draft_oracle.ingest.odds import (
     espn_summary_to_rows,
     is_playoff_game,
     is_preseason_game,
+    load_local_game_dates,
     odds_api_events_to_rows,
     parse_espn_completion,
     parse_kaggle_extensive,
+    parse_sbr_archive,
     parse_sbr_workbook,
     resolve_team_id,
 )
@@ -575,6 +577,170 @@ def test_consolidate_empty_frame() -> None:
     out = consolidate_odds(empty)
     assert out.empty
     assert "xval_delta" in out.columns
+
+
+# ── Local-date normalization for the market join (CODE_REVIEW M-2) ────────
+
+
+def test_consolidate_snaps_utc_date_to_local() -> None:
+    """A Kaggle UTC calendar date is snapped to the archive local date (M-2)."""
+    from draft_oracle.ingest.odds import _favorite_rows_from_games, _finalize
+
+    kaggle = _finalize(
+        _favorite_rows_from_games(
+            pd.DataFrame(_kaggle_pair(game_id=1, date="2024-05-02 02:00:00+00:00",
+                                      season=2024, home="Toronto Maple Leafs",
+                                      away="Boston Bruins", price=-175)),
+            source=SOURCE_KAGGLE,
+        )
+    )
+    home_id = resolve_team_id("Toronto Maple Leafs")
+    away_id = resolve_team_id("Boston Bruins")
+    assert home_id is not None and away_id is not None
+    # Archive stamps the game one local day earlier than the UTC-stamped odds row.
+    local_dates = {(2024, home_id, away_id): (date(2024, 5, 1),)}
+    consolidated = consolidate_odds(kaggle, local_game_dates=local_dates)
+    row = consolidated.iloc[0]
+    assert row["game_date"] == "2024-05-01"  # snapped from UTC 2024-05-02
+    assert row["game_key"].startswith("2024:2024-05-01:")
+
+
+def test_consolidate_keeps_exact_local_date_untouched() -> None:
+    """A row already on a local date is not moved (single convention, no churn)."""
+    from draft_oracle.ingest.odds import _favorite_rows_from_games, _finalize
+
+    kaggle = _finalize(
+        _favorite_rows_from_games(
+            pd.DataFrame(_kaggle_pair(game_id=1, date="2024-05-01 18:00:00+00:00",
+                                      season=2024, home="Toronto Maple Leafs",
+                                      away="Boston Bruins", price=-175)),
+            source=SOURCE_KAGGLE,
+        )
+    )
+    home_id = resolve_team_id("Toronto Maple Leafs")
+    away_id = resolve_team_id("Boston Bruins")
+    assert home_id is not None and away_id is not None
+    local_dates = {(2024, home_id, away_id): (date(2024, 5, 1),)}
+    consolidated = consolidate_odds(kaggle, local_game_dates=local_dates)
+    assert consolidated.iloc[0]["game_date"] == "2024-05-01"
+
+
+def test_consolidate_no_snap_when_no_archive_match() -> None:
+    """No nearby archive game (>1 day) leaves the source date untouched."""
+    from draft_oracle.ingest.odds import _favorite_rows_from_games, _finalize
+
+    kaggle = _finalize(
+        _favorite_rows_from_games(
+            pd.DataFrame(_kaggle_pair(game_id=1, date="2024-05-02 02:00:00+00:00",
+                                      season=2024, home="Toronto Maple Leafs",
+                                      away="Boston Bruins", price=-175)),
+            source=SOURCE_KAGGLE,
+        )
+    )
+    home_id = resolve_team_id("Toronto Maple Leafs")
+    away_id = resolve_team_id("Boston Bruins")
+    assert home_id is not None and away_id is not None
+    local_dates = {(2024, home_id, away_id): (date(2024, 1, 1),)}  # far away
+    consolidated = consolidate_odds(kaggle, local_game_dates=local_dates)
+    assert consolidated.iloc[0]["game_date"] == "2024-05-02"  # unchanged
+
+
+def test_load_local_game_dates_indexes_home_away(tmp_path: Path) -> None:
+    archive = tmp_path / "nhl-archive"
+    archive.mkdir()
+    frame = pd.DataFrame(
+        [
+            {"seasonId": 20232024, "gameId": 111, "teamId": 10, "homeRoad": "H",
+             "gameDate": "2024-05-01"},
+            {"seasonId": 20232024, "gameId": 111, "teamId": 6, "homeRoad": "R",
+             "gameDate": "2024-05-01"},
+        ]
+    )
+    frame.to_csv(archive / "team-games-2023-24.csv.gz", index=False, compression="gzip")
+    index = load_local_game_dates(archive)
+    assert index[(2024, 10, 6)] == (date(2024, 5, 1),)
+
+
+def test_market_join_attaches_genuine_covered_odds() -> None:
+    """CODE_REVIEW M-2: normalized odds dates attach covered prices to games.
+
+    Builds the covered odds (SBR + ESPN completion - the only genuinely-priced
+    sources for 2023-2026 after the C-2 placeholder guard) and the NHL-archive
+    game frame from committed data, then asserts that >=95% of covered odds rows
+    that identify a real archive game (a matchup within +-1 day) attach through
+    ``_attach_market``'s exact-date join. The no-normalization control proves the
+    fix is what closes the gap (UTC dates otherwise drop most of them).
+    """
+    from draft_oracle.ingest.normalize import (
+        DEFAULT_ARCHIVE_DIR,
+        load_archive_team_games,
+        normalize_team_games,
+    )
+    from draft_oracle.ingest.odds import DEFAULT_ODDS_ARCHIVE_DIR
+    from draft_oracle.models.game_win import _attach_market, _pivot_games
+
+    seasons = [2023, 2024, 2025, 2026]
+    sbr = parse_sbr_archive(DEFAULT_ODDS_ARCHIVE_DIR)
+    espn = parse_espn_completion(
+        DEFAULT_ODDS_ARCHIVE_DIR / "espn-2025-26-completion" / "games.csv"
+    )
+    source = pd.concat([sbr, espn], ignore_index=True)
+
+    labels = ["2021-22", "2022-23", "2023-24", "2024-25", "2025-26"]
+    team_games = normalize_team_games(load_archive_team_games(DEFAULT_ARCHIVE_DIR, labels))
+    games = _pivot_games(team_games)
+    games["season_end_year"] = games["season_end_year"].astype(int)
+
+    # Same-matchup archive dates, keyed home/away, for the "genuine" filter.
+    archive_dates: dict[tuple[int, int, int], list[pd.Timestamp]] = {}
+    a_season = games["season_end_year"].astype(int).tolist()
+    a_home = games["home_team_id"].astype(int).tolist()
+    a_away = games["away_team_id"].astype(int).tolist()
+    a_date = pd.to_datetime(games["game_date"]).tolist()
+    for season, home_id, away_id, when in zip(a_season, a_home, a_away, a_date, strict=True):
+        archive_dates.setdefault((int(season), int(home_id), int(away_id)), []).append(
+            pd.Timestamp(when)
+        )
+
+    def attach_rate(odds: pd.DataFrame) -> tuple[int, float]:
+        odds = odds.copy()
+        odds["season_end_year"] = odds["season_end_year"].astype(int)
+        covered = odds.loc[odds["covered"] & odds["season_end_year"].isin(seasons)].copy()
+        covered["game_date"] = pd.to_datetime(covered["game_date"])
+        joined = _attach_market(games, odds)
+        joined["season_end_year"] = joined["season_end_year"].astype(int)
+        hit = joined.loc[
+            :, ["season_end_year", "game_date", "home_team_id", "away_team_id"]
+        ].copy()
+        hit["_hit"] = joined["market_home_prob"].notna()
+        merged = covered.merge(
+            hit, on=["season_end_year", "game_date", "home_team_id", "away_team_id"], how="left"
+        )
+        merged["_hit"] = merged["_hit"].fillna(value=False)
+        genuine_mask = [
+            any(
+                abs((gd - ad).days) <= 1
+                for ad in archive_dates.get((int(sy), int(hid), int(aid)), [])
+            )
+            for sy, gd, hid, aid in zip(
+                merged["season_end_year"],
+                merged["game_date"],
+                merged["home_team_id"],
+                merged["away_team_id"],
+                strict=True,
+            )
+        ]
+        genuine = merged.loc[genuine_mask]
+        return len(genuine), float(genuine["_hit"].mean())
+
+    local_dates = load_local_game_dates(DEFAULT_ARCHIVE_DIR)
+    normalized = consolidate_odds(source, local_game_dates=local_dates)
+    n_genuine, rate = attach_rate(normalized)
+    assert n_genuine > 500  # a substantial covered universe is exercised
+    assert rate >= 0.95, f"only {rate:.3f} of genuine covered odds attached"
+
+    _, control_rate = attach_rate(consolidate_odds(source))  # no normalization
+    assert control_rate < rate  # the local-date fix is what closes the gap
 
 
 # ── Placeholder guard + xval gate (CODE_REVIEW C-2) ──────────────────────

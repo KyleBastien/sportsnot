@@ -15,14 +15,14 @@ plus an optional de-vigged betting-market home probability.
   model selection (SPEC section 6).
 
 ## Model selection (validation Brier, lower is better)
-- lightgbm: 0.2401
-- logistic_regression: 0.2373  <- chosen
+- lightgbm: 0.2402
+- logistic_regression: 0.2383  <- chosen
 
 Chosen model: **logistic_regression** (lowest validation Brier).
 It is refit on train + validation seasons before the held-out test.
 
 ## Held-out test Brier vs. fixed baselines
-- market + stats model: 0.2422
+- market + stats model: 0.2410
 - stats-only model:     0.2413
 - baseline (a) coin flip:              0.2500
 - baseline (b) higher reg-season pts:  0.4450
@@ -32,8 +32,8 @@ It is refit on train + validation seasons before the held-out test.
 - Beats both baselines: yes
 
 ## Ablation: does the market help? (test seasons with odds coverage)
-- Test-set market coverage: 31.6% of games priced.
-- market + stats Brier: 0.2422
+- Test-set market coverage: 34.3% of games priced.
+- market + stats Brier: 0.2410
 - stats-only Brier:     0.2413
-- Market improves Brier: no (delta -0.0009).
+- Market improves Brier: yes (delta +0.0003).
 
