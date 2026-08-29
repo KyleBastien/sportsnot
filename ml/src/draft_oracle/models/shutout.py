@@ -106,6 +106,61 @@ def base_rate_probs(n: int, rate: float) -> np.ndarray:
     return np.full(int(n), float(rate), dtype=float)
 
 
+# Candidate model weights for the shrinkage sweep: 1.0 = pure model, 0.0 = pure
+# base rate. Selected on the validation fold, never on the held-out test (US-105).
+DEFAULT_SHRINKAGE_GRID: tuple[float, ...] = (
+    1.0,
+    0.9,
+    0.8,
+    0.7,
+    0.6,
+    0.5,
+    0.4,
+    0.3,
+    0.2,
+    0.1,
+    0.0,
+)
+
+
+def _apply_shrinkage(probs: np.ndarray, *, weight: float, base_rate: float) -> np.ndarray:
+    """Blend ``probs`` toward ``base_rate``: ``weight*probs + (1-weight)*base_rate``.
+
+    ``weight == 1.0`` is a no-op (pure model); ``weight == 0.0`` collapses onto the
+    base rate. The result is clipped to ``[0, 1]``.
+    """
+    if weight >= 1.0:
+        return np.asarray(np.clip(probs, 0.0, 1.0), dtype=float)
+    blended = weight * probs + (1.0 - weight) * float(base_rate)
+    return np.asarray(np.clip(blended, 0.0, 1.0), dtype=float)
+
+
+def _select_shrinkage_weight(
+    probs: np.ndarray,
+    labels: np.ndarray,
+    *,
+    base_rate: float,
+    grid: tuple[float, ...],
+) -> tuple[float, dict[str, float]]:
+    """Pick the shrinkage weight minimising validation Brier (ties prefer more model).
+
+    Returns the chosen weight and the full ``{weight -> validation Brier}`` sweep so
+    the report can print the honest decision either way. Grid is scored high-weight
+    first so an exact tie keeps the least-shrunk (most model-driven) option.
+    """
+    by_weight: dict[str, float] = {}
+    best_weight = 1.0
+    best_brier = float("inf")
+    for weight in sorted(set(grid), reverse=True):
+        shrunk = _apply_shrinkage(probs, weight=weight, base_rate=base_rate)
+        score = brier_score(shrunk, labels)
+        by_weight[f"{weight:.2f}"] = score
+        if score < best_brier - 1e-12:
+            best_brier = score
+            best_weight = weight
+    return best_weight, by_weight
+
+
 # ── Pre-game team state (leakage-free running goaltending proxies) ──────────
 
 
@@ -373,10 +428,20 @@ class ShutoutModel:
     estimator: Any
     feature_columns: tuple[str, ...]
     model_type: str
+    shrinkage_weight: float = 1.0
+    base_rate: float = 0.0
 
     def predict_shutout_prob(self, dataset: pd.DataFrame) -> np.ndarray:
-        """Shutout probability for each row of a :func:`build_shutout_dataset` frame."""
-        return _predict(self.estimator, dataset, self.feature_columns)
+        """Shutout probability for each row of a :func:`build_shutout_dataset` frame.
+
+        When ``shrinkage_weight`` is below ``1.0`` the raw estimator probability is
+        blended toward the playoff ``base_rate`` (US-105 / CODE_REVIEW observation:
+        the raw model shows no held-out skill, so a data-selected shrinkage pulls it
+        back toward the base rate). ``shrinkage_weight == 1.0`` leaves probabilities
+        untouched.
+        """
+        raw = _predict(self.estimator, dataset, self.feature_columns)
+        return _apply_shrinkage(raw, weight=self.shrinkage_weight, base_rate=self.base_rate)
 
     def predict_matchup(
         self,
@@ -453,6 +518,7 @@ class ShutoutConfig:
     n_test_seasons: int = 2
     calibration_bins: int = 5
     calibration_tolerance: float = 0.25
+    shrinkage_grid: tuple[float, ...] = DEFAULT_SHRINKAGE_GRID
 
 
 @dataclass
@@ -473,6 +539,15 @@ class ShutoutResult:
     n_train: int
     n_val: int
     n_test: int
+    shrinkage_weight: float = 1.0
+    shrinkage_base_rate: float = 0.0
+    val_brier_by_shrinkage: dict[str, float] = field(default_factory=dict)
+    test_brier_model_unshrunk: float = float("nan")
+
+    @property
+    def shrinkage_adopted(self) -> bool:
+        """True when the validation sweep pulled the model below full model weight."""
+        return self.shrinkage_weight < 1.0
 
     @property
     def calibration_rel_error(self) -> float:
@@ -506,7 +581,14 @@ class ShutoutResult:
             "validation_brier": self.val_brier_by_model,
             "test_brier": {
                 "model": self.test_brier_model,
+                "model_unshrunk": self.test_brier_model_unshrunk,
                 "base_rate": self.test_brier_base_rate,
+            },
+            "shrinkage": {
+                "weight": self.shrinkage_weight,
+                "base_rate": self.shrinkage_base_rate,
+                "adopted": self.shrinkage_adopted,
+                "validation_brier_by_weight": self.val_brier_by_shrinkage,
             },
             "shutout_rate": {
                 "train": self.train_shutout_rate,
@@ -559,13 +641,40 @@ class ShutoutResult:
         for model_type, brier in sorted(self.val_brier_by_model.items()):
             marker = "  <- chosen" if model_type == self.chosen_model_type else ""
             lines.append(f"- {model_type}: {brier:.4f}{marker}")
+        shrink_note = (
+            "shrinkage adopted"
+            if self.shrinkage_adopted
+            else "no shrinkage -- pure model wins on validation"
+        )
         lines += [
             "",
             f"Chosen model: **{self.chosen_model_type}** (lowest validation Brier).",
             "It is refit on train + validation seasons before the held-out test.",
             "",
+            "## Base-rate shrinkage (validation-selected, US-105)",
+            "The raw model shows little to no held-out skill over the playoff base",
+            "rate (CODE_REVIEW observation), so a shrinkage weight `w` blending",
+            "`w*model + (1-w)*base_rate` is selected on the validation fold only",
+            "(never the held-out test). `w=1.0` keeps the pure model; `w=0.0`",
+            "collapses onto the base rate.",
+            "",
+            f"- Selected weight: **{self.shrinkage_weight:.2f}** ({shrink_note})",
+            f"- Shrinkage base rate (train+val shutout rate): {self.shrinkage_base_rate:.4f}",
+            "- Validation Brier by weight (1.00 = pure model):",
+        ]
+        for weight_key in sorted(self.val_brier_by_shrinkage, key=float, reverse=True):
+            marker = (
+                "  <- chosen"
+                if abs(float(weight_key) - self.shrinkage_weight) < 1e-9
+                else ""
+            )
+            brier = self.val_brier_by_shrinkage[weight_key]
+            lines.append(f"  - w={weight_key}: {brier:.4f}{marker}")
+        lines += [
+            "",
             "## Held-out test Brier vs. base-rate baseline",
-            f"- shutout model:            {self.test_brier_model:.4f}",
+            f"- shutout model (w={self.shrinkage_weight:.2f}): {self.test_brier_model:.4f}",
+            f"- shutout model (unshrunk, w=1.00):  {self.test_brier_model_unshrunk:.4f}",
             f"- baseline (train shutout rate {self.train_shutout_rate:.3f}): "
             f"{self.test_brier_base_rate:.4f}",
             f"- Beats base rate: {'yes' if self.beats_base_rate else 'NO'}",
@@ -629,29 +738,47 @@ def train_shutout_model(
     train_val = pd.concat([train, val], ignore_index=True)
 
     val_brier: dict[str, float] = {}
+    val_probs_by_model: dict[str, np.ndarray] = {}
     for model_type in ("logistic_regression", "lightgbm"):
         fitted = _train_variant(train, model_type=model_type, seed=config.seed)
-        val_brier[model_type] = brier_score(
-            _predict(fitted, val, SHUTOUT_FEATURE_COLUMNS), val["is_shutout"]
-        )
+        preds = _predict(fitted, val, SHUTOUT_FEATURE_COLUMNS)
+        val_probs_by_model[model_type] = preds
+        val_brier[model_type] = brier_score(preds, val["is_shutout"])
     chosen = min(val_brier, key=lambda k: val_brier[k])
 
+    # Shrinkage toward the base rate is selected on the validation fold ONLY -- the
+    # held-out test never tunes it (US-105 / CODE_REVIEW: the raw model shows no
+    # held-out skill, so pull it back toward the playoff base rate if that helps).
+    train_base_rate = float(train["is_shutout"].mean())
+    val_labels = val["is_shutout"].to_numpy(dtype=float)
+    shrink_weight, val_brier_by_shrinkage = _select_shrinkage_weight(
+        val_probs_by_model[chosen],
+        val_labels,
+        base_rate=train_base_rate,
+        grid=config.shrinkage_grid,
+    )
+
     holdout_model = _train_variant(train_val, model_type=chosen, seed=config.seed)
-    test_probs = _predict(holdout_model, test, SHUTOUT_FEATURE_COLUMNS)
+    test_probs_raw = _predict(holdout_model, test, SHUTOUT_FEATURE_COLUMNS)
     test_labels = test["is_shutout"].to_numpy(dtype=float)
 
     train_rate = float(train_val["is_shutout"].mean())
+    test_probs = _apply_shrinkage(test_probs_raw, weight=shrink_weight, base_rate=train_rate)
     test_brier_model = brier_score(test_probs, test_labels)
+    test_brier_model_unshrunk = brier_score(test_probs_raw, test_labels)
     test_brier_base = brier_score(base_rate_probs(len(test), train_rate), test_labels)
     observed_rate = float(test_labels.mean()) if test_labels.size else float("nan")
     predicted_rate = float(test_probs.mean()) if test_probs.size else float("nan")
     bins = _calibration_bins(test_probs, test_labels, n_bins=config.calibration_bins)
 
+    production_base_rate = float(dataset["is_shutout"].mean())
     production = _train_variant(dataset, model_type=chosen, seed=config.seed)
     model = ShutoutModel(
         estimator=production,
         feature_columns=SHUTOUT_FEATURE_COLUMNS,
         model_type=chosen,
+        shrinkage_weight=shrink_weight,
+        base_rate=production_base_rate,
     )
 
     return ShutoutResult(
@@ -669,6 +796,10 @@ def train_shutout_model(
         n_train=len(train),
         n_val=len(val),
         n_test=len(test),
+        shrinkage_weight=shrink_weight,
+        shrinkage_base_rate=train_rate,
+        val_brier_by_shrinkage=val_brier_by_shrinkage,
+        test_brier_model_unshrunk=test_brier_model_unshrunk,
     )
 
 

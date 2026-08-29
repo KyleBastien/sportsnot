@@ -24,8 +24,31 @@ vs. 2 for a normal win, so this prices the goalie slot's upside (SPEC 1).
 Chosen model: **logistic_regression** (lowest validation Brier).
 It is refit on train + validation seasons before the held-out test.
 
+## Base-rate shrinkage (validation-selected, US-105)
+The raw model shows little to no held-out skill over the playoff base
+rate (CODE_REVIEW observation), so a shrinkage weight `w` blending
+`w*model + (1-w)*base_rate` is selected on the validation fold only
+(never the held-out test). `w=1.0` keeps the pure model; `w=0.0`
+collapses onto the base rate.
+
+- Selected weight: **1.00** (no shrinkage -- pure model wins on validation)
+- Shrinkage base rate (train+val shutout rate): 0.1224
+- Validation Brier by weight (1.00 = pure model):
+  - w=1.00: 0.0998  <- chosen
+  - w=0.90: 0.0999
+  - w=0.80: 0.0999
+  - w=0.70: 0.0999
+  - w=0.60: 0.1000
+  - w=0.50: 0.1000
+  - w=0.40: 0.1001
+  - w=0.30: 0.1002
+  - w=0.20: 0.1003
+  - w=0.10: 0.1003
+  - w=0.00: 0.1004
+
 ## Held-out test Brier vs. base-rate baseline
-- shutout model:            0.0981
+- shutout model (w=1.00): 0.0981
+- shutout model (unshrunk, w=1.00):  0.0981
 - baseline (train shutout rate 0.122): 0.0979
 - Beats base rate: NO
 

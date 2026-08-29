@@ -95,8 +95,8 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Regenerated the market-dependent artifacts on the corrected odds layer (US-101..104). `oracle odds` rebuilt odds.parquet (8839 covered / 19314 flagged; 20260 placeholder rows rejected, honest 2024-25 = no historical coverage). `train-game-win` re-emitted an IDENTICAL game-win manifest/report (test_market_coverage 34.3%, market still helps by +0.0003 Brier over stats-only) -- US-103/104 already left it consistent, so no diff. `eval-series-sim` also re-emitted identically. Shutout: added a validation-selected base-rate shrinkage in models/shutout.py (`_apply_shrinkage`/`_select_shrinkage_weight`; ShutoutModel gains shrinkage_weight+base_rate applied in predict_shutout_prob so goalie valuation inherits it). Sweep w in {1.0..0.0} chosen on the VALIDATION fold only (never the held-out test), base_rate = train+val shutout rate. On real data the pure model wins validation Brier at every step (w=1.00: 0.0998 monotonically worse to w=0.00: 0.1004), so shrinkage is EVALUATED but NOT ADOPTED; manifest records weight=1.0, adopted=false, the full validation_brier_by_weight sweep, and model_unshrunk. Report prints the honest decision. 5 new unit tests. ruff+mypy clean, 590 ml tests pass (1 pre-existing flaky timestamp race in test_backtest_report.py -- passes on rerun, out of US-105 scope)."
     },
     {
       "id": "US-106",

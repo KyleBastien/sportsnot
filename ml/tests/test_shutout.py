@@ -281,3 +281,78 @@ def test_train_manifest_records_seed_and_calibration() -> None:
     assert np.isfinite(result.test_predicted_rate)
     # The report renders without error and mentions the model.
     assert any("Shutout probability model" in line for line in result.report_lines())
+
+
+# ── Base-rate shrinkage (US-105) ───────────────────────────────────────────
+
+
+def test_apply_shrinkage_blends_toward_base_rate() -> None:
+    from draft_oracle.models.shutout import _apply_shrinkage
+
+    probs = np.array([0.0, 0.2, 0.8, 1.0])
+    # w=1.0 is a no-op (pure model).
+    assert np.allclose(_apply_shrinkage(probs, weight=1.0, base_rate=0.1), probs)
+    # w=0.0 collapses entirely onto the base rate.
+    assert np.allclose(
+        _apply_shrinkage(probs, weight=0.0, base_rate=0.1), np.full_like(probs, 0.1)
+    )
+    # w=0.5 lands halfway between model and base rate; result stays in [0, 1].
+    half = _apply_shrinkage(probs, weight=0.5, base_rate=0.1)
+    assert np.allclose(half, 0.5 * probs + 0.5 * 0.1)
+    assert np.all(half >= 0.0) and np.all(half <= 1.0)
+
+
+def test_select_shrinkage_prefers_base_rate_for_a_skill_less_model() -> None:
+    from draft_oracle.models.shutout import _select_shrinkage_weight
+
+    rng = np.random.default_rng(0)
+    labels = (rng.random(4000) < 0.1).astype(float)
+    # A "model" that is pure noise around the base rate carries no skill, so the
+    # validation sweep should pull it toward the base rate (weight below 1.0).
+    noisy = np.clip(0.1 + rng.normal(0.0, 0.25, size=labels.size), 0.0, 1.0)
+    weight, by_weight = _select_shrinkage_weight(
+        noisy, labels, base_rate=0.1, grid=(1.0, 0.5, 0.0)
+    )
+    assert weight < 1.0
+    assert set(by_weight) == {"1.00", "0.50", "0.00"}
+
+
+def test_shutout_model_applies_shrinkage_in_predictions() -> None:
+    seasons = [20182019, 20192020, 20202021, 20212022, 20222023]
+    team_games = _synthetic_team_games(seasons=seasons, seed=7)
+    result = train_shutout_model(team_games, config=ShutoutConfig(seed=7, min_pregame_games=0))
+    dataset = build_shutout_dataset(team_games, min_pregame_games=0)
+    # Force a shrunk copy of the fitted model and confirm predictions move toward
+    # the base rate relative to the pure-model estimator.
+    from draft_oracle.models.shutout import ShutoutModel, _apply_shrinkage
+
+    pure = ShutoutModel(
+        estimator=result.model.estimator,
+        feature_columns=result.model.feature_columns,
+        model_type=result.model.model_type,
+    )
+    shrunk = ShutoutModel(
+        estimator=result.model.estimator,
+        feature_columns=result.model.feature_columns,
+        model_type=result.model.model_type,
+        shrinkage_weight=0.5,
+        base_rate=0.1,
+    )
+    pure_probs = pure.predict_shutout_prob(dataset)
+    shrunk_probs = shrunk.predict_shutout_prob(dataset)
+    assert np.allclose(shrunk_probs, _apply_shrinkage(pure_probs, weight=0.5, base_rate=0.1))
+    assert np.all(shrunk_probs >= 0.0) and np.all(shrunk_probs <= 1.0)
+
+
+def test_manifest_records_shrinkage_decision() -> None:
+    seasons = [20182019, 20192020, 20202021, 20212022, 20222023]
+    team_games = _synthetic_team_games(seasons=seasons, seed=3)
+    result = train_shutout_model(team_games, config=ShutoutConfig(seed=3, min_pregame_games=0))
+    manifest = result.manifest()
+    shrink = manifest["shrinkage"]
+    assert 0.0 <= shrink["weight"] <= 1.0
+    assert shrink["adopted"] == (shrink["weight"] < 1.0)
+    assert shrink["validation_brier_by_weight"]
+    assert np.isfinite(manifest["test_brier"]["model_unshrunk"])
+    # The decision is spelled out in the human-readable report either way.
+    assert any("Base-rate shrinkage" in line for line in result.report_lines())
