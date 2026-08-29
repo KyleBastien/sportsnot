@@ -92,6 +92,7 @@ __all__ = [
     "dedupe_duplicate_events",
     "evaluate_opponents",
     "fit_opponent_models",
+    "load_committed_opponents",
     "opponent_model_from_config",
     "train_opponent_model_from_normalized",
 ]
@@ -170,6 +171,10 @@ class Coefficients:
 
     def as_dict(self) -> dict[str, float]:
         return {"rank": round(self.rank, 6), "affinity": round(self.affinity, 6)}
+
+    @classmethod
+    def from_manifest_entry(cls, data: Mapping[str, Any]) -> Coefficients:
+        return cls(rank=float(data["rank"]), affinity=float(data["affinity"]))
 
 
 def _clamp01(value: float) -> float:
@@ -509,7 +514,68 @@ class FittedLeagueOpponents:
                 }
                 for manager, coefficients in sorted(self.per_manager.items())
             },
+            "affinity": {
+                manager: {
+                    str(team_id): round(float(fraction), 6)
+                    for team_id, fraction in sorted(teams.items())
+                }
+                for manager, teams in sorted(self.affinity.items())
+            },
         }
+
+    @classmethod
+    def from_manifest(
+        cls, model: Mapping[str, Any], config: OpponentFitConfig | None = None
+    ) -> FittedLeagueOpponents:
+        """Reconstruct a fitted model from its serialized ``manifest()`` block.
+
+        Pure (JSON in, model out) — the draft-time load path with no training,
+        ingest, or network. ``config`` overrides the drafting hyper-parameters
+        (``need_weight`` / ``temperature``); it defaults to the fit defaults.
+        """
+        cfg = config or OpponentFitConfig()
+        league = Coefficients.from_manifest_entry(model["league_coefficients"])
+        per_manager: dict[str, Coefficients] = {}
+        counts: dict[str, int] = {}
+        for manager, entry in model.get("per_manager", {}).items():
+            per_manager[str(manager)] = Coefficients.from_manifest_entry(entry["coefficients"])
+            counts[str(manager)] = int(entry.get("picks", 0))
+        affinity: dict[str, dict[int, float]] = {}
+        for manager, teams in model.get("affinity", {}).items():
+            affinity[str(manager)] = {int(team): float(frac) for team, frac in teams.items()}
+        return cls(
+            league=league,
+            per_manager=per_manager,
+            affinity=affinity,
+            manager_pick_counts=counts,
+            total_picks=int(model.get("total_picks", 0)),
+            config=cfg,
+        )
+
+    @classmethod
+    def load(cls, artifact_dir: Path) -> FittedLeagueOpponents:
+        """Load the committed opponent artifact (``manifest.json``) from ``artifact_dir``.
+
+        Reads only the on-disk manifest — no ``league_draft_picks`` parquet, no
+        model fitting, no ingest, no network — so it is safe at draft time.
+        """
+        manifest_path = Path(artifact_dir) / "manifest.json"
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        model = payload.get("model", payload)
+        defaults = OpponentFitConfig()
+        cfg_data = payload.get("config", {})
+        config = OpponentFitConfig(
+            seed=int(cfg_data.get("seed", defaults.seed)),
+            temperature=defaults.temperature,
+            need_weight=float(cfg_data.get("need_weight", defaults.need_weight)),
+            l2=float(cfg_data.get("l2", defaults.l2)),
+            manager_blend_k=float(cfg_data.get("manager_blend_k", defaults.manager_blend_k)),
+            league_fallback_k=float(cfg_data.get("league_fallback_k", defaults.league_fallback_k)),
+            min_manager_picks=int(cfg_data.get("min_manager_picks", defaults.min_manager_picks)),
+            fallback_rank=float(cfg_data.get("fallback_rank", defaults.fallback_rank)),
+            top_k=int(cfg_data.get("top_k", defaults.top_k)),
+        )
+        return cls.from_manifest(model, config=config)
 
     def report_lines(self) -> list[str]:
         lines = [
@@ -572,6 +638,19 @@ def fit_opponent_models(
 
 
 # ── Config-driven model swap ──────────────────────────────────────────────
+
+
+def load_committed_opponents(
+    artifact_dir: Path = DEFAULT_OPPONENT_ARTIFACT_DIR,
+) -> FittedLeagueOpponents | None:
+    """Load the committed opponent artifact, or ``None`` when it is absent.
+
+    A convenience for CLI auto-detection: the fitted model becomes the default
+    only when its committed ``manifest.json`` is present.
+    """
+    if not (Path(artifact_dir) / "manifest.json").exists():
+        return None
+    return FittedLeagueOpponents.load(artifact_dir)
 
 
 def opponent_model_from_config(

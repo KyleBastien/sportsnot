@@ -801,7 +801,20 @@ that will, times a goalie slot correctly, and respects forced picks.
 ```
 uv run oracle recommend --artifact-dir artifacts/2025-r1 --managers 6 --seat 3
 uv run oracle recommend ... --rollouts 800 --depth 2   # tune accuracy/speed
+uv run oracle recommend ... --managers ben,judah,levi,kyle --opponents fitted  # real seats
 ```
+
+**Opponent model (`--opponents` / `--managers`, US-113).** Both `oracle recommend` and
+`oracle draft` default to `--opponents auto`: the committed **fitted** league model
+(`artifacts/models/opponent/`) is used when its `manifest.json` is present (loaded
+directly — no network, no training, no `league_draft_picks.parquet`), otherwise the
+greedy fallback. Force either with `--opponents greedy|fitted` (an explicit `fitted`
+with no artifact fails loudly rather than silently downgrading). `--managers` accepts
+**either** a league size (`4` → `seat1..seat4`) **or** a comma list of real ids
+(`ben,judah,levi,kyle`) so each manager's fitted model attaches to their real seat; the
+`seatN` ids fall back to the fitted league model. The fitted path is vectorized (the
+same batched kernel as greedy, faithful to the object rollout to <1e-9), so it holds the
+same <10 s budget at `rollouts>=500`.
 
 **Committed comparison (`uv run oracle compare-strategies` →
 `artifacts/models/recommend/`).** Over `>=200` seeded, single-decision same-slot drafts:
@@ -855,6 +868,7 @@ routes through the US-021 recommender and the rules-enforcing simulator.
 ```
 uv run oracle draft --artifact artifacts/2025-r1 --managers 4 --slot 1        # start
 uv run oracle draft --artifact artifacts/2025-r1 --managers 4 --slot 2 --ir   # IR league
+uv run oracle draft --artifact artifacts/2025-r1 --managers ben,judah,levi,kyle --slot 1  # fitted seats
 uv run oracle draft --resume artifacts/2025-r1/draft-session.json             # resume a log
 ```
 

@@ -21,6 +21,10 @@ from draft_oracle.backtest.replay import (
     run_backtest_from_normalized,
 )
 from draft_oracle.cli.draft import draft as draft_command
+from draft_oracle.cli.draft import (
+    parse_managers,
+    resolve_opponents_kind,
+)
 from draft_oracle.ingest.entity_match import (
     DEFAULT_OVERRIDES_DIR,
     build_league_draft_picks,
@@ -87,6 +91,7 @@ from draft_oracle.models.skater_production import (
 from draft_oracle.optimize.opponents import (
     DEFAULT_OPPONENT_ARTIFACT_DIR,
     OpponentFitConfig,
+    load_committed_opponents,
     train_opponent_model_from_normalized,
 )
 from draft_oracle.optimize.slot_strategies import SlotStrategyConfig
@@ -576,7 +581,10 @@ def recommend(
     artifact_dir: Annotated[
         Path, typer.Option(help="Projection artifact directory (has skaters/teams parquet).")
     ],
-    managers: Annotated[int, typer.Option(help="League size (2-12).")] = 4,
+    managers: Annotated[
+        str,
+        typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."),
+    ] = "4",
     seat: Annotated[int, typer.Option(help="Owner's snake seat (1-based).")] = 1,
     ir: Annotated[
         bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
@@ -587,37 +595,70 @@ def recommend(
     ] = 0,
     temperature: Annotated[float, typer.Option(help="Greedy opponent softmax temperature.")] = 0.3,
     seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
+    opponents: Annotated[
+        str,
+        typer.Option(
+            help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."
+        ),
+    ] = "auto",
+    opponent_artifact: Annotated[
+        Path, typer.Option(help="Committed opponent-model artifact directory (fitted path).")
+    ] = DEFAULT_OPPONENT_ARTIFACT_DIR,
 ) -> None:
     """Recommend the best pick right now via multi-step Monte-Carlo rollout (US-021).
 
     Builds a fresh draft from a projection artifact, puts the owner on the clock at
     ``seat``, and prints the top-5 explained recommendations (VOR, survival, need,
-    delta vs. #2). Opponents are the greedy fallback (vectorized fast path).
+    delta vs. #2). Opponents default to the committed *fitted* league model when its
+    artifact is present; ``--opponents greedy`` forces the vectorized fallback, and
+    passing real names to ``--managers`` attaches each manager's fitted model to their
+    real seat.
     """
+    import random as _random
+    from collections.abc import Mapping
+
     from draft_oracle.optimize.recommend import (
         RecommendConfig,
         build_pool_from_projection_artifact,
         recommend_pick,
     )
-    from draft_oracle.optimize.simulator import DraftState, GreedyOpponentModel
+    from draft_oracle.optimize.simulator import DraftState, GreedyOpponentModel, OpponentModel
 
-    if not 1 <= seat <= managers:
-        raise typer.BadParameter(f"seat must be in 1..{managers}")
+    manager_ids = parse_managers(managers)
+    manager_count = len(manager_ids)
+    if not 1 <= seat <= manager_count:
+        raise typer.BadParameter(f"seat must be in 1..{manager_count}")
+    opponents_kind = resolve_opponents_kind(opponents, opponent_artifact)
     pool = build_pool_from_projection_artifact(artifact_dir, ir=ir)
-    manager_ids = [f"seat{i + 1}" for i in range(managers)]
     owner = manager_ids[seat - 1]
     state = DraftState.new(manager_ids, pool, allow_ir=ir)
-    # Advance to the owner's first turn (opponents ahead of the owner draft greedily).
-    model = GreedyOpponentModel(temperature=temperature, need_weight=4.0)
-    import random as _random
+
+    opponent_model: OpponentModel | Mapping[str, OpponentModel]
+    if opponents_kind == "fitted":
+        fitted = load_committed_opponents(opponent_artifact)
+        if fitted is None:
+            raise typer.BadParameter(
+                f"--opponents fitted needs a committed artifact at {opponent_artifact}"
+            )
+        opponent_model = fitted.as_mapping(manager_ids)
+    else:
+        opponent_model = GreedyOpponentModel(temperature=temperature, need_weight=4.0)
+
+    def _model_for(manager: str) -> OpponentModel:
+        if isinstance(opponent_model, Mapping):
+            return opponent_model[manager]
+        return opponent_model
 
     rng = _random.Random(seed)
+    # Advance to the owner's first turn (opponents ahead of the owner draft via the model).
     while state.current_manager != owner:
         current = state.current_manager
-        state.apply_pick(model.pick(state, current, rng))
+        state.apply_pick(_model_for(current).pick(state, current, rng))
     config = RecommendConfig(rollouts=rollouts, depth=depth or None, seed=seed)
-    result = recommend_pick(state, owner, model, config=config, managers=managers)
-    typer.echo(f"Recommendation for {owner} (pick #{state.pick_index + 1}):")
+    result = recommend_pick(state, owner, opponent_model, config=config, managers=manager_count)
+    typer.echo(
+        f"Recommendation for {owner} (pick #{state.pick_index + 1}, {opponents_kind} opponents):"
+    )
     for line in result.report_lines():
         typer.echo(line)
 

@@ -594,6 +594,28 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   every historical round runs with `injuries=None` and `run_backtest_from_normalized`
   never loads the live `injuries.parquet` (m-4; no historical injury data exists per
   SPEC §5, and today's snapshot would leak roster status into `ir=True` picks).
+- Opponent model draft-time load (US-113, `optimize/opponents.py`): the committed
+  artifact (`artifacts/models/opponent/manifest.json`) is the ONLY draft-time input --
+  `FittedLeagueOpponents.load(dir)` / `load_committed_opponents(dir)` read it with
+  `json` alone (no `league_draft_picks.parquet`, no fit, no network). The manifest now
+  persists per-manager `affinity` (team_id->fraction) under `model.affinity` so the
+  reloaded model is faithful, not affinity-blind; `manifest()` rounds to 6dp so reload
+  != full-precision fit (compare via `from_manifest(result.fitted.manifest())`). CLI
+  wiring (`cli/draft.py`): `parse_managers(str)` accepts EITHER a count (`4`->seatN) OR
+  comma names (`ben,judah,levi,kyle`); `resolve_opponents_kind(kind, dir)` auto-picks
+  fitted when `manifest.json` exists (explicit `fitted` w/o artifact fails loudly). Both
+  `oracle draft` and `oracle recommend` share these. GOTCHA: `--managers` was already an
+  int flag -- it's now `str` on draft/recommend ONLY (project keeps int).
+- Recommend fast path (US-113, `optimize/recommend.py`): `_expected_values` vectorizes
+  greedy (single `GreedyOpponentModel`) AND now deterministic per-manager fitted
+  (`_fitted_zero_temp_models` gate: Mapping of temperature-0 `FittedOpponentModel`
+  covering every `state.order` seat). `_vectorized_fitted_expected` mirrors the greedy
+  kernel but scores opponents by `beta_rank*rank_z + beta_affinity*affinity +
+  need_weight*need` with `rank_z` standardized (population std, ddof=0) within the LEGAL
+  set per base position each pick -- reproduces the object rollout to <1e-9, so wiring
+  fitted in never changes a pick, and holds the <10s budget at rollouts>=500 (object
+  path is ~0.1s/rollout = 50s+). A temperature>0 fitted model falls back to the object
+  path (US-116 owns full reconciliation). Owner tail is always greedy-VOR.
 
 ---
 
@@ -901,4 +923,52 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
     "freeze at final state" == post-round-(N-1) state. When round N HAS games (backtest)
     the round stays in `playoff_round_starts`, keeps its first-game cutoff, and freezes
     mid-loop -- the final pass is a no-op.
+---
+
+## 2026-08-29 - US-113 (Wire the fitted opponent model into the draft-time CLI, M-9)
+- `oracle draft` and `oracle recommend` now use the committed fitted opponent model
+  instead of always falling back to greedy. Added `--opponents {greedy,fitted,auto}`
+  (auto = fitted when `artifacts/models/opponent/manifest.json` exists) and made
+  `--managers` accept either a league size (`4`) or comma-separated real ids
+  (`ben,judah,levi,kyle`) so each manager's fitted model attaches to their real seat;
+  `seatN` ids fall back to the fitted league model.
+- Persisted per-manager `affinity` in the opponent manifest and added a JSON-only load
+  path (`FittedLeagueOpponents.load` / `from_manifest` / `load_committed_opponents`) so
+  the draft-time fitted model reconstructs from the committed artifact alone -- no
+  network, no `league_draft_picks.parquet`, no training. Regenerated
+  `artifacts/models/opponent/manifest.json` + `report.md` (coefficients unchanged;
+  affinity block added).
+- Vectorized the fitted recommend path (`_vectorized_fitted_expected` +
+  `_fitted_zero_temp_models` gate) so the fitted model holds the same <10s budget as
+  greedy at rollouts>=500 (full-depth 4-manager pick #1: ~8.8s vs ~50s+ on the object
+  path). It reproduces the object rollout to <1e-9.
+- Files changed: `ml/src/draft_oracle/optimize/opponents.py` (affinity in manifest,
+  Coefficients.from_manifest_entry, FittedLeagueOpponents.from_manifest/load,
+  load_committed_opponents), `ml/src/draft_oracle/optimize/recommend.py` (vectorized
+  fitted kernel + gate), `ml/src/draft_oracle/cli/draft.py` (parse_managers,
+  resolve_opponents_kind, DraftSession opponents/fitted fields + build_opponent_model,
+  --opponents/--managers/--opponent-artifact, persistence), `ml/src/draft_oracle/cli/project.py`
+  (`oracle recommend` flags + fitted mapping), `ml/artifacts/models/opponent/{manifest.json,report.md}`,
+  `ml/README.md`, tests in `test_draft.py` / `test_opponents.py` / `test_recommend.py`.
+- Checks: ruff clean, mypy clean (63 files), full `pytest` green (634 passed). Playwright
+  (web e2e) untouched -- this story is isolated to the standalone `ml/` Python project,
+  no web/UI changes, so the web suite is unaffected.
+- **Learnings for future iterations:**
+  - The opponent manifest previously dropped `affinity`, so any draft-time reload of the
+    fitted model would silently be affinity-blind (the huge affinity coefficient x 0).
+    Persist BOTH coefficients and affinity, and regenerate the artifact when you change
+    the manifest shape (`oracle train-opponents` from committed normalized data is
+    deterministic; coefficients don't move).
+  - The object-model rollout is ~0.1s/rollout; only the vectorized numpy kernel meets
+    the interactive budget. When adding a new opponent policy, add a vectorized variant
+    (temperature-0 deterministic is straightforward: masked argmax) rather than relying
+    on the object path. Standardize `rank_z` within the legal set per base position with
+    population std (matches `_legal_rank_z`).
+  - `--managers` collided (league-size int vs seat names): resolve by making it a `str`
+    that accepts a count OR names. Watch for the SAME Typer flag being declared twice --
+    it silently produces a duplicate option row in `--help`.
+  - US-116 still owns full vectorized/object reconciliation (m-7 greedy kernel scores by
+    `asset_value` not `rank_value`, m-9 argmax-over-all-neg-inf bug). The fitted kernel
+    here intentionally scopes to temperature==0 and falls back to the object path
+    otherwise.
 ---

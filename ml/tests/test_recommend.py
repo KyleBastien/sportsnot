@@ -15,11 +15,16 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from draft_oracle.optimize.opponents import Coefficients, FittedOpponentModel
 from draft_oracle.optimize.recommend import (
     Recommendation,
     RecommendConfig,
     StrategyComparison,
+    _expected_value,
+    _fitted_zero_temp_models,
     _PositionRunOpponent,
+    _prune_candidates,
+    _vectorized_fitted_expected,
     asset_value,
     build_pool_from_projection_artifact,
     build_synthetic_pool,
@@ -242,6 +247,56 @@ def test_vectorized_greedy_matches_object_path_when_deterministic() -> None:
     vec = recommend_pick(state, "m0", gmodel, config=cfg)
     obj = recommend_pick(state, "m0", mapping, config=cfg)
     assert vec.best.asset.key == obj.best.asset.key
+
+
+def _fitted_mapping(
+    state: DraftState, *, temperature: float = 0.0
+) -> dict[str, FittedOpponentModel]:
+    return {
+        manager: FittedOpponentModel(
+            coefficients=Coefficients(rank=0.5, affinity=1.2),
+            affinity={1: 0.6, 2: 0.3, 3: 0.1},
+            need_weight=1.0,
+            temperature=temperature,
+        )
+        for manager in state.rosters
+    }
+
+
+def test_vectorized_fitted_matches_object_path() -> None:
+    # The fitted fast path must reproduce the per-pick object rollout exactly (up to
+    # float noise), so wiring the fitted model in never changes the recommendation.
+    state = DraftState.new([f"m{i}" for i in range(4)], _pool(4, False), allow_ir=False)
+    mapping = _fitted_mapping(state)
+    repl = replacement_levels(state, 4)
+    candidates = [c.asset for c in _prune_candidates(state, "m0", repl, 6)]
+    cfg = RecommendConfig(rollouts=30, depth=2, seed=11)
+    models = _fitted_zero_temp_models(mapping, state)
+    assert models is not None
+    vec = _vectorized_fitted_expected(state, "m0", candidates, models, repl, cfg)
+    obj = [_expected_value(state, "m0", asset, mapping, repl, cfg) for asset in candidates]
+    assert vec == pytest.approx(obj, abs=1e-9)
+
+
+def test_recommend_pick_uses_fitted_fast_path() -> None:
+    state = DraftState.new([f"m{i}" for i in range(4)], _pool(4, False), allow_ir=False)
+    mapping = _fitted_mapping(state)
+    result = recommend_pick(state, "m0", mapping, config=RecommendConfig(rollouts=40, seed=5))
+    assert result.evaluations
+    assert result.best.asset.key in state.available
+
+
+def test_fitted_zero_temp_models_gates_the_fast_path() -> None:
+    state = DraftState.new([f"m{i}" for i in range(4)], _pool(4, False), allow_ir=False)
+    # Deterministic fitted mapping -> eligible for the vectorized kernel.
+    assert _fitted_zero_temp_models(_fitted_mapping(state), state) is not None
+    # A sampling (temperature>0) fitted model cannot be reproduced by argmax -> object path.
+    assert _fitted_zero_temp_models(_fitted_mapping(state, temperature=0.5), state) is None
+    # A greedy mapping is not fitted -> object path.
+    greedy = {m: GreedyOpponentModel(temperature=0.0) for m in state.rosters}
+    assert _fitted_zero_temp_models(greedy, state) is None
+    # A single (non-mapping) model is not a per-manager fitted set.
+    assert _fitted_zero_temp_models(GreedyOpponentModel(), state) is None
 
 
 def test_full_depth_12_manager_recommendation_completes() -> None:

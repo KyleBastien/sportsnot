@@ -55,6 +55,7 @@ if TYPE_CHECKING:
 
 from draft_oracle.optimize.opponents import (
     FittedLeagueOpponents,
+    FittedOpponentModel,
     OpponentFitConfig,
     fit_opponent_models,
 )
@@ -566,6 +567,163 @@ def _vectorized_greedy_expected(
     return means
 
 
+def _fitted_zero_temp_models(
+    opponent_model: OpponentModel | Mapping[str, OpponentModel],
+    state: DraftState,
+) -> dict[str, FittedOpponentModel] | None:
+    """The per-manager fitted models iff every opponent seat maps to a temperature-0 one.
+
+    Guards the vectorized fitted fast path: it can only reproduce a deterministic
+    (argmax) fitted policy, so a positive-temperature (sampling) model, a mixed set,
+    or a missing seat forces the general object-model rollout instead.
+    """
+    if not isinstance(opponent_model, Mapping):
+        return None
+    models: dict[str, FittedOpponentModel] = {}
+    for manager in dict.fromkeys(state.order):
+        model = opponent_model.get(manager)
+        if not isinstance(model, FittedOpponentModel) or model.temperature > 0.0:
+            return None
+        models[manager] = model
+    return models
+
+
+def _vectorized_fitted_expected(
+    state: DraftState,
+    owner: str,
+    candidate_assets: Sequence[DraftAsset],
+    models: Mapping[str, FittedOpponentModel],
+    replacement: Mapping[str, float],
+    cfg: RecommendConfig,
+) -> list[float]:
+    """Batched expected owner value against deterministic per-manager fitted opponents.
+
+    The fitted analogue of :func:`_vectorized_greedy_expected`: the owner still fills
+    via greedy-VOR, but each opponent seat scores legal assets by its own
+    ``beta_rank * rank_z + beta_affinity * affinity + need_weight * need`` utility
+    (``rank_z`` standardized within the legal set per base position, exactly as
+    :meth:`FittedOpponentModel._utilities`), advanced across the whole rollout batch in
+    lockstep. This keeps the fitted recommend under the 10s budget at ``rollouts>=500``
+    without falling back to the per-pick Python object rollout.
+    """
+    pool = sorted(state.available.values(), key=lambda a: (-asset_value(a), a.key))
+    n_assets = len(pool)
+    key_to_idx = {asset.key: i for i, asset in enumerate(pool)}
+    val = np.array([asset_value(a) for a in pool], dtype="float64")
+    rank_val = np.array([a.rank_value for a in pool], dtype="float64")
+    posc = np.array([_POS_INDEX[a.position] for a in pool], dtype="int64")
+    repl_arr = np.array([replacement["F"], replacement["D"], replacement["G"]], dtype="float64")
+    vor_owner = val - repl_arr[posc]
+
+    mgr_ids = list(dict.fromkeys(state.order))
+    mid_to_idx = {m: i for i, m in enumerate(mgr_ids)}
+    n_managers = len(mgr_ids)
+    cap = state.capacity
+    limits = np.array([cap.forwards, cap.defense, cap.goalies], dtype="int64")
+    base_counts = np.zeros((n_managers, 3), dtype="int64")
+    for manager, roster in state.rosters.items():
+        base_counts[mid_to_idx[manager]] = [
+            roster.count("F"),
+            roster.count("D"),
+            roster.count("G"),
+        ]
+    owner_idx = mid_to_idx[owner]
+    cap_total = cap.total
+
+    # Per-manager fitted parameters, indexed by manager row.
+    coef_rank = np.zeros(n_managers, dtype="float64")
+    coef_aff = np.zeros(n_managers, dtype="float64")
+    aff_matrix = np.zeros((n_managers, n_assets), dtype="float64")
+    need_weight = 1.0
+    for manager, model in models.items():
+        idx = mid_to_idx[manager]
+        coef_rank[idx] = model.coefficients.rank
+        coef_aff[idx] = model.coefficients.affinity
+        need_weight = model.need_weight
+        aff_matrix[idx] = [
+            float(model.affinity.get(int(a.team_id), 0.0)) if a.team_id is not None else 0.0
+            for a in pool
+        ]
+
+    pos_masks = [posc == p for p in range(3)]
+
+    rem = state.order[state.pick_index :]
+    rem_m = [mid_to_idx[m] for m in rem]
+    owner_needed = cap_total - int(base_counts[owner_idx].sum())
+    owner_positions = [k for k, mi in enumerate(rem_m) if mi == owner_idx]
+    last_owner_k = owner_positions[owner_needed - 1]
+
+    rollouts = cfg.rollouts
+    rows = np.arange(rollouts)
+    neg_inf = float("-inf")
+    means: list[float] = []
+    for asset in candidate_assets:
+        idx_c = key_to_idx[asset.key]
+        alive = np.ones((rollouts, n_assets), dtype=bool)
+        counts = np.broadcast_to(base_counts, (rollouts, n_managers, 3)).copy()
+        owner_total = np.zeros(rollouts, dtype="float64")
+
+        alive[:, idx_c] = False
+        counts[:, owner_idx, posc[idx_c]] += 1
+        owner_total += val[idx_c]
+        owner_taken = 1
+
+        for k in range(1, last_owner_k + 1):
+            mgr_i = rem_m[k]
+            cnt_m = counts[:, mgr_i, :]
+            cap_ok = cnt_m < limits
+            legal = alive & cap_ok[:, posc]
+            if mgr_i == owner_idx:
+                if cfg.depth is not None and owner_taken >= cfg.depth:
+                    _vec_fill_owner(
+                        alive,
+                        counts,
+                        owner_idx,
+                        val,
+                        vor_owner,
+                        posc,
+                        limits,
+                        owner_total,
+                        cap_total - owner_taken,
+                    )
+                    owner_taken = cap_total
+                    break
+                scores = np.where(legal, vor_owner[None, :], neg_inf)
+                choice = np.argmax(scores, axis=1)
+                owner_total += val[choice]
+                owner_taken += 1
+            else:
+                urgency = (limits - cnt_m) / limits
+                rank_z = np.zeros((rollouts, n_assets), dtype="float64")
+                for pos_mask in pos_masks:
+                    legal_p = legal & pos_mask[None, :]
+                    cnt = legal_p.sum(axis=1)
+                    safe = np.maximum(cnt, 1)
+                    mean = np.where(cnt > 0, (rank_val[None, :] * legal_p).sum(axis=1) / safe, 0.0)
+                    sum_sq = ((rank_val[None, :] ** 2) * legal_p).sum(axis=1)
+                    var = np.where(cnt > 0, sum_sq / safe - mean**2, 0.0)
+                    std = np.sqrt(np.maximum(var, 0.0))
+                    std_safe = np.where(std > 0.0, std, 1.0)
+                    z_p = np.where(
+                        std[:, None] > 0.0,
+                        (rank_val[None, :] - mean[:, None]) / std_safe[:, None],
+                        0.0,
+                    )
+                    rank_z[:, pos_mask] = z_p[:, pos_mask]
+                utility = (
+                    coef_rank[mgr_i] * rank_z
+                    + coef_aff[mgr_i] * aff_matrix[mgr_i][None, :]
+                    + need_weight * urgency[:, posc]
+                )
+                masked = np.where(legal, utility, neg_inf)
+                choice = np.argmax(masked, axis=1)
+            alive[rows, choice] = False
+            counts[rows, mgr_i, posc[choice]] += 1
+
+        means.append(float(owner_total.mean()))
+    return means
+
+
 def _expected_values(
     state: DraftState,
     owner: str,
@@ -576,12 +734,18 @@ def _expected_values(
 ) -> list[float]:
     """Expected final owner value per candidate, vectorized where possible.
 
-    Uses the batched numpy kernel when the opponents are a single greedy model
-    (the <10s fast path); otherwise falls back to the general object-model rollout.
+    Uses the batched numpy kernel when the opponents are a single greedy model or a
+    per-manager set of deterministic fitted models (the <10s fast paths); otherwise
+    falls back to the general object-model rollout.
     """
     if isinstance(opponent_model, GreedyOpponentModel):
         return _vectorized_greedy_expected(
             state, owner, candidate_assets, opponent_model, replacement, cfg
+        )
+    fitted_models = _fitted_zero_temp_models(opponent_model, state)
+    if fitted_models is not None:
+        return _vectorized_fitted_expected(
+            state, owner, candidate_assets, fitted_models, replacement, cfg
         )
     return [
         _expected_value(state, owner, asset, opponent_model, replacement, cfg)

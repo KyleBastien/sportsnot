@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -31,6 +31,10 @@ from typing import Annotated, Any
 
 import typer
 
+from draft_oracle.optimize.opponents import (
+    DEFAULT_OPPONENT_ARTIFACT_DIR,
+    FittedLeagueOpponents,
+)
 from draft_oracle.optimize.recommend import (
     RecommendConfig,
     build_pool_from_projection_artifact,
@@ -40,6 +44,7 @@ from draft_oracle.optimize.simulator import (
     DraftAsset,
     DraftState,
     GreedyOpponentModel,
+    OpponentModel,
 )
 
 __all__ = [
@@ -59,6 +64,50 @@ DEFAULT_TEMPERATURE = 0.3
 DEFAULT_SEED = 20260827
 DEFAULT_ROLLOUTS = 500
 DEFAULT_NEED_WEIGHT = 4.0
+
+OPPONENTS_GREEDY = "greedy"
+OPPONENTS_FITTED = "fitted"
+_OPPONENTS_AUTO = ("", "auto")
+
+
+def parse_managers(managers: str) -> list[str]:
+    """Resolve the seat->id map from the ``--managers`` value.
+
+    Accepts either a league size (``4`` -> ``seat1..seat4``, the historical form) or a
+    comma list of real names (``ben,judah,levi,kyle``) so per-manager fitted models can
+    attach to real seats. The ``seatN`` fallback keeps the tool usable without names.
+    """
+    stripped = managers.strip()
+    if stripped.isdigit():
+        count = int(stripped)
+        if not 2 <= count <= 12:
+            raise typer.BadParameter("--managers count must be in 2..12")
+        return [f"seat{index + 1}" for index in range(count)]
+    names = [token.strip() for token in stripped.split(",") if token.strip()]
+    if not 2 <= len(names) <= 12:
+        raise typer.BadParameter("--managers must name 2..12 seats (or give a count)")
+    return names
+
+
+def resolve_opponents_kind(opponents: str, artifact_dir: Path) -> str:
+    """Resolve the opponent policy: explicit ``greedy``/``fitted`` or auto-detect.
+
+    ``auto`` (the default) picks ``fitted`` when the committed opponent artifact is
+    present and ``greedy`` otherwise. An explicit ``fitted`` with no artifact fails
+    loudly rather than silently falling back.
+    """
+    kind = opponents.strip().lower()
+    if kind in _OPPONENTS_AUTO:
+        has_artifact = (Path(artifact_dir) / "manifest.json").exists()
+        return OPPONENTS_FITTED if has_artifact else OPPONENTS_GREEDY
+    if kind in (OPPONENTS_GREEDY, OPPONENTS_FITTED):
+        if kind == OPPONENTS_FITTED and not (Path(artifact_dir) / "manifest.json").exists():
+            raise typer.BadParameter(
+                f"--opponents fitted needs a committed artifact at {artifact_dir} "
+                "(run `oracle train-opponents` first)"
+            )
+        return kind
+    raise typer.BadParameter(f"--opponents must be greedy, fitted, or auto (got {opponents!r})")
 
 # A resolution is treated as unambiguous only when the best fuzzy match clears
 # the runner-up by this margin; otherwise the pick is rejected as ambiguous.
@@ -286,6 +335,9 @@ class DraftSession:
     temperature: float = DEFAULT_TEMPERATURE
     seed: int = DEFAULT_SEED
     rollouts: int = DEFAULT_ROLLOUTS
+    opponents: str = OPPONENTS_GREEDY
+    opponent_artifact_dir: Path = DEFAULT_OPPONENT_ARTIFACT_DIR
+    fitted: FittedLeagueOpponents | None = None
     state: DraftState = field(init=False)
 
     def __post_init__(self) -> None:
@@ -293,6 +345,10 @@ class DraftSession:
             raise ValueError(f"slot must be in 1..{self.manager_count}, got {self.slot}")
         if len(self.managers) != self.manager_count:
             raise ValueError("managers length must equal manager_count")
+        if self.opponents not in (OPPONENTS_GREEDY, OPPONENTS_FITTED):
+            raise ValueError(f"opponents must be greedy or fitted, got {self.opponents!r}")
+        if self.opponents == OPPONENTS_FITTED and self.fitted is None:
+            self.fitted = FittedLeagueOpponents.load(self.opponent_artifact_dir)
         self._rebuild()
 
     @classmethod
@@ -307,10 +363,14 @@ class DraftSession:
         temperature: float = DEFAULT_TEMPERATURE,
         seed: int = DEFAULT_SEED,
         rollouts: int = DEFAULT_ROLLOUTS,
+        managers: list[str] | None = None,
+        opponents: str = OPPONENTS_GREEDY,
+        opponent_artifact_dir: Path = DEFAULT_OPPONENT_ARTIFACT_DIR,
+        fitted: FittedLeagueOpponents | None = None,
     ) -> DraftSession:
         """Start a fresh session from a US-017 projection artifact directory."""
         pool = build_pool_from_projection_artifact(artifact_dir, ir=ir)
-        managers = [f"seat{i + 1}" for i in range(manager_count)]
+        manager_ids = managers or [f"seat{i + 1}" for i in range(manager_count)]
         eliminated_ids = _resolve_eliminated(pool, eliminated or [])
         return cls(
             artifact_dir=artifact_dir,
@@ -318,11 +378,14 @@ class DraftSession:
             slot=slot,
             ir=ir,
             pool=pool,
-            managers=managers,
+            managers=manager_ids,
             eliminated_team_ids=eliminated_ids,
             temperature=temperature,
             seed=seed,
             rollouts=rollouts,
+            opponents=opponents,
+            opponent_artifact_dir=opponent_artifact_dir,
+            fitted=fitted,
         )
 
     @property
@@ -447,12 +510,25 @@ class DraftSession:
                 lines.append(f"    {asset.name[:22]:22} {asset.team_abbrev:4} {_value(asset):6.2f}")
         return ActionResult(True, "roster", lines)
 
+    def build_opponent_model(self) -> OpponentModel | Mapping[str, OpponentModel]:
+        """The opponent policy the recommender rolls out: fitted per-manager or greedy.
+
+        ``fitted`` returns the per-seat mapping so each real manager id gets their own
+        fitted model (unknown ids fall back to the league model); ``greedy`` returns the
+        single vectorized fast-path fallback.
+        """
+        if self.opponents == OPPONENTS_FITTED:
+            if self.fitted is None:
+                raise ValueError("fitted opponents requested but no artifact is loaded")
+            return self.fitted.as_mapping(self.managers)
+        return GreedyOpponentModel(temperature=self.temperature, need_weight=DEFAULT_NEED_WEIGHT)
+
     def recommend(self, depth: int | None = None) -> ActionResult:
         """Top-5 explained recommendations for whoever is on the clock (US-021)."""
         if self.state.is_complete:
             return ActionResult(False, "draft is complete; nothing to recommend")
         current = self.state.current_manager
-        model = GreedyOpponentModel(temperature=self.temperature, need_weight=DEFAULT_NEED_WEIGHT)
+        model = self.build_opponent_model()
         config = RecommendConfig(
             rollouts=self.rollouts,
             depth=depth,
@@ -462,7 +538,9 @@ class DraftSession:
         recommendation = recommend_pick(
             self.state, current, model, config=config, managers=self.manager_count
         )
-        return ActionResult(True, "recommendation", recommendation.report_lines())
+        return ActionResult(
+            True, f"recommendation ({self.opponents} opponents)", recommendation.report_lines()
+        )
 
     # ── Persistence (replayable session log) ─────────────────────────────
 
@@ -478,6 +556,8 @@ class DraftSession:
             "temperature": self.temperature,
             "seed": self.seed,
             "rollouts": self.rollouts,
+            "opponents": self.opponents,
+            "opponent_artifact_dir": str(self.opponent_artifact_dir),
             "eliminated_team_ids": sorted(self.eliminated_team_ids),
             "picks": [pick.as_dict() for pick in self.picks],
         }
@@ -522,6 +602,10 @@ class DraftSession:
             temperature=float(data.get("temperature", DEFAULT_TEMPERATURE)),
             seed=int(data.get("seed", DEFAULT_SEED)),
             rollouts=int(data.get("rollouts", DEFAULT_ROLLOUTS)),
+            opponents=str(data.get("opponents", OPPONENTS_GREEDY)),
+            opponent_artifact_dir=Path(
+                data.get("opponent_artifact_dir", str(DEFAULT_OPPONENT_ARTIFACT_DIR))
+            ),
         )
 
 
@@ -626,7 +710,12 @@ def draft(
         Path | None,
         typer.Option(help="Projection artifact directory (skaters/teams parquet)."),
     ] = None,
-    managers: Annotated[int, typer.Option(help="League size (2-12).")] = 4,
+    managers: Annotated[
+        str,
+        typer.Option(
+            help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."
+        ),
+    ] = "4",
     slot: Annotated[int, typer.Option("--slot", help="Your snake seat (1-based).")] = 1,
     ir: Annotated[
         bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
@@ -645,6 +734,15 @@ def draft(
     rollouts: Annotated[
         int, typer.Option(help="Monte-Carlo rollouts per candidate for recommend.")
     ] = DEFAULT_ROLLOUTS,
+    opponents: Annotated[
+        str,
+        typer.Option(
+            help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."
+        ),
+    ] = "auto",
+    opponent_artifact: Annotated[
+        Path, typer.Option(help="Committed opponent-model artifact directory (fitted path).")
+    ] = DEFAULT_OPPONENT_ARTIFACT_DIR,
 ) -> None:
     """Start an interactive, artifact-powered draft assistant (US-024).
 
@@ -653,6 +751,11 @@ def draft(
     comes from the precomputed artifact — no network, no training at draft time.
     Illegal actions are rejected with the reason (position full, already drafted,
     eliminated), and the session autosaves to a replayable JSON log.
+
+    Opponents default to the committed *fitted* league model when its artifact is
+    present (``--opponents greedy`` forces the fallback); pass real names to
+    ``--managers`` (``ben,judah,levi,kyle``) to attach each manager's fitted model
+    to their real seat.
     """
     if resume is not None:
         loaded = DraftSession.resume(resume)
@@ -661,18 +764,24 @@ def draft(
         return
     if artifact is None:
         raise typer.BadParameter("provide --artifact <dir> (or --resume <session.json>)")
-    if not 1 <= slot <= managers:
-        raise typer.BadParameter(f"slot must be in 1..{managers}")
+    manager_ids = parse_managers(managers)
+    manager_count = len(manager_ids)
+    if not 1 <= slot <= manager_count:
+        raise typer.BadParameter(f"slot must be in 1..{manager_count}")
     eliminated_teams = [token for token in eliminated.split(",") if token.strip()]
+    opponents_kind = resolve_opponents_kind(opponents, opponent_artifact)
     new_session = DraftSession.from_artifact(
         artifact,
-        manager_count=managers,
+        manager_count=manager_count,
         slot=slot,
         ir=ir,
         eliminated=eliminated_teams,
         temperature=temperature,
         seed=seed,
         rollouts=rollouts,
+        managers=manager_ids,
+        opponents=opponents_kind,
+        opponent_artifact_dir=opponent_artifact,
     )
     session_path = session or (artifact / "draft-session.json")
     _run_loop(new_session, session_path)

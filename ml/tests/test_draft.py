@@ -3,20 +3,30 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
+from draft_oracle.cli import draft as draft_module
 from draft_oracle.cli.draft import (
     DraftSession,
     parse_command,
+    parse_managers,
     resolve_asset,
     resolve_manager,
+    resolve_opponents_kind,
 )
 from draft_oracle.cli.project import app
+from draft_oracle.optimize.opponents import (
+    Coefficients,
+    FittedLeagueOpponents,
+    FittedOpponentModel,
+    OpponentFitConfig,
+)
 from draft_oracle.optimize.recommend import build_synthetic_pool
-from draft_oracle.optimize.simulator import DraftAsset
+from draft_oracle.optimize.simulator import DraftAsset, GreedyOpponentModel
 
 runner = CliRunner()
 
@@ -310,3 +320,188 @@ def test_draft_command_registered() -> None:
 def test_draft_command_requires_artifact() -> None:
     result = runner.invoke(app, ["draft"])
     assert result.exit_code != 0
+
+
+# ── opponent model wiring (US-113) ─────────────────────────────────────────
+
+REAL_MANAGERS = ["ben", "judah", "levi", "kyle"]
+
+
+def _fitted() -> FittedLeagueOpponents:
+    """A tiny in-memory fitted league model (no artifact, no training run)."""
+    return FittedLeagueOpponents(
+        league=Coefficients(rank=0.2, affinity=1.0),
+        per_manager={"ben": Coefficients(rank=-0.1, affinity=2.0)},
+        affinity={"ben": {1: 0.5}},
+        manager_pick_counts={"ben": 90},
+        total_picks=100,
+        config=OpponentFitConfig(),
+    )
+
+
+def _fitted_session(tmp_dir: Path, **overrides: object) -> DraftSession:
+    pool = build_synthetic_pool(MANAGERS, allow_ir=False)
+    kwargs: dict[str, object] = {
+        "artifact_dir": Path("art"),
+        "manager_count": MANAGERS,
+        "slot": 1,
+        "ir": False,
+        "pool": pool,
+        "managers": list(REAL_MANAGERS),
+        "rollouts": 20,
+        "opponents": "fitted",
+        "opponent_artifact_dir": tmp_dir,
+        "fitted": _fitted(),
+    }
+    kwargs.update(overrides)
+    return DraftSession(**kwargs)  # type: ignore[arg-type]
+
+
+def test_parse_managers_count_gives_seats() -> None:
+    assert parse_managers("4") == SEATS
+
+
+def test_parse_managers_uses_real_names() -> None:
+    assert parse_managers("ben, judah ,levi,kyle") == REAL_MANAGERS
+
+
+def test_parse_managers_rejects_out_of_range_count() -> None:
+    with pytest.raises(Exception):  # noqa: B017 - typer.BadParameter
+        parse_managers("1")
+
+
+def test_parse_managers_rejects_too_few_names() -> None:
+    with pytest.raises(Exception):  # noqa: B017 - typer.BadParameter
+        parse_managers("ben")
+
+
+def test_resolve_opponents_kind_auto_detects(tmp_path: Path) -> None:
+    assert resolve_opponents_kind("auto", tmp_path) == "greedy"
+    (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
+    assert resolve_opponents_kind("auto", tmp_path) == "fitted"
+    assert resolve_opponents_kind("", tmp_path) == "fitted"
+
+
+def test_resolve_opponents_kind_explicit_fitted_without_artifact_is_loud(tmp_path: Path) -> None:
+    with pytest.raises(Exception):  # noqa: B017 - typer.BadParameter fails closed
+        resolve_opponents_kind("fitted", tmp_path)
+
+
+def test_resolve_opponents_kind_rejects_unknown(tmp_path: Path) -> None:
+    with pytest.raises(Exception):  # noqa: B017 - typer.BadParameter
+        resolve_opponents_kind("random", tmp_path)
+
+
+def test_build_opponent_model_greedy_is_single_fast_path() -> None:
+    session = _make_session()
+    model = session.build_opponent_model()
+    assert isinstance(model, GreedyOpponentModel)
+
+
+def test_build_opponent_model_fitted_maps_each_seat(tmp_path: Path) -> None:
+    session = _fitted_session(tmp_path)
+    model = session.build_opponent_model()
+    assert isinstance(model, Mapping)
+    assert set(model) == set(REAL_MANAGERS)
+    assert all(isinstance(m, FittedOpponentModel) for m in model.values())
+    # ben's own coefficients attach to ben's seat; the rest fall back to the league model.
+    ben_model = model["ben"]
+    judah_model = model["judah"]
+    assert isinstance(ben_model, FittedOpponentModel)
+    assert isinstance(judah_model, FittedOpponentModel)
+    assert ben_model.coefficients == Coefficients(rank=-0.1, affinity=2.0)
+    assert judah_model.coefficients == Coefficients(rank=0.2, affinity=1.0)
+
+
+def test_session_loads_fitted_from_artifact_dir(tmp_path: Path) -> None:
+    (tmp_path / "manifest.json").write_text(json.dumps(_fitted().manifest()), encoding="utf-8")
+    pool = build_synthetic_pool(MANAGERS, allow_ir=False)
+    session = DraftSession(
+        artifact_dir=Path("art"),
+        manager_count=MANAGERS,
+        slot=1,
+        ir=False,
+        pool=pool,
+        managers=list(REAL_MANAGERS),
+        opponents="fitted",
+        opponent_artifact_dir=tmp_path,
+    )
+    assert session.fitted is not None
+    model = session.build_opponent_model()
+    assert isinstance(model, Mapping)
+    ben_model = model["ben"]
+    assert isinstance(ben_model, FittedOpponentModel)
+    assert ben_model.coefficients == Coefficients(rank=-0.1, affinity=2.0)
+
+
+def test_session_rejects_unknown_opponents() -> None:
+    with pytest.raises(ValueError, match="greedy or fitted"):
+        _make_session(opponents="wat")
+
+
+def test_recommend_reports_fitted_opponents(tmp_path: Path) -> None:
+    session = _fitted_session(tmp_path)
+    result = session.recommend(depth=1)
+    assert result.ok
+    assert "fitted opponents" in result.message
+
+
+def test_recommend_reports_greedy_opponents() -> None:
+    session = _make_session(rollouts=20)
+    result = session.recommend(depth=1)
+    assert result.ok
+    assert "greedy opponents" in result.message
+
+
+def test_opponents_survive_save_resume(tmp_path: Path) -> None:
+    session = _fitted_session(tmp_path)
+    # A real committed manifest lives at the artifact dir so resume can reload it.
+    (tmp_path / "manifest.json").write_text(json.dumps(_fitted().manifest()), encoding="utf-8")
+    path = tmp_path / "session.json"
+    session.save(path)
+
+    def loader(_dir: Path, ir: bool) -> list[DraftAsset]:
+        return build_synthetic_pool(MANAGERS, allow_ir=ir)
+
+    resumed = DraftSession.resume(path, pool_loader=loader)
+    assert resumed.opponents == "fitted"
+    assert resumed.opponent_artifact_dir == tmp_path
+    assert resumed.managers == REAL_MANAGERS
+    assert resumed.fitted is not None
+
+
+def test_run_loop_end_to_end_uses_fitted_model(tmp_path: Path) -> None:
+    """Drive a scripted draft through the interactive CLI with the fitted model.
+
+    Asserts the fitted per-manager model was actually used (not silently fallen
+    back to the greedy fallback): the recommendation is labeled ``fitted`` and the
+    session's opponent policy is a mapping of :class:`FittedOpponentModel`.
+    """
+    session = _fitted_session(tmp_path)
+    scripted = iter(
+        [
+            f"pick ben {session.state.legal_assets('ben')[0].name}",
+            "recommend --depth 1",
+            "quit",
+        ]
+    )
+
+    def _input(_prompt: str) -> str:
+        try:
+            return next(scripted)
+        except StopIteration as exc:  # pragma: no cover - defensive
+            raise EOFError from exc
+
+    echoed: list[str] = []
+    final = draft_module._run_loop(
+        session,
+        tmp_path / "log.json",
+        input_fn=_input,
+        echo=echoed.append,
+    )
+
+    assert any("recommendation (fitted opponents)" in line for line in echoed)
+    model = final.build_opponent_model()
+    assert isinstance(model, Mapping)
+    assert all(isinstance(m, FittedOpponentModel) for m in model.values())
+    assert len(final.picks) == 1

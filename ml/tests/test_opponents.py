@@ -11,6 +11,7 @@ a tiny synthetic league. All fixtures are in-memory -- no committed data, no net
 
 from __future__ import annotations
 
+import json
 import random
 from pathlib import Path
 
@@ -19,6 +20,7 @@ import pytest
 
 from draft_oracle.optimize.opponents import (
     Coefficients,
+    FittedLeagueOpponents,
     FittedOpponentModel,
     OpponentEvalResult,
     OpponentFitConfig,
@@ -27,7 +29,9 @@ from draft_oracle.optimize.opponents import (
     dedupe_duplicate_events,
     evaluate_opponents,
     fit_opponent_models,
+    load_committed_opponents,
     opponent_model_from_config,
+    train_opponent_model_from_normalized,
 )
 from draft_oracle.optimize.simulator import (
     DraftAsset,
@@ -432,3 +436,72 @@ def test_fitted_counts_match_real_league_truth() -> None:
         assert counts[press_manager] == 33
     # the old double-count pushed a manager to 105/138; the true ceiling is kyle at 120.
     assert max(counts.values()) == 120
+
+
+# ── Committed artifact load path (US-113) ─────────────────────────────────
+
+
+def _tiny_fitted() -> FittedLeagueOpponents:
+    return FittedLeagueOpponents(
+        league=Coefficients(rank=0.25, affinity=1.5),
+        per_manager={"ben": Coefficients(rank=-0.1, affinity=2.0)},
+        affinity={"ben": {1: 0.5, 6: 0.25}},
+        manager_pick_counts={"ben": 90},
+        total_picks=120,
+        config=OpponentFitConfig(need_weight=1.0),
+    )
+
+
+def test_manifest_round_trips_through_from_manifest() -> None:
+    original = _tiny_fitted()
+    rebuilt = FittedLeagueOpponents.from_manifest(original.manifest())
+    assert rebuilt.league == original.league
+    assert rebuilt.per_manager == original.per_manager
+    assert rebuilt.affinity == {"ben": {1: 0.5, 6: 0.25}}
+    assert rebuilt.total_picks == original.total_picks
+    assert rebuilt.manager_pick_counts == original.manager_pick_counts
+
+
+def test_load_reads_only_manifest_json(tmp_path: Path) -> None:
+    fitted = _tiny_fitted()
+    payload = {
+        "model": fitted.manifest(),
+        "config": {"seed": 42, "need_weight": 1.0, "min_manager_picks": 20},
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+    loaded = FittedLeagueOpponents.load(tmp_path)
+    assert loaded.config.seed == 42
+    model = loaded.model_for("ben")
+    assert model.coefficients == Coefficients(rank=-0.1, affinity=2.0)
+    assert model.affinity == {1: 0.5, 6: 0.25}
+
+
+def test_load_committed_opponents_returns_none_when_absent(tmp_path: Path) -> None:
+    assert load_committed_opponents(tmp_path) is None
+
+
+def test_load_committed_opponents_loads_when_present(tmp_path: Path) -> None:
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(_tiny_fitted().manifest()), encoding="utf-8"
+    )
+    loaded = load_committed_opponents(tmp_path)
+    assert loaded is not None
+    assert loaded.league == Coefficients(rank=0.25, affinity=1.5)
+
+
+def test_train_writes_affinity_and_reloads(tmp_path: Path) -> None:
+    """The committed-artifact path is self-sufficient: train -> load reproduces it."""
+    if not _REAL_LEAGUE_PICKS.exists():
+        pytest.skip("committed league_draft_picks parquet not present")
+    result = train_opponent_model_from_normalized(
+        normalized_dir=_REAL_LEAGUE_PICKS.parent,
+        artifact_dir=tmp_path,
+    )
+    reloaded = FittedLeagueOpponents.load(tmp_path)
+    # The artifact rounds to 6 dp; the reload reproduces the *committed* model exactly.
+    expected = FittedLeagueOpponents.from_manifest(result.fitted.manifest())
+    assert reloaded.league == expected.league
+    assert reloaded.per_manager == expected.per_manager
+    # affinity persisted so the draft-time model is faithful, not affinity-blind.
+    assert reloaded.affinity == expected.affinity
+    assert reloaded.model_for("ben").affinity
