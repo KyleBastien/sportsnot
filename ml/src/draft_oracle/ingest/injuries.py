@@ -46,7 +46,13 @@ import pandas as pd
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
-from draft_oracle.ingest.entity_match import DEFAULT_OVERRIDES_DIR, normalize_name
+from draft_oracle.ingest.entity_match import (
+    DEFAULT_OVERRIDES_DIR,
+    PlayerIndex,
+    build_player_index,
+    last_name_key,
+    normalize_name,
+)
 from draft_oracle.ingest.nhl_api import (
     DEFAULT_MAX_ATTEMPTS,
     DEFAULT_TIMEOUT,
@@ -85,6 +91,7 @@ SOURCE_LAST_KNOWN = "last_known"
 
 _INJURY_COLUMNS: tuple[str, ...] = (
     "player_id",
+    "espn_id",
     "player_name",
     "position",
     "team_id",
@@ -193,14 +200,157 @@ def normalize_status(status_raw: str | None, type_name: str | None = None) -> st
 # ── Feed → normalized rows ───────────────────────────────────────────────
 
 
+# ESPN skater position abbreviations fold to the fantasy pool position (F/D);
+# goalies (and anything unrecognized) are NOT resolved to a skater id because a
+# goalie injury is consumed at the team level (team_abbrev + position), not by a
+# per-player join (see features.team_series._injured_goalie_teams).
+_ESPN_SKATER_POSITIONS: dict[str, str] = {
+    "C": "F",
+    "LW": "F",
+    "RW": "F",
+    "L": "F",
+    "R": "F",
+    "W": "F",
+    "F": "F",
+    "D": "D",
+}
+
+
+def _fantasy_position(espn_position: str | None) -> str | None:
+    if espn_position is None:
+        return None
+    return _ESPN_SKATER_POSITIONS.get(espn_position.strip().upper())
+
+
+def _team_abbrev_key(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().upper()
+    return text or None
+
+
+@dataclass(frozen=True)
+class PlayerIdResolution:
+    """Outcome of mapping one ESPN athlete to an NHL ``player_id``."""
+
+    player_id: int | None
+    method: str  # exact | team | position | lastname | goalie | unresolved
+
+
+def resolve_espn_player_id(
+    name: str | None,
+    team_abbrev: str | None,
+    position: str | None,
+    index: PlayerIndex,
+    team_by_id: Mapping[int, Any],
+) -> PlayerIdResolution:
+    """Resolve one ESPN injury entry to an NHL ``player_id`` via name + team.
+
+    Uses the shared entity-match index (``build_player_index``): an exact
+    normalized-name hit wins; same-name collisions (there are two ``Sebastian
+    Aho``s) are disambiguated by the injury's team abbreviation, then by
+    position. A unique surname fallback covers feed spellings the exact key
+    misses. Goalies fold to ``method='goalie'`` (team-level consumers key on
+    ``team_abbrev``); anything left ambiguous is ``method='unresolved'`` and is
+    NEVER guessed (SPEC §7 honesty rule).
+    """
+    fantasy_pos = _fantasy_position(position)
+    if fantasy_pos is None:
+        return PlayerIdResolution(None, "goalie")
+    norm = normalize_name(name)
+    team_key = _team_abbrev_key(team_abbrev)
+
+    def _disambiguate(candidates: list[Any], method: str) -> PlayerIdResolution | None:
+        if len(candidates) == 1:
+            return PlayerIdResolution(candidates[0].player_id, method)
+        if team_key is not None:
+            by_team = [
+                c
+                for c in candidates
+                if _team_abbrev_key(team_by_id.get(c.player_id)) == team_key
+            ]
+            if len(by_team) == 1:
+                return PlayerIdResolution(by_team[0].player_id, "team")
+            if by_team:
+                candidates = by_team
+        by_pos = [c for c in candidates if c.position == fantasy_pos]
+        if len(by_pos) == 1:
+            return PlayerIdResolution(by_pos[0].player_id, "position")
+        return None
+
+    exact = index.by_norm.get(norm, [])
+    if exact:
+        resolved = _disambiguate(exact, "exact")
+        return resolved if resolved is not None else PlayerIdResolution(None, "unresolved")
+
+    last = last_name_key(name)
+    last_hits = index.by_last.get(last, []) if last else []
+    if last_hits:
+        resolved = _disambiguate(last_hits, "lastname")
+        if resolved is not None:
+            return resolved
+    return PlayerIdResolution(None, "unresolved")
+
+
+def resolve_player_ids(
+    rows: pd.DataFrame, players: pd.DataFrame | None
+) -> tuple[pd.DataFrame, list[int]]:
+    """Map the ESPN ``espn_id`` key to an NHL ``player_id`` on every skater row.
+
+    The frame keeps ``espn_id`` for provenance; ``player_id`` becomes the NHL id
+    when a skater resolves and otherwise falls back to the ESPN id (so the row
+    stays uniquely keyed and is never dropped). Returns the frame plus the list
+    of ESPN ids that could not be resolved (surfaced, never guessed). When no
+    ``players`` dimension is supplied the ESPN ids are retained unchanged.
+    """
+    if rows.empty or players is None or players.empty:
+        return rows, []
+    skaters = players[players["position"].isin(("F", "D"))]
+    index = build_player_index(skaters)
+    has_team = "current_team_abbrev" in players.columns
+    team_by_id: dict[int, Any] = (
+        {
+            int(rec["player_id"]): rec["current_team_abbrev"]
+            for rec in players.to_dict("records")
+        }
+        if has_team
+        else {}
+    )
+    df = rows.copy()
+    resolved_ids: list[int] = []
+    unresolved: list[int] = []
+    for rec in df.to_dict("records"):
+        result = resolve_espn_player_id(
+            _as_str(rec["player_name"]),
+            _as_str(rec["team_abbrev"]),
+            _as_str(rec["position"]),
+            index,
+            team_by_id,
+        )
+        if result.player_id is not None:
+            resolved_ids.append(int(result.player_id))
+        else:
+            resolved_ids.append(int(rec["espn_id"]))
+            if result.method == "unresolved":
+                unresolved.append(int(rec["espn_id"]))
+    df["player_id"] = resolved_ids
+    return df, unresolved
+
+
 def injuries_response_to_rows(
-    response: EspnInjuriesResponse, *, as_of: str | None = None
+    response: EspnInjuriesResponse,
+    *,
+    players: pd.DataFrame | None = None,
+    as_of: str | None = None,
 ) -> pd.DataFrame:
     """Flatten the ESPN injuries feed into normalized per-player rows.
 
     Team ids come from :func:`resolve_team_id` on the group's display name (the
-    stable NHL id, not ESPN's), position from the athlete block. Entries without
-    an athlete id are skipped — every row must key on a player.
+    stable NHL id, not ESPN's), position from the athlete block. The ESPN athlete
+    id is preserved in ``espn_id``; when a ``players`` dimension is supplied the
+    row's ``player_id`` is resolved to the NHL id via name + team matching so the
+    injured flag and IR-stash valuation join against real player ids (M-11).
+    Entries without an athlete id are skipped — every row must key on a player.
     """
     rows: list[dict[str, Any]] = []
     for group in response.injuries:
@@ -215,9 +365,11 @@ def injuries_response_to_rows(
             type_name = entry.type.name if entry.type else None
             return_date = entry.details.return_date if entry.details else None
             detail = entry.details.type if entry.details else None
+            espn_id = int(athlete.id)
             rows.append(
                 {
-                    "player_id": int(athlete.id),
+                    "player_id": espn_id,
+                    "espn_id": espn_id,
                     "player_name": player_name,
                     "position": position,
                     "team_id": team_id,
@@ -230,15 +382,12 @@ def injuries_response_to_rows(
                     "source": SOURCE_ESPN,
                 }
             )
-    return _finalize(rows)
-
-
-def _finalize(rows: list[dict[str, Any]]) -> pd.DataFrame:
-    """Build a column-stable frame, de-duplicated on ``player_id`` (last wins)."""
     df = pd.DataFrame.from_records(rows, columns=list(_INJURY_COLUMNS))
     if df.empty:
         return df
+    df, unresolved = resolve_player_ids(df, players)
     df = df.drop_duplicates(subset=["player_id"], keep="last").reset_index(drop=True)
+    df.attrs["unresolved_espn_ids"] = unresolved
     return df
 
 
@@ -250,6 +399,7 @@ class InjuryOverride:
     """One manual injury override entry from ``injuries.yaml``."""
 
     player: str | None = None
+    player_id: int | None = None
     espn_id: int | None = None
     status: str | None = None
     return_date: str | None = None
@@ -268,7 +418,8 @@ def load_injury_overrides(
 
     A missing file is not an error — the overrides layer is simply empty. The
     file's top-level ``overrides`` key holds a list of entries; each needs a
-    ``player`` name and/or an ``espn_id`` so it can be matched to a source row.
+    ``player`` name and/or an id (``player_id`` = NHL id, the preferred key, or
+    the legacy ``espn_id``) so it can be matched to a source row.
     """
     if not path.exists():
         return []
@@ -278,12 +429,14 @@ def load_injury_overrides(
     for item in entries:
         if not isinstance(item, Mapping):
             continue
+        player_id = item.get("player_id")
         espn_id = item.get("espn_id")
         status = item.get("status")
         return_game = item.get("return_game")
         overrides.append(
             InjuryOverride(
                 player=_as_str(item.get("player")),
+                player_id=int(player_id) if player_id is not None else None,
                 espn_id=int(espn_id) if espn_id is not None else None,
                 status=normalize_status(str(status)) if status is not None else None,
                 return_date=_as_str(item.get("return_date")),
@@ -333,8 +486,12 @@ def apply_overrides(source: pd.DataFrame, overrides: Iterable[InjuryOverride]) -
 def _match_mask(df: pd.DataFrame, override: InjuryOverride, name_keys: pd.Series) -> pd.Series:
     if df.empty:
         return pd.Series([], dtype=bool)
-    if override.espn_id is not None:
-        return df["player_id"] == override.espn_id
+    # NHL player_id is the preferred key; the legacy espn_id matches the
+    # provenance column; name is the last resort (accent/punctuation-insensitive).
+    if override.player_id is not None:
+        return df["player_id"] == override.player_id
+    if override.espn_id is not None and "espn_id" in df.columns:
+        return df["espn_id"] == override.espn_id
     if override.player:
         return name_keys == normalize_name(override.player)
     return pd.Series([False] * len(df), index=df.index)
@@ -353,8 +510,12 @@ def _rewrite_matched(df: pd.DataFrame, mask: pd.Series, override: InjuryOverride
 
 def _append_override_row(df: pd.DataFrame, override: InjuryOverride) -> pd.DataFrame:
     team_id = resolve_team_id(override.team) if override.team else None
+    # Key on the NHL player_id when given; fall back to the ESPN id so a legacy
+    # espn_id-only override still injects a uniquely keyed row.
+    player_id = override.player_id if override.player_id is not None else override.espn_id
     row = {
-        "player_id": override.espn_id,
+        "player_id": player_id,
+        "espn_id": override.espn_id,
         "player_name": override.player,
         "position": None,
         "team_id": team_id,
@@ -466,6 +627,7 @@ class InjuriesResult:
     override_rows: int
     total_rows: int
     degraded: bool
+    unresolved_player_ids: list[int] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
     def report_lines(self) -> list[str]:
@@ -475,6 +637,11 @@ class InjuriesResult:
             f"  override rows: {self.override_rows}",
             f"  total rows: {self.total_rows}",
         ]
+        if self.unresolved_player_ids:
+            lines.append(
+                f"  unresolved ESPN athlete ids (kept, not id-joined): "
+                f"{len(self.unresolved_player_ids)} -> {self.unresolved_player_ids}"
+            )
         if self.degraded:
             lines.append("  DEGRADED: source unavailable; used last-known data")
         for warning in self.warnings:
@@ -482,14 +649,30 @@ class InjuriesResult:
         return lines
 
 
+def _load_players(normalized_dir: Path) -> pd.DataFrame | None:
+    """Load the normalized ``players`` dimension for ESPN->NHL id mapping, if present."""
+    path = normalized_dir / "players.parquet"
+    if not path.is_file():
+        return None
+    return pd.read_parquet(path)
+
+
 def build_injuries_table(
     *,
     client: EspnInjuriesClient | None = None,
     overrides_path: Path = DEFAULT_INJURIES_OVERRIDES,
     out_dir: Path = DEFAULT_NORMALIZED_DIR,
+    players: pd.DataFrame | None = None,
     fetch: bool = True,
 ) -> InjuriesResult:
     """Ingest injuries into ``injuries.parquet``; overrides are final authority.
+
+    The ESPN feed keys on athlete ids that are disjoint from NHL player ids, so
+    every source row is resolved to an NHL ``player_id`` via name + team matching
+    against the ``players`` dimension (loaded from ``out_dir/players.parquet``
+    when not supplied) — otherwise the ``injured`` flag and IR-stash valuation
+    could never match a real player (CODE_REVIEW M-11). Unresolved skaters are
+    kept (never dropped) and surfaced in the result.
 
     On a source failure (or ``fetch=False``) the last-known table is reused so
     the pipeline never stalls on a flaky feed — the overrides always merge on
@@ -497,7 +680,16 @@ def build_injuries_table(
     """
     warnings: list[str] = []
     degraded = False
+    unresolved: list[int] = []
     out_path = out_dir / f"{INJURIES_TABLE_NAME}.parquet"
+
+    if players is None:
+        players = _load_players(out_dir)
+    if players is None:
+        warnings.append(
+            "no players.parquet found; ESPN athlete ids left unmapped (injured flag "
+            "will not join)"
+        )
 
     source: pd.DataFrame | None = None
     owns_client = fetch and client is None
@@ -506,7 +698,8 @@ def build_injuries_table(
         if active_client is None:
             active_client = EspnInjuriesClient()
         try:
-            source = injuries_response_to_rows(active_client.injuries())
+            source = injuries_response_to_rows(active_client.injuries(), players=players)
+            unresolved = list(source.attrs.get("unresolved_espn_ids", []))
         except NHLApiError as error:
             warnings.append(f"ESPN injuries source failed ({error}); using last-known data")
             degraded = True
@@ -535,6 +728,7 @@ def build_injuries_table(
         override_rows=override_rows,
         total_rows=len(merged),
         degraded=degraded,
+        unresolved_player_ids=unresolved,
         warnings=warnings,
     )
 

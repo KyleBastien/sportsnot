@@ -17,6 +17,10 @@ from typer.testing import CliRunner
 
 from draft_oracle.cli.project import app
 from draft_oracle.features.skater import FEATURE_SET_VERSION
+from draft_oracle.ingest.injuries import (
+    EspnInjuriesResponse,
+    injuries_response_to_rows,
+)
 from draft_oracle.models.series_sim import HOME_ICE_PATTERN
 from draft_oracle.models.skater_production import SkaterProductionConfig
 from draft_oracle.projection_artifact import (
@@ -438,6 +442,69 @@ def test_injury_flag_is_set_from_injuries_table() -> None:
     assert result.manifest["counts"]["skaters_injured"] >= 1
     others = result.skaters.loc[result.skaters["player_id"] != injured_pid, "injured"]
     assert not others.any()
+
+
+def test_espn_mapped_injury_drives_flag_and_ir_stash() -> None:
+    # M-11: the ESPN feed keys on athlete ids disjoint from NHL player ids. A
+    # skater must be resolved by name + team to its NHL id before the injured
+    # flag and _apply_ir_stash can fire. Here ESPN id 4900001 (~4-5M range) must
+    # map to harness skater 100 (AAA forward) via injuries_response_to_rows.
+    sk, tg, players, series = _archive()
+    feed = {
+        "injuries": [
+            {
+                "displayName": "AAA",
+                "abbreviation": "AAA",
+                "injuries": [
+                    {
+                        "status": "Injured Reserve",
+                        "athlete": {
+                            "id": "4900001",  # disjoint ESPN id, not the NHL 100
+                            "fullName": "AAA-100",
+                            "position": {"abbreviation": "C"},
+                        },
+                        "type": {"name": "INJURY_STATUS_INJURED_RESERVE"},
+                        "details": {"type": "Lower Body", "returnDate": None},
+                    }
+                ],
+            }
+        ]
+    }
+    injuries = injuries_response_to_rows(
+        EspnInjuriesResponse.model_validate(feed), players=players
+    )
+    # The disjoint ESPN id was mapped onto the NHL player id (100), not left as-is.
+    assert set(injuries["player_id"]) == {100}
+    assert set(injuries["espn_id"]) == {4900001}
+
+    config = ProjectArtifactConfig(
+        ir=True,
+        seed=20260827,
+        n_sims=300,
+        production_config=SkaterProductionConfig(
+            seed=20260827, n_val_seasons=1, n_test_seasons=1, min_confident_games=5
+        ),
+    )
+    result = build_projection_artifact(
+        sk,
+        players,
+        tg,
+        series,
+        season=2022,
+        playoff_round=1,
+        snapshot_id="snap",
+        injuries=injuries,
+        config=config,
+    )
+    flagged = result.skaters.set_index("player_id")["injured"]
+    # Injured flag fires on the MAPPED NHL id, never the raw ESPN id.
+    assert bool(flagged.loc[100]) is True
+    assert 4900001 not in set(result.skaters["player_id"])
+    # _apply_ir_stash valued the mapped injured skater (ir enabled).
+    assert result.manifest["ir_stash"]["enabled"] is True
+    assert result.manifest["ir_stash"]["candidates"] >= 1
+    verdict = result.skaters.set_index("player_id")["ir_verdict"].loc[100]
+    assert isinstance(verdict, str) and verdict != ""
 
 
 def test_missing_round_raises() -> None:

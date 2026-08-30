@@ -2,8 +2,9 @@
 #
 # Each entry under `overrides` merges on top of the automatically-ingested ESPN
 # injuries feed. Matching precedence per entry:
-#   1. `espn_id` (exact ESPN athlete id) if provided
-#   2. else `player` name (accent/punctuation-insensitive)
+#   1. `player_id` (exact NHL player id — the PREFERRED key, matches the mapped id)
+#   2. `espn_id` (legacy ESPN athlete id; matches the `espn_id` provenance column)
+#   3. else `player` name (accent/punctuation-insensitive)
 #
 # A matched entry REWRITES the source row's status / return_date / detail.
 # An unmatched entry is INJECTED as a new row (assert an injury the feed missed).
@@ -11,7 +12,8 @@
 #
 # Fields:
 #   player:      display name (recommended for readability; used for matching)
-#   espn_id:     ESPN athlete id (optional; exact match)
+#   player_id:   NHL player id (preferred; exact match against the mapped id)
+#   espn_id:     ESPN athlete id (legacy; exact match against the espn_id column)
 #   status:      out | ir | day_to_day | healthy  (normalized on load)
 #   return_date: expected return, e.g. "2026-05-01"
 #   detail:      free-text note, e.g. "Lower Body"
@@ -23,7 +25,7 @@
 # Example (commented out — ships empty; the ESPN feed is the routine source):
 # overrides:
 #   - player: "Connor McDavid"
-#     espn_id: 3895074
+#     player_id: 8478402
 #     status: day_to_day
 #     return_date: "2026-05-01"
 #     detail: "owner: precautionary rest"

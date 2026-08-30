@@ -616,6 +616,28 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   fitted in never changes a pick, and holds the <10s budget at rollouts>=500 (object
   path is ~0.1s/rollout = 50s+). A temperature>0 fitted model falls back to the object
   path (US-116 owns full reconciliation). Owner tail is always greedy-VOR.
+- ESPN->NHL injury id mapping (US-114, `ingest/injuries.py`, CODE_REVIEW M-11):
+  the ESPN injuries feed keys on athlete ids in the ~4-5M range; NHL player ids
+  live in [8.4M, 8.5M] (DISJOINT), so before this fix `injured` flags + IR-stash
+  valuation were permanent no-ops against the live feed. `injuries_response_to_rows`
+  now preserves the ESPN id in a new `espn_id` provenance column and, when a
+  `players` dimension is supplied, resolves each skater's `player_id` to the NHL id
+  via `resolve_player_ids` -> `resolve_espn_player_id` (name+team match through the
+  SHARED `entity_match.build_player_index` / `PlayerIndex.by_norm` / `.by_last`;
+  same-name collisions like the two Sebastian Ahos disambiguate by team abbrev then
+  position). Goalies fold to `method='goalie'` (team-level consumers key on
+  team_abbrev, NOT a per-player id join); anything ambiguous is `method='unresolved'`
+  -> kept (never dropped), keyed on the ESPN id, and surfaced via
+  `frame.attrs['unresolved_espn_ids']` + `InjuriesResult.unresolved_player_ids`
+  (SPEC honesty: never guessed). `build_injuries_table` auto-loads
+  `out_dir/players.parquet` (warns if absent). Manual overrides (`injuries.yaml`)
+  now prefer a `player_id` (NHL) key; legacy `espn_id` matches the `espn_id` column.
+  GOTCHA: mypy rejects `df.itertuples()` field access as an untyped union -- iterate
+  `df.to_dict('records')` (values are Any) instead. Downstream join is
+  `projection_artifact._injured_player_ids` (player_id + position!=G) feeding the
+  `injured` skater column and `_apply_ir_stash` (config.ir gate); test the full chain
+  by resolving a disjoint ESPN id onto a harness skater id then asserting
+  `manifest['ir_stash']['candidates'] >= 1`.
 
 ---
 
@@ -971,4 +993,32 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
     `asset_value` not `rank_value`, m-9 argmax-over-all-neg-inf bug). The fitted kernel
     here intentionally scopes to temperature==0 and falls back to the object path
     otherwise.
+---
+
+## 2026-08-30 - US-114 (Map ESPN athlete ids to NHL player ids in the injuries pipeline, M-11)
+- Implemented ESPN->NHL player-id resolution in the injuries ingest so the injured
+  flag and IR-stash valuation actually match live-feed players (id spaces were disjoint).
+- `injuries_response_to_rows(response, players=...)` preserves the ESPN id in a new
+  `espn_id` column and resolves `player_id` to the NHL id via name+team matching through
+  the shared `entity_match` machinery; unresolved skaters are kept and reported (never
+  guessed). Goalies fold to team-level. Overrides now prefer an NHL `player_id` key.
+  `build_injuries_table` auto-loads `players.parquet` and surfaces
+  `unresolved_player_ids`.
+- Added a full-chain test asserting an ESPN id (~4.9M) maps onto a harness skater id and
+  that BOTH the `injured` flag and `_apply_ir_stash` fire on the mapped id (acceptance
+  criteria), plus disjoint-range / collision / goalie / unresolved unit tests.
+- Files changed: ml/src/draft_oracle/ingest/injuries.py, ml/tests/test_injuries.py,
+  ml/tests/test_projection_artifact.py, ml/data/overrides/injuries.yaml.
+- Quality: ruff clean, mypy clean (63 files), full ml suite 642 passed. Playwright not
+  run (web-only; this change is isolated to the ml Python project).
+- **Learnings for future iterations:**
+  - The prior iteration had already drafted most of injuries.py/test_injuries.py/yaml
+    as UNCOMMITTED changes; the remaining gap vs the acceptance criteria was the
+    explicit `_apply_ir_stash`-fires-on-mapped-ids assertion (added in
+    test_projection_artifact.py, which owns the `_archive()`/`_config()` harness).
+  - `EspnInjuriesResponse` is re-exported from `ingest.injuries`, NOT `ingest.nhl_api`.
+  - mypy rejects `df.itertuples()` field access (untyped union) -> iterate
+    `df.to_dict('records')` instead; ruff enforces 100-char lines + import order.
+  - `ProjectArtifactConfig.ir` defaults to False -- set `ir=True` to exercise the
+    IR-stash path; assert via `manifest['ir_stash']['candidates']`.
 ---
