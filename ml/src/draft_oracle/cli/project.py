@@ -567,9 +567,13 @@ def project(
     typer.echo(f"  snapshot id: {result.manifest['snapshot_id']}")
     slots = result.manifest.get("slot_strategies")
     if slots:
+        opp_label = slots.get(
+            "opponent_label",
+            "fitted" if slots["fitted_opponents"] else "greedy",
+        )
         typer.echo(
             f"  slot strategies: {len(slots['slots'])} slots"
-            f" ({'fitted' if slots['fitted_opponents'] else 'greedy'} opponents);"
+            f" ({opp_label} opponents);"
             f" best slot {slots['best_slot']}"
         )
     for warning in result.warnings:

@@ -25,6 +25,7 @@ from draft_oracle.optimize.recommend import (
     _PositionRunOpponent,
     _prune_candidates,
     _vectorized_fitted_expected,
+    _vectorized_greedy_expected,
     asset_value,
     build_pool_from_projection_artifact,
     build_synthetic_pool,
@@ -235,6 +236,120 @@ def test_choose_pick_returns_legal_asset() -> None:
     model = GreedyOpponentModel(temperature=0.3)
     pick = choose_pick(state, "m0", model, config=RecommendConfig(rollouts=32))
     assert pick.key in state.available
+
+
+def _pool_rank_ne_projection(managers: int) -> list[DraftAsset]:
+    """A pool where ``rank_value`` deliberately disagrees with ``projection``.
+
+    Public perception (``rank_value``) is the reverse of the model's ``projection``
+    within each position, so an opponent scored by ``rank_value`` (the object model's
+    real policy) drafts a different asset than one scored by ``projection`` -- the
+    exact divergence CODE_REVIEW m-7 flags. Used to prove the fast and object paths
+    agree only after the fast path scores opponents by ``rank_value``.
+    """
+    cap = roster_capacity(False)
+    pool: list[DraftAsset] = []
+    n_f = cap.forwards * managers + 6
+    for i in range(n_f):
+        pool.append(
+            DraftAsset(
+                key=f"F{i}",
+                name=f"F{i}",
+                position="F",
+                rank_value=float(i + 1),  # ascending: opposite of projection
+                player_id=1000 + i,
+                team_id=1 + (i % 8),
+                team_abbrev=f"T{1 + (i % 8)}",
+                projection=30.0 - i,  # descending
+            )
+        )
+    n_d = cap.defense * managers + 6
+    for i in range(n_d):
+        pool.append(
+            DraftAsset(
+                key=f"D{i}",
+                name=f"D{i}",
+                position="D",
+                rank_value=float(i + 1),
+                player_id=2000 + i,
+                team_id=1 + (i % 8),
+                team_abbrev=f"T{1 + (i % 8)}",
+                projection=20.0 - i,
+            )
+        )
+    n_g = cap.goalies * managers + 6
+    for i in range(n_g):
+        pool.append(
+            DraftAsset(
+                key=f"G{i}",
+                name=f"G{i}",
+                position="G",
+                rank_value=float(i + 1),
+                team_id=100 + i,
+                team_abbrev=f"T{100 + i}",
+                projection=25.0 - 2.0 * i,
+            )
+        )
+    return pool
+
+
+def _advance(state: DraftState, picks: int) -> None:
+    """Deterministically advance the draft by ``picks`` first-legal choices."""
+    for _ in range(picks):
+        legal = state.legal_assets(state.current_manager)
+        state.apply_pick(legal[0])
+
+
+def test_fast_path_scores_opponents_by_rank_value_and_matches_object(
+) -> None:
+    # m-7 + m-8: with rank_value != projection and the owner already holding picks,
+    # the deterministic greedy fast path must equal the object path, which (a) scores
+    # opponents by rank_value and (b) includes the owner's already-drafted roster.
+    state = DraftState.new([f"m{i}" for i in range(4)], _pool_rank_ne_projection(4), allow_ir=False)
+    _advance(state, 7)  # snake: pick_index 7 is m0's second turn; m0 owns 1 asset
+    assert state.current_manager == "m0"
+    assert len(state.rosters["m0"].all_assets()) == 1
+    gmodel = GreedyOpponentModel(temperature=0.0)
+    mapping = {m: GreedyOpponentModel(temperature=0.0) for m in state.rosters}
+    repl = replacement_levels(state, 4)
+    candidates = [c.asset for c in _prune_candidates(state, "m0", repl, 6)]
+    cfg = RecommendConfig(rollouts=6, seed=7)
+    vec = _vectorized_greedy_expected(state, "m0", candidates, gmodel, repl, cfg)
+    obj = [_expected_value(state, "m0", asset, mapping, repl, cfg) for asset in candidates]
+    assert vec == pytest.approx(obj, abs=1e-9)
+    # The base roster value is actually part of the number (guards against m-8
+    # silently zeroing it): every candidate's E[roster] exceeds it.
+    base = sum(asset_value(a) for a in state.rosters["m0"].all_assets())
+    assert base > 0.0
+    assert all(v > base for v in vec)
+
+
+def test_fast_path_raises_on_dry_pool_like_object_path() -> None:
+    # m-9: a state where a manager runs out of a needed position before the owner's
+    # last pick must raise in the fast path, not silently draft pool index 0. The
+    # owner is the last seat (m2) so the rollout spans the whole draft and the starved
+    # manager's dry pick falls inside the owner's horizon.
+    managers = [f"m{i}" for i in range(3)]
+    pool: list[DraftAsset] = []
+    for i in range(20):
+        pool.append(_skater(f"F{i}", "F", 30.0 - i, team_id=1 + (i % 4), player_id=1000 + i))
+    for i in range(12):
+        pool.append(_skater(f"D{i}", "D", 20.0 - i, team_id=1 + (i % 4), player_id=2000 + i))
+    for i in range(2):  # 3 managers each need 1 goalie; only 2 exist -> one runs dry
+        pool.append(_team(100 + i, 25.0 - 2.0 * i))
+    state = DraftState.new(managers, pool, allow_ir=False)
+    _advance(state, 2)  # m0, m1 have picked -> m2 (last seat) is on the clock
+    assert state.current_manager == "m2"
+    gmodel = GreedyOpponentModel(temperature=0.0)
+    mapping = {m: GreedyOpponentModel(temperature=0.0) for m in state.rosters}
+    repl = replacement_levels(state, 3)
+    candidates = [c.asset for c in _prune_candidates(state, "m2", repl, 4)]
+    cfg = RecommendConfig(rollouts=4, seed=1)
+    with pytest.raises(ValueError, match="no legal asset"):
+        _vectorized_greedy_expected(state, "m2", candidates, gmodel, repl, cfg)
+    # The object path raises on the same starved state.
+    with pytest.raises(ValueError, match="no legal asset"):
+        [_expected_value(state, "m2", asset, mapping, repl, cfg) for asset in candidates]
 
 
 def test_vectorized_greedy_matches_object_path_when_deterministic() -> None:

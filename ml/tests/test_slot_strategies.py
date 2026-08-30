@@ -195,10 +195,39 @@ def test_fitted_opponent_path_runs_and_flags() -> None:
         opponents=_league_fitted(),
         config=_fast_config(),
     )
-    assert report.fitted_opponents is True
-    assert "fitted league model" in "\n".join(report.report_lines())
+    # The league model carries no per-seat coefficients and no affinity, so the
+    # seat-keyed simulation runs the league-average coefficients with affinity
+    # zeroed -- it must NOT be advertised as a genuinely fitted per-manager model
+    # (CODE_REVIEW m-10).
+    assert report.fitted_opponents is False
+    text = "\n".join(report.report_lines())
+    assert "league-average" in text
+    assert "fitted league model" not in text
     for plan in report.slots:
         assert plan.projected_total > 0.0
+
+
+def test_seat_keyed_fitted_model_is_labeled_fitted() -> None:
+    # A model whose per-manager keys DO match the seat ids the planner uses is a
+    # genuine per-seat fit and is labeled as such.
+    fitted = FittedLeagueOpponents(
+        league=Coefficients(rank=1.0, affinity=0.0),
+        per_manager={"seat1": Coefficients(rank=1.2, affinity=0.5)},
+        affinity={"seat1": {8471234: 0.4}},
+        manager_pick_counts={"seat1": 9},
+        total_picks=9,
+        config=OpponentFitConfig(),
+    )
+    report = build_slot_strategies(
+        pool=build_synthetic_pool(3, allow_ir=False),
+        managers=3,
+        allow_ir=False,
+        opponents=fitted,
+        config=_fast_config(),
+    )
+    assert report.fitted_opponents is True
+    assert "fitted per-manager league model" in "\n".join(report.report_lines())
+    assert report.summary()["opponent_label"] == "fitted per-manager league model"
 
 
 # ── Rendering + summary ─────────────────────────────────────────────────────

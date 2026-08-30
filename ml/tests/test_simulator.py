@@ -134,6 +134,33 @@ def test_eliminated_team_removed_from_pool() -> None:
     assert keys == {"F2"}  # both the skater on team 7 and team 7's goalie slot gone
 
 
+def test_unresolved_team_skater_dropped_once_teams_eliminated() -> None:
+    # m-11 fail-safe: a skater whose team never resolved (team_id=None) cannot be
+    # confirmed alive once any team is eliminated, so it must not stay draftable.
+    unresolved = DraftAsset(
+        key="F_unknown",
+        name="F_unknown",
+        position="F",
+        rank_value=95.0,
+        player_id=42,
+        team_id=None,
+    )
+    pool = [
+        unresolved,
+        _skater("F2", "F", 90.0, team_id=3, player_id=2),
+        _team_asset(3, 80.0),
+    ]
+    # No eliminations yet: the unresolved skater is still draftable (round-1 behavior).
+    open_state = DraftState.new(["a"], pool, allow_ir=False)
+    assert "F_unknown" in open_state.available
+    # Once a team is eliminated, the unresolved skater is removed fail-safe.
+    elim_state = DraftState.new(
+        ["a"], pool, allow_ir=False, eliminated_team_ids=frozenset({99})
+    )
+    assert "F_unknown" not in elim_state.available
+    assert "F2" in elim_state.available  # a resolved, non-eliminated skater survives
+
+
 def test_place_rejects_over_limit() -> None:
     state = DraftState.new(["a"], _exact_pool(1, False), allow_ir=False)
     goalie = next(a for a in state.available.values() if a.position == "G")

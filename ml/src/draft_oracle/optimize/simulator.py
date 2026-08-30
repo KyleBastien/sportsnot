@@ -210,6 +210,11 @@ class DraftState:
         for asset in pool:
             if asset.team_id is not None and asset.team_id in eliminated_team_ids:
                 continue
+            # Fail-safe: once any team is eliminated, a skater whose ``team_id`` never
+            # resolved cannot be confirmed to survive, so it must not stay draftable
+            # (a whole-team goalie asset always carries a ``team_id``).
+            if eliminated_team_ids and asset.team_id is None:
+                continue
             if asset.key in available:
                 raise ValueError(f"duplicate asset key in pool: {asset.key!r}")
             available[asset.key] = asset

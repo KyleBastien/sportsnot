@@ -377,6 +377,7 @@ class SlotStrategyReport:
     seed: int
     rollouts: int
     fitted_opponents: bool
+    opponent_label: str = "greedy fallback"
 
     def best_slot(self) -> SlotPlan:
         """The slot with the highest projected final-roster total (tie: lowest slot)."""
@@ -386,13 +387,12 @@ class SlotStrategyReport:
 
     def report_lines(self) -> list[str]:
         """Human-readable Markdown report (ASCII only, cp1252-safe)."""
-        opp = "fitted league model" if self.fitted_opponents else "greedy fallback"
         lines = [
             "# Draft Oracle per-slot strategy report",
             "",
             f"- League size: {self.managers} managers"
             f" ({'IR' if self.ir else 'no-IR'}, {self.rounds} rounds)",
-            f"- Opponents: {opp}",
+            f"- Opponents: {self.opponent_label}",
             f"- Rollouts per turn: {self.rollouts} | seed {self.seed}",
             "",
             "## Projected final-roster points by slot",
@@ -458,6 +458,7 @@ class SlotStrategyReport:
             "seed": self.seed,
             "rollouts": self.rollouts,
             "fitted_opponents": self.fitted_opponents,
+            "opponent_label": self.opponent_label,
             "best_slot": self.best_slot().slot,
             "slots": [
                 {
@@ -496,10 +497,25 @@ def build_slot_strategies(
         opponent_model: OpponentModel | Mapping[str, OpponentModel] = opponents.as_mapping(
             manager_ids
         )
+        # The seat ids (``seat1..seatN``) never match the fitted per-manager keys
+        # (ben/judah/kyle/levi) or their affinity tables, so ``as_mapping`` yields the
+        # league-average coefficients with the affinity feature zeroed for every seat.
+        # Label the report by the model actually simulated, not by "fitted supplied".
+        genuinely_fitted = any(
+            (mid in opponents.per_manager) or bool(opponents.affinity.get(mid))
+            for mid in manager_ids
+        )
+        opponent_label = (
+            "fitted per-manager league model"
+            if genuinely_fitted
+            else "league-average fitted coefficients (per-seat, affinity zeroed)"
+        )
     else:
         opponent_model = GreedyOpponentModel(
             temperature=cfg.temperature, need_weight=cfg.need_weight
         )
+        genuinely_fitted = False
+        opponent_label = "greedy fallback"
 
     rounds = roster_capacity(allow_ir).total
     slots = [
@@ -521,7 +537,8 @@ def build_slot_strategies(
         slots=slots,
         seed=cfg.seed,
         rollouts=cfg.rollouts,
-        fitted_opponents=opponents is not None,
+        fitted_opponents=genuinely_fitted,
+        opponent_label=opponent_label,
     )
 
 

@@ -3,6 +3,24 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
 ---
 
 ## Codebase Patterns
+- Recommend fast path vs object rollout (US-116, `optimize/recommend.py`): two
+  rollout impls must stay reconciled. The OBJECT path (`_expected_value` ->
+  `_rollout_owner_value`) is the source of truth: opponents draft by `rank_value`
+  (`GreedyOpponentModel`/`FittedOpponentModel`), the owner fills greedy-VOR by
+  `asset_value`, and E[roster] = `_owner_roster_value` = sum of asset_value over the
+  owner's WHOLE roster (already-drafted + rollout picks). The VECTORIZED paths
+  (`_vectorized_greedy_expected`, `_vectorized_fitted_expected`) must match: score
+  opponents by `rank_val` (NOT `val`/projection), and add
+  `base_owner_value = _owner_roster_value(state, owner)` to every candidate mean
+  (owner_total only accumulates rollout picks). Dry states: any pick site must call
+  `_require_legal_rows(legal, manager)` (raises like the object path) -- a bare numpy
+  `argmax` over an all -inf row silently returns index 0 and drafts garbage; the
+  owner greedy TAIL (`_vec_fill_owner`) instead masks per-row and STOPS (matches
+  `_fill_owner_greedily`'s break). GOTCHA: fast==object EXACTLY only at temperature 0;
+  parity tests must advance the draft so the owner holds >=1 asset (else
+  base_owner_value=0 hides the m-8 bug) and, to exercise the dry-raise, make the
+  OWNER the last snake seat on the clock (object stops at owner-full, so an opponent
+  that only runs dry afterward won't raise).
 - Odds favorite attribution (US-102, `ingest/odds.py`): favorite-only rows go
   through `_favorite_rows_from_games(grouped, source=, resolve_favorite=,
   placeholder_seasons=)`. `resolve_favorite: FavoriteResolver` = `(game_id,
@@ -1071,4 +1089,40 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   - Monkeypatch draft_oracle.projection_artifact.build_projection_artifact (module
     attr) to spy on the injuries/league_picks a pinned run actually passes -- the
     from_normalized wrapper resolves it as a module global.
+---
+
+## 2026-08-30 - US-116 (m-7, m-8, m-9, m-10, m-11)
+- Reconciled the vectorized fast path with the object rollout so both agree, fail
+  identically, and label themselves truthfully.
+- Files changed:
+  - src/draft_oracle/optimize/recommend.py: added _require_legal_rows helper;
+    _vectorized_greedy_expected now builds rank_val and scores opponents by
+    rank_value (m-7); both vectorized paths add base_owner_value to each mean (m-8)
+    and guard every k-loop pick with _require_legal_rows (m-9); _vec_fill_owner
+    masks per-row so a dry row stops filling instead of corrupting (m-9).
+  - src/draft_oracle/optimize/simulator.py: DraftState.new drops team_id=None
+    skaters once eliminated_team_ids is non-empty (m-11 fail-safe).
+  - src/draft_oracle/optimize/slot_strategies.py: SlotStrategyReport.opponent_label
+    field; build_slot_strategies computes genuinely_fitted + honest label; report
+    lines / summary use the label; fitted_opponents bool now truthful (m-10).
+  - src/draft_oracle/cli/project.py: slot-strategy echo uses opponent_label.
+  - tests/test_recommend.py, tests/test_simulator.py, tests/test_slot_strategies.py:
+    new coverage (parity, dry-raise, unresolved-team drop, honest/genuine labels).
+- Learnings for future iterations:
+  - The greedy fast path and the object rollout MUST agree exactly only at
+    temperature 0 (deterministic argmax); positive temperature uses different RNG
+    streams (python random vs numpy gumbel) so they only agree in distribution.
+  - m-8 was invisible to the pre-existing parity tests because they used a FRESH
+    DraftState (owner roster empty -> base_owner_value 0). Any new fast-vs-object
+    parity test must advance the draft so the owner already holds >=1 asset.
+  - To force a dry-pool raise inside the owner's rollout HORIZON, make the OWNER the
+    last snake seat and put it on the clock (advance to its pick_index) -- the
+    object rollout stops at owner-full, so a starved opponent that only runs dry
+    after the owner finishes will NOT raise.
+  - slot_strategies is inherently seat-based (seat1..seatN); fitted per-manager
+    models keyed by real names (ben/judah/kyle/levi) NEVER map onto seats, so the
+    report always runs league-average coefficients with affinity zeroed unless the
+    caller supplies a model literally keyed by seat ids. Label by the model used.
+  - Pre-existing failure tests/test_backtest_report.py (write_report re-stamps a
+    fresh wall-clock timestamp) is m-20, owned by US-117 -- left untouched.
 ---

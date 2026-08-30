@@ -437,6 +437,18 @@ def _expected_value(
 _POS_INDEX: dict[str, int] = {"F": 0, "D": 1, "G": 2}
 
 
+def _require_legal_rows(legal: np.ndarray, manager: str) -> None:
+    """Raise if any rollout row has no legal asset for ``manager``.
+
+    The object-model rollout raises ``ValueError`` from ``greedy_vor_pick`` /
+    ``OpponentModel.pick`` when a manager has nothing legal to draft. The vectorized
+    kernel must fail the same way: an ``argmax`` over an all -inf row silently returns
+    index 0 and drafts whatever asset happens to sit there, corrupting the rollout.
+    """
+    if not bool(legal.any(axis=1).all()):
+        raise ValueError(f"manager {manager!r} has no legal asset to draft")
+
+
 def _vec_fill_owner(
     alive: np.ndarray,
     counts: np.ndarray,
@@ -454,11 +466,19 @@ def _vec_fill_owner(
     for _ in range(remaining):
         cap_ok = counts[:, owner_idx, :] < limits
         legal = alive & cap_ok[:, posc]
+        has_legal = legal.any(axis=1)
+        if not has_legal.any():
+            break
         scores = np.where(legal, vor_owner[None, :], neg_inf)
         choice = np.argmax(scores, axis=1)
-        owner_total += val[choice]
-        alive[rows, choice] = False
-        counts[rows, owner_idx, posc[choice]] += 1
+        # Match the object path's ``_fill_owner_greedily``: a row with no legal asset
+        # simply stops filling (the owner gets fewer picks) rather than the argmax
+        # over all -inf silently drafting pool index 0.
+        active = rows[has_legal]
+        chosen = choice[has_legal]
+        owner_total[active] += val[chosen]
+        alive[active, chosen] = False
+        counts[active, owner_idx, posc[chosen]] += 1
 
 
 def _vectorized_greedy_expected(
@@ -482,6 +502,7 @@ def _vectorized_greedy_expected(
     n_assets = len(pool)
     key_to_idx = {asset.key: i for i, asset in enumerate(pool)}
     val = np.array([asset_value(a) for a in pool], dtype="float64")
+    rank_val = np.array([a.rank_value for a in pool], dtype="float64")
     posc = np.array([_POS_INDEX[a.position] for a in pool], dtype="int64")
     repl_arr = np.array([replacement["F"], replacement["D"], replacement["G"]], dtype="float64")
     vor_owner = val - repl_arr[posc]
@@ -510,6 +531,7 @@ def _vectorized_greedy_expected(
     rollouts = cfg.rollouts
     rows = np.arange(rollouts)
     neg_inf = float("-inf")
+    base_owner_value = _owner_roster_value(state, owner)
     means: list[float] = []
     for asset in candidate_assets:
         idx_c = key_to_idx[asset.key]
@@ -545,14 +567,18 @@ def _vectorized_greedy_expected(
                     )
                     owner_taken = cap_total
                     break
+                _require_legal_rows(legal, mgr_ids[mgr_i])
                 scores = np.where(legal, vor_owner[None, :], neg_inf)
                 choice = np.argmax(scores, axis=1)
                 owner_total += val[choice]
                 owner_taken += 1
             else:
+                _require_legal_rows(legal, mgr_ids[mgr_i])
                 urgency = (limits - cnt_m) / limits
                 bump = gmodel.need_weight * urgency
-                scores = val[None, :] + bump[:, posc]
+                # Score opponents by ``rank_value`` (public perception), matching
+                # ``GreedyOpponentModel.pick``; ``val`` (projection) would diverge.
+                scores = rank_val[None, :] + bump[:, posc]
                 if gmodel.temperature <= 0.0:
                     masked = np.where(legal, scores, neg_inf)
                     choice = np.argmax(masked, axis=1)
@@ -563,7 +589,10 @@ def _vectorized_greedy_expected(
             alive[rows, choice] = False
             counts[rows, mgr_i, posc[choice]] += 1
 
-        means.append(float(owner_total.mean()))
+        # ``owner_total`` accumulates only picks made during this rollout; add the
+        # owner's already-drafted roster so E[roster] matches the object path's
+        # ``_owner_roster_value`` (one documented definition).
+        means.append(float(owner_total.mean()) + base_owner_value)
     return means
 
 
@@ -656,6 +685,7 @@ def _vectorized_fitted_expected(
     rollouts = cfg.rollouts
     rows = np.arange(rollouts)
     neg_inf = float("-inf")
+    base_owner_value = _owner_roster_value(state, owner)
     means: list[float] = []
     for asset in candidate_assets:
         idx_c = key_to_idx[asset.key]
@@ -688,11 +718,13 @@ def _vectorized_fitted_expected(
                     )
                     owner_taken = cap_total
                     break
+                _require_legal_rows(legal, mgr_ids[mgr_i])
                 scores = np.where(legal, vor_owner[None, :], neg_inf)
                 choice = np.argmax(scores, axis=1)
                 owner_total += val[choice]
                 owner_taken += 1
             else:
+                _require_legal_rows(legal, mgr_ids[mgr_i])
                 urgency = (limits - cnt_m) / limits
                 rank_z = np.zeros((rollouts, n_assets), dtype="float64")
                 for pos_mask in pos_masks:
@@ -720,7 +752,9 @@ def _vectorized_fitted_expected(
             alive[rows, choice] = False
             counts[rows, mgr_i, posc[choice]] += 1
 
-        means.append(float(owner_total.mean()))
+        # Same E[roster] definition as the greedy and object paths: include the
+        # owner's already-drafted roster value.
+        means.append(float(owner_total.mean()) + base_owner_value)
     return means
 
 
