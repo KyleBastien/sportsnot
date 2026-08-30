@@ -3,6 +3,11 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
 ---
 
 ## Codebase Patterns
+- Clean artifact regeneration (US-118): `add_git_provenance()` inspects Git from the
+  Python process working directory. Importing source from a detached clean worktree
+  via `PYTHONPATH` is insufficient if the process CWD remains a dirty checkout. Run
+  inside the clean worktree and write artifacts to an external directory so earlier
+  generated rounds do not make later manifests dirty.
 - Artifact provenance (US-117): every model/projection/backtest manifest writer must
   wrap payloads with `draft_oracle.provenance.add_git_provenance`; this stamps both
   `git_sha` and an explicit `git_dirty` marker so dirty-tree artifacts cannot claim
@@ -1328,4 +1333,35 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   - Preserve unrelated unstaged `scripts/ralph/CLAUDE.md`,
     `scripts/ralph/ralph.ps1`, and untracked 2026 backtest artifacts outside story
     commit.
+---
+
+## 2026-08-30T09:42:13-07:00 - US-118
+- Regenerated `artifacts/2026-r1` through `2026-r4` from clean committed HEAD
+  `8000f5b`, with `git_dirty=false` in every run manifest. R3 retains its combined
+  R3+R4 output. R1-R3 slot strategies now consume the deduped league fit and report
+  the model actually used: league-average fitted coefficients with per-seat affinity
+  zeroed (`fitted_opponents=false`).
+- Formalized all four directories as an explicit owner-approved committed exception
+  in SPEC section 4 and `ml/.gitignore`, replacing the old force-add workaround.
+- Added 8 committed-artifact regression tests covering clean provenance, quantile
+  ordering, projection decomposition, bracket membership, team-goalie identity,
+  matchup probability complements, combined R3+R4 goalie decomposition, and honest
+  slot-strategy labels.
+- Files changed: `AGENTS.md`, `ml/.gitignore`, `ml/SPEC.md`,
+  `ml/artifacts/2026-r1..r4/`, `ml/tests/test_committed_projection_artifacts.py`,
+  `scripts/ralph/prd.json`, and `scripts/ralph/progress.txt`.
+- Quality: ruff clean; mypy strict clean (69 files); full ML suite 664 passed in
+  81.54s. Playwright not run because this story changes standalone ML artifacts,
+  contract docs, and Python regression tests only; no web/UI path changed.
+- Normal commit attempted first. Hook passed affected lint/typecheck/test stages, then
+  failed only because `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was unavailable.
+  Retried with `git commit --no-verify` under documented authentication-only fallback.
+- **Learnings for future iterations:**
+  - `add_git_provenance()` resolves Git state from process CWD, not imported source
+    location. A clean worktree on `PYTHONPATH` still stamps dirty if Python runs from
+    a dirty checkout.
+  - Write regenerated artifacts outside the clean worktree. Writing R1 into tracked
+    `artifacts/` would dirty that worktree before R2-R4 manifests are built.
+  - Anonymous `seat1..seatN` slot reports cannot apply named-manager affinity; honest
+    output uses deduped league-average coefficients and labels affinity as zeroed.
 ---

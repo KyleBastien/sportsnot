@@ -1,6 +1,7 @@
 {
   "artifact_version": "live-projection-v1",
   "as_of_cutoff": "2026-04-18",
+  "combined_event": null,
   "counts": {
     "eligible_series": 8,
     "eligible_teams": 16,
@@ -26,8 +27,9 @@
     "VGK"
   ],
   "feature_version": "skater-v1",
-  "generated_at": "2026-08-29T03:17:35.415620+00:00",
-  "git_sha": "3bf153731382487adc116e3416f7ef29699fe4d3",
+  "generated_at": "2026-08-30T16:37:46.174826+00:00",
+  "git_dirty": false,
+  "git_sha": "8000f5bc02872032833dd93c2775421c4e08151b",
   "ir_stash": {
     "candidates": 0,
     "enabled": false,
@@ -47,8 +49,8 @@
     "ir": false,
     "managers": 4,
     "replacement_level": {
-      "D": 3.5395,
-      "F": 4.7885,
+      "D": 3.63125,
+      "F": 4.783,
       "G": 6.707952353820153
     },
     "roster_demand": {
@@ -65,9 +67,10 @@
   },
   "slot_strategies": {
     "best_slot": 1,
-    "fitted_opponents": true,
+    "fitted_opponents": false,
     "ir": false,
     "managers": 4,
+    "opponent_label": "league-average fitted coefficients (per-seat, affinity zeroed)",
     "rollouts": 500,
     "rounds": 9,
     "seed": 20260827,
@@ -85,7 +88,7 @@
           32,
           33
         ],
-        "projected_total": 48.948427,
+        "projected_total": 49.516177,
         "slot": 1
       },
       {
@@ -101,7 +104,7 @@
           31,
           34
         ],
-        "projected_total": 48.820677,
+        "projected_total": 49.099927,
         "slot": 2
       },
       {
@@ -117,11 +120,11 @@
           30,
           35
         ],
-        "projected_total": 48.396427,
+        "projected_total": 48.801677,
         "slot": 3
       },
       {
-        "first_pick": "COL",
+        "first_pick": "Nathan MacKinnon",
         "pick_numbers": [
           4,
           5,
@@ -133,7 +136,7 @@
           29,
           36
         ],
-        "projected_total": 48.635927,
+        "projected_total": 49.161427,
         "slot": 4
       }
     ]

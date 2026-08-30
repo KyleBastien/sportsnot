@@ -82,8 +82,18 @@ ml/
     raw/league-drafts/       ← committed sheet snapshots + app exports + docs
     features/                ← versioned matrices (gitignored)
     overrides/               ← injuries.yaml, name_overrides.yaml, manager_aliases.yaml
-  artifacts/                 ← gitignored except backtests/*/report.md and manifests
+  artifacts/                 ← generated; gitignored except approved outputs below
+    2026-r1/..2026-r4/       ← committed 2026 projection reproducibility fixtures
+    backtests/*/             ← committed report.md and manifest.json only
+    models/*/                ← committed report.md and manifest.json only
 ```
+
+The committed `artifacts/2026-r1/` through `artifacts/2026-r4/` directories are an
+explicit owner-approved exception to the generated-artifact rule. They preserve the
+2026 playoff draft evidence, including the combined R3+R4 event, and are regression
+fixtures for the structural checks in `tests/test_committed_projection_artifacts.py`.
+Regenerate them only from a clean committed HEAD; every `run_manifest.json` must name
+that source commit and record `git_dirty: false`.
 
 ## 5. External data sources (decided — do not re-evaluate)
 

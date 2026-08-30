@@ -228,7 +228,9 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   `ml/tests/conftest.py`; HTTP tests must use fixture transports.
 - Stamp generated artifact manifests through
   `draft_oracle.provenance.add_git_provenance` so `git_sha` and `git_dirty` stay
-  consistent.
+  consistent. For clean-worktree regeneration, run the Python process with its
+  working directory inside that clean worktree; changing `PYTHONPATH` alone does not
+  change the repository inspected by `git_state()`.
 - Keep imports in `draft_oracle.cli.project` lightweight. Import training and HTTP
   modules inside command bodies so draft-time commands start without LightGBM,
   scikit-learn, or httpx.
