@@ -3,6 +3,10 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
 ---
 
 ## Codebase Patterns
+- Team outcome feature ownership (US-119): `models/game_win.py` owns chronological
+  team aggregates and exact-game market joins; `models/series_sim.py` consumes the
+  fitted game model. Shared Elo config/math lives in `features/elo.py`. Do not add a
+  parallel team/series matrix unless a production path consumes and evaluates it.
 - Clean artifact regeneration (US-118): `add_git_provenance()` inspects Git from the
   Python process working directory. Importing source from a detached clean worktree
   via `PYTHONPATH` is insufficient if the process CWD remains a dirty checkout. Run
@@ -1364,4 +1368,33 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
     `artifacts/` would dirty that worktree before R2-R4 manifests are built.
   - Anonymous `seat1..seatN` slot reports cannot apply named-manager affinity; honest
     output uses deduped league-average coefficients and labels affinity as zeroed.
+---
+
+## 2026-08-30T09:48:57-07:00 - US-119
+- Deleted the unused `features/team_series.py` matrix, including its market,
+  injuries, matchup, proxy, and matrix-building code. No production model or CLI
+  consumed it. Preserved live Elo configuration/math in focused `features/elo.py`;
+  game-win and series models now import that module directly.
+- Removed orphaned matrix/join tests. Added 8 focused Elo and deleted-public-API
+  regression tests. Recorded feature ownership decision in README, SPEC, AGENTS.md,
+  and Codebase Patterns.
+- Files changed: `AGENTS.md`, `ml/README.md`, `ml/SPEC.md`,
+  `ml/src/draft_oracle/features/{__init__.py,elo.py,team_series.py}`,
+  `ml/src/draft_oracle/ingest/injuries.py`, `ml/src/draft_oracle/models/{game_win.py,
+  series_sim.py}`, `ml/tests/{test_elo.py,test_team_series.py}`,
+  `scripts/ralph/{prd.json,progress.txt}`.
+- Quality: ruff clean; mypy strict clean (69 files); full ML suite 652 passed in
+  77.47s. Playwright not run because this standalone Python/docs story changes no
+  web or UI path.
+- Normal commit attempted first. Hook passed affected lint/typecheck/test stages,
+  then failed only because `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was
+  unavailable. Retried with `git commit --no-verify` under documented
+  authentication-only fallback.
+- **Learnings for future iterations:**
+  - Game-win model already owns leakage-safe chronological team aggregates and
+    exact-game market ablation; series simulation consumes that fitted model.
+    Parallel unconsumed matrices create false architecture signals.
+  - When deleting a mixed-purpose module, trace symbol-level consumers first. Here
+    only Elo primitives were live, so extraction preserved behavior while deleting
+    dead joins and their orphaned tests.
 ---

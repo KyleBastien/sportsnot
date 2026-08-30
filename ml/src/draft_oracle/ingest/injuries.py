@@ -203,7 +203,7 @@ def normalize_status(status_raw: str | None, type_name: str | None = None) -> st
 # ESPN skater position abbreviations fold to the fantasy pool position (F/D);
 # goalies (and anything unrecognized) are NOT resolved to a skater id because a
 # goalie injury is consumed at the team level (team_abbrev + position), not by a
-# per-player join (see features.team_series._injured_goalie_teams).
+# per-player join.
 _ESPN_SKATER_POSITIONS: dict[str, str] = {
     "C": "F",
     "LW": "F",

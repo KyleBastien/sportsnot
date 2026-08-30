@@ -10,7 +10,7 @@ regularized simple models):
 * **Pre-game features, leakage-free by construction.** A single chronological
   pass over games maintains each team's running Elo rating (cross-season, with a
   season-boundary regression identical to
-  :func:`draft_oracle.features.team_series.compute_elo_ratings`) and in-season
+  :mod:`draft_oracle.features.elo`) and in-season
   regular-season aggregates (goals for/against per game, win %, points per game).
   Every game reads only the state accumulated from *strictly earlier* games, so
   no game can leak into its own features. A held-out season therefore contributes
@@ -44,7 +44,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from draft_oracle.features.team_series import (
+from draft_oracle.features.elo import (
     EloConfig,
     expected_score,
     regress_to_mean,

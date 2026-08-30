@@ -429,49 +429,23 @@ so "power-play time share" is proxied by power-play *production* (`pp_point_shar
 `game_type_id == 2` games; the last-N window uses the most recent games of any
 type within the season before the cutoff.
 
-## Team/series features (`features/team_series.py`)
+## Team model features and Elo decision
 
-As-of team/series feature engineering for the per-game win model and series
-simulator (US-010). One row per team, computed **as of a playoff-round (series)
-start**, sharing the same leakage guard as the skater features.
+The unused `features/team_series.py` matrix was deleted in US-119. It built
+team-form, market, injury, and matchup joins but no training, evaluation,
+projection, or draft path consumed its output. Keeping that parallel matrix made
+load-bearing-looking code and tests without affecting a recommendation.
 
-```python
-from draft_oracle.features import build_team_series_features, EloConfig
+The live per-game win pipeline remains the single team-feature owner. It builds
+chronological Elo and in-season aggregate differences directly from each game,
+joins exact-game market probabilities when available, and reports the held-out
+market ablation described below. The series simulator consumes that fitted
+per-game model. Current injuries affect explicit projection and IR-stash paths;
+they are not duplicated into an unconsumed team matrix.
 
-matrix = build_team_series_features(
-    team_games,
-    season_id=20232024,
-    as_of_date="2024-04-20",
-    playoff_round=1,
-    matchups=matchups,  # optional: opponent_team_abbrev, home_ice, series price
-    odds=odds,  # optional: normalized odds table for market features
-    injuries=injuries,  # optional (CURRENT round only — never historical)
-)
-```
-
-**Feature groups** (`TEAM_FEATURE_COLUMNS`, keyed by `team-series-v1`): team form
-(`goal_differential_per_game`, `goals_for/against_per_game`, game-averaged
-`power_play_pct` / `penalty_kill_pct`, `shots_for/against_per_game`, `rest_days`,
-`days_between_games`), `elo_rating` (cross-season, unit-tested `expected_score` /
-`update_rating` + season regression), goaltender situation
-(`starter_save_pct_season` / `_l15`, `team_shutout_rate`,
-`starter_unavailability_risk`), market (`market_implied_win_prob` +
-`market_available`, `series_implied_win_prob` + `series_market_available`), and
-round-context/matchup (`opponent_team_abbrev`, `home_ice_advantage`,
-`head_to_head_win_pct`, `expected_opponent_strength`, each with a `*_available`
-missing-flag).
-
-**Documented proxies (honesty, SPEC §7)** — the committed archive has **no
-goalie-level game rows**, so per-goalie save % cannot be computed. The league's
-goalie slot is a whole *team's* goaltending (SPEC §1), so save % is a **team-level
-proxy** `1 - GA / shots-against`; `backup_save_pct` is left missing +
-`goalie_split_available == False`, never fabricated. `power_play_pct` /
-`penalty_kill_pct` are **game-averaged** single-game rates, not opportunity
-weighted. The injuries table is **current-only**, so
-`starter_unavailability_risk` is meaningful for the upcoming round only. Elo is
-replayed game-by-game across seasons (`compute_elo_ratings`) with a between-season
-regression toward the mean; the market join maps `season_id % 10000` to the odds
-table's `season_end_year`.
+Shared Elo configuration and pure math now live in `features/elo.py`. Both the
+per-game win model and series simulator import those primitives, while each owns
+its chronological state replay.
 
 ## Per-game win model (`models/game_win.py`)
 
@@ -492,7 +466,7 @@ uv run oracle train-game-win --no-odds  # stat-only (drop the market feature)
 ```
 
 **Features** are home-minus-away differences (`STAT_FEATURE_COLUMNS`): a
-cross-season `elo_diff` (reusing `team_series` Elo), in-season regular-season
+cross-season `elo_diff` (reusing `features/elo.py` primitives), in-season regular-season
 `goal_diff`/`goals_for`/`goals_against`/`win_pct`/`points_per_game` diffs, and an
 `is_playoff` flag. The market variant (`MARKET_FEATURE_COLUMNS`) adds the
 de-vigged `market_home_prob` + a `market_available` flag; a missing price imputes

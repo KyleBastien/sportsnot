@@ -234,6 +234,9 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
 - Keep imports in `draft_oracle.cli.project` lightweight. Import training and HTTP
   modules inside command bodies so draft-time commands start without LightGBM,
   scikit-learn, or httpx.
+- Team outcome features belong to `draft_oracle.models.game_win`; shared Elo math
+  lives in `draft_oracle.features.elo`. Do not recreate a parallel team/series
+  matrix unless a production model consumes and evaluates it.
 
 ## Ralph Agent System
 

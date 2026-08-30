@@ -70,7 +70,7 @@ ml/
     rules.py                 ← US-002 (scoring, snake/redraft order, roster validation)
     ingest/                  ← US-003..008 (nhl_api.py, normalize.py, odds.py,
                                 league_drafts.py, entity_match.py, injuries.py)
-    features/                ← US-009/010 (skater.py, team_series.py, leakage.py)
+    features/                ← skater.py, elo.py, leakage.py
     models/                  ← US-011..016 (game_win.py, shutout.py, series_sim.py,
                                 skater_rate.py, returns.py, projections.py)
     optimize/                ← US-018..023 (vor.py, simulator.py, opponents.py,

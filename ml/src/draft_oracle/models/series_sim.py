@@ -44,7 +44,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from draft_oracle.features.team_series import (
+from draft_oracle.features.elo import (
     EloConfig,
     expected_score,
     regress_to_mean,
