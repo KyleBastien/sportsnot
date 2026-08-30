@@ -285,8 +285,8 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 15,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "M-10 snapshot pinning made complete-or-loud. create_snapshot (ingest/normalize.py) now freezes every optional table a pinned run consumes (OPTIONAL_TABLE_NAMES = league_draft_picks, odds, injuries) when present, and records each as 'frozen'/'absent' in the snapshot _manifest.json plus a 'complete': true marker. build_projection_artifact_from_normalized + run_backtest_from_normalized now read ALL inputs (core tables, injuries, league picks, odds) from source_dir (the frozen snapshot) when pinned -- the old injuries=_load_injuries(normalized_dir)/odds=_load_odds(normalized_dir) LIVE leaks are gone. New _require_complete_snapshot(source_dir) (projection_artifact.py, imported by replay.py) fails loudly on a pinned run when the snapshot has no _manifest.json (FileNotFoundError) or lacks the 'complete' marker (RuntimeError, legacy core-only snapshot) or declares a table frozen that is missing. This makes the code's '(snapshot, seed) fully determines every score' claim true. Tests: test_normalize freezes-optional+records-completeness; test_projection_artifact pinned run reads frozen injuries (player 100) not mutated live (999) + fitted-opponent league picks present though live file deleted, plus two loud-fail tests (incomplete manifest, no manifest). ruff+mypy clean, 645 ml tests pass. (JS/TS typecheck/lint/playwright untouched -- change is Python-only in the standalone ml project.)"
     },
     {
       "id": "US-116",

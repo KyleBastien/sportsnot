@@ -72,6 +72,7 @@ from draft_oracle.projection_artifact import (
     ProjectArtifactConfig,
     _load_league_picks,
     _load_tables,
+    _require_complete_snapshot,
     _snapshot_id_for,
     build_projection_artifact,
 )
@@ -1168,17 +1169,21 @@ def run_backtest_from_normalized(
 ) -> tuple[BacktestResult, Path]:
     """Load normalized tables, run the backtest, and persist it to disk.
 
-    When ``snapshot`` is pinned the tables are read from the frozen snapshot copy;
-    otherwise the live normalized tables are used. Writes ``manifest.json`` and a
-    committed ``report.md`` under ``backtest_root/<run-id>/`` and returns the result
-    and that run directory.
+    When ``snapshot`` is pinned every consumed input (core tables, league picks,
+    odds) is read from the frozen snapshot copy so ``(snapshot, seed)`` fully
+    determines every roster; an incomplete snapshot makes the pinned run fail
+    loudly (M-10). Otherwise the live normalized tables are used. Writes
+    ``manifest.json`` and a committed ``report.md`` under
+    ``backtest_root/<run-id>/`` and returns the result and that run directory.
     """
     from draft_oracle.backtest.report import write_report
 
     source_dir = normalized_dir / SNAPSHOTS_SUBDIR / snapshot if snapshot else normalized_dir
+    if snapshot is not None:
+        _require_complete_snapshot(source_dir)
     tables = _load_tables(source_dir)
     league_picks = _load_league_picks(source_dir)
-    odds = _load_odds(normalized_dir)
+    odds = _load_odds(source_dir)
     snapshot_id = _snapshot_id_for(source_dir, snapshot)
 
     # Historical rounds never receive the live injuries snapshot (CODE_REVIEW m-4);

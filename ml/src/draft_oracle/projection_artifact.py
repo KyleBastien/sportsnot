@@ -909,6 +909,43 @@ def write_projection_artifact(result: ProjectArtifactResult, out_dir: Path) -> P
 DEFAULT_NORMALIZED_DIR = Path("data/normalized")
 DEFAULT_ARTIFACTS_ROOT = Path("artifacts")
 SNAPSHOTS_SUBDIR = "snapshots"
+SNAPSHOT_MANIFEST_NAME = "_manifest.json"
+
+# Optional tables a pinned run consumes; a complete snapshot records each as
+# "frozen" or "absent" so absence is the frozen truth, not a silent live read.
+_OPTIONAL_SNAPSHOT_TABLES = ("league_draft_picks", "odds", "injuries")
+
+
+def _require_complete_snapshot(source_dir: Path) -> dict[str, object]:
+    """Fail loudly when a pinned snapshot is not a complete, self-contained input.
+
+    A snapshot written before complete-snapshot support (M-10) freezes only the
+    core tables, so a pinned run would silently fall back to live odds/injuries and
+    drop the fitted-opponent league comparison. Rather than degrade silently, a pin
+    against such a snapshot raises, naming the fix. Returns the parsed manifest.
+    """
+    manifest_path = source_dir / SNAPSHOT_MANIFEST_NAME
+    if not manifest_path.exists():
+        raise FileNotFoundError(
+            f"pinned snapshot at {source_dir} has no {SNAPSHOT_MANIFEST_NAME}; "
+            "recreate it with `oracle snapshot` so every consumed input is frozen"
+        )
+    loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not (isinstance(loaded, dict) and loaded.get("complete") is True):
+        raise RuntimeError(
+            f"pinned snapshot {source_dir.name} predates complete-snapshot support "
+            "(no 'complete' marker); recreate it with `oracle snapshot` so "
+            "league_draft_picks/odds/injuries are frozen instead of read live (M-10)"
+        )
+    optional = loaded.get("optional_tables")
+    if isinstance(optional, dict):
+        for name in _OPTIONAL_SNAPSHOT_TABLES:
+            if optional.get(name) == "frozen" and not (source_dir / f"{name}.parquet").exists():
+                raise FileNotFoundError(
+                    f"pinned snapshot {source_dir.name} declares '{name}' frozen but "
+                    f"{name}.parquet is missing from the snapshot"
+                )
+    return loaded
 
 
 def _load_tables(source_dir: Path) -> dict[str, pd.DataFrame]:
@@ -919,21 +956,26 @@ def _load_tables(source_dir: Path) -> dict[str, pd.DataFrame]:
     }
 
 
-def _load_injuries(normalized_dir: Path) -> pd.DataFrame | None:
-    """Load the current-status injuries table if it has been ingested, else ``None``."""
-    path = normalized_dir / "injuries.parquet"
+def _load_injuries(source_dir: Path) -> pd.DataFrame | None:
+    """Load the current-status injuries table from ``source_dir``, else ``None``.
+
+    A pinned run passes the frozen snapshot directory so mutable live injuries are
+    never read (M-10); the live path passes the normalized directory.
+    """
+    path = source_dir / "injuries.parquet"
     if not path.exists():
         return None
     return pd.read_parquet(path)
 
 
-def _load_league_picks(normalized_dir: Path) -> pd.DataFrame | None:
-    """Load the entity-matched league draft history if present, else ``None``.
+def _load_league_picks(source_dir: Path) -> pd.DataFrame | None:
+    """Load the entity-matched league draft history from ``source_dir``, else ``None``.
 
-    Feeds the fitted opponent model for the per-slot strategy report (US-023); absent
-    -> the report falls back to greedy opponents.
+    Feeds the fitted opponent model for the per-slot strategy report (US-023); a
+    pinned run reads the frozen copy so the league comparison is reproducible and
+    never silently drops to greedy (M-10). Absent -> greedy fallback.
     """
-    path = normalized_dir / "league_draft_picks.parquet"
+    path = source_dir / "league_draft_picks.parquet"
     if not path.exists():
         return None
     return pd.read_parquet(path)
@@ -965,14 +1007,19 @@ def build_projection_artifact_from_normalized(
 ) -> tuple[ProjectArtifactResult, Path]:
     """Load normalized tables, build the artifact, and write it to disk.
 
-    When ``snapshot`` is given the tables are read from
-    ``normalized_dir/snapshots/<snapshot>/`` (a frozen copy); otherwise the live
+    When ``snapshot`` is given every input -- core tables, injuries, and league
+    picks -- is read from the frozen copy under
+    ``normalized_dir/snapshots/<snapshot>/`` so ``(snapshot, seed)`` fully
+    determines the artifact; a snapshot that is not a complete, self-contained
+    contract makes the pinned run fail loudly (M-10). Otherwise the live
     ``normalized_dir`` is used and the snapshot id is derived from its source
     signature. The artifact is written to ``artifacts_root/<season>-r<round>/``.
     """
     source_dir = normalized_dir / SNAPSHOTS_SUBDIR / snapshot if snapshot else normalized_dir
+    if snapshot is not None:
+        _require_complete_snapshot(source_dir)
     tables = _load_tables(source_dir)
-    injuries = _load_injuries(normalized_dir)
+    injuries = _load_injuries(source_dir)
     league_picks = _load_league_picks(source_dir)
     snapshot_id = _snapshot_id_for(source_dir, snapshot)
 

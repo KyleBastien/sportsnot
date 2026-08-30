@@ -6,6 +6,7 @@ archive dependency (SPEC §7).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -14,6 +15,7 @@ import pytest
 from draft_oracle.ingest import PlayoffBracket
 from draft_oracle.ingest.normalize import (
     MANIFEST_NAME,
+    OPTIONAL_TABLE_NAMES,
     TABLE_NAMES,
     bracket_year_from_label,
     build_team_abbrev_map,
@@ -391,7 +393,41 @@ def test_create_and_list_snapshot(tmp_path: Path) -> None:
     pd.testing.assert_frame_equal(live, frozen)
 
 
-def test_snapshot_without_tables_raises(tmp_path: Path) -> None:
+def test_snapshot_freezes_optional_tables_and_records_completeness(tmp_path: Path) -> None:
+    # M-10: a pinned run consumes league_draft_picks/odds/injuries; a snapshot must
+    # freeze every present optional table and record absent ones explicitly so a
+    # consumer never silently falls back to live inputs.
+    archive = tmp_path / "archive"
+    out = tmp_path / "normalized"
+    _write_fixture_archive(archive)
+    normalize_archive(archive_dir=archive, out_dir=out)
+
+    # Two of the three optional tables exist; odds does not.
+    picks = pd.DataFrame([{"manager": "kyle", "player_id": 100}])
+    picks.to_parquet(out / "league_draft_picks.parquet", index=False)
+    injuries = pd.DataFrame([{"player_id": 100, "status": "out"}])
+    injuries.to_parquet(out / "injuries.parquet", index=False)
+
+    snap = create_snapshot(out_dir=out, snapshot_id="20260827T010000Z")
+
+    assert (snap.path / "league_draft_picks.parquet").exists()
+    assert (snap.path / "injuries.parquet").exists()
+    assert not (snap.path / "odds.parquet").exists()
+
+    manifest = json.loads((snap.path / MANIFEST_NAME).read_text(encoding="utf-8"))
+    assert manifest["complete"] is True
+    assert manifest["optional_tables"] == {
+        "league_draft_picks": "frozen",
+        "odds": "absent",
+        "injuries": "frozen",
+    }
+    # Absent optional tables are named so their absence is the frozen truth.
+    assert set(manifest["optional_tables"]) == set(OPTIONAL_TABLE_NAMES)
+    assert snap.row_counts["league_draft_picks"] == 1
+    assert snap.row_counts["injuries"] == 1
+
+
+
     with pytest.raises(FileNotFoundError):
         create_snapshot(out_dir=tmp_path / "empty")
 

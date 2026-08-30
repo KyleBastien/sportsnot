@@ -638,6 +638,22 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
   `injured` skater column and `_apply_ir_stash` (config.ir gate); test the full chain
   by resolving a disjoint ESPN id onto a harness skater id then asserting
   `manifest['ir_stash']['candidates'] >= 1`.
+- Snapshot pinning (US-115, `ingest/normalize.py` + `projection_artifact.py`,
+  CODE_REVIEW M-10): a pinned run must be self-contained. `create_snapshot` freezes
+  the 5 core `TABLE_NAMES` PLUS every present `OPTIONAL_TABLE_NAMES`
+  (`league_draft_picks`, `odds`, `injuries`) and writes a snapshot `_manifest.json`
+  with `optional_tables: {name: 'frozen'|'absent'}` and `complete: true`. BOTH
+  `build_projection_artifact_from_normalized` and `run_backtest_from_normalized` read
+  EVERY input from `source_dir` (= snapshot dir when pinned, else live
+  `normalized_dir`) -- never from live `normalized_dir` under a pin. GOTCHA: the old
+  bug was `injuries=_load_injuries(normalized_dir)` / `odds=_load_odds(normalized_dir)`
+  reading LIVE even when pinned -- always thread `source_dir`. Loud guard =
+  `_require_complete_snapshot(source_dir)` (in projection_artifact, imported by
+  replay): raises `FileNotFoundError` (no `_manifest.json`) / `RuntimeError` (no
+  `complete` marker = legacy core-only snapshot) / `FileNotFoundError` (declared-frozen
+  table missing). GOTCHA: `create_snapshot` needs ALL 5 core tables present
+  (`_tables_present` checks `teams` too), so a from-normalized test fixture that only
+  writes the 4 projection tables must also drop a `teams.parquet` before snapshotting.
 
 ---
 
@@ -1021,4 +1037,38 @@ Started: 2026-08-29 (fix round from ml/CODE_REVIEW.md; build-run log archived in
     `df.to_dict('records')` instead; ruff enforces 100-char lines + import order.
   - `ProjectArtifactConfig.ir` defaults to False -- set `ir=True` to exercise the
     IR-stash path; assert via `manifest['ir_stash']['candidates']`.
+---
+
+## 2026-08-30 - US-115 (Make snapshot pinning complete or loud, M-10)
+- Fixed the hollow snapshot contract: a pinned run previously froze only the 5
+  core tables yet read league_draft_picks/odds/injuries from LIVE normalized_dir,
+  so fitted opponents silently fell back to greedy, the league-comparison section
+  vanished, and mutable live inputs leaked -- falsifying "(snapshot, seed) fully
+  determines every score".
+- Files changed:
+  - ml/src/draft_oracle/ingest/normalize.py: added OPTIONAL_TABLE_NAMES
+    (league_draft_picks, odds, injuries); create_snapshot now freezes each present
+    optional table and records optional_tables {frozen|absent} + complete:true in
+    the snapshot _manifest.json.
+  - ml/src/draft_oracle/projection_artifact.py: build_projection_artifact_from_normalized
+    reads injuries + league_picks from source_dir (snapshot when pinned); new
+    _require_complete_snapshot() fails loudly on a pin against a missing/legacy/
+    incomplete snapshot. _load_injuries/_load_league_picks re-doc'd around source_dir.
+  - ml/src/draft_oracle/backtest/replay.py: run_backtest_from_normalized reads odds
+    from source_dir when pinned and guards via _require_complete_snapshot.
+  - ml/tests/test_normalize.py: freezes-optional-tables + records-completeness test.
+  - ml/tests/test_projection_artifact.py: pinned run reads frozen injuries (100) not
+    mutated live (999) + fitted-opponent picks present though live deleted; two
+    loud-fail tests (incomplete manifest -> RuntimeError, no manifest -> FileNotFoundError).
+- Checks: ruff + mypy clean; 645 ml tests pass. JS/TS typecheck/lint/playwright
+  untouched (Python-only change in the standalone ml project, no nx target).
+- **Learnings for future iterations:**
+  - Consolidated into Codebase Patterns: snapshot pinning must thread source_dir
+    for EVERY consumed input; guard legacy snapshots with _require_complete_snapshot.
+  - create_snapshot requires all 5 core tables (teams included) via _tables_present;
+    from-normalized fixtures that write only the 4 projection tables must add a
+    teams.parquet before snapshotting.
+  - Monkeypatch draft_oracle.projection_artifact.build_projection_artifact (module
+    attr) to spy on the injuries/league_picks a pinned run actually passes -- the
+    from_normalized wrapper resolves it as a module global.
 ---

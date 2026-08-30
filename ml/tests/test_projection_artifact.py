@@ -8,6 +8,8 @@ on the same snapshot, the run manifest contents, and the ``oracle project`` CLI.
 
 from __future__ import annotations
 
+import json
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +23,7 @@ from draft_oracle.ingest.injuries import (
     EspnInjuriesResponse,
     injuries_response_to_rows,
 )
+from draft_oracle.ingest.normalize import create_snapshot
 from draft_oracle.models.series_sim import HOME_ICE_PATTERN
 from draft_oracle.models.skater_production import SkaterProductionConfig
 from draft_oracle.projection_artifact import (
@@ -660,6 +663,109 @@ def test_from_normalized_writes_all_files(tmp_path: Path) -> None:
         .read_text(encoding="utf-8")
         .startswith("# Draft Oracle cheat sheet")
     )
+
+
+def test_pinned_run_reads_frozen_inputs_not_live(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # M-10: a pinned run must read every consumed input (injuries + league picks)
+    # from the frozen snapshot so (snapshot, seed) fully determines the artifact --
+    # the fitted-opponent league comparison is present and mutable live tables leak
+    # nothing.
+    import draft_oracle.projection_artifact as pa
+
+    normalized = tmp_path / "normalized"
+    _write_normalized(normalized)
+    pd.DataFrame([{"team_id": 1, "team_abbrev": "AAA"}]).to_parquet(
+        normalized / "teams.parquet", index=False
+    )
+    frozen_injuries = pd.DataFrame(
+        [{"player_id": 100, "player_name": "AAA-100", "position": "F", "status": "out"}]
+    )
+    frozen_injuries.to_parquet(normalized / "injuries.parquet", index=False)
+    frozen_picks = pd.DataFrame([{"manager": "kyle", "player_id": 100}])
+    frozen_picks.to_parquet(normalized / "league_draft_picks.parquet", index=False)
+
+    create_snapshot(out_dir=normalized, snapshot_id="pin1")
+
+    # Corrupt the LIVE injuries and delete the LIVE league picks: any live read is
+    # now observable (wrong player id) or would drop the fitted-opponent input.
+    pd.DataFrame(
+        [{"player_id": 999, "player_name": "X", "position": "F", "status": "out"}]
+    ).to_parquet(normalized / "injuries.parquet", index=False)
+    (normalized / "league_draft_picks.parquet").unlink()
+
+    captured: dict[str, pd.DataFrame | None] = {}
+    real = pa.build_projection_artifact
+
+    def spy(*args: object, **kwargs: object) -> object:
+        captured["injuries"] = kwargs.get("injuries")  # type: ignore[assignment]
+        captured["league_picks"] = kwargs.get("league_picks")  # type: ignore[assignment]
+        return real(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(pa, "build_projection_artifact", spy)
+
+    result, _ = build_projection_artifact_from_normalized(
+        season=2022,
+        playoff_round=1,
+        normalized_dir=normalized,
+        artifacts_root=tmp_path / "artifacts",
+        snapshot="pin1",
+        config=_config(),
+    )
+
+    # Injuries came from the frozen snapshot (player 100), NOT the mutated live 999.
+    assert captured["injuries"] is not None
+    assert set(captured["injuries"]["player_id"]) == {100}
+    # The fitted-opponent league picks are present under the pin though the live
+    # file was deleted -- no silent greedy fallback.
+    assert captured["league_picks"] is not None
+    assert not captured["league_picks"].empty
+    assert result.manifest["snapshot_id"] == "pin1"
+
+
+def test_pinned_run_on_incomplete_snapshot_fails_loudly(tmp_path: Path) -> None:
+    # A legacy snapshot froze only the core tables (no 'complete' marker); a pin
+    # against it must raise rather than silently read live odds/injuries (M-10).
+    normalized = tmp_path / "normalized"
+    _write_normalized(normalized)
+    snap_dir = normalized / "snapshots" / "legacy"
+    snap_dir.mkdir(parents=True)
+    for name in ("skater_games", "team_games", "series", "players"):
+        shutil.copy(normalized / f"{name}.parquet", snap_dir / f"{name}.parquet")
+    (snap_dir / "_manifest.json").write_text(
+        json.dumps({"snapshot_id": "legacy"}), encoding="utf-8"
+    )
+
+    with pytest.raises(RuntimeError, match="complete-snapshot"):
+        build_projection_artifact_from_normalized(
+            season=2022,
+            playoff_round=1,
+            normalized_dir=normalized,
+            artifacts_root=tmp_path / "artifacts",
+            snapshot="legacy",
+            config=_config(),
+        )
+
+
+def test_pinned_run_without_snapshot_manifest_fails_loudly(tmp_path: Path) -> None:
+    # A snapshot directory with no manifest at all is not a valid pin.
+    normalized = tmp_path / "normalized"
+    _write_normalized(normalized)
+    snap_dir = normalized / "snapshots" / "bare"
+    snap_dir.mkdir(parents=True)
+    for name in ("skater_games", "team_games", "series", "players"):
+        shutil.copy(normalized / f"{name}.parquet", snap_dir / f"{name}.parquet")
+
+    with pytest.raises(FileNotFoundError, match=r"_manifest\.json"):
+        build_projection_artifact_from_normalized(
+            season=2022,
+            playoff_round=1,
+            normalized_dir=normalized,
+            artifacts_root=tmp_path / "artifacts",
+            snapshot="bare",
+            config=_config(),
+        )
 
 
 def test_slot_strategies_skipped_when_pool_too_small() -> None:

@@ -45,6 +45,13 @@ MANIFEST_NAME = "_manifest.json"
 # The five normalized tables, in dependency order.
 TABLE_NAMES = ("skater_games", "team_games", "series", "players", "teams")
 
+# Optional tables that pinned downstream runs consume (fitted-opponent league
+# picks, market odds, injuries). Frozen into a snapshot when present so that a
+# pin is self-contained (M-10). A consumer that finds one recorded ``"absent"``
+# in the snapshot manifest knows that is the frozen truth at snapshot time, not
+# a silent live read.
+OPTIONAL_TABLE_NAMES = ("league_draft_picks", "odds", "injuries")
+
 # ── Position mapping (SPEC §1) ───────────────────────────────────────────
 
 _POSITION_MAP: dict[str, str] = {"C": "F", "L": "F", "R": "F", "D": "D"}
@@ -562,7 +569,10 @@ def create_snapshot(
     """Freeze a dated copy of the normalized tables under ``snapshots/<id>/``.
 
     ``snapshot_id`` defaults to a UTC timestamp. Downstream stages pin the id to
-    train and backtest on reproducible data (SPEC §3).
+    train and backtest on reproducible data (SPEC §3). Every optional table a
+    pinned run consumes (``league_draft_picks``, ``odds``, ``injuries``) is frozen
+    when present and recorded in the snapshot manifest, so a pin is a complete,
+    self-contained contract rather than a silent fallback to live tables (M-10).
     """
     if not _tables_present(out_dir):
         raise FileNotFoundError(
@@ -578,10 +588,27 @@ def create_snapshot(
         frame.to_parquet(snapshot_dir / f"{name}.parquet", index=False)
         row_counts[name] = len(frame)
 
+    # Freeze every optional table a pinned run may consume so the snapshot is a
+    # complete, self-contained contract (M-10). Absent tables are recorded
+    # explicitly so a consumer never confuses "frozen truth: not present" with a
+    # silent greedy fallback.
+    optional_tables: dict[str, str] = {}
+    for name in OPTIONAL_TABLE_NAMES:
+        src = out_dir / f"{name}.parquet"
+        if src.exists():
+            frame = pd.read_parquet(src)
+            frame.to_parquet(snapshot_dir / f"{name}.parquet", index=False)
+            row_counts[name] = len(frame)
+            optional_tables[name] = "frozen"
+        else:
+            optional_tables[name] = "absent"
+
     manifest: dict[str, object] = {
         "snapshot_id": resolved_id,
         "created_at": datetime.now(UTC).isoformat(),
         "row_counts": row_counts,
+        "optional_tables": optional_tables,
+        "complete": True,
     }
     (snapshot_dir / MANIFEST_NAME).write_text(
         json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
