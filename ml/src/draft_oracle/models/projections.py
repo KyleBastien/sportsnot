@@ -60,6 +60,8 @@ from draft_oracle.models.skater_production import (
     spearman_correlation,
     train_skater_production_model,
 )
+from draft_oracle.provenance import add_git_provenance
+from draft_oracle.rules import player_points
 
 __all__ = [
     "BASELINE_REG_GAMES",
@@ -519,7 +521,7 @@ def _previous_round_points(labels: pd.DataFrame) -> dict[tuple[int, int, int], f
     out: dict[tuple[int, int, int], float] = {}
     for rec in labels.to_dict("records"):
         key = (int(rec["season_id"]), int(rec["playoff_round"]), int(rec["player_id"]))
-        out[key] = float(rec["round_goals"]) + float(rec["round_assists"])
+        out[key] = float(player_points(int(rec["round_goals"]), int(rec["round_assists"])))
     return out
 
 
@@ -685,12 +687,13 @@ def evaluate_skater_projections_from_normalized(
     series = pd.read_parquet(normalized_dir / "series.parquet")
 
     result = evaluate_skater_projections(skater_games, players, team_games, series, config=config)
+    manifest = add_git_provenance(result.manifest())
 
     artifact_dir.mkdir(parents=True, exist_ok=True)
     (artifact_dir / "report.md").write_text(
         "\n".join(result.report_lines()) + "\n", encoding="utf-8"
     )
     (artifact_dir / "manifest.json").write_text(
-        json.dumps(result.manifest(), indent=2) + "\n", encoding="utf-8"
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     return result

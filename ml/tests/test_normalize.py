@@ -1,8 +1,4 @@
-"""Tests for draft_oracle.ingest.normalize (US-004).
-
-All fixtures are built in-memory / on tmp_path — no network, no committed
-archive dependency (SPEC §7).
-"""
+"""Tests for draft_oracle.ingest.normalize (US-004)."""
 
 from __future__ import annotations
 
@@ -75,6 +71,18 @@ def test_season_id_from_year() -> None:
 def test_season_id_from_label_rejects_garbage() -> None:
     with pytest.raises(ValueError, match="Unrecognized season label"):
         season_id_from_label("nope")
+
+
+def test_real_archive_team_games_normalize_smoke() -> None:
+    path = Path("data/raw/nhl-archive/team-games-2025-26.csv.gz")
+    assert path.is_file(), "committed NHL archive season is required"
+
+    normalized = normalize_team_games(pd.read_csv(path))
+
+    assert not normalized.empty
+    assert normalized["season_id"].eq(20252026).all()
+    assert normalized["game_id"].notna().all()
+    assert normalized["team_abbrev"].notna().all()
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────
@@ -425,8 +433,6 @@ def test_snapshot_freezes_optional_tables_and_records_completeness(tmp_path: Pat
     assert set(manifest["optional_tables"]) == set(OPTIONAL_TABLE_NAMES)
     assert snap.row_counts["league_draft_picks"] == 1
     assert snap.row_counts["injuries"] == 1
-
-
 
     with pytest.raises(FileNotFoundError):
         create_snapshot(out_dir=tmp_path / "empty")

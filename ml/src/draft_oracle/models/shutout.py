@@ -58,6 +58,7 @@ from draft_oracle.models.game_win import (
     brier_score,
     default_temporal_split,
 )
+from draft_oracle.provenance import add_git_provenance
 
 __all__ = [
     "NEUTRAL_SAVE_PCT",
@@ -663,11 +664,7 @@ class ShutoutResult:
             "- Validation Brier by weight (1.00 = pure model):",
         ]
         for weight_key in sorted(self.val_brier_by_shrinkage, key=float, reverse=True):
-            marker = (
-                "  <- chosen"
-                if abs(float(weight_key) - self.shrinkage_weight) < 1e-9
-                else ""
-            )
+            marker = "  <- chosen" if abs(float(weight_key) - self.shrinkage_weight) < 1e-9 else ""
             brier = self.val_brier_by_shrinkage[weight_key]
             lines.append(f"  - w={weight_key}: {brier:.4f}{marker}")
         lines += [
@@ -823,12 +820,13 @@ def train_shutout_from_normalized(
 
     team_games = pd.read_parquet(normalized_dir / "team_games.parquet")
     result = train_shutout_model(team_games, config=config)
+    manifest = add_git_provenance(result.manifest())
 
     artifact_dir.mkdir(parents=True, exist_ok=True)
     (artifact_dir / "report.md").write_text(
         "\n".join(result.report_lines()) + "\n", encoding="utf-8"
     )
     (artifact_dir / "manifest.json").write_text(
-        json.dumps(result.manifest(), indent=2) + "\n", encoding="utf-8"
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     return result

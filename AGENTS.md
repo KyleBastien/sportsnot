@@ -219,6 +219,20 @@ The Android CI workflow (`.github/workflows/android-build.yml`) runs on
 gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
 `packages/web/`, or `capacitor.config.ts`.
 
+## Draft Oracle (`ml/`)
+
+- Run Python checks from `ml/`: `.venv/Scripts/python.exe -m ruff check src tests scripts`,
+  `.venv/Scripts/python.exe -m mypy src tests scripts`, and
+  `.venv/Scripts/python.exe -m pytest`.
+- Tests enforce offline execution through the autouse socket guard in
+  `ml/tests/conftest.py`; HTTP tests must use fixture transports.
+- Stamp generated artifact manifests through
+  `draft_oracle.provenance.add_git_provenance` so `git_sha` and `git_dirty` stay
+  consistent.
+- Keep imports in `draft_oracle.cli.project` lightweight. Import training and HTTP
+  modules inside command bodies so draft-time commands start without LightGBM,
+  scikit-learn, or httpx.
+
 ## Ralph Agent System
 
 The repo includes a Ralph autonomous agent system (`scripts/ralph/`) for automated story implementation. Ralph agents read a `prd.json`, implement stories one at a time, and track progress in `progress.txt`. Agent instructions are in `scripts/ralph/CLAUDE.md`. Copilot Skills for PRD generation and Ralph conversion are in `.agents/skills/`.

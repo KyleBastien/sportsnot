@@ -8,98 +8,30 @@ projection and draft-assistant commands follow in US-017/024.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
 from draft_oracle import __version__
-from draft_oracle.backtest.replay import (
-    DEFAULT_BACKTEST_ROOT,
-    STRATEGIES,
-    BacktestConfig,
-    Strategy,
-    run_backtest_from_normalized,
-)
-from draft_oracle.cli.draft import draft as draft_command
-from draft_oracle.cli.draft import (
-    parse_managers,
-    resolve_opponents_kind,
-)
-from draft_oracle.ingest.entity_match import (
-    DEFAULT_OVERRIDES_DIR,
-    build_league_draft_picks,
-)
-from draft_oracle.ingest.injuries import (
-    DEFAULT_INJURIES_OVERRIDES,
-    build_injuries_table,
-)
-from draft_oracle.ingest.league_drafts import (
-    DEFAULT_LEAGUE_DRAFTS_DIR,
-    build_league_drafts,
-)
-from draft_oracle.ingest.normalize import (
-    DEFAULT_ARCHIVE_DIR,
-    DEFAULT_NORMALIZED_DIR,
-    create_snapshot,
-    list_snapshots,
-    normalize_archive,
-)
-from draft_oracle.ingest.odds import (
-    DEFAULT_ODDS_ARCHIVE_DIR,
-    build_odds_table,
-)
-from draft_oracle.models.game_win import (
-    DEFAULT_MODEL_ARTIFACT_DIR,
-    GameWinConfig,
-    train_game_win_from_normalized,
-)
-from draft_oracle.models.projections import (
-    DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_PROJECTION_ARTIFACT_DIR,
-)
-from draft_oracle.models.projections import (
-    ProjectionConfig,
-    evaluate_skater_projections_from_normalized,
-)
-from draft_oracle.models.returns import (
-    DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_RETURN_TIME_ARTIFACT_DIR,
-)
-from draft_oracle.models.returns import (
-    ReturnTimeConfig,
-    train_return_time_from_normalized,
-)
-from draft_oracle.models.series_sim import (
-    DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_SERIES_SIM_ARTIFACT_DIR,
-)
-from draft_oracle.models.series_sim import (
-    SeriesSimConfig,
-    evaluate_series_sim_from_normalized,
-)
-from draft_oracle.models.shutout import (
-    DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_SHUTOUT_ARTIFACT_DIR,
-)
-from draft_oracle.models.shutout import (
-    ShutoutConfig,
-    train_shutout_from_normalized,
-)
-from draft_oracle.models.skater_production import (
-    DEFAULT_MODEL_ARTIFACT_DIR as DEFAULT_SKATER_PRODUCTION_ARTIFACT_DIR,
-)
-from draft_oracle.models.skater_production import (
-    SkaterProductionConfig,
-    train_skater_production_from_normalized,
-)
-from draft_oracle.optimize.opponents import (
-    DEFAULT_OPPONENT_ARTIFACT_DIR,
-    OpponentFitConfig,
-    load_committed_opponents,
-    train_opponent_model_from_normalized,
-)
-from draft_oracle.optimize.slot_strategies import SlotStrategyConfig
-from draft_oracle.projection_artifact import (
-    DEFAULT_ARTIFACTS_ROOT,
-    ProjectArtifactConfig,
-    build_projection_artifact_from_normalized,
-)
+
+DEFAULT_ARCHIVE_DIR = Path("data/raw/nhl-archive")
+DEFAULT_NORMALIZED_DIR = Path("data/normalized")
+DEFAULT_ODDS_ARCHIVE_DIR = Path("data/raw/odds-archive")
+DEFAULT_LEAGUE_DRAFTS_DIR = Path("data/raw/league-drafts")
+DEFAULT_OVERRIDES_DIR = Path("data/overrides")
+DEFAULT_INJURIES_OVERRIDES = DEFAULT_OVERRIDES_DIR / "injuries.yaml"
+DEFAULT_MODEL_ARTIFACT_DIR = Path("artifacts/models/game-win")
+DEFAULT_SHUTOUT_ARTIFACT_DIR = Path("artifacts/models/shutout")
+DEFAULT_SKATER_PRODUCTION_ARTIFACT_DIR = Path("artifacts/models/skater-production")
+DEFAULT_RETURN_TIME_ARTIFACT_DIR = Path("artifacts/models/return-time")
+DEFAULT_SERIES_SIM_ARTIFACT_DIR = Path("artifacts/models/series-sim")
+DEFAULT_PROJECTION_ARTIFACT_DIR = Path("artifacts/models/skater-projection")
+DEFAULT_OPPONENT_ARTIFACT_DIR = Path("artifacts/models/opponent")
+DEFAULT_ARTIFACTS_ROOT = Path("artifacts")
+DEFAULT_BACKTEST_ROOT = Path("artifacts/backtests")
+
+Strategy = Literal["oracle", "greedy_vor", "one_step", "random_legal"]
+STRATEGIES: tuple[Strategy, ...] = ("oracle", "greedy_vor", "one_step", "random_legal")
 
 app = typer.Typer(
     add_completion=False,
@@ -132,6 +64,8 @@ def normalize(
     ] = False,
 ) -> None:
     """Normalize the committed NHL archive into Parquet tables (idempotent)."""
+    from draft_oracle.ingest.normalize import normalize_archive
+
     result = normalize_archive(archive_dir=archive_dir, out_dir=out_dir, force=force)
     if result.skipped:
         typer.echo(f"Up to date - {out_dir} matches sources; nothing to do.")
@@ -155,6 +89,8 @@ def snapshot(
     ] = False,
 ) -> None:
     """Freeze a dated copy of the normalized tables; downstream pins the id."""
+    from draft_oracle.ingest.normalize import create_snapshot, list_snapshots
+
     if show_list:
         ids = list_snapshots(out_dir)
         if not ids:
@@ -185,6 +121,8 @@ def odds(
     ] = False,
 ) -> None:
     """Build the de-vigged odds tables from committed archives (offline)."""
+    from draft_oracle.ingest.odds import build_odds_table
+
     if no_odds:
         typer.echo("Odds ingestion skipped (--no-odds); stat-only path is unaffected.")
         return
@@ -212,6 +150,8 @@ def league_drafts(
     ] = DEFAULT_NORMALIZED_DIR,
 ) -> None:
     """Parse the committed league draft-history snapshots into Parquet tables."""
+    from draft_oracle.ingest.league_drafts import build_league_drafts
+
     result = build_league_drafts(league_dir=league_dir, out_dir=out_dir)
     for line in result.report_lines():
         typer.echo(line)
@@ -230,6 +170,8 @@ def match_drafts(
     ] = DEFAULT_NORMALIZED_DIR,
 ) -> None:
     """Match league picks to NHL ids -> league_draft_picks + match-rate report."""
+    from draft_oracle.ingest.entity_match import build_league_draft_picks
+
     result = build_league_draft_picks(
         normalized_dir=normalized_dir,
         overrides_dir=overrides_dir,
@@ -256,6 +198,8 @@ def injuries(
     ] = False,
 ) -> None:
     """Ingest ESPN injuries into injuries.parquet; overrides win as final authority."""
+    from draft_oracle.ingest.injuries import build_injuries_table
+
     result = build_injuries_table(
         overrides_path=overrides_path,
         out_dir=out_dir,
@@ -280,6 +224,8 @@ def train_game_win(
     seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
 ) -> None:
     """Train the per-game win model; write the evaluation report + manifest."""
+    from draft_oracle.models.game_win import GameWinConfig, train_game_win_from_normalized
+
     result = train_game_win_from_normalized(
         normalized_dir=normalized_dir,
         artifact_dir=artifact_dir,
@@ -310,6 +256,8 @@ def train_shutout(
     seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
 ) -> None:
     """Train the shutout-probability model; write the evaluation report + manifest."""
+    from draft_oracle.models.shutout import ShutoutConfig, train_shutout_from_normalized
+
     result = train_shutout_from_normalized(
         normalized_dir=normalized_dir,
         artifact_dir=artifact_dir,
@@ -340,6 +288,11 @@ def train_skater_production(
     seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
 ) -> None:
     """Train the skater per-game production model; write the report + manifest."""
+    from draft_oracle.models.skater_production import (
+        SkaterProductionConfig,
+        train_skater_production_from_normalized,
+    )
+
     result = train_skater_production_from_normalized(
         normalized_dir=normalized_dir,
         artifact_dir=artifact_dir,
@@ -371,6 +324,8 @@ def train_return_time(
     seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
 ) -> None:
     """Calibrate the injury return-time model on archive absence spells."""
+    from draft_oracle.models.returns import ReturnTimeConfig, train_return_time_from_normalized
+
     result = train_return_time_from_normalized(
         normalized_dir=normalized_dir,
         artifact_dir=artifact_dir,
@@ -397,6 +352,8 @@ def eval_series_sim(
     seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
 ) -> None:
     """Calibrate the best-of-7 series simulator; write the report + manifest."""
+    from draft_oracle.models.series_sim import SeriesSimConfig, evaluate_series_sim_from_normalized
+
     result = evaluate_series_sim_from_normalized(
         normalized_dir=normalized_dir,
         artifact_dir=artifact_dir,
@@ -422,6 +379,11 @@ def project_skaters(
     seed: Annotated[int, typer.Option(help="Deterministic training/MC seed.")] = 20260827,
 ) -> None:
     """Evaluate skater round-point projections with uncertainty; write report + manifest."""
+    from draft_oracle.models.projections import (
+        ProjectionConfig,
+        evaluate_skater_projections_from_normalized,
+    )
+
     result = evaluate_skater_projections_from_normalized(
         normalized_dir=normalized_dir,
         artifact_dir=artifact_dir,
@@ -456,6 +418,11 @@ def train_opponents(
     seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
 ) -> None:
     """Fit the league-history opponent model; write the validation report + manifest."""
+    from draft_oracle.optimize.opponents import (
+        OpponentFitConfig,
+        train_opponent_model_from_normalized,
+    )
+
     result = train_opponent_model_from_normalized(
         normalized_dir=normalized_dir,
         artifact_dir=artifact_dir,
@@ -533,6 +500,13 @@ def project(
     run_manifest.json under artifacts_root/<season>-r<round>/. Eliminated teams are
     excluded automatically.
     """
+    from draft_oracle.ingest.normalize import normalize_archive
+    from draft_oracle.optimize.slot_strategies import SlotStrategyConfig
+    from draft_oracle.projection_artifact import (
+        ProjectArtifactConfig,
+        build_projection_artifact_from_normalized,
+    )
+
     if not no_refresh and not snapshot:
         normalize_archive(archive_dir=archive_dir, out_dir=normalized_dir)
     result, out_dir = build_projection_artifact_from_normalized(
@@ -621,6 +595,8 @@ def recommend(
     import random as _random
     from collections.abc import Mapping
 
+    from draft_oracle.cli.draft import parse_managers, resolve_opponents_kind
+    from draft_oracle.optimize.opponents import load_committed_opponents
     from draft_oracle.optimize.recommend import (
         RecommendConfig,
         build_pool_from_projection_artifact,
@@ -697,7 +673,59 @@ def compare_strategies_cmd(
         typer.echo(line)
 
 
-app.command(name="draft")(draft_command)
+@app.command(name="draft")
+def draft_cmd(
+    artifact: Annotated[
+        Path | None,
+        typer.Option(help="Projection artifact directory (skaters/teams parquet)."),
+    ] = None,
+    managers: Annotated[
+        str,
+        typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."),
+    ] = "4",
+    slot: Annotated[int, typer.Option("--slot", help="Your snake seat (1-based).")] = 1,
+    ir: Annotated[
+        bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
+    ] = False,
+    eliminated: Annotated[str, typer.Option(help="Comma-separated eliminated team abbrevs.")] = "",
+    session: Annotated[
+        Path | None, typer.Option(help="Session-log path (autosaved after each pick).")
+    ] = None,
+    resume: Annotated[
+        Path | None, typer.Option("--resume", help="Resume a saved session JSON instead.")
+    ] = None,
+    temperature: Annotated[float, typer.Option(help="Greedy opponent softmax temperature.")] = 0.3,
+    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
+    rollouts: Annotated[
+        int, typer.Option(help="Monte-Carlo rollouts per candidate for recommend.")
+    ] = 500,
+    opponents: Annotated[
+        str,
+        typer.Option(
+            help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."
+        ),
+    ] = "auto",
+    opponent_artifact: Annotated[
+        Path, typer.Option(help="Committed opponent-model artifact directory (fitted path).")
+    ] = DEFAULT_OPPONENT_ARTIFACT_DIR,
+) -> None:
+    """Start the interactive, artifact-powered draft assistant (US-024)."""
+    from draft_oracle.cli.draft import draft
+
+    draft(
+        artifact=artifact,
+        managers=managers,
+        slot=slot,
+        ir=ir,
+        eliminated=eliminated,
+        session=session,
+        resume=resume,
+        temperature=temperature,
+        seed=seed,
+        rollouts=rollouts,
+        opponents=opponents,
+        opponent_artifact=opponent_artifact,
+    )
 
 
 @app.command()
@@ -737,6 +765,8 @@ def backtest(
     if any round-N game leaks into the as-of inputs. Per-round intermediates and the
     run manifest are written under backtest_root/<run-id>/.
     """
+    from draft_oracle.backtest.replay import BacktestConfig, run_backtest_from_normalized
+
     resolved: tuple[Strategy, ...] = tuple(_coerce_strategy(s) for s in (strategies or ["oracle"]))
     config = BacktestConfig(
         seed=seed,

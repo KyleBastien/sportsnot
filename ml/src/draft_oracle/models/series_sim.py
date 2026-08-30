@@ -71,6 +71,7 @@ from draft_oracle.models.skater_production import (
     _series_round_map,
     playoff_round_cutoffs,
 )
+from draft_oracle.provenance import add_git_provenance
 from draft_oracle.rules import SHUTOUT_POINTS, WIN_POINTS
 
 __all__ = [
@@ -349,9 +350,7 @@ class _MatchupPlan:
     frozen: bool = False
 
 
-def _matchup_cutoff_plan(
-    team_games: pd.DataFrame, series: pd.DataFrame
-) -> list[_MatchupPlan]:
+def _matchup_cutoff_plan(team_games: pd.DataFrame, series: pd.DataFrame) -> list[_MatchupPlan]:
     """Every real series' pre-round freeze target: its declared round-start cutoff.
 
     Freezing a matchup's pre-series snapshot at the *round's* start (not the
@@ -934,13 +933,14 @@ def evaluate_series_sim_from_normalized(
     team_games = pd.read_parquet(normalized_dir / "team_games.parquet")
     series = pd.read_parquet(normalized_dir / "series.parquet")
     result = evaluate_series_sim(team_games, series, config=config)
+    manifest = add_git_provenance(result.manifest())
 
     artifact_dir.mkdir(parents=True, exist_ok=True)
     (artifact_dir / "report.md").write_text(
         "\n".join(result.report_lines()) + "\n", encoding="utf-8"
     )
     (artifact_dir / "manifest.json").write_text(
-        json.dumps(result.manifest(), indent=2) + "\n", encoding="utf-8"
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     return result
 

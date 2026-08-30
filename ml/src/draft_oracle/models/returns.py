@@ -52,6 +52,7 @@ from draft_oracle.ingest.injuries import (
     STATUS_OUT,
     InjuryOverride,
 )
+from draft_oracle.provenance import add_git_provenance
 
 __all__ = [
     "DEFAULT_HORIZON",
@@ -648,12 +649,13 @@ def train_return_time_from_normalized(
     team_games = pd.read_parquet(normalized_dir / "team_games.parquet")
 
     result = train_return_time_model(skater_games, team_games, config=config)
+    manifest = add_git_provenance(result.manifest())
 
     artifact_dir.mkdir(parents=True, exist_ok=True)
     (artifact_dir / "report.md").write_text(
         "\n".join(result.report_lines()) + "\n", encoding="utf-8"
     )
     (artifact_dir / "manifest.json").write_text(
-        json.dumps(result.manifest(), indent=2) + "\n", encoding="utf-8"
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     return result

@@ -45,7 +45,6 @@ and git SHA live only in ``run_manifest.json`` -- never in the Parquet payload.
 from __future__ import annotations
 
 import json
-import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -117,6 +116,7 @@ from draft_oracle.optimize.vor import (
     build_cheatsheet,
     write_cheatsheet,
 )
+from draft_oracle.provenance import add_git_provenance
 
 __all__ = [
     "LIVE_PROJECTION_VERSION",
@@ -205,21 +205,6 @@ class ProjectArtifactResult:
     manifest: dict[str, Any]
     warnings: list[str]
     slot_strategies: SlotStrategyReport | None = None
-
-
-def _git_sha() -> str | None:
-    """Current git commit SHA, or ``None`` when git is unavailable (e.g. tests)."""
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except (OSError, subprocess.CalledProcessError):  # pragma: no cover - env dependent
-        return None
-    sha = out.stdout.strip()
-    return sha or None
 
 
 def _injured_player_ids(injuries: pd.DataFrame | None) -> set[int]:
@@ -746,50 +731,52 @@ def build_projection_artifact(
 
     slot_report = _build_slot_report(skaters, teams, league_picks, warnings, config)
 
-    manifest = {
-        "artifact_version": LIVE_PROJECTION_VERSION,
-        "package_version": __version__,
-        "season": int(season),
-        "playoff_round": int(playoff_round),
-        "snapshot_id": snapshot_id,
-        "as_of_cutoff": cutoff,
-        "feature_version": FEATURE_SET_VERSION,
-        "model_versions": {
-            "game_win": GAME_WIN_MODEL_VERSION,
-            "shutout": SHUTOUT_MODEL_VERSION,
-            "skater_production": SKATER_PRODUCTION_VERSION,
-            "series_sim": SERIES_SIM_VERSION,
-            "projection": PROJECTION_VERSION,
-        },
-        "git_sha": git_sha if git_sha is not None else _git_sha(),
-        "seeds": {"base": config.seed, "n_sims": config.n_sims, "horizon": config.horizon},
-        "generated_at": generated_at or datetime.now(UTC).isoformat(),
-        "scarcity": cheatsheet.summary(),
-        "counts": {
-            "eligible_series": int(len(teams) // 2),
-            "eligible_teams": len(teams),
-            "skaters_projected": len(skaters),
-            "skaters_injured": int(skaters["injured"].sum()) if not skaters.empty else 0,
-        },
-        "eligible_team_abbrevs": sorted(length_by_abbrev),
-        "ir_stash": {
-            "enabled": config.ir,
-            "candidates": len(ir_valuations),
-            "stash_verdicts": sum(1 for v in ir_valuations if v.verdict == "stash"),
-        },
-        "slot_strategies": slot_report.summary() if slot_report is not None else None,
-        "combined_event": (
-            {
-                "draft_event": "R3_4",
-                "draft_round": _COMBINED_DRAFT_ROUND,
-                "scored_rounds": list(_COMBINED_SCORED_ROUNDS),
-                "teams": combined_diagnostics,
-            }
-            if combined_diagnostics is not None
-            else None
-        ),
-        "warnings": warnings,
-    }
+    manifest = add_git_provenance(
+        {
+            "artifact_version": LIVE_PROJECTION_VERSION,
+            "package_version": __version__,
+            "season": int(season),
+            "playoff_round": int(playoff_round),
+            "snapshot_id": snapshot_id,
+            "as_of_cutoff": cutoff,
+            "feature_version": FEATURE_SET_VERSION,
+            "model_versions": {
+                "game_win": GAME_WIN_MODEL_VERSION,
+                "shutout": SHUTOUT_MODEL_VERSION,
+                "skater_production": SKATER_PRODUCTION_VERSION,
+                "series_sim": SERIES_SIM_VERSION,
+                "projection": PROJECTION_VERSION,
+            },
+            "git_sha": git_sha,
+            "seeds": {"base": config.seed, "n_sims": config.n_sims, "horizon": config.horizon},
+            "generated_at": generated_at or datetime.now(UTC).isoformat(),
+            "scarcity": cheatsheet.summary(),
+            "counts": {
+                "eligible_series": int(len(teams) // 2),
+                "eligible_teams": len(teams),
+                "skaters_projected": len(skaters),
+                "skaters_injured": int(skaters["injured"].sum()) if not skaters.empty else 0,
+            },
+            "eligible_team_abbrevs": sorted(length_by_abbrev),
+            "ir_stash": {
+                "enabled": config.ir,
+                "candidates": len(ir_valuations),
+                "stash_verdicts": sum(1 for v in ir_valuations if v.verdict == "stash"),
+            },
+            "slot_strategies": slot_report.summary() if slot_report is not None else None,
+            "combined_event": (
+                {
+                    "draft_event": "R3_4",
+                    "draft_round": _COMBINED_DRAFT_ROUND,
+                    "scored_rounds": list(_COMBINED_SCORED_ROUNDS),
+                    "teams": combined_diagnostics,
+                }
+                if combined_diagnostics is not None
+                else None
+            ),
+            "warnings": warnings,
+        }
+    )
 
     return ProjectArtifactResult(
         season=int(season),

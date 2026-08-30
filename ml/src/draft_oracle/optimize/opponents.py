@@ -75,6 +75,7 @@ from draft_oracle.optimize.simulator import (
     OpponentModel,
     roster_capacity,
 )
+from draft_oracle.provenance import add_git_provenance
 from draft_oracle.rules import snake_order
 
 __all__ = [
@@ -1089,12 +1090,13 @@ def train_opponent_model_from_normalized(
     fitted = fit_opponent_models(picks, cfg)
     evaluation = evaluate_opponents(picks, cfg)
     result = OpponentModelResult(fitted=fitted, evaluation=evaluation)
+    manifest = add_git_provenance(result.manifest())
 
     artifact_dir.mkdir(parents=True, exist_ok=True)
     (artifact_dir / "report.md").write_text(
         "\n".join(result.report_lines()) + "\n", encoding="utf-8"
     )
     (artifact_dir / "manifest.json").write_text(
-        json.dumps(result.manifest(), indent=2) + "\n", encoding="utf-8"
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     return result

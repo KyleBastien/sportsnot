@@ -37,6 +37,7 @@ DEFAULT_DELAY = 1.0
 DEFAULT_MAX_ATTEMPTS = 4
 DEFAULT_RETRY_BACKOFF = 1.0
 DEFAULT_TIMEOUT = 30.0
+SKATER_SUMMARY_ROW_CAP = 10_000
 
 GameType = int  # 2 = regular season, 3 = playoffs
 SeasonId = int  # e.g. 20252026
@@ -403,4 +404,10 @@ class NHLApiClient:
             "cayenneExp": cayenne,
         }
         data = self._get_json(self.stats_base, "/skater/summary", params)
-        return SkaterSummaryResponse.model_validate(data)
+        response = SkaterSummaryResponse.model_validate(data)
+        if response.total is not None and response.total >= SKATER_SUMMARY_ROW_CAP:
+            raise NHLApiError(
+                "NHL skater summary reached the 10,000-row response cap; "
+                "partition the request by date to avoid silent truncation"
+            )
+        return response

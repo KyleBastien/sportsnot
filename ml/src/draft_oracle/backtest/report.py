@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 
 from draft_oracle import __version__
@@ -241,7 +240,7 @@ def _header_lines(result: BacktestResult) -> list[str]:
         f"# Backtest report — run `{result.run_id}`",
         "",
         f"- Package version: {__version__}",
-        f"- Generated: {datetime.now(UTC).isoformat()}",
+        f"- Generated: {result.generated_at}",
         f"- Seasons: {', '.join(str(s) for s in result.seasons)}",
         f"- Rounds replayed: {len(result.rounds)}",
         f"- League size: {cfg.managers} managers; IR slots: {cfg.ir}",

@@ -76,6 +76,7 @@ from draft_oracle.projection_artifact import (
     _snapshot_id_for,
     build_projection_artifact,
 )
+from draft_oracle.provenance import add_git_provenance
 from draft_oracle.rules import goalie_series_points, player_points
 
 __all__ = [
@@ -689,12 +690,8 @@ def _market_series_prob(
     # mid-series closing line.
     game_one_date = scoped["game_date"].min()
     game_one = scoped.loc[scoped["game_date"] == game_one_date]
-    top_home = game_one.loc[game_one["home_team_id"] == top_id, "home_implied"].astype(
-        float
-    )
-    top_away = game_one.loc[game_one["away_team_id"] == top_id, "away_implied"].astype(
-        float
-    )
+    top_home = game_one.loc[game_one["home_team_id"] == top_id, "home_implied"].astype(float)
+    top_away = game_one.loc[game_one["away_team_id"] == top_id, "away_implied"].astype(float)
     top_probs = pd.concat([top_home, top_away])
     if top_probs.empty:
         return None
@@ -735,8 +732,7 @@ def _build_series_evals(
 ) -> list[SeriesEval]:
     """Per-series stat-only + market-aware win probabilities vs. the actual winner."""
     stat_by_team = {
-        int(rec["team_id"]): float(rec["p_series_win"])
-        for rec in result.teams.to_dict("records")
+        int(rec["team_id"]): float(rec["p_series_win"]) for rec in result.teams.to_dict("records")
     }
     evals: list[SeriesEval] = []
     for row in round_series.to_dict("records"):
@@ -1041,9 +1037,7 @@ def _league_comparisons(
         ]
         if scoped.empty:
             continue
-        oracle_points = [
-            s.oracle_points for s in rnd.slot_results if s.strategy == "oracle"
-        ]
+        oracle_points = [s.oracle_points for s in rnd.slot_results if s.strategy == "oracle"]
         if not oracle_points:
             continue
         managers = [
@@ -1134,11 +1128,12 @@ def write_backtest(result: BacktestResult, root: Path = DEFAULT_BACKTEST_ROOT) -
     ``manifest.json`` is committed; the per-round JSON files under ``rounds/`` are
     regenerable intermediates (gitignored) that reporting (US-026) reads back.
     """
+    manifest = add_git_provenance(result.manifest())
     out_dir = root / result.run_id
     rounds_dir = out_dir / "rounds"
     rounds_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "manifest.json").write_text(
-        json.dumps(result.manifest(), indent=2) + "\n", encoding="utf-8"
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     for round_result in result.rounds:
         name = f"{round_result.season}-r{round_result.playoff_round}.json"

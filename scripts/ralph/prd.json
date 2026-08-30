@@ -328,8 +328,8 @@
         "All Playwright tests pass (even if it's outside of your changes)"
       ],
       "priority": 17,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed and committed. Ruff clean, mypy strict clean (68 files), and 656 tests pass. Normal commit hook passed affected lint/typecheck/test stages but CodeScene authentication was unavailable; retried with --no-verify per Ralph's documented auth-only fallback."
     },
     {
       "id": "US-118",

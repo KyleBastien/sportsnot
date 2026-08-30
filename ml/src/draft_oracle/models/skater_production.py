@@ -52,6 +52,7 @@ from draft_oracle.features.skater import (
     build_skater_features,
 )
 from draft_oracle.models.game_win import TemporalSplit, default_temporal_split
+from draft_oracle.provenance import add_git_provenance
 
 __all__ = [
     "LABEL_COLUMN",
@@ -877,12 +878,13 @@ def train_skater_production_from_normalized(
     series = pd.read_parquet(normalized_dir / "series.parquet")
 
     result = train_skater_production_model(skater_games, players, team_games, series, config=config)
+    manifest = add_git_provenance(result.manifest())
 
     artifact_dir.mkdir(parents=True, exist_ok=True)
     (artifact_dir / "report.md").write_text(
         "\n".join(result.report_lines()) + "\n", encoding="utf-8"
     )
     (artifact_dir / "manifest.json").write_text(
-        json.dumps(result.manifest(), indent=2) + "\n", encoding="utf-8"
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     return result

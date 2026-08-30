@@ -50,6 +50,7 @@ from draft_oracle.features.team_series import (
     regress_to_mean,
     update_rating,
 )
+from draft_oracle.provenance import add_git_provenance
 
 __all__ = [
     "GAME_WIN_MODEL_VERSION",
@@ -748,12 +749,13 @@ def train_game_win_from_normalized(
         odds = pd.read_parquet(odds_path)
 
     result = train_game_win_model(team_games, odds=odds, config=config)
+    manifest = add_git_provenance(result.manifest())
 
     artifact_dir.mkdir(parents=True, exist_ok=True)
     (artifact_dir / "report.md").write_text(
         "\n".join(result.report_lines()) + "\n", encoding="utf-8"
     )
     (artifact_dir / "manifest.json").write_text(
-        json.dumps(result.manifest(), indent=2) + "\n", encoding="utf-8"
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     return result

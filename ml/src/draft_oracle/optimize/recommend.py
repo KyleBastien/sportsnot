@@ -67,6 +67,7 @@ from draft_oracle.optimize.simulator import (
     survival_probability,
 )
 from draft_oracle.optimize.vor import replacement_level
+from draft_oracle.provenance import add_git_provenance
 
 __all__ = [
     "DEFAULT_MAX_CANDIDATES",
@@ -1332,14 +1333,17 @@ def evaluate_recommendation_strategies_from_normalized(
     lines += fitted_comparison.report_lines()
     lines += [""]
     lines += run_comparison.report_lines()
+    manifest = add_git_provenance(
+        {
+            "balanced_fitted": fitted_comparison.manifest(),
+            "positional_run": run_comparison.manifest(),
+        }
+    )
     artifact_dir.mkdir(parents=True, exist_ok=True)
     (artifact_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     (artifact_dir / "manifest.json").write_text(
         json.dumps(
-            {
-                "balanced_fitted": fitted_comparison.manifest(),
-                "positional_run": run_comparison.manifest(),
-            },
+            manifest,
             indent=2,
         )
         + "\n",

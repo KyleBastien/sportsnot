@@ -1,8 +1,8 @@
 """Tests for draft_oracle.rules — the SportsNot ruleset mirror (US-002).
 
-Golden vectors are copied verbatim from
-``packages/utils/src/lib/utils.test.ts`` so that any drift between the
-TypeScript app and this Python mirror is caught. Property-based tests
+Golden vectors are equivalent to the cases in
+``packages/utils/src/lib/utils.test.ts`` but use renumbered ids. This keeps
+semantic drift between the TypeScript app and Python mirror detectable. Property-based tests
 (hypothesis) cover scoring and snake-order invariants.
 """
 

@@ -473,9 +473,7 @@ def test_espn_mapped_injury_drives_flag_and_ir_stash() -> None:
             }
         ]
     }
-    injuries = injuries_response_to_rows(
-        EspnInjuriesResponse.model_validate(feed), players=players
-    )
+    injuries = injuries_response_to_rows(EspnInjuriesResponse.model_validate(feed), players=players)
     # The disjoint ESPN id was mapped onto the NHL player id (100), not left as-is.
     assert set(injuries["player_id"]) == {100}
     assert set(injuries["espn_id"]) == {4900001}
@@ -537,9 +535,7 @@ def test_pre_round_artifact_builds_before_round_starts() -> None:
     # round 2 would start -- and no round-2 game exists in the archive at all.
     cutoff = pd.Timestamp(result.manifest["as_of_cutoff"])
     assert cutoff == pd.Timestamp("2022-04-26")
-    played = tg.loc[
-        (tg["season_id"] == 20212022) & (tg["game_type_id"] == 3), "game_date"
-    ]
+    played = tg.loc[(tg["season_id"] == 20212022) & (tg["game_type_id"] == 3), "game_date"]
     assert cutoff > pd.to_datetime(played).max()
 
 
@@ -580,6 +576,7 @@ def test_manifest_records_versions_seeds_and_snapshot() -> None:
     assert m["artifact_version"] == LIVE_PROJECTION_VERSION
     assert m["snapshot_id"] == "snap-123"
     assert m["git_sha"] == "deadbeef"
+    assert isinstance(m["git_dirty"], bool)
     assert m["feature_version"] == FEATURE_SET_VERSION
     assert m["seeds"]["base"] == 20260827
     assert set(m["model_versions"]) == {
