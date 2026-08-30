@@ -77,6 +77,20 @@ Only update these files if you have **genuinely reusable knowledge** that would 
 - Keep changes focused and minimal
 - Follow existing code patterns
 
+### CodeScene Authentication Failure
+
+Always attempt the commit normally first. If the pre-commit hook fails **only**
+because CodeScene authentication is unavailable or rejected (for example,
+`CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` is missing, expired, or invalid):
+
+1. Confirm all other required quality checks passed independently.
+2. Retry that commit with `git commit --no-verify`.
+3. Record the CodeScene authentication failure and hook bypass in
+   `progress.txt`.
+
+Never use `--no-verify` for lint, typecheck, test, build, CodeScene threshold,
+or code-health failures. Fix those failures before committing.
+
 ## Browser Testing (If Available)
 
 For any story that changes UI, verify it works in the browser if you have browser testing tools available:

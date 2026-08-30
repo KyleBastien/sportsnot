@@ -1,8 +1,8 @@
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: .\ralph.ps1 [-Tool copilot|claude] [-MaxIterations 10]
+# Usage: .\ralph.ps1 [-Tool copilot|claude|codex] [-MaxIterations 10]
 
 param(
-    [ValidateSet("copilot", "claude")]
+    [ValidateSet("copilot", "claude", "codex")]
     [string]$Tool = "copilot",
     [int]$MaxIterations = 10
 )
@@ -100,7 +100,7 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
             }
 
             $process.WaitForExit()
-        } else {
+        } elseif ($Tool -eq "claude") {
             # Claude Code: stream-json for real-time output display
             $LastWasTool = $false
             $process = New-Object System.Diagnostics.Process
@@ -151,6 +151,89 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
             }
 
             $process.WaitForExit()
+        } else {
+            # Codex CLI: JSONL events for real-time output display
+            $LastWasTool = $false
+            $process = New-Object System.Diagnostics.Process
+            $process.StartInfo.FileName = "codex"
+            $process.StartInfo.ArgumentList.Add("exec")
+            $process.StartInfo.ArgumentList.Add("--ephemeral")
+            $process.StartInfo.ArgumentList.Add(
+                "--dangerously-bypass-approvals-and-sandbox"
+            )
+            $process.StartInfo.ArgumentList.Add("--json")
+            $process.StartInfo.ArgumentList.Add("-")
+            $process.StartInfo.WorkingDirectory = $RepoRoot
+            $process.StartInfo.RedirectStandardInput = $true
+            $process.StartInfo.RedirectStandardOutput = $true
+            $process.StartInfo.RedirectStandardError = $false
+            $process.StartInfo.UseShellExecute = $false
+            $process.StartInfo.CreateNoWindow = $true
+            $process.Start() | Out-Null
+
+            $process.StandardInput.Write($PromptContent)
+            $process.StandardInput.Close()
+
+            $reader = $process.StandardOutput
+            while (-not $reader.EndOfStream) {
+                $line = $reader.ReadLine()
+                if (-not $line) { continue }
+
+                try {
+                    $json = $line | ConvertFrom-Json -ErrorAction SilentlyContinue
+                    if (-not $json) { continue }
+
+                    if ($json.type -eq "item.completed" -and
+                        $json.item.type -eq "agent_message") {
+                        if ($LastWasTool) {
+                            Write-Host ""
+                            [System.IO.File]::AppendAllText($TempOutput, "`n")
+                        }
+                        Write-Host $json.item.text
+                        [System.IO.File]::AppendAllText(
+                            $TempOutput,
+                            "$($json.item.text)`n"
+                        )
+                        $LastWasTool = $false
+                    } elseif ($json.type -eq "item.started") {
+                        $toolName = switch ($json.item.type) {
+                            "command_execution" { "Shell" }
+                            "file_change" { "File change" }
+                            "mcp_tool_call" { "MCP: $($json.item.tool)" }
+                            "web_search" { "Web search" }
+                            default { $null }
+                        }
+
+                        if ($toolName) {
+                            $toolMsg = "`n-> Using: $toolName"
+                            Write-Host $toolMsg
+                            [System.IO.File]::AppendAllText(
+                                $TempOutput,
+                                $toolMsg
+                            )
+                            $LastWasTool = $true
+                        }
+                    } elseif ($json.type -eq "turn.failed" -or
+                        $json.type -eq "error") {
+                        $errorMessage = $json.message
+                        if (-not $errorMessage -and $json.error) {
+                            $errorMessage = $json.error.message
+                        }
+                        if (-not $errorMessage) {
+                            $errorMessage = $line
+                        }
+                        Write-Host "Codex error: $errorMessage" -ForegroundColor Red
+                    }
+                } catch {
+                    # Non-JSON line, skip
+                }
+            }
+
+            $process.WaitForExit()
+        }
+
+        if ($process.ExitCode -ne 0) {
+            Write-Host "$Tool exited with code $($process.ExitCode)." -ForegroundColor Red
         }
 
         $Output = Get-Content $TempOutput -Raw -ErrorAction SilentlyContinue
