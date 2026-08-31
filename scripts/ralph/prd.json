@@ -1,372 +1,228 @@
 {
-  "project": "SportsNot",
-  "branchName": "ralph/ml-draft-optimizer",
-  "description": "Draft Oracle fix round: resolve the adversarially-verified findings in ml/CODE_REVIEW.md (2 critical, 11 major, 21 minor; every finding independently reproduced). Read ml/CODE_REVIEW.md and ml/SPEC.md before any story. Priorities: US-101..105 repair the corrupted odds/market evaluation layer, US-106..111 fix backtest/opponent correctness and regenerate stale evidence, US-112..115 wire the disconnected seams (pre-round cutoff, fitted opponents in the CLI, injuries id mapping, snapshot completeness), US-116..119 close the minors. Build-run prd/progress archived under scripts/ralph/archive/2026-08-29-ml-draft-optimizer-build/.",
-  "userStories": [
-    {
-      "id": "US-101",
-      "title": "Reject placeholder odds: per-season variance guard and xval_delta gate (C-2)",
-      "description": "As the tool owner, I want the Kaggle archive's constant -105 placeholder prices rejected as uncovered so no fabricated market ever enters odds.parquet again. (CODE_REVIEW C-2)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "parse_kaggle_extensive marks a season-source's price rows uncovered when the price column is near-constant (e.g. nunique<=2 or std below a documented epsilon over a season); the guard is unit-tested against the real committed file and must reject all of 2004-2018 and 2025, 98.7% of 2019, and the pre-Dec-11 2026 rows",
-        "xval_delta (already recorded per row) becomes a consumed gate: rows whose cross-source delta vs SBR exceeds a documented threshold are flagged and excluded from covered market probabilities, with counts logged, never silently dropped",
-        "Coverage numbers in any manifest/report reflect the post-guard truth; the honest outcome (2024-25 has NO historical market coverage) is stated, never imputed",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 1,
-      "passes": true,
-      "notes": "Added a documented per-season placeholder guard in ingest/odds.py: _placeholder_prices_by_season flags a season whole (nunique<=2 or std<PLACEHOLDER_STD_EPSILON) or dominant-modal (modal fraction>=PLACEHOLDER_MODAL_FRACTION) with a PLACEHOLDER_MIN_SEASON_ROWS floor; parse_kaggle_extensive emits those rows covered=False (kept, never dropped) and records placeholder_uncovered_rows on frame.attrs. consolidate_odds now consumes xval_delta as a gate (XVAL_DELTA_THRESHOLD=0.15) via _blank_market_fields, recording xval_flagged_rows. OddsResult + `oracle odds` CLI surface both counts. Real-file test asserts reject-all 2004-2018+2025, 98.73% of 2019, pre-Dec-11 2026. Placeholder covered=False -> honest coverage (2024-25 has none). ruff+mypy clean, 572 ml tests pass. Downstream manifest regeneration deferred to US-103/US-106 (needs the market-date fix first)."
-    },
-    {
-      "id": "US-102",
-      "title": "Fix Kaggle favorite attribution and the -100..-109 de-vig inversion (C-1, m-5)",
-      "description": "As the tool owner, I want the favorite side identified from data that actually encodes it, so surviving favorite-only prices produce sane probabilities. (CODE_REVIEW C-1, m-5)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "Favorite attribution no longer uses the Kaggle home-row spread sign (proven game-level and identical on both rows for 29,415/29,417 games); for ESPN-completion games read homeTeamOdds.favorite from the committed raw summaries (odds-archive/espn-2025-26-completion/raw/summary/), and for Kaggle rows without a trustworthy favorite signal mark the price unattributed/uncovered rather than guessing",
-        "devig_favorite_only handles prices in (-100,-110): the favorite's implied probability is always >= 0.5 after de-vig, property-tested across the full American-odds range",
-        "Unit tests reproduce the review's evidence rows (constant spread pairs; a -105 price) and assert the new behavior",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 2,
-      "passes": true,
-      "notes": "devig_favorite_only now floors the favorite at 0.5 (m-5): a marginal favorite (-101..-110) no longer de-vigs below even; property-tested across the full negative American range. Favorite attribution (C-1): _favorite_rows_from_games takes a FavoriteResolver; Kaggle uses _kaggle_favorite_side (trusts ONLY a genuine per-team opposite-signed spread pair via _favorite_side_from_pair_spreads) so the committed archive's identical-both-rows spread yields covered=False unattributed rows (attrs['unattributed_uncovered_rows']); real-file test asserts 0 attributed favorites. parse_espn_completion reads the authoritative homeTeamOdds.favorite flag from raw/summary/{event_id}.json.gz (_espn_completion_favorite_sides + _pickcenter_favorite_side), falling back to ESPN's home-relative spread when a summary is absent; real file -> 903 covered, 308 away favorites now correctly attributed (was 0). ruff+mypy clean, 577 ml tests pass. Downstream odds.parquet/game-win/backtest market artifacts regenerate under US-103/US-106 (need the date-normalization fix first)."
-    },
-    {
-      "id": "US-103",
-      "title": "Normalize odds dates to NHL local-date convention before the market join (M-2, ingest UTC finding)",
-      "description": "As the tool owner, I want one date convention in the consolidated odds table so covered prices actually attach to games. (CODE_REVIEW M-2)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "consolidate_odds converts Kaggle/ESPN UTC calendar dates to the NHL archive's local game date (the +-1-day matcher already identifies the pairing); the written table carries a single documented convention",
-        "models/game_win.py _attach_market's exact-date join now attaches >=95% of genuinely covered odds rows for seasons 2023-2026, measured against data/raw/nhl-archive team-games and asserted in a test against the committed data",
-        "The game-win manifest's market-coverage figure is regenerated and honestly reflects the new attachment rate",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 3,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-104",
-      "title": "Label playoffs by gameTypeId, not date windows; extend the preseason filter (M-4, m-12)",
-      "description": "As the tool owner, I want is_playoff derived from the archive's authoritative gameTypeId so April regular-season games stop polluting playoff-market lookups. (CODE_REVIEW M-4, m-12)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "is_playoff is set by joining odds rows to nhl-archive team-games gameTypeId (2=regular, 3=playoff); rows that match no archive game get is_playoff=None and are excluded from playoff consumers, logged not dropped silently",
-        "A test against the committed data asserts 0 gameTypeId=2 games flagged is_playoff=True (review measured 705 today, 232 in 2021-22) and 0 playoff games flagged False",
-        "Preseason exclusion covers early-October preseason games (identified via absence from the archive's regular-season game set, not by month alone); the review's 23-54 games/season leak is asserted closed",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 4,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-105",
-      "title": "Regenerate odds.parquet and the market-dependent model reports honestly (post US-101..104)",
-      "description": "As the tool owner, I want every committed market-related evaluation artifact rebuilt on the corrected odds layer, reporting the new truth even where it is worse. (CODE_REVIEW C-1/C-2 impact)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "Regenerate data/normalized odds outputs and the committed game-win report/ablation and series-calibration artifacts under ml/artifacts/models/ with the corrected pipeline; manifests record the new coverage per season",
-        "The market ablation and market-aware track are computed only over genuinely covered games; seasons with no real coverage are listed as uncovered - if the market feature now helps or still hurts, print the honest number either way, never tune on held-out data",
-        "Shutout model: evaluate shrinking it toward the playoff base rate given its report shows no held-out skill (CODE_REVIEW observations); adopt shrinkage if it improves held-out calibration, and report the decision with numbers either way",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 5,
-      "passes": true,
-      "notes": "Regenerated the market-dependent artifacts on the corrected odds layer (US-101..104). `oracle odds` rebuilt odds.parquet (8839 covered / 19314 flagged; 20260 placeholder rows rejected, honest 2024-25 = no historical coverage). `train-game-win` re-emitted an IDENTICAL game-win manifest/report (test_market_coverage 34.3%, market still helps by +0.0003 Brier over stats-only) -- US-103/104 already left it consistent, so no diff. `eval-series-sim` also re-emitted identically. Shutout: added a validation-selected base-rate shrinkage in models/shutout.py (`_apply_shrinkage`/`_select_shrinkage_weight`; ShutoutModel gains shrinkage_weight+base_rate applied in predict_shutout_prob so goalie valuation inherits it). Sweep w in {1.0..0.0} chosen on the VALIDATION fold only (never the held-out test), base_rate = train+val shutout rate. On real data the pure model wins validation Brier at every step (w=1.00: 0.0998 monotonically worse to w=0.00: 0.1004), so shrinkage is EVALUATED but NOT ADOPTED; manifest records weight=1.0, adopted=false, the full validation_brier_by_weight sweep, and model_unshrunk. Report prints the honest decision. 5 new unit tests. ruff+mypy clean, 590 ml tests pass (1 pre-existing flaky timestamp race in test_backtest_report.py -- passes on rerun, out of US-105 scope)."
-    },
-    {
-      "id": "US-106",
-      "title": "Opponent model: dedupe sheet/app copies, fit within league, refit the artifact (M-3)",
-      "description": "As the tool owner, I want opponents fitted on real drafts only - no double-counted Gemmell rows, no cross-league pseudo-drafts. (CODE_REVIEW M-3)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "opponents.py groups and pools by (season, league_name, draft_event) and dedupes duplicated events preferring source='app' over 'sheet' (they are the same real draft: 32/32 identical R1 player ids)",
-        "Refit and recommit the opponent artifact: manager_pick_counts must now show ben/judah/levi at 87 and kyle at 87+33 Press picks, total consistent with the true event inventory; validation (top-K membership accuracy) regenerated on the deduped data with honest numbers",
-        "A regression test computes per-manager choice counts from the fitted model against hand-counted truth from league_draft_picks.parquet",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 6,
-      "passes": true,
-      "notes": "opponents.py now dedupes duplicated app/sheet copies of the same real draft before fitting: dedupe_duplicate_events(picks) keeps one row per (season, league_name, draft_event) preferring source='app' over 'sheet' (2026 Gemmell R1 is 32/32 identical), a no-op on synthetic fixtures lacking source/league_name. _prepare_picks calls it first so every consumer (counts, choices, validation) sees deduped data. Pooling is now league-aware via _event_keys(frame) -> [season,(league_name),draft_event]: _build_choices, _membership_for_season, and _per_pick_accuracy add league_name when present, so 2026 Gemmell and Press Play-offs no longer merge into one cross-league choice set. Refit+recommitted artifacts/models/opponent/{manifest.json,report.md}: manager_pick_counts now ben/judah/levi=87, kyle=87+33 Press=120, press managers=33 (was ben 105, kyle 138), total_picks 480, honest leave-one-season-out membership regenerated (3/3 beat greedy). Regression tests: test_fitted_counts_match_real_league_truth asserts the hand-counted per-manager counts off the committed parquet; dedupe unit + league-isolation tests cover synthetic frames. ruff+mypy clean, 595 ml tests pass. Playwright not run (ml is a standalone Python project, unrelated to web/e2e)."
-    },
-    {
-      "id": "US-107",
-      "title": "Honor the retroactive IR swap in backtest league scoring (M-7)",
-      "description": "As the tool owner, I want _score_league_roster to score the league the way the league actually scores itself. (CODE_REVIEW M-7)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "_score_league_roster consumes points_excluded/ir_activated: an activated IR player's actual points count and the excluded starter's do not, per SPEC section 1's retroactive swap",
-        "The review's executed scenario (starter 7 pts excluded, IR_F 4 pts activated, goalie 6) is a unit test asserting 10, not 13",
-        "2025 league-comparison numbers are recomputed with the fix (the season with 5 documented activations) as part of the test or a documented check",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 7,
-      "passes": true,
-      "notes": "_score_league_roster (backtest/replay.py) now honors the retroactive IR swap (SPEC section 1): a row flagged points_excluded contributes 0 (the excluded starter's points drop), an IR_F/IR_D row flagged ir_activated is scored as an active skater via skater_actual (the activated IR player's points count in the starter's place), and a non-activated IR slot still scores 0. Previously it unconditionally skipped IR rows AND counted the excluded starter. Two unit tests in test_backtest.py: test_score_league_roster_honors_retroactive_ir_swap asserts the review's executed scenario (starter 7 excluded, IR_F 4 activated, goalie 6) => 10.0 not 13.0; test_score_league_roster_no_swap_counts_starter_benches_ir asserts the no-swap control => 13.0. 2025 documented check: 2025 is the IR season (5 documented activations) and every league comparison that season now applies the swap; the full committed 2023-2024-2025 backtest report regeneration at HEAD is US-110's scope (M-6). ruff+mypy clean, 597 ml tests pass. Playwright not run (ml is a standalone Python project, unrelated to web/e2e)."
-    },
-    {
-      "id": "US-108",
-      "title": "End-to-end tests for rounds 2-4 and the combined R3_4 event (M-8)",
-      "description": "As the tool owner, I want the multi-round and combined-event replay paths exercised under test - the exact blind spot that hid M-6 and M-7. (CODE_REVIEW M-8)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "The synthetic archive fixture extends through a full 4-round playoff (bracket, games, skaters) and at least one test replays rounds 2, 3, and the combined R3_4 event end-to-end (scored_rounds=[3,4], combined-event projection folding, surviving-team eligibility, manifest combined_event populated)",
-        "A leakage-guard test spans the two-round game-id union of the combined event",
-        "Instrumentation claim from the review is dead: build_projection_artifact and replay_round are each invoked with playoff_round values other than 1 somewhere in the suite",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 8,
-      "passes": true,
-      "notes": "Added a self-contained 16-team, 4-round synthetic archive to tests/test_backtest.py (_four_round_archive/_four_round_tables): the lower-seed wins every series so survivors are deterministic (R1->T01..T08, R2->T01..T04, R3->T01,T02, R4->T01); only the target season 2022 plays all four rounds, earlier seasons play round 1 (enough to train). Generalized _team_rows with an optional team_ids map (defaults to TEAMS.index, existing calls unchanged). Five new tests exercise the exact M-6/M-7 blind spot: run_backtest replays R1/R2/combined-R3_4 (scored_rounds==[3,4], surviving-team narrowing 16>8>4, leakage_ok); build_projection_artifact(playoff_round=3) populates manifest combined_event (draft_event R3_4, scored_rounds [3,4], final-four folding); replay_round(playoff_round=2) is a single-round event; and a leakage-guard test spans the R3|R4 game-id union (clean at R3 start, raises at a post-final cutoff). Instrumentation claim dead: both build_projection_artifact and replay_round now run with playoff_round!=1. ruff+mypy clean, 601 ml tests pass. Playwright unaffected (Python-only change)."
-    },
-    {
-      "id": "US-109",
-      "title": "Make the market-series benchmark as-of series start, or relabel it truthfully (M-5)",
-      "description": "As the tool owner, I want Track 2 of the backtest to measure what the market said BEFORE each series, or to say plainly that it does not. (CODE_REVIEW M-5)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "_market_series_prob uses only the series' game-1 pre-series line (preferred), or - if that is not implementable from the data - the report renames the track to state it averages in-series closing lines and cannot be read as an as-of-round-start benchmark",
-        "Whichever path is taken, a unit test pins the chosen semantics",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 9,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-110",
-      "title": "Close the leakage-edge findings: guard tautology, per-series snapshot cutoff, historical injuries, 2020 round-robin (m-2, m-3, m-4, m-6)",
-      "description": "As the tool owner, I want the four confirmed leakage-edge defects fixed so the guard guards and snapshots respect the declared cutoff. (CODE_REVIEW m-2, m-3, m-4, m-6)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "Backtest leakage guard compares against an independent date source so a skater/team-table desync is caught; the review's demonstrated desync leak is a failing-then-passing test",
-        "Pre-series team snapshots are frozen at the round's as_of_cutoff, not each matchup's first played game, so overlapping rounds cannot absorb post-cutoff games",
-        "Historical backtest rounds run with an empty/as-of injuries input, never today's snapshot; under ir=True this is asserted by test",
-        "2020 bubble round-robin games are assigned to their true round (qualifying/round-robin), not round 2 via team-pair collision; the affected 2020 labels/snapshots are regenerated",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 10,
-      "passes": true,
-      "notes": "Four leakage-edge fixes, all with failing-then-passing unit tests, ruff+mypy clean, 609 ml tests pass. m-2 (replay.assert_round_inputs_leakfree): added an INDEPENDENT date-source check -- the skater-table call now passes authoritative_dates=team_games and each sliced skater row's TRUE game date (game_id->team_games date) is compared to the cutoff, catching a skater/team desync the tautological self-date filter is blind to (test_leakage_guard_catches_skater_team_date_desync). m-3 (series_sim.reconstruct_series_matchups): new optional series= param builds a _matchup_cutoff_plan and _freeze_due_matchups freezes each matchup's pre-series snapshot at its ROUND's as_of_cutoff (earliest round game) not the matchup's own first game, so an overlapping slower series can't absorb post-cutoff games; both production callers (projection_artifact, projections) now pass series= (test_reconstruct_freezes_at_round_cutoff_not_matchup_first_game). m-4 (replay.run_backtest): dropped the injuries param entirely -- every historical round runs with injuries=None; run_backtest_from_normalized no longer loads/reads the live injuries.parquet snapshot (test_from_normalized_never_injects_live_injuries plants a corrupt injuries.parquet under ir=True; old loader would raise). m-6 (skater_production._assign_rounds + series_sim): added _playoff_round_digit(game_id) -> round char (index 7); qualifying/round-robin games (digit '0', 2019-20 bubble) are excluded from round assignment AND from matchup formation/shutout counting, so a round-robin game whose pair also meets in a real series is no longer mislabeled round 2 (fixes 2020 round-2 cutoff = Aug 22 not Aug 1). 2020 labels/snapshots are non-committed intermediates recomputed correctly by the fixed code at build time; committed model-report evidence (series-sim/skater-production) regenerates with US-111's HEAD rerun + the P2 evidence-regen pass. Pure-Python ml change (no web/TS/e2e touched)."
-    },
-    {
-      "id": "US-111",
-      "title": "Regenerate the backtest report at HEAD with combined R3_4 scoring (M-6)",
-      "description": "As the tool owner, I want the committed backtest evidence to measure the event the league actually plays, on the fixed scorer and deduped opponents. (CODE_REVIEW M-6; depends on US-106..110)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "Rerun the 2023-2025 backtest at HEAD and commit the report: the league comparison scores R3_4 rosters across rounds 3 AND 4 (review's independent recompute: 2024 league mean 58.75, levi 78 - the new table must reconcile with those hand-checked values)",
-        "The run parameters (rollouts, drafts/slot) are stated in the report AND justified against the SPEC's evaluation criteria - if compute forces fewer than the specced >=500 rollouts / >=200 drafts, say so explicitly in the report rather than silently under-running; prefer meeting the spec",
-        "The stale seed20260827 report directory is replaced or clearly superseded (old one may remain with a SUPERSEDED note)",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 11,
-      "passes": true,
-      "notes": "Regenerated the committed 2023-2024-2025-seed20260827 backtest report+manifest at HEAD (replaced the stale 3bf1537 run in place; run_id is deterministic seasons+seed so it overwrites). The league comparison now scores R3_4 across BOTH rounds 3 AND 4 and reconciles EXACTLY with the review's hand-checked recompute: 2024 R3_4 league mean 58.75, levi best 78.00 (2025 R3_4 league mean 59.75 at HEAD after US-107 IR + US-110 round-labeling fixes). Ran `oracle backtest --seasons 2023 2024 2025` all 4 strategies, seed 20260827, managers=4, ir=false, n_drafts=1, rollouts=64 (4x the stale run's 16). Added an explicit **Run parameters** provenance note to report._header_lines stating the config AND that the whole-replay run deliberately under-samples the README recommend-command design targets (>=500 rollouts / >=200 drafts, which are single-fixed-state targets) to stay tractable, and that the M-6 league headline is deterministic (unaffected by rollout count). Market-aware series track honestly 'n/a' (0 series covered by committed odds post US-103/104). Files: ml/src/draft_oracle/backtest/report.py, ml/tests/test_backtest_report.py (+run-params assertion), ml/artifacts/backtests/2023-2024-2025-seed20260827/{report.md,manifest.json}. ruff+mypy clean; 609 ml tests pass. Pure-Python ml change (no web/TS/e2e) -> Playwright unaffected."
-    },
-    {
-      "id": "US-112",
-      "title": "Pre-round as-of cutoff: make `oracle project` work before the round starts (M-1)",
-      "description": "As the tool owner, I want to build the round-N artifact at the moment I actually draft - after round N-1 ends, before round N begins. (CODE_REVIEW M-1)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "The round-N cutoff derives from data available pre-round (previous round's completion date / bracket announcement), not round-N's own first game; pre-series snapshots freeze at that boundary",
-        "A test builds a round-2 artifact from an archive containing only completed round-1 games (no round-2 games) and succeeds with correct eligibility; leakage tests still pass (the change must not weaken as-of discipline)",
-        "Backtest cutoffs remain leak-safe and its results are shown unchanged-or-explained on the committed seasons",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 12,
-      "passes": true,
-      "notes": "Added playoff_round_cutoffs (skater_production.py): extends playoff_round_starts with a PRE-round cutoff for the round after the latest played round = day after that round's last game (round-1 = day after regular-season end when no playoff games yet). Played rounds keep their own first-game cutoff untouched, so backtests are byte-identical. build_projection_artifact + series_sim._matchup_cutoff_plan now consume playoff_round_cutoffs; reconstruct_series_matchups adds a final _freeze_due_matchups(as_of=Timestamp.max) pass so a pending round-N matchup (cutoff after every played game) freezes at the post-round-(N-1) state instead of never freezing / skipping the series. New tests build a round-2 artifact from a round-1-only archive (eligibility = the 2 bracket teams; cutoff = day after round-1's last game) and assert leak-safety. 10 leakage tests + 611 ml tests pass; ruff+mypy clean."
-    },
-    {
-      "id": "US-113",
-      "title": "Wire the fitted opponent model into the draft-time CLI (M-9)",
-      "description": "As the tool owner, I want `oracle draft` and `oracle recommend` to use the opponent model that was built for them. (CODE_REVIEW M-9)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "oracle draft/recommend gain --opponents {greedy,fitted} (default fitted when the committed opponent artifact is present) and --managers ben,judah,levi,kyle so per-manager models attach to real seats; seat1..seatN remains the fallback",
-        "The fitted path at draft time loads only the committed artifact - no network, no training stack imports (ties into US-117's lazy imports), recommend stays under the 10s budget",
-        "An end-to-end test drives a scripted draft through the CLI with the fitted model and asserts it was actually used (not silently fallen back)",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 13,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-114",
-      "title": "Map ESPN athlete ids to NHL player ids in the injuries pipeline (M-11)",
-      "description": "As the tool owner, I want the injuries feed to actually match players so the injured flag and IR-stash valuation work against the real feed. (CODE_REVIEW M-11)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "injuries ingestion resolves ESPN athlete ids to NHL player ids via name+team matching through the existing entity_match machinery, with unresolved entries reported (never guessed); manual overrides key on the NHL id",
-        "A test uses a REALISTIC fixture: ESPN athlete ids in the ~4-5M range (as in the committed raw summaries) that must resolve to archive NHL ids in the 8.4M+ range - the disjoint-id no-op the review proved is a failing-then-passing test",
-        "projection_artifact's injured flag and _apply_ir_stash are asserted to fire on the mapped ids",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 14,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-115",
-      "title": "Make snapshot pinning complete or loud (M-10)",
-      "description": "As the tool owner, I want a pinned snapshot to either contain everything a run reads or refuse to run - never silently degrade. (CODE_REVIEW M-10)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "create_snapshot freezes every table the pinned paths consume (league_draft_picks, odds, injuries included), OR pinned runs fail loudly naming the missing input - silent greedy-fallback and silently-vanishing league-comparison sections are eliminated either way",
-        "The '(snapshot, seed) fully determines every score' claim in the code is made true or removed",
-        "Tests cover a pinned run: fitted opponents present, league comparison present, and mutable live inputs not read",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 15,
-      "passes": true,
-      "notes": "M-10 snapshot pinning made complete-or-loud. create_snapshot (ingest/normalize.py) now freezes every optional table a pinned run consumes (OPTIONAL_TABLE_NAMES = league_draft_picks, odds, injuries) when present, and records each as 'frozen'/'absent' in the snapshot _manifest.json plus a 'complete': true marker. build_projection_artifact_from_normalized + run_backtest_from_normalized now read ALL inputs (core tables, injuries, league picks, odds) from source_dir (the frozen snapshot) when pinned -- the old injuries=_load_injuries(normalized_dir)/odds=_load_odds(normalized_dir) LIVE leaks are gone. New _require_complete_snapshot(source_dir) (projection_artifact.py, imported by replay.py) fails loudly on a pinned run when the snapshot has no _manifest.json (FileNotFoundError) or lacks the 'complete' marker (RuntimeError, legacy core-only snapshot) or declares a table frozen that is missing. This makes the code's '(snapshot, seed) fully determines every score' claim true. Tests: test_normalize freezes-optional+records-completeness; test_projection_artifact pinned run reads frozen injuries (player 100) not mutated live (999) + fitted-opponent league picks present though live file deleted, plus two loud-fail tests (incomplete manifest, no manifest). ruff+mypy clean, 645 ml tests pass. (JS/TS typecheck/lint/playwright untouched -- change is Python-only in the standalone ml project.)"
-    },
-    {
-      "id": "US-116",
-      "title": "Reconcile the vectorized fast path with the object model (m-7, m-8, m-9, m-10, m-11)",
-      "description": "As the tool owner, I want the two rollout implementations to agree, fail identically, and label themselves truthfully. (CODE_REVIEW m-7..m-11)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "Fast path scores greedy opponents by rank_value matching GreedyOpponentModel; expected_points includes the owner's already-drafted roster value in both paths (one documented definition)",
-        "Dry-pool states raise in the fast path exactly as the object path does (no argmax-over--inf index-0 corruption); property test compares the two paths on seeded random states",
-        "slot_strategies output is labeled by the model actually used (league-average with zeroed affinity is not called 'fitted'); simulator's eliminated filter also blocks skaters with unresolved team_id=None (fail-safe direction)",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 16,
-      "passes": true,
-      "notes": "m-7: _vectorized_greedy_expected now scores greedy opponents by rank_value (added rank_val array), matching GreedyOpponentModel.pick (was scoring by projection/asset_value). m-8: both vectorized paths (_vectorized_greedy_expected + _vectorized_fitted_expected) add base_owner_value=_owner_roster_value(state,owner) to each candidate mean so E[roster] matches the object path's definition (includes already-drafted roster); previously fast path started owner_total=0 and excluded it (bug only surfaced with a non-empty owner roster; fresh-state parity tests never triggered it). m-9: new _require_legal_rows(legal, manager) raises ValueError('no legal asset') when ANY rollout row has no legal asset -- both k-loop pick sites (owner + opponent) in both vectorized paths call it, matching the object path's greedy_vor_pick/model.pick raise; _vec_fill_owner now masks per-row (has_legal) so a dry row STOPS filling (matches _fill_owner_greedily's break) instead of argmax-over--inf drafting index 0. m-10: build_slot_strategies computes genuinely_fitted (seat ids seat1..seatN never match fitted per_manager keys ben/judah/kyle/levi nor affinity, so as_mapping degrades to league-average+zeroed affinity) and an honest opponent_label; SlotStrategyReport gained opponent_label field used in report_lines/summary; fitted_opponents bool now = genuinely_fitted (truthful); CLI project.py uses opponent_label. m-11: DraftState.new drops team_id=None skaters when eliminated_team_ids is non-empty (fail-safe; round-1 no-elimination behavior preserved). Tests: test_recommend parity (rank!=projection pool + mid-draft owner roster -> vec==obj abs=1e-9) + dry-pool raise (owner=last seat so dry falls in horizon); test_simulator unresolved-team-None drop; test_slot_strategies honest label + genuine seat-keyed fit. ruff+mypy clean; 648 ml tests pass. Pre-existing failure test_backtest_report timestamp (m-20, the review's documented '1 failing test in the suite') is owned by US-117 -- untouched here (change is Python-only; backtest/report.py not modified). JS/TS lint/typecheck/playwright untouched."
-    },
-    {
-      "id": "US-117",
-      "title": "Hygiene batch: determinism, guards, provenance nits (m-1, m-13, m-14 stamping, m-15, m-16, m-17, m-19, m-20, golden-vector docstring)",
-      "description": "As the tool owner, I want the confirmed minor defects cleared in one sweep. (CODE_REVIEW minors table)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "write_report renders deterministically for a given result (timestamp passed in or stamped once) - the currently failing test passes without weakening its assertion",
-        "projections.py actuals use rules.player_points (no inline goals+assists); test_rules docstring no longer claims verbatim-copied vectors (they are equivalent, renumbered)",
-        "NHLApiClient.skater_summary checks the response 'total' against the 10k cap and raises or partitions by date - silent truncation is impossible; unit test with a fixture at the cap",
-        "run_2026_backtest.py docstring matches its config and the file moves under the SPEC directory contract (or into scripts/) with mypy coverage",
-        "conftest.py installs a network guard (socket/transport block) making the no-network-in-tests rule enforced, not conventional",
-        "A real-file smoke test parses one committed nhl-archive season file through the normalizers",
-        "Artifact manifests record a dirty-tree marker when the working tree is not clean at generation time",
-        "oracle draft/recommend do not import LightGBM/scikit-learn/httpx at startup (lazy imports); asserted by a subprocess test that blocks those modules",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 17,
-      "passes": true,
-      "notes": "Completed and committed. Ruff clean, mypy strict clean (68 files), and 656 tests pass. Normal commit hook passed affected lint/typecheck/test stages but CodeScene authentication was unavailable; retried with --no-verify per Ralph's documented auth-only fallback."
-    },
-    {
-      "id": "US-118",
-      "title": "Regenerate the 2026 projection artifacts at a clean HEAD and formalize their committed status",
-      "description": "As the tool owner, I want the committed 2026-r1..r4 artifacts reproducible from their stamped SHA and their presence reconciled with the SPEC. (CODE_REVIEW m-14, m-18; depends on US-106/112/116)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "Regenerate 2026-r1..r4 artifacts at a clean committed HEAD so run_manifest git_sha actually reproduces each artifact (r3's combined-event output included); slot_strategies now reflect the deduped fitted opponent model",
-        "SPEC section 4 and ml/.gitignore are amended to name committed projection artifacts as an explicit owner-approved exception (replacing the force-add workaround), or the artifacts are removed per ad0cfd4's own revert note - one of the two, stated in the commit message",
-        "All structural checks the review verified (quantiles, decomposition, bracket membership, goalie identity) still pass on the regenerated artifacts - rerun them in a test or documented script",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 18,
-      "passes": true,
-      "notes": "Regenerated committed 2026-r1..r4 projection artifacts from clean HEAD 8000f5b with git_dirty=false, including combined R3_4 output and slot strategies using the deduped league fit with an honest league-average/affinity-zeroed label. SPEC section 4 and ml/.gitignore now make these four directories an explicit owner-approved committed exception. Added 8 committed-artifact regression tests for quantiles, decomposition, bracket membership, goalie identity, combined-event math, clean provenance, and opponent labeling. Ruff clean, mypy strict clean (69 files), 664 tests pass. Playwright not run because no web/UI path changed."
-    },
-    {
-      "id": "US-119",
-      "title": "Team/series feature matrix: wire it in or delete it",
-      "description": "As the tool owner, I want no dead load-bearing-looking code: the US-010 feature matrix with its market/injuries joins is built and tested but consumed by nothing. (CODE_REVIEW observations)",
-      "acceptanceCriteria": [
-        "Read ml/SPEC.md AND the relevant finding in ml/CODE_REVIEW.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
-        "Decide and implement: either the game-win model (or series model) consumes the team_series feature matrix with a before/after held-out comparison reported honestly, or the unused joins/matrix are deleted with the decision recorded in ml/README.md",
-        "No orphaned tests remain for whichever path is taken",
-        "All Typecheck passes (even if it's outside of your changes)",
-        "Lint passes (even if it's outside of your changes)",
-        "Unit tests have been added",
-        "All Unit tests pass (even if it's outside of your changes)",
-        "All Playwright tests pass (even if it's outside of your changes)"
-      ],
-      "priority": 19,
-      "passes": true,
-      "notes": "Deleted the unconsumed team_series feature matrix and its market/injury/matchup joins instead of wiring a second parallel team-feature pipeline. Moved the live Elo config/math into features/elo.py; game_win and series_sim now import it directly. Removed orphaned matrix tests and added focused Elo/public-API regression tests. README and SPEC record the ownership decision. Ruff clean, mypy strict clean (69 files), 652 ml tests pass. Playwright not run because this standalone Python/docs story changes no web or UI path."
-    }
-  ]
+ "project": "SportsNot",
+ "branchName": "ralph/ml-draft-optimizer",
+ "description": "Draft Oracle round-3 fix round: resolve the adversarially-verified findings in ml/CODE_REVIEW_R2.md (0 critical, 5 major, 18 minor; every finding independently reproduced, several by mutation testing). Read ml/CODE_REVIEW_R2.md and ml/SPEC.md before any story. Round-2 verdict for context: all 33 round-1 findings are fixed or partial; the remaining problems live almost entirely in committed evidence/reporting, plus one model-input bug (shootout games dropped from game-win training). Priorities: US-201..203 fix the three data/scoring defects (league-comparison pooling, the 2024 McDavid/Draisaitl entity-match error, the shootout drop), US-204..205 add the mutation-killing test guards and recover the lost affinity signal, US-206..210 close the robustness/documentation minors, US-211 regenerates ALL stale committed evidence at a clean HEAD and must run LAST. Fix-round prd/progress archived under scripts/ralph/archive/2026-08-31-ml-draft-optimizer-fixround/.",
+ "userStories": [
+  {
+   "id": "US-201",
+   "title": "League comparisons: dedupe, league scoping, and duplicate-safe exclusion flags (R2-M1)",
+   "description": "As the tool owner, I want the backtest's league-comparison table to score only rosters that actually existed, so the committed 2026 report stops merging kyle's two leagues into one fictitious roster. (CODE_REVIEW_R2 R2-M1) Root cause: the M-3 fix (dedupe + league-aware pooling) landed only in optimize/opponents.py; _league_comparisons in ml/src/draft_oracle/backtest/replay.py:1034 still scopes on (season, draft_event) and groups by manager alone. For 2026, kyle's 29 R1 rows (11 Press Play-offs + 9 Gemmell app + 9 Gemmell sheet duplicates) merge into a 15-skater/2-goalie union scoring 72.0 — his real per-league rosters score 50.0 (Press) and 37.0 (Gemmell) — and the table mixes 7 managers from two different 4-manager leagues.",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND the R2-M1 finding in ml/CODE_REVIEW_R2.md in full before starting; the review's evidence includes reproduced failure scenarios your fix and tests must cover",
+    "_league_comparisons applies dedupe_duplicate_events (app-preferred, same as opponents.py) and groups league picks by (league_name, manager) within each (season, draft_event) — reuse opponents' _event_keys or an equivalent shared helper rather than duplicating the logic",
+    "No comparison row ever unions picks from two leagues: on the real 2026 parquet, kyle's R1 rosters score per-league (Gemmell 37.0, Press 50.0 — never 72.0), and no league table mixes managers from different leagues",
+    "Exclusion flags survive dedupe: a points_excluded flag carried by ANY duplicate copy of an asset is honored on the kept row (regression case: 2026 ben's Alex Tuch is flagged in the sheet copy but not the app copy)",
+    "Decide and document (docstring + report) whether the league table reports each league separately or restricts to the oracle's simulated league; either is fine, silence about it is not",
+    "A regression test using the real committed 2026 league_draft_picks.parquet (or an equivalent two-league fixture) fails on the pre-fix pooling behavior and passes at HEAD",
+    "Do NOT regenerate the committed 2026 backtest artifact in this story — that happens in US-211 after all scoring fixes land",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 1,
+   "passes": false,
+   "notes": ""
+  },
+  {
+   "id": "US-202",
+   "title": "Correct the 2024 McDavid/Draisaitl entity-match error and guard duplicate ownership (R2-M4)",
+   "description": "As the tool owner, I want levi's 2024 R3_4 'McDavid' row matched to the player he actually drafted (Leon Draisaitl), and the parser to catch impossible duplicate ownership, so the league table stops being inflated by 14 points. (CODE_REVIEW_R2 R2-M4) Evidence: league_draft_picks.parquet row 99 lastname-matched 'McDavid' to Connor McDavid 8478402 (confidence 0.9, needs_review=False) — but judah owns McDavid in the same event (impossible under full re-draft), and the sheet's own point columns (points_when_drafted 24 / points_for_round 7 / current_total 31) exactly match Draisaitl's archive splits while McDavid's (21/21/42) exactly match judah's row. The R1/R2 sheets confirm judah owned Draisaitl and levi owned McDavid through R2; they swapped at the R3_4 re-draft.",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND the R2-M4 finding in ml/CODE_REVIEW_R2.md in full before starting",
+    "levi's 2024 R3_4 Forward raw name 'McDavid' resolves to Leon Draisaitl (8477934) via the existing override mechanism (ml/data/overrides/name_overrides.yaml or the parser's documented correction path) — NEVER by editing the raw committed sheet snapshot",
+    "Parser validation: two managers owning the same player_id within one (league_name, season, draft_event) fails loudly or marks both rows needs_review=True with a logged count — unit-tested, and the real 2024 case is the regression fixture",
+    "Point-column cross-check: where sheet rows carry points_when_drafted/points_for_round/current_total, an entity match whose archive splits contradict all three columns (documented tolerance) gets needs_review=True; test reproduces the row-99 scenario catching the mis-match",
+    "Regenerate ml/data/normalized/league_draft_picks.parquet; verify levi's corrected 2024 R3_4 roster scores 64.0 through the league scorer and the duplicate-ownership scan is clean across all seasons/events",
+    "Committed backtest report regeneration is deferred to US-211 (expected post-fix values there: 2024 R3_4 levi 64.0, mean 55.25, League best 65.00 — tying, not beating, the oracle best)",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 2,
+   "passes": false,
+   "notes": ""
+  },
+  {
+   "id": "US-203",
+   "title": "Stop dropping shootout games from game-win training (R2-M3)",
+   "description": "As the tool owner, I want every decided game in the game-win model's training/eval universe, so ~5-7% of each season (all shootout games) stops silently vanishing. (CODE_REVIEW_R2 R2-M3) Root cause: _pivot_games (ml/src/draft_oracle/models/game_win.py:253) filters games.loc[home_goals != away_goals], but the NHL archive stamps shootout games with EQUAL goals_for on both sides (the SO deciding goal is not counted) while the same rows carry the true decision in the win / wins_in_shootout / points columns. Measured: 65/952 games dropped in 2020-21, 77/1398 in 2024-25, 5.5-8.5% across all 11 seasons — excluded from training, Elo state updates, and the market-join target frame.",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND the R2-M3 finding in ml/CODE_REVIEW_R2.md in full before starting",
+    "home_win is derived from the archive's win column (exactly one side has win=1 in every decided game), not from goal comparison; tied-goal rows with a decided winner are retained with the correct winner; genuinely undecided rows (if any exist) are still excluded loudly",
+    "Unit test on a real shootout fixture (e.g. game_id 2020020007: equal goals_for, home row points=2/wins=1) asserting it enters the pivoted frame with the correct home_win",
+    "Real-data invariant test: the pivoted frame's per-season game count equals the unique decided games in normalized team_games (2020-21: 952, 2024-25: 1398)",
+    "Elo updates and the market join now see SO games; the previously-unattachable covered 2021 odds rows (dropped-SO games) now attach — verify and note the count",
+    "HONESTY GATE: retraining will move the game-win metrics; report the new numbers truthfully in progress.txt — do NOT tune baselines, seeds, or splits to preserve the old numbers. Committed artifact regeneration is deferred to US-211",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 3,
+   "passes": false,
+   "notes": ""
+  },
+  {
+   "id": "US-204",
+   "title": "Mutation-killing numeric guards for combined R3_4 valuation and scoring (R2-M5, R2-m7, R2-m16)",
+   "description": "As the tool owner, I want tests that actually fail when the combined-event math breaks, because round 2 proved by mutation testing that reintroducing M-6's exact defect (R3-only grading), deleting the goalie Cup-Final fold, and reverting the league leg to R3-only ALL pass the full 652-test suite today. (CODE_REVIEW_R2 R2-M5, R2-m7, R2-m16) The existing combined-event tests assert only metadata (scored_rounds==[3,4], team sets); the four-round fixture is deterministic, so concrete totals are assertable.",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND the R2-M5/R2-m7/R2-m16 findings in ml/CODE_REVIEW_R2.md in full before starting",
+    "Roster-scoring guard: on the deterministic four-round fixture, assert a concrete combined-event points total that equals the R3+R4 sum (and strictly exceeds the same roster scored on round 3 alone) — this must fail if replay.py:241/245 sums only scored_rounds[:1] (round 2 measured seat-1 oracle points 101.0 -> 63.0 under that mutant)",
+    "Goalie-fold guard: a FRESH-RUN test (not the committed-manifest self-consistency check) asserts each final-four team's e_goalie_points_combined == e_goalie_points_r3 + p_advance * e_goalie_points_r4 with p_advance > 0 and e_goalie_points_r4 > 0 — this must fail if projection_artifact.py:362 drops the p_advance term",
+    "League-leg guard: a league-picks fixture spanning the combined event asserts manager actuals sum rounds 3 AND 4 — this must fail if _league_comparisons (replay.py:1033) reverts to scored=[rnd.playoff_round]",
+    "VERIFICATION GATE: before finalizing, apply each of the three mutations in a scratch copy and record in progress.txt which new test fails for each — a guard that does not kill its mutant does not satisfy this story",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 4,
+   "passes": false,
+   "notes": ""
+  },
+  {
+   "id": "US-205",
+   "title": "Opponent model: league-isolation regression test and recover sheet team_ids in dedupe (R2-m3, R2-m4)",
+   "description": "As the tool owner, I want the league-isolation half of the M-3 fix guarded by a test (round 2 proved reverting _event_keys to ['season','draft_event'] passes the entire suite) and the team-affinity signal recovered: the app-preferred dedupe keeps rows whose team_id is only 11% filled while discarding the sheet copy's 92%-filled team_ids, starving the model's dominant coefficient (affinity beta 2.85) of ~15 team-bearing picks per manager for 2026 Gemmell. (CODE_REVIEW_R2 R2-m3, R2-m4) The per-manager player_id sets of the two copies are identical for R1/R2, so the sheet's team_ids can be merged into the kept app rows losslessly.",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND the R2-m3/R2-m4 findings in ml/CODE_REVIEW_R2.md in full before starting",
+    "A regression test asserts fitted choice pools are single-league (e.g. every pool's rows share one league_name on the real committed parquet, or the pool count is 36 not 27) and demonstrably fails if _event_keys reverts to ['season','draft_event']",
+    "dedupe_duplicate_events (or a step beside it) merges the sheet copy's resolved team_id into kept app rows where the (manager, player_id) matches, documented in the docstring; goalie/team rows unaffected",
+    "Test against the real parquet: per-manager team-bearing pick counts rise to ben 78 / judah 77 / kyle 82 / levi 76 (from 63/63/66/63)",
+    "Refit the opponent model locally to confirm it trains cleanly with the recovered signal and report the coefficient/membership movement honestly in progress.txt; the committed artifact refresh itself is deferred to US-211",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 5,
+   "passes": false,
+   "notes": ""
+  },
+  {
+   "id": "US-206",
+   "title": "Odds/ingest robustness: no-signal fallback, favorite-side xval, cap guard, orientation accounting (R2-m1, R2-m2, R2-m12, R2-m14)",
+   "description": "As the tool owner, I want the ingest layer's remaining guess-or-silence paths closed: parse_espn_completion's fallback fabricates an 'away' favorite when both the summary flag and the home spread are missing (odds.py:995); the xval gate compares favorite-probability magnitudes so opposite-favorite sources pass with delta~0; the skater_summary 10k-cap guard is bypassed when the API omits 'total' (nhl_api.py:408); and the documented orientation-flipped SBR pair (2020-01-17 PIT/DET, PROVENANCE section 5) is covered-but-unjoinable without appearing in any unmatched accounting. (CODE_REVIEW_R2 R2-m1, R2-m2, R2-m12, R2-m14)",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND the R2-m1/R2-m2/R2-m12/R2-m14 findings in ml/CODE_REVIEW_R2.md in full before starting",
+    "parse_espn_completion's resolver returns None when neither the summary favorite flag nor a usable (non-null, non-zero) home spread exists; the row flows through the existing unattributed/uncovered path — tested with the synthetic NaN-spread case from the review; committed-data output unchanged (all 903 games have the flag)",
+    "The xval gate flags favorite-SIDE disagreement between co-covering sources (compare home-side implied probabilities, or flag favorite_side mismatch) — synthetic test: SBR home-favorite -165 vs Kaggle away-favorite -165 for the same game must be flagged, not pass with delta 0.003",
+    "skater_summary raises NHLApiError when len(response.data) >= SKATER_SUMMARY_ROW_CAP even if 'total' is absent or null — tested with both response shapes via mocked transport",
+    "Covered SBR rows that match the both-orientation gameType index but can never date-snap or market-join in the true orientation are counted and logged in the consolidation accounting (correcting the orientation via the archive is optional; silent loss is not) — the PIT/DET 2020-01-17 pair is the test case",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 6,
+   "passes": false,
+   "notes": ""
+  },
+  {
+   "id": "US-207",
+   "title": "Fast-path parity: tie-breaks, per-manager need_weight, honest seatN labeling (R2-m15, R2-m11, R2-m10)",
+   "description": "As the tool owner, I want the vectorized rollout paths to match the object path in the cases the parity tests currently skip: on exact opponent-score ties the fast paths pick by projection-then-key while the object paths pick by rank_value-then-key (demonstrated divergence up to 12 pts/candidate on tied pools); _vectorized_fitted_expected overwrites need_weight in its manager loop (recommend.py:667) so every seat gets the LAST manager's weight; and default seat1..seatN managers silently run a 'fitted opponents'-labeled model whose dominant affinity signal is entirely zeroed (no per-manager coefficients match). (CODE_REVIEW_R2 R2-m15, R2-m11, R2-m10) The object path is the source of truth (see Codebase Patterns).",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND the R2-m15/R2-m11/R2-m10 findings in ml/CODE_REVIEW_R2.md in full before starting",
+    "Fast paths tie-break identically to the object paths (rank_value desc, then key asc) in both _vectorized_greedy_expected and _vectorized_fitted_expected; a parity test with two assets sharing rank_value (the review's FA/FB construction: rank 50/50, proj 9/40) passes where it diverged before",
+    "_vectorized_fitted_expected carries a per-manager need_weight array indexed like coef_rank/coef_aff; a parity test with heterogeneous weights {1.0, 0.2, 8.0, 3.5} matches the object path (the review measured [205,204,203,203,203,203] vs [205,204,203,201,201,201] pre-fix)",
+    "When the fitted model attaches to a seat with no per-manager coefficients (seatN defaults), the CLI emits a visible warning and/or labels the output honestly (e.g. 'fitted (league-average, no per-manager affinity)') instead of plain 'fitted opponents' — tested",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 7,
+   "passes": false,
+   "notes": ""
+  },
+  {
+   "id": "US-208",
+   "title": "Finish the draft-time import diet and move the session autosave out of the fixtures (R2-m9, R2-m18)",
+   "description": "As the tool owner, I want a REAL 'oracle draft' run (not just --help) to work without the training stack, and draft-night session files kept out of the committed reproducibility fixtures. (CODE_REVIEW_R2 R2-m9, R2-m18) Evidence: cli/draft.py:34 -> optimize/__init__ (eager re-exports) -> ir_value -> models.projections -> game_win imports lightgbm+sklearn, and models.returns -> entity_match -> normalize -> nhl_api imports httpx; the US-117 subprocess guard only exercises --help so it cannot see this. Separately, cli/draft.py:786 defaults the session autosave to <artifact>/draft-session.json, which the blanket !artifacts/2026-r*/** gitignore re-include makes committable inside the fixtures.",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND the R2-m9/R2-m18 findings in ml/CODE_REVIEW_R2.md in full before starting",
+    "A real 'oracle draft' and 'oracle recommend' invocation against ml/artifacts/2026-r1 completes with lightgbm, sklearn, and httpx import-blocked — restructure optimize/__init__ (lazy __getattr__ re-exports, or make the CLI import submodules directly) so the draft-time chain never triggers training/HTTP imports",
+    "The existing subprocess import-guard test is upgraded from --help to an actual command run against a committed artifact (scripted picks or immediate quit), with the three modules blocked — it must fail on the pre-fix import chain",
+    "The default session autosave path is outside the artifact directory (cwd, or an explicit --session only); no default invocation writes any file into artifacts/2026-r*; tested",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 8,
+   "passes": false,
+   "notes": ""
+  },
+  {
+   "id": "US-209",
+   "title": "Committed-artifact CSV integrity checks (R2-m13)",
+   "description": "As the tool owner, I want the committed 2026-r* CSVs verified against their parquet twins, because round 2 truncated artifacts/2026-r1/skaters.csv to 200 bytes and all 652 tests passed — the regression tests read only the parquet files. (CODE_REVIEW_R2 R2-m13)",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND the R2-m13 finding in ml/CODE_REVIEW_R2.md in full before starting",
+    "tests/test_committed_projection_artifacts.py asserts csv==parquet content equality (same rows, same columns, values equal within a documented float tolerance) for skaters and teams across all four committed 2026-r* directories",
+    "VERIFICATION GATE: confirm in a scratch copy that a truncated skaters.csv now fails the suite; record which test fails in progress.txt",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 9,
+   "passes": false,
+   "notes": ""
+  },
+  {
+   "id": "US-210",
+   "title": "Documentation truth pass: README, docstrings, per-season coverage in the game-win writer (R2-m17, R2-m6, info nits)",
+   "description": "As the tool owner, I want the docs to describe the pipeline that exists at HEAD, not the pre-fix one. (CODE_REVIEW_R2 R2-m17, R2-m6) Confirmed stale: README quotes the pre-US-106 double-counted opponent validation numbers (.269/.261/.180, top-1 .126 vs .112) contradicted by the committed artifact (.222/.273/.308, .113 vs .104); the Betting-odds section documents date-window playoff tagging, a September-only preseason drop, and Kaggle as a usable price source; the injuries schema defines player_id as the ESPN athlete id (the exact semantics US-114 removed) and omits espn_id; line 80 still describes the deleted team/series matrix. Also: apply_overrides' docstring states the stale espn_id-first precedence; rules.py claims its golden vectors are 'copied from' utils.test.ts (they are equivalent, not copied); and no committed game-win artifact records per-season market coverage (the whole 2025 test half is uncovered and nothing committed says so).",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND the R2-m17/R2-m6 findings in ml/CODE_REVIEW_R2.md in full before starting",
+    "README opponent validation paragraph either quotes the committed artifact's current numbers or references the artifact instead of inlining numbers; no pre-fix number survives",
+    "README Betting-odds section rewritten to describe the HEAD pipeline: gameTypeId playoff labels via the archive join, local-date snapping, the per-season placeholder guard, the xval gate, unattributed Kaggle favorites, and ESPN-completion favorites from raw summaries (with the honest consequence: no historical market coverage for 2024-25)",
+    "README injuries schema documents player_id as the NHL id, adds espn_id, and describes the ESPN->NHL resolution path; the features/ directory line no longer mentions the team/series matrix",
+    "apply_overrides docstring matches the implemented player_id-first precedence; rules.py docstring says the golden vectors are equivalent to (not 'copied from') utils.test.ts",
+    "The game-win report/manifest writer records market coverage per season (train and test), stating uncovered seasons outright — regeneration of the committed artifact happens in US-211",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 10,
+   "passes": false,
+   "notes": ""
+  },
+  {
+   "id": "US-211",
+   "title": "Regenerate ALL stale committed evidence at a clean HEAD — must run LAST (R2-M2, R2-m5, R2-m6, R2-m8)",
+   "description": "As the tool owner, I want every committed model/backtest artifact to be reproducible from the code that sits next to it, because round 2 proved the committed 2026-combined-r500 backtest was generated 7 hours BEFORE the first fix commit (its market Brier 0.2080 uses the condemned mid-series semantics on corrupted odds; the honest game-1 number at HEAD is ~0.234, WORSE than the model's 0.2179, flipping the report's conclusion), the skater-production/series-sim/skater-projection reports embed pre-fix 2020 labels (US-110's promised regen never ran; train rows 5157 vs 4837 at HEAD), and NO committed model/backtest manifest carries git provenance. (CODE_REVIEW_R2 R2-M2, R2-m5, R2-m6, R2-m8) This story runs only after US-201..US-210 are merged.",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND the R2-M2/R2-m5/R2-m6/R2-m8 findings in ml/CODE_REVIEW_R2.md in full before starting; confirm US-201..US-210 all have passes:true first — if any does not, stop and pick that story instead",
+    "Regenerate from a clean committed HEAD (see Codebase Patterns: run inside a clean worktree with the process CWD in it, write artifacts to an external directory, then commit): game-win (post-US-203 shootout fix, with per-season coverage from US-210), skater-production, series-sim, skater-projection (the US-110 debt), opponent (post-US-205 team_id recovery), backtests/2023-2024-2025 (post-US-202: expect 2024 R3_4 levi 64.0 / mean 55.25 / League best 65.00 tying the oracle best), and backtests/2026-combined-r500 (post-US-201 per-league tables; market track at HEAD game-1 semantics)",
+    "Every regenerated manifest carries git_sha naming the real generating commit and git_dirty=false, plus seeds/versions; the structural checks in tests/ pass on all regenerated artifacts",
+    "HONESTY GATE: the 2026 market track is expected to come out WORSE than the old stale number (~0.234 vs 0.2080) and the league tables will drop — report every movement truthfully in the committed reports and progress.txt; do NOT reroll seeds, change configs, weaken baselines, or keep a stale artifact because its numbers look better. A worse honest number satisfies this story; a preserved stale one never does",
+    "After regeneration, rerun the full suite and confirm the committed 2023-2025 report still reproduces byte-identically (timestamp aside) from its named commit",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 11,
+   "passes": false,
+   "notes": ""
+  }
+ ]
 }
