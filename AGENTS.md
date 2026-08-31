@@ -246,6 +246,10 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   tables. Scored sheet matches are review-flagged when all three exact integer point
   splits disagree with the NHL archive; duplicate player ownership is scoped by
   `(league_name, season, draft_event)` and ignores same-manager source copies.
+- Opponent fitting must call `dedupe_duplicate_events` and group through league-aware
+  `event_keys`. App rows remain authoritative, but missing app skater `team_id` values
+  inherit an unambiguous sheet match on `(league event, manager, player_id)` before
+  sheet rows are dropped; existing app ids and goalie/team rows stay untouched.
 
 ## Ralph Agent System
 

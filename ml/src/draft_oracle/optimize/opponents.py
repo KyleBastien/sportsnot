@@ -257,8 +257,43 @@ def _dedupe_asset_key(row: Mapping[Hashable, Any]) -> str | None:
     return None
 
 
+def _merge_sheet_team_ids(frame: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
+    """Fill missing app skater teams from an unambiguous matching sheet row.
+
+    The app export is authoritative for draft membership and order, but its skater
+    ``team_id`` coverage is sparse. The duplicate sheet copy has resolved teams for
+    the same ``(manager, player_id)`` assets. Supplement only missing app skater ids;
+    never overwrite an app value, infer through a conflicting sheet match, or alter
+    goalie/team rows.
+    """
+    fill_keys = [*keys, "manager", "player_id"]
+    sheet_rows = frame.loc[
+        frame["source"].eq("sheet")
+        & frame["player_id"].notna()
+        & frame["team_id"].notna()
+        & ~frame["position"].eq("G"),
+        [*fill_keys, "team_id"],
+    ].drop_duplicates()
+    if sheet_rows.empty:
+        return frame
+
+    candidate_counts = sheet_rows.groupby(fill_keys, dropna=False)["team_id"].transform("size")
+    supplements = sheet_rows.loc[candidate_counts.eq(1)].rename(
+        columns={"team_id": "_sheet_team_id"}
+    )
+    merged = frame.merge(supplements, on=fill_keys, how="left", validate="many_to_one")
+    missing_app_team = (
+        merged["source"].eq("app")
+        & ~merged["position"].eq("G")
+        & merged["team_id"].isna()
+        & merged["_sheet_team_id"].notna()
+    )
+    merged.loc[missing_app_team, "team_id"] = merged.loc[missing_app_team, "_sheet_team_id"]
+    return merged.drop(columns="_sheet_team_id")
+
+
 def dedupe_duplicate_events(picks: pd.DataFrame) -> pd.DataFrame:
-    """Merge safety flags, then prefer ``source='app'`` for duplicate drafts.
+    """Merge sheet metadata, then prefer ``source='app'`` for duplicate drafts.
 
     A single physical draft can appear twice: an authoritative in-app export
     (``source='app'``) and a hand-maintained spreadsheet copy (``source='sheet'``). The
@@ -267,13 +302,16 @@ def dedupe_duplicate_events(picks: pd.DataFrame) -> pd.DataFrame:
     ``(season, league_name, draft_event)``, preferring ``app`` over ``sheet``. Before
     dropping a copy, carry ``points_excluded=True`` onto the kept row when any source
     marks the same manager/asset excluded; scoring annotations must not disappear merely
-    because the authoritative app export omitted them. Frames lacking
-    ``source``/``league_name`` (synthetic fixtures) are returned unchanged.
+    because the authoritative app export omitted them. Also recover a missing app skater
+    ``team_id`` from the sheet copy when ``(manager, player_id)`` matches uniquely within
+    the same league event. Existing app ids and goalie/team rows remain unchanged. Frames
+    lacking ``source``/``league_name`` (synthetic fixtures) are returned unchanged.
     """
     if "source" not in picks.columns or "league_name" not in picks.columns:
         return picks
     frame = picks.copy()
     keys = event_keys(frame)
+    frame = _merge_sheet_team_ids(frame, keys)
     if "points_excluded" in frame.columns and "manager" in frame.columns:
         frame["_dedupe_asset_key"] = [_dedupe_asset_key(row) for row in frame.to_dict("records")]
         resolved = frame["_dedupe_asset_key"].notna()

@@ -12,7 +12,9 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
 - League draft consumers must call `dedupe_duplicate_events` before aggregation and
   use shared `event_keys` grouping; real events are keyed by
   `(season, league_name, draft_event)`, never season/event alone. Dedupe preserves
-  asset-level `points_excluded=True` from any source before preferring app rows.
+  asset-level `points_excluded=True` from any source before preferring app rows and
+  fills missing app skater `team_id` values from an unambiguous matching sheet row.
+  Never overwrite app team ids or apply this supplement to goalie/team rows.
 - Mock TanStack Query-shaped results must expose every status field consumed by shared
   hooks; successful static results include `isFetched: true`.
 - On Windows, `yarn nx e2e @sportsnot/e2e` can start Playwright before `serve-static`
@@ -858,4 +860,42 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
     the fixture.
   - Separate guards are required for oracle roster scoring, projection valuation, and
     league scoring because all three consume the combined event through different paths.
+---
+
+## 2026-08-31T03:24:49Z - US-205
+- What was implemented: Recovered sheet-resolved skater `team_id` values before
+  app-preferred duplicate-event removal, scoped by league event, manager, and player.
+  Existing app ids, conflicting sheet matches, and goalie/team rows remain untouched.
+  Added synthetic and real-data guards proving choice pools remain league-isolated;
+  the real table has 36 pools and team-bearing counts ben 78 / judah 77 / kyle 82 /
+  levi 76.
+- Files changed:
+  - `ml/src/draft_oracle/optimize/opponents.py`
+  - `ml/tests/test_opponents.py`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Mutation verification: Replaced `_event_keys` with `['season', 'draft_event']`;
+  `test_choice_pools_are_isolated_by_league` failed because two synthetic league pools
+  collapsed to one. Restored source before final checks.
+- Honest local refit: league rank beta moved 0.143571 -> 0.141591 and affinity beta
+  moved 2.848344 -> 3.039483. Per-manager affinity moved ben 2.432013 -> 2.352631,
+  judah 1.534445 -> 1.586691, kyle 1.441580 -> 1.744744, and levi 1.169610 ->
+  1.275698. Held-out fitted membership moved 2024 0.2222 -> 0.2870, 2025 0.2955 ->
+  0.3409, and 2026 0.3083 -> 0.2875; seasons beating greedy stayed 2/3. Ordered
+  2026 top-1/top-3 stayed 0.1125/0.2083. Committed opponent artifact remains deferred
+  to US-211.
+- Quality checks: ML ruff passed; ML mypy passed (69 source files); ML pytest passed
+  (666 tests); monorepo affected lint and typecheck passed; all Nx unit tests passed
+  (9 projects, web 380 tests); web production build passed; Playwright passed 96/96.
+  Normal commit hook passed affected lint/typecheck/unit gates (no Nx tasks), then
+  failed only because `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was unavailable;
+  commit retried with `--no-verify` per Ralph's CodeScene authentication exception.
+- **Learnings for future iterations:**
+  - Source preference and metadata quality are separate: supplement sparse app fields
+    from uniquely matching sheet rows before dropping duplicate sources.
+  - Regression tests must exercise `_event_keys` through real pool construction; a
+    public-helper-only assertion would not kill an internal grouping regression.
+  - More affinity coverage improved 2024/2025 held-out membership but reduced 2026;
+    preserve honest per-season movement instead of reporting only aggregate wins.
 ---

@@ -18,6 +18,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+import draft_oracle.optimize.opponents as opponents_module
 from draft_oracle.optimize.opponents import (
     Coefficients,
     FittedLeagueOpponents,
@@ -419,6 +420,58 @@ def test_dedupe_carries_exclusion_flag_from_dropped_sheet_copy() -> None:
     assert bool(ben["points_excluded"]) is True
 
 
+def test_dedupe_recovers_missing_app_skater_team_from_sheet_copy() -> None:
+    frame = _dup_frame()
+    app_ben = (
+        frame["league_name"].eq("The Gemmell Cup")
+        & frame["source"].eq("app")
+        & frame["manager"].eq("ben")
+    )
+    frame.loc[app_ben, "team_id"] = None
+    sheet_kyle = (
+        frame["league_name"].eq("The Gemmell Cup")
+        & frame["source"].eq("sheet")
+        & frame["manager"].eq("kyle")
+    )
+    frame.loc[sheet_kyle, "team_id"] = 6
+    goalie_rows = []
+    for source in ("sheet", "app"):
+        goalie = _dup_row("The Gemmell Cup", source, "ben", 1, 999, 30)
+        goalie["position"] = "G"
+        goalie["player_id"] = None
+        goalie_rows.append(goalie)
+    frame = pd.concat([frame, pd.DataFrame(goalie_rows)], ignore_index=True)
+
+    deduped = dedupe_duplicate_events(frame)
+    ben = deduped.loc[
+        deduped["league_name"].eq("The Gemmell Cup") & deduped["manager"].eq("ben")
+    ].iloc[0]
+    assert ben["source"] == "app"
+    assert int(ben["team_id"]) == 5
+    kyle = deduped.loc[
+        deduped["league_name"].eq("The Gemmell Cup")
+        & deduped["manager"].eq("kyle")
+        & deduped["position"].eq("F")
+    ].iloc[0]
+    assert int(kyle["team_id"]) == 5
+    goalie = deduped.loc[
+        deduped["league_name"].eq("The Gemmell Cup")
+        & deduped["manager"].eq("ben")
+        & deduped["position"].eq("G")
+    ].iloc[0]
+    assert int(goalie["team_id"]) == 30
+
+
+def test_choice_pools_are_isolated_by_league() -> None:
+    """Mutation guard: dropping league_name from _event_keys merges these pools."""
+    prepared = opponents_module._prepare_picks(_dup_frame())
+    pools = list(
+        prepared.groupby([*opponents_module._event_keys(prepared), "base_position"], sort=True)
+    )
+    assert len(pools) == 2
+    assert all(pool["league_name"].nunique() == 1 for _, pool in pools)
+
+
 def test_dedupe_is_noop_without_source_or_league_columns() -> None:
     frame = _affinity_league((2024,))
     pd.testing.assert_frame_equal(dedupe_duplicate_events(frame), frame)
@@ -455,6 +508,24 @@ def test_fitted_counts_match_real_league_truth() -> None:
     assert len(tuch) == 1
     assert tuch.iloc[0]["source"] == "app"
     assert bool(tuch.iloc[0]["points_excluded"]) is True
+
+    prepared = opponents_module._prepare_picks(picks)
+    pools = list(
+        prepared.groupby([*opponents_module._event_keys(prepared), "base_position"], sort=True)
+    )
+    assert len(pools) == 36
+    assert all(pool["league_name"].nunique() == 1 for _, pool in pools)
+
+    team_counts = deduped.loc[deduped["team_id"].notna()].groupby("manager").size()
+    core_counts = {
+        manager: int(team_counts[manager]) for manager in ("ben", "judah", "kyle", "levi")
+    }
+    assert core_counts == {
+        "ben": 78,
+        "judah": 77,
+        "kyle": 82,
+        "levi": 76,
+    }
 
     counts = fit_opponent_models(picks, OpponentFitConfig()).manager_pick_counts
     assert counts["ben"] == 87
@@ -510,9 +581,7 @@ def test_load_committed_opponents_returns_none_when_absent(tmp_path: Path) -> No
 
 
 def test_load_committed_opponents_loads_when_present(tmp_path: Path) -> None:
-    (tmp_path / "manifest.json").write_text(
-        json.dumps(_tiny_fitted().manifest()), encoding="utf-8"
-    )
+    (tmp_path / "manifest.json").write_text(json.dumps(_tiny_fitted().manifest()), encoding="utf-8")
     loaded = load_committed_opponents(tmp_path)
     assert loaded is not None
     assert loaded.league == Coefficients(rank=0.25, affinity=1.5)
