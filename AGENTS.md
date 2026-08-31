@@ -233,6 +233,9 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   consistent. For clean-worktree regeneration, run the Python process with its
   working directory inside that clean worktree; changing `PYTHONPATH` alone does not
   change the repository inspected by `git_state()`.
+- Committed projection CSV/parquet twins must contain the same ordered rows and
+  columns. Compare them with blank-string/null normalization and a `1e-12` float
+  tolerance in `test_committed_projection_artifacts.py`.
 - Keep imports in `draft_oracle.cli.project` lightweight. Import training and HTTP
   modules inside command bodies so draft-time commands start without LightGBM,
   scikit-learn, or httpx. Keep `draft_oracle.optimize` package re-exports lazy and

@@ -36,6 +36,8 @@ EXPECTED_TEAMS = {
     3: {"CAR", "COL", "MTL", "VGK"},
     4: {"CAR", "VGK"},
 }
+CSV_FLOAT_RTOL = 1e-12
+CSV_FLOAT_ATOL = 1e-12
 
 
 def _artifact(round_number: int) -> tuple[Path, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
@@ -54,6 +56,29 @@ def _goalie_team_abbrevs(cheatsheet: str) -> set[str]:
     )
     assert all(player == team for player, team in goalie_rows)
     return {team for _, team in goalie_rows}
+
+
+@pytest.mark.parametrize("round_number", [1, 2, 3, 4])
+@pytest.mark.parametrize("table_name", ["skaters", "teams"])
+def test_committed_2026_projection_csv_matches_parquet(
+    round_number: int,
+    table_name: str,
+) -> None:
+    """CSV twins preserve parquet rows within CSV round-trip precision."""
+    artifact_dir = ARTIFACTS_ROOT / f"2026-r{round_number}"
+    csv_frame = pd.read_csv(artifact_dir / f"{table_name}.csv").replace("", np.nan)
+    parquet_frame = pd.read_parquet(
+        artifact_dir / f"{table_name}.parquet"
+    ).replace("", np.nan)
+
+    pd.testing.assert_frame_equal(
+        csv_frame,
+        parquet_frame,
+        check_dtype=False,
+        check_exact=False,
+        rtol=CSV_FLOAT_RTOL,
+        atol=CSV_FLOAT_ATOL,
+    )
 
 
 @pytest.mark.parametrize("round_number", [1, 2, 3, 4])

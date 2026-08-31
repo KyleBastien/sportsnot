@@ -3,6 +3,9 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
 ---
 
 ## Codebase Patterns
+- Committed projection artifacts ship CSV/parquet twins. Structural tests must compare
+  ordered rows and columns after blank-string/null normalization, with `1e-12` relative
+  and absolute float tolerance for CSV round trips.
 - Odds source cross-validation must compare one consistent side (`home_implied`), not
   each source's favorite-probability magnitude. Game-type lookup may index both
   orientations, but market joins are orientation-specific; reverse-only archive matches
@@ -1023,4 +1026,37 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
     cannot expose lazy command imports or artifact-loader imports.
   - Precomputed draft-time transforms should live outside modules that also import
     training primitives, even when the transform originally belonged to that domain.
+---
+
+## 2026-08-31T04:25:38Z - US-209
+- What was implemented: Added parameterized integrity checks for `skaters` and `teams`
+  across all four committed 2026 projection artifact directories. Tests require CSV
+  and parquet twins to preserve identical ordered rows and columns, normalize serialized
+  blanks against parquet nulls, and compare numeric values at `1e-12` relative/absolute
+  tolerance.
+- Files changed:
+  - `ml/tests/test_committed_projection_artifacts.py`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Mutation verification: In a detached scratch worktree, truncating
+  `artifacts/2026-r1/skaters.csv` to exactly 200 bytes failed
+  `test_committed_2026_projection_csv_matches_parquet[skaters-1]` with a 1-row versus
+  462-row shape mismatch. Scratch worktree was removed after verification.
+- Quality checks: ML ruff passed; ML mypy passed (70 source files); ML pytest passed
+  682/682. Monorepo affected lint/typecheck passed; all 9 Nx unit-test targets passed
+  (web 380 tests); web production build passed. Initial parallel Playwright run passed
+  95/96, with the long 44-pick mock draft timing out on a transient disabled Confirm
+  button; readiness-gated isolated rerun passed in 10.9 seconds, covering the sole
+  failed case. Normal commit hook passed affected lint/typecheck/unit stages (no Nx
+  tasks), then failed only because `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was
+  unavailable; commit retried with `--no-verify` per Ralph's CodeScene authentication
+  exception.
+- **Learnings for future iterations:**
+  - `pd.read_csv` maps serialized blank fields to NaN while parquet retains empty string
+    values for string columns; normalize empty strings before frame comparison.
+  - `pd.testing.assert_frame_equal` protects row count/order and column count/order in
+    addition to values, so one guard detects both truncation and schema drift.
+  - Full mock-draft E2E can flake under 12-worker contention; retry the failed case
+    against a readiness-checked static server before diagnosing product behavior.
 ---
