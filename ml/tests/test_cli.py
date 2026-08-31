@@ -24,7 +24,10 @@ def test_version_command() -> None:
 def test_draft_commands_start_without_training_or_network_stack() -> None:
     code = """
 import builtins
+import os
 import sys
+import tempfile
+from pathlib import Path
 
 blocked_roots = {"lightgbm", "sklearn", "httpx"}
 real_import = builtins.__import__
@@ -39,9 +42,38 @@ from typer.testing import CliRunner
 from draft_oracle.cli.project import app
 
 runner = CliRunner()
-for command in ("draft", "recommend"):
-    result = runner.invoke(app, [command, "--help"])
-    assert result.exit_code == 0, result.output
+artifact = (Path.cwd() / "artifacts/2026-r1").resolve()
+assert not (artifact / "draft-session.json").exists()
+original_cwd = Path.cwd()
+with tempfile.TemporaryDirectory() as temp_dir:
+    try:
+        os.chdir(temp_dir)
+        result = runner.invoke(
+            app,
+            [
+                "recommend",
+                "--artifact-dir",
+                str(artifact),
+                "--rollouts",
+                "1",
+                "--depth",
+                "1",
+                "--opponents",
+                "greedy",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "Recommendation for seat1" in result.output
+        result = runner.invoke(
+            app,
+            ["draft", "--artifact", str(artifact), "--opponents", "greedy"],
+            input="quit\\n",
+        )
+        assert result.exit_code == 0, result.output
+        assert Path("draft-session.json").is_file()
+    finally:
+        os.chdir(original_cwd)
+assert not (artifact / "draft-session.json").exists()
 assert not blocked_roots.intersection(sys.modules)
 """
     ml_root = Path(__file__).parents[1]

@@ -690,7 +690,8 @@ def draft_cmd(
     ] = False,
     eliminated: Annotated[str, typer.Option(help="Comma-separated eliminated team abbrevs.")] = "",
     session: Annotated[
-        Path | None, typer.Option(help="Session-log path (autosaved after each pick).")
+        Path | None,
+        typer.Option(help="Session-log path (defaults to ./draft-session.json)."),
     ] = None,
     resume: Annotated[
         Path | None, typer.Option("--resume", help="Resume a saved session JSON instead.")

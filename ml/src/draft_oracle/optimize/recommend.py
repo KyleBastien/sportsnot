@@ -1388,7 +1388,7 @@ def build_pool_from_frames(
     """
     import pandas as pd
 
-    from draft_oracle.optimize.ir_value import reprice_pool_for_ir
+    from draft_oracle.optimize.ir_pool import reprice_pool_for_ir
 
     abbrev_to_id = {
         str(rec["team_abbrev"]): int(rec["team_id"]) for rec in teams.to_dict("records")

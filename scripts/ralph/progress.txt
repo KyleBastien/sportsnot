@@ -38,11 +38,15 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
   wrap payloads with `draft_oracle.provenance.add_git_provenance`; this stamps both
   `git_sha` and an explicit `git_dirty` marker so dirty-tree artifacts cannot claim
   clean reproducibility.
-- Draft-time CLI startup (US-117): keep `cli/project.py` imports stdlib + Typer only;
-  import ingest/training/HTTP modules inside command bodies. `draft` and `recommend`
-  help/startup must work with `lightgbm`, `sklearn`, and `httpx` blocked. Tests are
-  offline by enforcement: `tests/conftest.py` blocks socket connections globally;
-  HTTP tests must inject `httpx.MockTransport` or another in-memory fixture transport.
+- Draft-time CLI startup (US-117/US-208): keep `cli/project.py` imports stdlib +
+  Typer only and keep `optimize/__init__.py` convenience re-exports lazy. Artifact
+  consumers must import lightweight primitives (for example `optimize/ir_pool.py`),
+  not modules that import projection training. Guard REAL `draft` and `recommend`
+  runs with `lightgbm`, `sklearn`, and `httpx` blocked; `--help` alone misses command
+  body imports. Default draft session state belongs in cwd, never inside immutable
+  artifact fixtures. Tests are offline by enforcement: `tests/conftest.py` blocks
+  socket connections globally; HTTP tests must inject `httpx.MockTransport` or
+  another in-memory fixture transport.
 - Recommend fast path vs object rollout (US-116, `optimize/recommend.py`): two
   rollout impls must stay reconciled. The OBJECT path (`_expected_value` ->
   `_rollout_owner_value`) is the source of truth: opponents draft by `rank_value`
@@ -982,4 +986,41 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
   - A loaded fitted artifact does not imply fitted per-manager behavior. Default
     `seatN` ids receive league coefficients and zero affinity unless users pass matching
     manager names, so user-visible labels must state that fallback.
+---
+
+## 2026-08-31T04:12:53Z - US-208
+- What was implemented: Replaced eager `draft_oracle.optimize` re-exports with a
+  typed lazy-export map while preserving all 69 public symbols. Split precomputed IR
+  pool repricing into a lightweight module so artifact loading never imports model
+  training. Upgraded the subprocess guard to execute real `recommend` and interactive
+  `draft` commands against the committed 2026 R1 artifact with LightGBM,
+  scikit-learn, and httpx import-blocked. Moved default draft autosave from the
+  artifact directory to `./draft-session.json`; the guard verifies the artifact stays
+  untouched.
+- Files changed:
+  - `ml/src/draft_oracle/optimize/__init__.py`
+  - `ml/src/draft_oracle/optimize/ir_pool.py`
+  - `ml/src/draft_oracle/optimize/ir_value.py`
+  - `ml/src/draft_oracle/optimize/recommend.py`
+  - `ml/src/draft_oracle/cli/draft.py`
+  - `ml/src/draft_oracle/cli/project.py`
+  - `ml/tests/test_cli.py`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Quality checks: ML ruff passed; ML mypy passed (70 source files); ML pytest passed
+  674/674. Monorepo affected lint and typecheck passed; all 9 Nx unit-test targets
+  passed (web 380 tests); web production build passed. Initial Nx E2E run hit the
+  known server-readiness race in one early test (`ERR_SOCKET_NOT_CONNECTED`); direct
+  readiness-gated Playwright rerun passed 96/96. Normal commit hook passed affected
+  lint/typecheck/unit stages (no Nx tasks), then failed only because
+  `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was unavailable; commit retried with
+  `--no-verify` per Ralph's CodeScene authentication exception.
+- **Learnings for future iterations:**
+  - Python loads a package `__init__.py` before any submodule, so direct imports such
+    as `draft_oracle.optimize.recommend` do not bypass eager package re-exports.
+  - Import guards must execute command bodies against real artifacts; help rendering
+    cannot expose lazy command imports or artifact-loader imports.
+  - Precomputed draft-time transforms should live outside modules that also import
+    training primitives, even when the transform originally belonged to that domain.
 ---

@@ -235,7 +235,9 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   change the repository inspected by `git_state()`.
 - Keep imports in `draft_oracle.cli.project` lightweight. Import training and HTTP
   modules inside command bodies so draft-time commands start without LightGBM,
-  scikit-learn, or httpx.
+  scikit-learn, or httpx. Keep `draft_oracle.optimize` package re-exports lazy and
+  isolate artifact-consumption primitives from simulation/training modules; import
+  guards must exercise real `draft` and `recommend` commands, not only `--help`.
 - Team outcome features belong to `draft_oracle.models.game_win`; shared Elo math
   lives in `draft_oracle.features.elo`. Do not recreate a parallel team/series
   matrix unless a production model consumes and evaluates it.

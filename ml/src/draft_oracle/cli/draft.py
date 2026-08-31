@@ -738,7 +738,8 @@ def draft(
     ] = False,
     eliminated: Annotated[str, typer.Option(help="Comma-separated eliminated team abbrevs.")] = "",
     session: Annotated[
-        Path | None, typer.Option(help="Session-log path (autosaved after each pick).")
+        Path | None,
+        typer.Option(help="Session-log path (defaults to ./draft-session.json)."),
     ] = None,
     resume: Annotated[
         Path | None, typer.Option("--resume", help="Resume a saved session JSON instead.")
@@ -766,7 +767,9 @@ def draft(
     recommendations (``recommend``) with full multi-step lookahead. All valuation
     comes from the precomputed artifact — no network, no training at draft time.
     Illegal actions are rejected with the reason (position full, already drafted,
-    eliminated), and the session autosaves to a replayable JSON log.
+    eliminated), and the session autosaves to a replayable JSON log in the current
+    directory unless ``--session`` supplies another path. Artifact directories remain
+    immutable inputs.
 
     Opponents default to the committed *fitted* league model when its artifact is
     present (``--opponents greedy`` forces the fallback); pass real names to
@@ -799,5 +802,5 @@ def draft(
         opponents=opponents_kind,
         opponent_artifact_dir=opponent_artifact,
     )
-    session_path = session or (artifact / "draft-session.json")
+    session_path = session or Path("draft-session.json")
     _run_loop(new_session, session_path)

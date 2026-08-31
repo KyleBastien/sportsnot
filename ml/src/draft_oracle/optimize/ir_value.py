@@ -47,7 +47,7 @@ from draft_oracle.models.projections import (
     expected_series_length,
     simulate_round_points,
 )
-from draft_oracle.optimize.simulator import DraftAsset
+from draft_oracle.optimize.ir_pool import reprice_pool_for_ir
 
 __all__ = [
     "DEFAULT_STASH_HORIZON",
@@ -333,37 +333,3 @@ def render_ir_section(valuations: Sequence[StashValuation]) -> list[str]:
             f"| {alt} | {val.verdict} |"
         )
     return lines
-
-
-def reprice_pool_for_ir(
-    pool: Sequence[DraftAsset],
-    stash_value_by_player: Mapping[int, float],
-) -> list[DraftAsset]:
-    """Reprice injured skaters to their IR stash value for the optimizer.
-
-    When the league enables IR, an injured skater destined for an ``IR_F`` / ``IR_D``
-    slot is worth its *stash value* (the marginal points the retroactive swap adds),
-    not its full-health projection -- valuing it at full health would have the optimizer
-    reach for a star who cannot play. Returns a new pool with each matching skater's
-    ``projection`` (and ``rank_value``) set to its stash value; every other asset is
-    returned unchanged.
-    """
-    repriced: list[DraftAsset] = []
-    for asset in pool:
-        if asset.player_id is not None and asset.player_id in stash_value_by_player:
-            value = float(stash_value_by_player[asset.player_id])
-            repriced.append(
-                DraftAsset(
-                    key=asset.key,
-                    name=asset.name,
-                    position=asset.position,
-                    rank_value=value,
-                    player_id=asset.player_id,
-                    team_id=asset.team_id,
-                    team_abbrev=asset.team_abbrev,
-                    projection=value,
-                )
-            )
-        else:
-            repriced.append(asset)
-    return repriced
