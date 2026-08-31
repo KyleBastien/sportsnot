@@ -496,6 +496,31 @@ def test_run_backtest_replays_rounds_2_and_combined_r3_r4() -> None:
     )
 
 
+def test_combined_r3_r4_roster_scoring_uses_both_rounds() -> None:
+    tables = _four_round_tables()
+    result = run_backtest(tables, [FOUR_ROUND_TARGET], config=_four_round_config())
+    combined = next(rnd for rnd in result.rounds if rnd.playoff_round == 3)
+    seat_one = next(slot for slot in combined.slot_results if slot.seat == 1)
+    season_id = (FOUR_ROUND_TARGET - 1) * 10000 + FOUR_ROUND_TARGET
+    skater_actual = skater_actual_points(tables["skater_games"], tables["series"])
+    team_actual = team_actual_goalie_points(tables["team_games"], tables["series"])
+
+    def roster_points(playoff_round: int) -> float:
+        total = 0.0
+        for key in seat_one.roster_keys:
+            lookup = skater_actual if key.startswith("P") else team_actual
+            total += lookup.get((season_id, playoff_round, int(key[1:])), 0)
+        return total
+
+    round_three_points = roster_points(3)
+    round_four_points = roster_points(4)
+    assert round_three_points == 63.0
+    assert round_four_points == 38.0
+    assert seat_one.oracle_points == 101.0
+    assert seat_one.oracle_points == round_three_points + round_four_points
+    assert seat_one.oracle_points > round_three_points
+
+
 def test_build_projection_artifact_combined_event_folds_r3_and_r4() -> None:
     # build_projection_artifact invoked with playoff_round=3 (not 1): the combined
     # R3_4 valuation must populate the manifest and fold the conditional Cup Final in.
@@ -525,6 +550,14 @@ def test_build_projection_artifact_combined_event_folds_r3_and_r4() -> None:
     assert combined["scored_rounds"] == [3, 4]
     # Exactly the final four teams (two conference-final series) are diagnosed.
     assert {d["team_abbrev"] for d in combined["teams"]} == {f"T{i:02d}" for i in range(1, 5)}
+    for diagnostic in combined["teams"]:
+        p_advance = diagnostic["p_advance"]
+        round_three = diagnostic["e_goalie_points_r3"]
+        round_four = diagnostic["e_goalie_points_r4"]
+        combined_points = diagnostic["e_goalie_points_combined"]
+        assert p_advance > 0.0
+        assert round_four > 0.0
+        assert combined_points == pytest.approx(round_three + p_advance * round_four, abs=2e-5)
     assert set(result.manifest["eligible_team_abbrevs"]) == {f"T{i:02d}" for i in range(1, 5)}
 
 
@@ -752,6 +785,74 @@ def test_score_league_roster_no_swap_counts_starter_benches_ir() -> None:
     )
     # No activation: starter (7) counts, bench IR (4) scores zero, goalie (6): 13.
     assert total == 13.0
+
+
+def test_combined_league_comparison_scores_rounds_three_and_four() -> None:
+    tables = _four_round_tables()
+    season_id = (FOUR_ROUND_TARGET - 1) * 10000 + FOUR_ROUND_TARGET
+    skater_actual = skater_actual_points(tables["skater_games"], tables["series"])
+    team_actual = team_actual_goalie_points(tables["team_games"], tables["series"])
+    picks = pd.DataFrame(
+        [
+            {
+                "season": FOUR_ROUND_TARGET,
+                "league_name": "Combined Fixture League",
+                "draft_event": "R3_4",
+                "manager": "alice",
+                "position": "F",
+                "player_id": 1000,
+                "team_id": None,
+                "points_excluded": False,
+                "ir_activated": False,
+            },
+            {
+                "season": FOUR_ROUND_TARGET,
+                "league_name": "Combined Fixture League",
+                "draft_event": "R3_4",
+                "manager": "alice",
+                "position": "G",
+                "player_id": None,
+                "team_id": 1,
+                "points_excluded": False,
+                "ir_activated": False,
+            },
+        ]
+    )
+    combined_round = RoundResult(
+        season=FOUR_ROUND_TARGET,
+        season_id=season_id,
+        playoff_round=3,
+        as_of_cutoff=f"{FOUR_ROUND_TARGET}-05-05",
+        opponents_kind="greedy",
+        eligible_team_abbrevs=TEAMS16[:4],
+        leakage_ok=True,
+        scored_rounds=[3, 4],
+        slot_results=[
+            SlotResult(
+                strategy="oracle",
+                seat=1,
+                oracle_manager="seat1",
+                draft_index=0,
+                oracle_points=40.0,
+                opponent_points={},
+                roster_keys=[],
+            )
+        ],
+    )
+
+    comparisons = _league_comparisons([combined_round], picks, skater_actual, team_actual)
+    assert len(comparisons) == 1
+    actual_points = comparisons[0].managers[0].actual_points
+    round_three_only = _score_league_roster(
+        picks,
+        skater_actual,
+        team_actual,
+        season_id=season_id,
+        scored_rounds=[3],
+    )
+    assert round_three_only == 16.0
+    assert actual_points == 37.0
+    assert actual_points > round_three_only
 
 
 def test_real_2026_league_comparisons_never_pool_leagues() -> None:
