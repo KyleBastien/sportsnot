@@ -19,7 +19,10 @@ from typer.testing import CliRunner
 
 from draft_oracle.backtest.replay import (
     BacktestConfig,
+    RoundResult,
+    SlotResult,
     _draft_events,
+    _league_comparisons,
     _market_series_prob,
     _score_league_roster,
     assert_round_inputs_leakfree,
@@ -749,6 +752,54 @@ def test_score_league_roster_no_swap_counts_starter_benches_ir() -> None:
     )
     # No activation: starter (7) counts, bench IR (4) scores zero, goalie (6): 13.
     assert total == 13.0
+
+
+def test_real_2026_league_comparisons_never_pool_leagues() -> None:
+    """Committed two-league fixture keeps kyle's real R1 rosters independent."""
+    normalized = Path("data/normalized")
+    league_picks = pd.read_parquet(normalized / "league_draft_picks.parquet")
+    series = pd.read_parquet(normalized / "series.parquet")
+    skater_actual = skater_actual_points(
+        pd.read_parquet(normalized / "skater_games.parquet"), series
+    )
+    team_actual = team_actual_goalie_points(
+        pd.read_parquet(normalized / "team_games.parquet"), series
+    )
+    rnd = RoundResult(
+        season=2026,
+        season_id=20252026,
+        playoff_round=1,
+        as_of_cutoff="2026-04-18",
+        opponents_kind="fitted",
+        eligible_team_abbrevs=[],
+        leakage_ok=True,
+        scored_rounds=[1],
+        slot_results=[
+            SlotResult(
+                strategy="oracle",
+                seat=1,
+                oracle_manager="kyle",
+                draft_index=0,
+                oracle_points=42.0,
+                opponent_points={},
+                roster_keys=[],
+            )
+        ],
+    )
+
+    comparisons = _league_comparisons([rnd], league_picks, skater_actual, team_actual)
+    by_league = {comparison.league_name: comparison for comparison in comparisons}
+
+    assert set(by_league) == {"Press Play-offs", "The Gemmell Cup"}
+    assert all(len(comparison.managers) == 4 for comparison in comparisons)
+    kyle_points = {
+        league: next(
+            manager.actual_points for manager in comparison.managers if manager.manager == "kyle"
+        )
+        for league, comparison in by_league.items()
+    }
+    assert kyle_points == {"Press Play-offs": 50.0, "The Gemmell Cup": 37.0}
+    assert 72.0 not in kyle_points.values()
 
 
 # ── Market-series benchmark (US-109, CODE_REVIEW M-5) ───────────────────────

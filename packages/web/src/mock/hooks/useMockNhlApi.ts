@@ -105,6 +105,7 @@ interface MockQueryResult<T> {
   isError: false;
   error: null;
   isFetching: false;
+  isFetched: true;
   isSuccess: true;
   status: 'success';
   refetch: () => Promise<MockQueryResult<T>>;
@@ -117,6 +118,7 @@ function makeMockQuery<T>(data: T): MockQueryResult<T> {
     isError: false,
     error: null,
     isFetching: false,
+    isFetched: true,
     isSuccess: true,
     status: 'success',
     refetch: () => Promise.resolve(result),

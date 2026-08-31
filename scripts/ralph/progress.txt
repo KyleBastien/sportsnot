@@ -3,6 +3,15 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
 ---
 
 ## Codebase Patterns
+- League draft consumers must call `dedupe_duplicate_events` before aggregation and
+  use shared `event_keys` grouping; real events are keyed by
+  `(season, league_name, draft_event)`, never season/event alone. Dedupe preserves
+  asset-level `points_excluded=True` from any source before preferring app rows.
+- Mock TanStack Query-shaped results must expose every status field consumed by shared
+  hooks; successful static results include `isFetched: true`.
+- On Windows, `yarn nx e2e @sportsnot/e2e` can start Playwright before `serve-static`
+  listens on port 4200. If early tests fail with `ERR_CONNECTION_REFUSED`, start
+  `yarn nx serve-static @sportsnot/web`, verify readiness, then run Playwright directly.
 - Team outcome feature ownership (US-119): `models/game_win.py` owns chronological
   team aggregates and exact-game market joins; `models/series_sim.py` consumes the
   fitted game model. Shared Elo config/math lives in `features/elo.py`. Do not add a
@@ -691,4 +700,42 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
   (`_tables_present` checks `teams` too), so a from-normalized test fixture that only
   writes the 4 projection tables must also drop a `teams.parquet` before snapshotting.
 
+---
+
+## 2026-08-31T02:34:21Z - US-201
+- What was implemented: Fixed backtest league comparisons to dedupe duplicate app/sheet
+  draft events, preserve exclusion flags from any duplicate asset row, and emit one
+  comparison per league. Added league identity to manifests/reports and documented that
+  every overlapping league is reported separately. Real 2026 regression proves kyle's
+  R1 scores remain Press Play-offs 50.0 and The Gemmell Cup 37.0, never pooled 72.0;
+  each comparison contains exactly four managers. Added missing `isFetched: true` to
+  mock NHL query results so repository-wide TypeScript checks pass.
+- Files changed:
+  - `ml/src/draft_oracle/optimize/opponents.py`
+  - `ml/src/draft_oracle/backtest/replay.py`
+  - `ml/src/draft_oracle/backtest/report.py`
+  - `ml/tests/test_opponents.py`
+  - `ml/tests/test_backtest.py`
+  - `ml/tests/test_backtest_report.py`
+  - `packages/web/src/mock/hooks/useMockNhlApi.ts`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Quality checks: ML ruff lint passed; ML mypy passed (69 files); ML pytest passed
+  (654 tests); monorepo lint passed (11 projects); monorepo typecheck passed (10
+  projects); monorepo unit tests passed (9 projects, web 380 tests); web production
+  build passed; Playwright passed 96/96 after explicit server readiness. Initial Nx E2E
+  attempt started Playwright before `serve-static` was listening (12 connection-refused
+  failures, remaining 84 passed); direct readiness-gated rerun passed all tests.
+  Normal commit hook passed affected lint/typecheck/unit checks, then failed only because
+  `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was unavailable; commit retried with
+  `--no-verify` per Ralph's CodeScene authentication exception.
+- **Learnings for future iterations:**
+  - `event_keys` is shared public grouping logic; opponent fitting keeps `_event_keys`
+    as compatibility alias for existing mutation guards.
+  - Safety annotations must merge by league/event/manager/asset before source-level
+    dedupe, or app preference silently drops sheet-only exclusions such as ben's 2026
+    R2 Alex Tuch flag.
+  - No committed 2026 backtest artifact was regenerated; US-211 owns final clean-HEAD
+    artifact regeneration after all scoring fixes.
 ---

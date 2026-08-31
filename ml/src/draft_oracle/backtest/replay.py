@@ -49,6 +49,8 @@ from draft_oracle.models.skater_production import (
 from draft_oracle.optimize.opponents import (
     FittedLeagueOpponents,
     OpponentFitConfig,
+    dedupe_duplicate_events,
+    event_keys,
     fit_opponent_models,
 )
 from draft_oracle.optimize.recommend import (
@@ -469,8 +471,9 @@ class LeagueComparison:
 
     Populated only where a backtested season/round overlaps the committed league draft
     history. ``oracle_mean_points`` / ``oracle_best_points`` aggregate the oracle policy
-    across the snake slots for the round; ``managers`` are the league's real active-
-    roster scores through the same rules engine.
+    across the snake slots for the round; ``managers`` are one named league's real
+    active-roster scores through the same rules engine. Separate leagues always produce
+    separate comparison rows.
     """
 
     season: int
@@ -479,6 +482,7 @@ class LeagueComparison:
     managers: list[LeagueManagerRoster]
     oracle_mean_points: float
     oracle_best_points: float
+    league_name: str | None = None
 
     @property
     def league_mean_points(self) -> float:
@@ -497,6 +501,7 @@ class LeagueComparison:
             "season": self.season,
             "playoff_round": self.playoff_round,
             "draft_event": self.draft_event,
+            "league_name": self.league_name,
             "oracle_mean_points": round(self.oracle_mean_points, 6),
             "oracle_best_points": round(self.oracle_best_points, 6),
             "league_mean_points": round(self.league_mean_points, 6),
@@ -1021,48 +1026,61 @@ def _league_comparisons(
     For each backtested round whose ``(season, draft_event)`` appears in the committed
     league draft history, score every real manager's active roster through the rules
     engine and pair it with the oracle policy's mean/best simulated points that round.
-    Rounds without league overlap are simply omitted.
+    Every overlapping league is reported separately because the replay config has no
+    simulated-league identity; manager rosters and league aggregates never cross a
+    ``league_name`` boundary. Duplicate source copies are app-preferred after preserving
+    any asset-level exclusion flag. Rounds without league overlap are simply omitted.
     """
     if league_picks is None or league_picks.empty or "season" not in league_picks.columns:
         return []
+    prepared = dedupe_duplicate_events(league_picks)
     comparisons: list[LeagueComparison] = []
     for rnd in rounds:
         event = ROUND_TO_DRAFT_EVENT.get(rnd.playoff_round)
         if event is None:
             continue
         scored = rnd.scored_rounds or [rnd.playoff_round]
-        scoped = league_picks.loc[
-            (league_picks["season"].astype(int) == int(rnd.season))
-            & (league_picks["draft_event"].astype(str) == event)
+        scoped = prepared.loc[
+            (prepared["season"].astype(int) == int(rnd.season))
+            & (prepared["draft_event"].astype(str) == event)
         ]
         if scoped.empty:
             continue
         oracle_points = [s.oracle_points for s in rnd.slot_results if s.strategy == "oracle"]
         if not oracle_points:
             continue
-        managers = [
-            LeagueManagerRoster(
-                manager=str(manager),
-                actual_points=_score_league_roster(
-                    picks,
-                    skater_actual,
-                    team_actual,
-                    season_id=rnd.season_id,
-                    scored_rounds=scored,
-                ),
+        for _, league_picks_for_event in scoped.groupby(
+            event_keys(scoped), sort=True, dropna=False
+        ):
+            league_name: str | None = None
+            if "league_name" in league_picks_for_event.columns:
+                raw_league_name = league_picks_for_event["league_name"].iloc[0]
+                if pd.notna(raw_league_name):
+                    league_name = str(raw_league_name)
+            managers = [
+                LeagueManagerRoster(
+                    manager=str(manager),
+                    actual_points=_score_league_roster(
+                        picks,
+                        skater_actual,
+                        team_actual,
+                        season_id=rnd.season_id,
+                        scored_rounds=scored,
+                    ),
+                )
+                for manager, picks in league_picks_for_event.groupby("manager")
+            ]
+            comparisons.append(
+                LeagueComparison(
+                    season=rnd.season,
+                    playoff_round=rnd.playoff_round,
+                    draft_event=event,
+                    managers=sorted(managers, key=lambda m: (-m.actual_points, m.manager)),
+                    oracle_mean_points=sum(oracle_points) / len(oracle_points),
+                    oracle_best_points=max(oracle_points),
+                    league_name=league_name,
+                )
             )
-            for manager, picks in scoped.groupby("manager")
-        ]
-        comparisons.append(
-            LeagueComparison(
-                season=rnd.season,
-                playoff_round=rnd.playoff_round,
-                draft_event=event,
-                managers=sorted(managers, key=lambda m: (-m.actual_points, m.manager)),
-                oracle_mean_points=sum(oracle_points) / len(oracle_points),
-                oracle_best_points=max(oracle_points),
-            )
-        )
     return comparisons
 
 

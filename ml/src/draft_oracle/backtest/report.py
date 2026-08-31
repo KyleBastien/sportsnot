@@ -416,6 +416,7 @@ def _league_section(result: BacktestResult) -> list[str]:
         rows.append(
             [
                 str(comp.season),
+                comp.league_name or "(unspecified)",
                 f"r{comp.playoff_round} ({comp.draft_event})",
                 _fmt(comp.oracle_mean_points, 2),
                 _fmt(comp.oracle_best_points, 2),
@@ -424,7 +425,14 @@ def _league_section(result: BacktestResult) -> list[str]:
             ]
         )
         managers = "; ".join(f"{m.manager} {_fmt(m.actual_points, 1)}" for m in comp.managers)
-        manager_rows.append([str(comp.season), f"r{comp.playoff_round}", managers])
+        manager_rows.append(
+            [
+                str(comp.season),
+                comp.league_name or "(unspecified)",
+                f"r{comp.playoff_round}",
+                managers,
+            ]
+        )
     return [
         "## League comparison",
         "",
@@ -432,15 +440,26 @@ def _league_section(result: BacktestResult) -> list[str]:
         "simulated roster points (mean/best across snake slots) vs. what the league's "
         "managers actually drafted, all scored through the same rules engine. The "
         "combined `R3_4` draft is scored across both the conference final and the Cup "
-        "Final, matching how the league drafts once for rounds 3+4.",
+        "Final, matching how the league drafts once for rounds 3+4. When history has "
+        "multiple leagues in one season/event, each league is reported separately; "
+        "manager rosters and league aggregates never pool across leagues.",
         "",
         *_table(
-            ["Season", "Round", "Oracle mean", "Oracle best", "League mean", "League best"], rows
+            [
+                "Season",
+                "League",
+                "Round",
+                "Oracle mean",
+                "Oracle best",
+                "League mean",
+                "League best",
+            ],
+            rows,
         ),
         "",
         "### Real league rosters (actual points)",
         "",
-        *_table(["Season", "Round", "Managers (points)"], manager_rows),
+        *_table(["Season", "League", "Round", "Managers (points)"], manager_rows),
     ]
 
 

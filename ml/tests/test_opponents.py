@@ -377,6 +377,7 @@ def _dup_row(
         "player_id": player_id,
         "team_id": team_id,
         "points_when_drafted": 1.0,
+        "points_excluded": False,
         "matched_name": f"P{player_id}",
         "player_or_team_name": f"P{player_id}",
     }
@@ -390,7 +391,14 @@ def _dup_frame() -> pd.DataFrame:
             rows.append(_dup_row("The Gemmell Cup", source, manager, slot, 100 + slot, 5))
     for slot, manager in enumerate(("tobi", "kyle"), start=1):
         rows.append(_dup_row("Press Play-offs", "app", manager, slot, 200 + slot, 9))
-    return pd.DataFrame(rows)
+    frame = pd.DataFrame(rows)
+    frame.loc[
+        (frame["league_name"] == "The Gemmell Cup")
+        & (frame["source"] == "sheet")
+        & (frame["manager"] == "ben"),
+        "points_excluded",
+    ] = True
+    return frame
 
 
 def test_dedupe_prefers_app_over_sheet_copy() -> None:
@@ -400,6 +408,15 @@ def test_dedupe_prefers_app_over_sheet_copy() -> None:
     assert len(gemmell) == 2  # not double-counted
     # the separate league (app only) is untouched
     assert len(deduped[deduped["league_name"] == "Press Play-offs"]) == 2
+
+
+def test_dedupe_carries_exclusion_flag_from_dropped_sheet_copy() -> None:
+    deduped = dedupe_duplicate_events(_dup_frame())
+    ben = deduped[
+        (deduped["league_name"] == "The Gemmell Cup") & (deduped["manager"] == "ben")
+    ].iloc[0]
+    assert ben["source"] == "app"
+    assert bool(ben["points_excluded"]) is True
 
 
 def test_dedupe_is_noop_without_source_or_league_columns() -> None:
@@ -427,6 +444,18 @@ def test_fitted_counts_match_real_league_truth() -> None:
     if not _REAL_LEAGUE_PICKS.exists():
         pytest.skip("committed league_draft_picks parquet not present")
     picks = pd.read_parquet(_REAL_LEAGUE_PICKS)
+    deduped = dedupe_duplicate_events(picks)
+    tuch = deduped.loc[
+        (deduped["season"] == 2026)
+        & (deduped["league_name"] == "The Gemmell Cup")
+        & (deduped["draft_event"] == "R2")
+        & (deduped["manager"] == "ben")
+        & (deduped["player_id"] == 8477949)
+    ]
+    assert len(tuch) == 1
+    assert tuch.iloc[0]["source"] == "app"
+    assert bool(tuch.iloc[0]["points_excluded"]) is True
+
     counts = fit_opponent_models(picks, OpponentFitConfig()).manager_pick_counts
     assert counts["ben"] == 87
     assert counts["judah"] == 87

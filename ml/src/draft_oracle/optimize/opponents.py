@@ -60,7 +60,7 @@ from __future__ import annotations
 import json
 import math
 import random
-from collections.abc import Mapping, Sequence
+from collections.abc import Hashable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -92,6 +92,7 @@ __all__ = [
     "build_team_affinity",
     "dedupe_duplicate_events",
     "evaluate_opponents",
+    "event_keys",
     "fit_opponent_models",
     "load_committed_opponents",
     "opponent_model_from_config",
@@ -228,7 +229,7 @@ class _Choice:
 _SOURCE_PRIORITY: dict[str, int] = {"app": 0, "sheet": 1}
 
 
-def _event_keys(frame: pd.DataFrame) -> list[str]:
+def event_keys(frame: pd.DataFrame) -> list[str]:
     """Grouping keys that isolate one real draft event, league-aware when possible.
 
     Real data carries ``league_name`` so two leagues drafting in the same season/round
@@ -242,25 +243,54 @@ def _event_keys(frame: pd.DataFrame) -> list[str]:
     return keys
 
 
+# Private compatibility name retained for opponent-model internals and mutation guards.
+_event_keys = event_keys
+
+
+def _dedupe_asset_key(row: Mapping[Hashable, Any]) -> str | None:
+    """Stable asset identity used to carry annotations across duplicate sources."""
+    position = str(row.get("position", ""))
+    asset_id = row.get("team_id") if position == "G" else row.get("player_id")
+    if pd.notna(asset_id):
+        prefix = "T" if position == "G" else "P"
+        return f"{prefix}{int(asset_id)}"
+    return None
+
+
 def dedupe_duplicate_events(picks: pd.DataFrame) -> pd.DataFrame:
-    """Drop duplicated copies of the same real draft, preferring ``source='app'``.
+    """Merge safety flags, then prefer ``source='app'`` for duplicate drafts.
 
     A single physical draft can appear twice: an authoritative in-app export
     (``source='app'``) and a hand-maintained spreadsheet copy (``source='sheet'``). The
     2026 Gemmell Cup is recorded both ways (32/32 identical round-1 player ids), so
     fitting on the raw table double-counts every Gemmell pick. Keep exactly one copy per
-    ``(season, league_name, draft_event)``, preferring ``app`` over ``sheet``. Frames
-    lacking ``source``/``league_name`` (synthetic fixtures) are returned unchanged.
+    ``(season, league_name, draft_event)``, preferring ``app`` over ``sheet``. Before
+    dropping a copy, carry ``points_excluded=True`` onto the kept row when any source
+    marks the same manager/asset excluded; scoring annotations must not disappear merely
+    because the authoritative app export omitted them. Frames lacking
+    ``source``/``league_name`` (synthetic fixtures) are returned unchanged.
     """
     if "source" not in picks.columns or "league_name" not in picks.columns:
         return picks
     frame = picks.copy()
+    keys = event_keys(frame)
+    if "points_excluded" in frame.columns and "manager" in frame.columns:
+        frame["_dedupe_asset_key"] = [_dedupe_asset_key(row) for row in frame.to_dict("records")]
+        resolved = frame["_dedupe_asset_key"].notna()
+        flag_keys = [*keys, "manager", "_dedupe_asset_key"]
+        frame.loc[resolved, "points_excluded"] = (
+            frame.loc[resolved]
+            .groupby(flag_keys, dropna=False)["points_excluded"]
+            .transform(lambda values: values.fillna(False).astype(bool).any())
+        )
     frame["_source_priority"] = frame["source"].map(
         lambda s: _SOURCE_PRIORITY.get(str(s), len(_SOURCE_PRIORITY))
     )
-    keys = ["season", "league_name", "draft_event"]
     best = frame.groupby(keys)["_source_priority"].transform("min")
-    kept = frame.loc[frame["_source_priority"] == best].drop(columns="_source_priority")
+    helper_columns = ["_source_priority"]
+    if "_dedupe_asset_key" in frame.columns:
+        helper_columns.append("_dedupe_asset_key")
+    kept = frame.loc[frame["_source_priority"] == best].drop(columns=helper_columns)
     return kept.reset_index(drop=True)
 
 

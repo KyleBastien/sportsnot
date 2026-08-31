@@ -178,6 +178,7 @@ def test_report_has_all_sections_and_league_comparison(tmp_path: Path) -> None:
             ],
             oracle_mean_points=20.0,
             oracle_best_points=22.0,
+            league_name="The Gemmell Cup",
         )
     ]
     result = _result([rnd], league=league)
@@ -188,6 +189,8 @@ def test_report_has_all_sections_and_league_comparison(tmp_path: Path) -> None:
     assert "## Series-model calibration" in text
     assert "## Draft strategy vs. baselines" in text
     assert "## League comparison" in text
+    assert "each league is reported separately" in text
+    assert "The Gemmell Cup" in text
     assert "kyle" in text and "ben" in text
     # The run-parameter provenance note states rollouts/drafts and the honest under-run.
     assert "**Run parameters.**" in text

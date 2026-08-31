@@ -82,6 +82,8 @@ Set `VITE_MOCK_MODE=true` in `.env` to run the entire app offline with in-memory
 - Swaps real Supabase hooks for mock equivalents via `mockHooksRegistry` (`packages/web/src/mock/`)
 - Uses static data from `@sportsnot/mock-data` (players, teams, games, bracket)
 - When mock mode is off, Rspack aliases `@sportsnot/mock-data` to `false` to tree-shake it out
+- Mock query results must include every TanStack Query status field consumed by shared
+  hooks (for example, `isFetched: true` for successful static results).
 
 The `packages/web/src/mock/` directory contains all mock infrastructure. The hook registry pattern (`mockHooksRegistry.ts`) maps each real Supabase hook to a mock implementation.
 
