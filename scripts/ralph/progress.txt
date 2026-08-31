@@ -40,6 +40,11 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
   via `PYTHONPATH` is insufficient if the process CWD remains a dirty checkout. Run
   inside the clean worktree and write artifacts to an external directory so earlier
   generated rounds do not make later manifests dirty.
+- Committed model/backtest evidence is guarded by
+  `ml/tests/test_committed_model_evidence.py`; regenerate report/manifest pairs at the
+  fixed seed from the same clean commit. The 2026 `r500` backtest can consume roughly
+  seven CPU hours and writes only at completion, so sustained CPU with quiet output is
+  expected.
 - Artifact provenance (US-117): every model/projection/backtest manifest writer must
   wrap payloads with `draft_oracle.provenance.add_git_provenance`; this stamps both
   `git_sha` and an explicit `git_dirty` marker so dirty-tree artifacts cannot claim
@@ -1098,4 +1103,60 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
     must normalize `2026.0` safely before emitting integer year keys.
   - Generated metrics should have one canonical artifact. README should explain the
     evaluation and link the artifact instead of copying numbers that stale after refits.
+---
+
+## 2026-08-31T21:20:57Z - US-211
+- What was implemented: Regenerated all eight committed model artifacts and both
+  committed backtests from clean detached commit
+  `da5e568a7f564697934e63ab1005f56e19968726`, using seed 20260827 and external output
+  directories. Every manifest now records the generating SHA and `git_dirty=false`.
+  Added structural regression coverage for provenance, fixed seeds, per-season market
+  coverage, the corrected 2024 league values, six separate 2026 league/event rows, and
+  the honest 2026 market Brier score.
+- Files changed:
+  - `ml/artifacts/models/{game-win,opponent,recommend,return-time,series-sim,shutout,skater-production,skater-projection}/manifest.json`
+  - Reports for game-win, opponent, recommend, series-sim, skater-production, and
+    skater-projection under `ml/artifacts/models/`
+  - Both files under `ml/artifacts/backtests/2023-2024-2025-seed20260827/`
+  - Both files under `ml/artifacts/backtests/2026-combined-r500-seed20260827/`
+  - `ml/tests/test_committed_model_evidence.py`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Reproducibility: Repeated the 2023-2025 backtest from the same detached clean SHA.
+  Its manifest was identical except `generated_at`; its report differed only on the
+  generated timestamp line.
+- Honest model movement: Game-win train/validation/test rows moved from
+  8,892/1,232/2,421 to 9,648/1,315/2,619 after retaining shootouts. Market+stats Brier
+  moved 0.2410 -> 0.2427, stats-only 0.2413 -> 0.2433, higher-points baseline 0.4450
+  -> 0.4493, and coin baseline stayed 0.2500. Coverage now explicitly reports 0/1,315
+  for 2024 validation, 0/1,311 for 2025 test, and 902/1,308 for 2026 test.
+  Skater-production train rows moved 5,157 -> 4,837 and model MAE 0.2449 -> 0.2455;
+  series-sim Brier moved 0.2300 -> 0.2308; skater-projection MAE moved 1.3725 ->
+  1.3751. Opponent league-rank weight moved 0.1602 -> 0.1416 and affinity weight
+  2.8501 -> 3.0395; fitted membership scores became 0.2870/0.3409/0.2875 for
+  2024/2025/2026, still beating greedy in two of three seasons.
+- Honest backtest movement: The corrected 2026 market-aware series Brier is 0.2339,
+  worse than stale 0.2080 and worse than the new stats-only model at 0.2224, reversing
+  the stale report's conclusion. The six league/event comparisons are no longer
+  pooled: oracle/league means are 53.75/49.50, 53.75/49.25, 66.50/43.50,
+  66.50/42.50, 36.03/38.25, and 36.03/35.50. Corrected 2024 R3_4 league values are
+  levi 64.0, mean 55.25, and best 65.0. The regenerated oracle best is 72.0, not the
+  PRD's estimated 65.0 tie; later correctness fixes changed that deterministic result,
+  so no seed/config tuning was used to force the estimate.
+- Quality checks: ML ruff passed; ML mypy passed (71 source files); ML pytest passed
+  695/695. Monorepo affected lint/typecheck passed; all nine Nx unit-test targets
+  passed (web 380 tests); web production build passed. Nx E2E first hit the documented
+  Windows startup race, then readiness-gated Playwright passed 96/96. New committed
+  evidence tests passed 12/12. Normal commit hook reached CodeScene after affected
+  checks, then failed only because `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was
+  unavailable; commit retried with `--no-verify` per Ralph's authentication exception.
+- **Learnings for future iterations:**
+  - A long backtest may stay silent and create no output until its final writer; monitor
+    the live process rather than treating quiet output as failure.
+  - Acceptance-value forecasts can become stale after later correctness fixes. Preserve
+    fixed seeds/configuration and report deterministic drift instead of tuning toward
+    the forecast.
+  - Artifact tests should guard provenance and report structure as well as metrics;
+    otherwise a valid-looking report can still come from stale code or pooled data.
 ---

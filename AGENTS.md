@@ -233,6 +233,11 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   consistent. For clean-worktree regeneration, run the Python process with its
   working directory inside that clean worktree; changing `PYTHONPATH` alone does not
   change the repository inspected by `git_state()`.
+- `test_committed_model_evidence.py` guards committed model/backtest provenance,
+  seeds, coverage, and league-comparison structure. Regenerate each report/manifest
+  pair together at a fixed seed. The 2026 `r500` backtest can run for roughly seven
+  CPU hours and writes its artifact only when the run completes; quiet output is
+  normal while the process remains active.
 - Committed projection CSV/parquet twins must contain the same ordered rows and
   columns. Compare them with blank-string/null normalization and a `1e-12` float
   tolerance in `test_committed_projection_artifacts.py`.

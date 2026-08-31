@@ -24,39 +24,41 @@
     ]
   },
   "counts": {
-    "train": 5157,
+    "train": 4837,
     "val": 611,
     "test": 1203,
     "cold_cases_test": 8
   },
   "validation_mae": {
-    "poisson": 0.2308785487507704,
-    "lightgbm": 0.2200254449706533
+    "poisson": 0.23105759174868082,
+    "lightgbm": 0.2204217364522459
   },
   "test_mae": {
-    "model": 0.24489946051016603,
-    "model_raw": 0.24211628108953628,
+    "model": 0.245518306645612,
+    "model_raw": 0.24265883215314107,
     "baseline_reg_ppg": 0.2659703959861031,
-    "baseline_mean": 0.3164825139738001
+    "baseline_mean": 0.31658713694634355
   },
   "test_spearman": {
-    "model": 0.5791632272389534,
+    "model": 0.5786950846625322,
     "baseline_reg_ppg": 0.5675472806454415
   },
   "per_season": [
     {
       "season_end_year": 2025,
       "n": 595,
-      "mae": 0.23800809989759492,
-      "spearman": 0.6119519623514695
+      "mae": 0.23904678354430872,
+      "spearman": 0.60962304755027
     },
     {
       "season_end_year": 2026,
       "n": 608,
-      "mae": 0.2516434729517447,
-      "spearman": 0.5478571296260919
+      "mae": 0.251851458364815,
+      "spearman": 0.5494719731377212
     }
   ],
   "beats_reg_baseline": true,
-  "beats_mean_baseline": true
+  "beats_mean_baseline": true,
+  "git_sha": "da5e568a7f564697934e63ab1005f56e19968726",
+  "git_dirty": false
 }

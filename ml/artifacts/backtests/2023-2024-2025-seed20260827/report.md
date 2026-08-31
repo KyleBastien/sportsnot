@@ -1,7 +1,7 @@
 # Backtest report — run `2023-2024-2025-seed20260827`
 
 - Package version: 0.1.0
-- Generated: 2026-08-29T22:27:15.104075+00:00
+- Generated: 2026-08-31T13:18:33.130556+00:00
 - Seasons: 2023, 2024, 2025
 - Rounds replayed: 9
 - League size: 4 managers; IR slots: False
@@ -18,10 +18,10 @@ MAE is mean absolute error of projected vs. actual round fantasy points (lower i
 
 | Season | Skaters n | Skater MAE | Skater rho | Teams n | Team MAE | Team rho |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2023 | 751 | 1.672 | 0.495 | 28 | 2.740 | 0.189 |
-| 2024 | 742 | 1.511 | 0.542 | 28 | 2.774 | 0.440 |
-| 2025 | 773 | 1.593 | 0.493 | 28 | 2.920 | 0.155 |
-| ALL | 2266 | 1.593 | 0.510 | 84 | 2.811 | 0.242 |
+| 2023 | 751 | 1.674 | 0.495 | 28 | 2.756 | 0.203 |
+| 2024 | 742 | 1.510 | 0.543 | 28 | 2.765 | 0.440 |
+| 2025 | 773 | 1.595 | 0.493 | 28 | 2.936 | 0.122 |
+| ALL | 2266 | 1.593 | 0.510 | 84 | 2.819 | 0.242 |
 
 ## Series-model calibration (Brier score, lower is better)
 
@@ -29,10 +29,10 @@ Track 1 — **stat-only** (the probabilities the projection artifact actually dr
 
 | Season | Series n | Series model | Higher seed=1 | Coin flip=0.5 |
 | --- | --- | --- | --- | --- |
-| 2023 | 14 | 0.2613 | 0.2857 | 0.2500 |
-| 2024 | 14 | 0.2032 | 0.2857 | 0.2500 |
-| 2025 | 14 | 0.2478 | 0.5714 | 0.2500 |
-| ALL | 42 | 0.2374 | 0.3810 | 0.2500 |
+| 2023 | 14 | 0.2602 | 0.2857 | 0.2500 |
+| 2024 | 14 | 0.2027 | 0.2857 | 0.2500 |
+| 2025 | 14 | 0.2476 | 0.5714 | 0.2500 |
+| ALL | 42 | 0.2368 | 0.3810 | 0.2500 |
 
 Aggregate stat-only series model beats both baselines: **True**.
 
@@ -53,42 +53,42 @@ Mean actual roster points and win rate (fraction of drafts where the roster stri
 
 | Strategy | Drafts | Mean points | Win rate |
 | --- | --- | --- | --- |
-| oracle | 36 | 58.31 | 80.6% |
-| greedy_vor | 36 | 56.94 | 88.9% |
-| one_step | 36 | 59.11 | 83.3% |
-| random_legal | 36 | 19.83 | 5.6% |
+| oracle | 36 | 58.94 | 86.1% |
+| greedy_vor | 36 | 59.00 | 86.1% |
+| one_step | 36 | 58.36 | 80.6% |
+| random_legal | 36 | 20.00 | 5.6% |
 
-Oracle mean-points beats: greedy_vor, random_legal.
+Oracle mean-points beats: one_step, random_legal.
 
 ### Oracle by snake slot
 
 | Seat | Drafts | Mean points | Win rate |
 | --- | --- | --- | --- |
-| 1 | 9 | 58.67 | 88.9% |
-| 2 | 9 | 57.89 | 88.9% |
-| 3 | 9 | 56.78 | 66.7% |
-| 4 | 9 | 59.89 | 77.8% |
+| 1 | 9 | 60.56 | 88.9% |
+| 2 | 9 | 59.22 | 88.9% |
+| 3 | 9 | 57.89 | 88.9% |
+| 4 | 9 | 58.11 | 77.8% |
 
 ## League comparison
 
-Where a backtested season overlaps the league's real drafts, the oracle's simulated roster points (mean/best across snake slots) vs. what the league's managers actually drafted, all scored through the same rules engine. The combined `R3_4` draft is scored across both the conference final and the Cup Final, matching how the league drafts once for rounds 3+4.
+Where a backtested season overlaps the league's real drafts, the oracle's simulated roster points (mean/best across snake slots) vs. what the league's managers actually drafted, all scored through the same rules engine. The combined `R3_4` draft is scored across both the conference final and the Cup Final, matching how the league drafts once for rounds 3+4. When history has multiple leagues in one season/event, each league is reported separately; manager rosters and league aggregates never pool across leagues.
 
-| Season | Round | Oracle mean | Oracle best | League mean | League best |
-| --- | --- | --- | --- | --- | --- |
-| 2024 | r1 (R1) | 62.75 | 65.00 | 48.25 | 58.00 |
-| 2024 | r2 (R2) | 52.25 | 56.00 | 48.75 | 61.00 |
-| 2024 | r3 (R3_4) | 63.75 | 65.00 | 58.75 | 78.00 |
-| 2025 | r1 (R1) | 62.50 | 64.00 | 55.00 | 59.00 |
-| 2025 | r2 (R2) | 43.00 | 43.00 | 36.75 | 41.00 |
-| 2025 | r3 (R3_4) | 85.00 | 88.00 | 59.75 | 72.00 |
+| Season | League | Round | Oracle mean | Oracle best | League mean | League best |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2024 | The Gemmell Cup | r1 (R1) | 63.50 | 65.00 | 48.25 | 58.00 |
+| 2024 | The Gemmell Cup | r2 (R2) | 57.00 | 60.00 | 48.75 | 61.00 |
+| 2024 | The Gemmell Cup | r3 (R3_4) | 64.25 | 72.00 | 55.25 | 65.00 |
+| 2025 | The Gemmell Cup | r1 (R1) | 64.00 | 64.00 | 55.00 | 59.00 |
+| 2025 | The Gemmell Cup | r2 (R2) | 44.00 | 45.00 | 36.75 | 41.00 |
+| 2025 | The Gemmell Cup | r3 (R3_4) | 86.25 | 94.00 | 59.75 | 72.00 |
 
 ### Real league rosters (actual points)
 
-| Season | Round | Managers (points) |
-| --- | --- | --- |
-| 2024 | r1 | kyle 58.0; judah 52.0; levi 47.0; ben 36.0 |
-| 2024 | r2 | levi 61.0; judah 54.0; kyle 50.0; ben 30.0 |
-| 2024 | r3 | levi 78.0; ben 65.0; judah 52.0; kyle 40.0 |
-| 2025 | r1 | kyle 59.0; levi 59.0; ben 52.0; judah 50.0 |
-| 2025 | r2 | kyle 41.0; levi 38.0; ben 36.0; judah 32.0 |
-| 2025 | r3 | ben 72.0; levi 66.0; judah 53.0; kyle 48.0 |
+| Season | League | Round | Managers (points) |
+| --- | --- | --- | --- |
+| 2024 | The Gemmell Cup | r1 | kyle 58.0; judah 52.0; levi 47.0; ben 36.0 |
+| 2024 | The Gemmell Cup | r2 | levi 61.0; judah 54.0; kyle 50.0; ben 30.0 |
+| 2024 | The Gemmell Cup | r3 | ben 65.0; levi 64.0; judah 52.0; kyle 40.0 |
+| 2025 | The Gemmell Cup | r1 | kyle 59.0; levi 59.0; ben 52.0; judah 50.0 |
+| 2025 | The Gemmell Cup | r2 | kyle 41.0; levi 38.0; ben 36.0; judah 32.0 |
+| 2025 | The Gemmell Cup | r3 | ben 72.0; levi 66.0; judah 53.0; kyle 48.0 |

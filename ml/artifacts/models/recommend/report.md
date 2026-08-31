@@ -8,11 +8,11 @@
 
 | Strategy | Mean final roster projection | Delta vs. greedy |
 | :------- | ---------------------------: | ---------------: |
-| Greedy-VOR (baseline a) | 184.634 | +0.000 |
-| One-step lookahead (baseline b) | 184.634 | +0.000 |
-| Multi-step rollout | 184.610 | -0.023 |
+| Greedy-VOR (baseline a) | 184.644 | +0.000 |
+| One-step lookahead (baseline b) | 184.644 | +0.000 |
+| Multi-step rollout | 184.620 | -0.024 |
 
-Multi-step vs. one-step: -0.023. Verdict: multi-step matches greedy-VOR (statistical tie).
+Multi-step vs. one-step: -0.024. Verdict: multi-step matches greedy-VOR (statistical tie).
 
 ## Scenario: positional-run opponents (forward run)
 

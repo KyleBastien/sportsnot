@@ -77,5 +77,7 @@
       "predicted_survival": 0.23737080478457787,
       "observed_survival": 0.2549757934373319
     }
-  ]
+  ],
+  "git_sha": "da5e568a7f564697934e63ab1005f56e19968726",
+  "git_dirty": false
 }

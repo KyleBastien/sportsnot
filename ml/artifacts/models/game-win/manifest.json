@@ -23,23 +23,104 @@
     ]
   },
   "counts": {
-    "train": 8892,
-    "val": 1232,
-    "test": 2421
+    "train": 9648,
+    "val": 1315,
+    "test": 2619
   },
   "validation_brier": {
-    "logistic_regression": 0.23825863979573023,
-    "lightgbm": 0.24019199281665227
+    "logistic_regression": 0.23965297074951084,
+    "lightgbm": 0.2408723590341016
   },
   "test_brier": {
-    "market_plus_stats": 0.24099596089079658,
-    "stats_only": 0.2412556356002993,
+    "market_plus_stats": 0.24273903200344607,
+    "stats_only": 0.24326382450209336,
     "coin_flip": 0.25,
-    "higher_points": 0.44496076001652207
+    "higher_points": 0.4493127147766323
   },
-  "test_market_coverage": 0.34324659231722426,
+  "test_market_coverage": 0.3444062619320351,
+  "market_coverage_by_season": {
+    "2016": {
+      "split": "train",
+      "priced_games": 0,
+      "total_games": 1243,
+      "coverage": 0.0,
+      "uncovered": true
+    },
+    "2017": {
+      "split": "train",
+      "priced_games": 1239,
+      "total_games": 1239,
+      "coverage": 1.0,
+      "uncovered": false
+    },
+    "2018": {
+      "split": "train",
+      "priced_games": 1270,
+      "total_games": 1271,
+      "coverage": 0.999213217938631,
+      "uncovered": false
+    },
+    "2019": {
+      "split": "train",
+      "priced_games": 1271,
+      "total_games": 1271,
+      "coverage": 1.0,
+      "uncovered": false
+    },
+    "2020": {
+      "split": "train",
+      "priced_games": 1127,
+      "total_games": 1128,
+      "coverage": 0.999113475177305,
+      "uncovered": false
+    },
+    "2021": {
+      "split": "train",
+      "priced_games": 869,
+      "total_games": 869,
+      "coverage": 1.0,
+      "uncovered": false
+    },
+    "2022": {
+      "split": "train",
+      "priced_games": 1315,
+      "total_games": 1315,
+      "coverage": 1.0,
+      "uncovered": false
+    },
+    "2023": {
+      "split": "train",
+      "priced_games": 255,
+      "total_games": 1312,
+      "coverage": 0.19435975609756098,
+      "uncovered": false
+    },
+    "2024": {
+      "split": "validation",
+      "priced_games": 0,
+      "total_games": 1315,
+      "coverage": 0.0,
+      "uncovered": true
+    },
+    "2025": {
+      "split": "test",
+      "priced_games": 0,
+      "total_games": 1311,
+      "coverage": 0.0,
+      "uncovered": true
+    },
+    "2026": {
+      "split": "test",
+      "priced_games": 902,
+      "total_games": 1308,
+      "coverage": 0.6896024464831805,
+      "uncovered": false
+    }
+  },
   "beats_coin_flip": true,
   "beats_higher_points": true,
   "beats_both_baselines": true,
-  "market_helps": true
+  "market_helps": true,
+  "git_sha": "da5e568a7f564697934e63ab1005f56e19968726",
+  "git_dirty": false
 }

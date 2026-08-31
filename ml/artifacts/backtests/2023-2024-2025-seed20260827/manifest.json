@@ -6,7 +6,7 @@
     2024,
     2025
   ],
-  "generated_at": "2026-08-29T22:27:15.079229+00:00",
+  "generated_at": "2026-08-31T13:18:33.130556+00:00",
   "config": {
     "seed": 20260827,
     "managers": 4,
@@ -111,7 +111,8 @@
       "season": 2024,
       "playoff_round": 1,
       "draft_event": "R1",
-      "oracle_mean_points": 62.75,
+      "league_name": "The Gemmell Cup",
+      "oracle_mean_points": 63.5,
       "oracle_best_points": 65.0,
       "league_mean_points": 48.25,
       "league_best_points": 58.0,
@@ -138,8 +139,9 @@
       "season": 2024,
       "playoff_round": 2,
       "draft_event": "R2",
-      "oracle_mean_points": 52.25,
-      "oracle_best_points": 56.0,
+      "league_name": "The Gemmell Cup",
+      "oracle_mean_points": 57.0,
+      "oracle_best_points": 60.0,
       "league_mean_points": 48.75,
       "league_best_points": 61.0,
       "managers": [
@@ -165,18 +167,19 @@
       "season": 2024,
       "playoff_round": 3,
       "draft_event": "R3_4",
-      "oracle_mean_points": 63.75,
-      "oracle_best_points": 65.0,
-      "league_mean_points": 58.75,
-      "league_best_points": 78.0,
+      "league_name": "The Gemmell Cup",
+      "oracle_mean_points": 64.25,
+      "oracle_best_points": 72.0,
+      "league_mean_points": 55.25,
+      "league_best_points": 65.0,
       "managers": [
-        {
-          "manager": "levi",
-          "actual_points": 78.0
-        },
         {
           "manager": "ben",
           "actual_points": 65.0
+        },
+        {
+          "manager": "levi",
+          "actual_points": 64.0
         },
         {
           "manager": "judah",
@@ -192,7 +195,8 @@
       "season": 2025,
       "playoff_round": 1,
       "draft_event": "R1",
-      "oracle_mean_points": 62.5,
+      "league_name": "The Gemmell Cup",
+      "oracle_mean_points": 64.0,
       "oracle_best_points": 64.0,
       "league_mean_points": 55.0,
       "league_best_points": 59.0,
@@ -219,8 +223,9 @@
       "season": 2025,
       "playoff_round": 2,
       "draft_event": "R2",
-      "oracle_mean_points": 43.0,
-      "oracle_best_points": 43.0,
+      "league_name": "The Gemmell Cup",
+      "oracle_mean_points": 44.0,
+      "oracle_best_points": 45.0,
       "league_mean_points": 36.75,
       "league_best_points": 41.0,
       "managers": [
@@ -246,8 +251,9 @@
       "season": 2025,
       "playoff_round": 3,
       "draft_event": "R3_4",
-      "oracle_mean_points": 85.0,
-      "oracle_best_points": 88.0,
+      "league_name": "The Gemmell Cup",
+      "oracle_mean_points": 86.25,
+      "oracle_best_points": 94.0,
       "league_mean_points": 59.75,
       "league_best_points": 72.0,
       "managers": [
@@ -270,5 +276,7 @@
       ]
     }
   ],
-  "leakage_ok": true
+  "leakage_ok": true,
+  "git_sha": "da5e568a7f564697934e63ab1005f56e19968726",
+  "git_dirty": false
 }

@@ -9,31 +9,31 @@ the skater's observed goals+assists per game in that round.
 - Seed: 20260827
 - Shrinkage: estimate * n/(n+10) + prior * k/(n+k), prior = position+team mean
 - Low-confidence flag: fewer than 10 regular-season games
-- Train seasons (end year): [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023] (5157 rows)
+- Train seasons (end year): [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023] (4837 rows)
 - Validation seasons: [2024] (611 rows)
 - Test seasons (held out): [2025, 2026] (1203 rows)
 - Splits are strictly temporal: each round is predicted using only data
   available before that round (SPEC section 6).
 
 ## Model selection (validation MAE, lower is better)
-- lightgbm: 0.2200  <- chosen
-- poisson: 0.2309
+- lightgbm: 0.2204  <- chosen
+- poisson: 0.2311
 
 Chosen model: **lightgbm** (lowest validation MAE).
 It is refit on train + validation seasons before the held-out test.
 
 ## Held-out test error vs. fixed baselines (per-game points)
-- production model (shrunk): MAE 0.2449, Spearman 0.5792
-- raw model (no shrinkage):  MAE 0.2421
+- production model (shrunk): MAE 0.2455, Spearman 0.5787
+- raw model (no shrinkage):  MAE 0.2427
 - baseline (a) reg-season points/game: MAE 0.2660, Spearman 0.5675
-- baseline (b) training mean:          MAE 0.3165
+- baseline (b) training mean:          MAE 0.3166
 
 - Beats reg-season-ppg baseline: yes
 - Beats training-mean baseline:  yes
 
 ## Per held-out season (MAE, Spearman rank correlation)
-- 2025: n=595, MAE 0.2380, Spearman 0.6120
-- 2026: n=608, MAE 0.2516, Spearman 0.5479
+- 2025: n=595, MAE 0.2390, Spearman 0.6096
+- 2026: n=608, MAE 0.2519, Spearman 0.5495
 
 ## Cold cases
 - Test-season labeled skaters with no regular-season feature row: 8.
