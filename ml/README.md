@@ -77,7 +77,7 @@ subpackage maps to the stories called out in `SPEC.md §4`:
 src/draft_oracle/
   rules.py       scoring, snake/re-draft order, roster validation (US-002)
   ingest/        NHL API, odds, league drafts, entity match, injuries (US-003..008)
-  features/      skater + team/series feature engineering, leakage guard (US-009/010)
+  features/      skater features, shared Elo math, leakage guard (US-009/010/119)
   models/        win, shutout, series sim, skater rate, returns, projections (US-011..016)
   optimize/      VOR, draft simulator, opponents, recommend, IR value, slot strategies (US-018..023)
   cli/           batch projection + interactive draft assistant (US-017/024)
@@ -91,7 +91,7 @@ src/draft_oracle/
    `snake_order`, `redraft_order`, `roster_composition`, and `validate_roster`
    (with `RosterSlot` / `RosterValidation`). These are the byte-for-byte mirror of
    `packages/utils/src/lib/utils.ts`; golden vectors in `tests/test_rules.py` are
-   copied from `utils.test.ts` to catch cross-language drift.
+   equivalent to those in `utils.test.ts` to catch cross-language drift.
 2. **Ingest** — pull and normalize NHL stats, betting odds, injuries, and league draft
    history into dated snapshots. Committed raw sources live under `data/raw/`; live
    pulls are cached and gitignored. The NHL client is documented below.
@@ -202,8 +202,8 @@ uv run oracle odds --no-odds    # skip odds entirely; the stat-only path is unaf
 | Source (`source` col) | Coverage | Prices |
 | --- | --- | --- |
 | `sbr_close` (SBR workbooks) | 2016-17 – 2021-22 complete, 2022-23 partial | both-side Open/Close — **preferred** |
-| `kaggle_espn` (Kaggle/ESPN) | 2004 – Dec 2025 | favorite-side only |
-| `espn_completion` (ESPN API) | Dec 2025 – Jun 2026 incl. 2026 playoffs | favorite-side only |
+| `kaggle_espn` (Kaggle/ESPN) | 2004 – Dec 2025; retained for audit, currently no usable prices | favorite-side only, but no trustworthy favorite attribution |
+| `espn_completion` (ESPN API) | Dec 2025 – Jun 2026 incl. 2026 playoffs | favorite-side only, attributed from cached raw summaries |
 
 **De-vigging** (`SPEC.md §5`):
 
@@ -215,20 +215,28 @@ uv run oracle odds --no-odds    # skip odds entirely; the stat-only path is unaf
   probability; the underdog is the complement. **No underdog American price is
   ever fabricated** — only probabilities are produced.
 
-**Playoffs** are tagged by the real per-season windows (PROVENANCE §5), not a
-fixed April–June rule (the 2020 bubble ran Aug–Sep; 2021 ran May–Jul). The 2021
-window still overlaps a few regular-season days — a documented limitation of
-date-window tagging. September games outside a playoff window are treated as
-preseason and dropped.
+**Favorite attribution and placeholder guard** — Kaggle's two team rows usually
+repeat one game-level spread, so they do not identify which team owns the
+favorite-only price. Those rows remain auditable but unattributed and uncovered;
+the parser never guesses a side. A per-season guard also rejects constant or
+modal placeholder prices (including the archive's fabricated `-105` blocks).
+ESPN-completion favorites instead come from each game's cached raw summary
+`homeTeamOdds.favorite` flag; a missing flag with no usable home-relative spread
+also stays unattributed and uncovered. Consequence: the historical pipeline has
+**no usable market coverage for 2024-25**.
 
-**Consolidation** collapses the per-source rows to one best row per game
-(`odds.parquet`); every source row is also kept in `odds_by_source.parquet`.
-Sources are matched on (season, away id, home id) with a ±1 day tolerance
-(Kaggle/ESPN dates are UTC, one calendar day ahead of SBR's local dates), at
-most one row per source per game so adjacent same-matchup games never merge. SBR
-Close wins ties; the de-vigged favorite probability of every covering source is
-cross-validated into `xval_delta`. Games present but priceless are flagged
-(`covered = False`), never imputed.
+**Archive join and consolidation** — Kaggle/ESPN UTC dates first snap to the NHL
+archive's local game date. The archive join supplies authoritative `gameTypeId`
+(2 regular season, 3 playoffs), replacing date-window playoff guesses and
+implicitly excluding preseason games absent from the archive. Consolidation then
+collapses source rows to one best row per game (`odds.parquet`) while preserving
+all rows in `odds_by_source.parquet`. Matching uses season plus oriented away/home
+ids with exact or ±1-day local-date tolerance; at most one row per source may
+attach to a game. SBR Close wins ties. Covering sources are cross-validated in a
+consistent home-team frame: `xval_delta` is the max-minus-min `home_implied`, and
+rows above the `0.15` gate are blanked to uncovered. Unattributed, placeholder,
+cross-validation-failed, and orientation-unjoinable rows are flagged and counted,
+never imputed or silently dropped.
 
 **Key columns:** `source`, `season_end_year`, `game_date`, `is_playoff`,
 `neutral_site`, `away_team_id`/`home_team_id`, `away_ml`/`home_ml` (favorite-only
@@ -374,17 +382,24 @@ mirrors `NHLApiClient`; no key, default httpx UA since ESPN 403s browser UAs):
   `https://sports.core.api.espn.com/v2/sports/hockey/leagues/nhl/athletes/{id}`,
   fetched only to fill a rare position/name gap (`client.core_athlete(id)`).
 
-**`injuries` table** — one row per player: `player_id` (ESPN athlete id),
+**`injuries` table** — one row per player: `player_id` (canonical NHL id for a
+resolved skater), `espn_id` (original ESPN athlete id retained for provenance),
 `player_name`, `position`, `team_id` (stable NHL id via `resolve_team_id`),
 `team_abbrev`, normalized `status` (`out` / `ir` / `day_to_day` / `healthy`),
 `status_raw`, `return_date`, `detail`, `as_of_date`, `source`
 (`espn` / `override` / `last_known`).
 
+ESPN ids are not NHL ids. `resolve_player_ids` matches the ESPN name against the
+NHL player dimension, disambiguating collisions by team then fantasy position and
+using a unique-surname fallback only when unambiguous. Goalies remain team-level.
+An unresolved skater is kept under its ESPN id, listed in
+`InjuriesResult.unresolved_player_ids`, and never silently joined to NHL skaters.
+
 **Overrides — final authority** — `data/overrides/injuries.yaml` merges *over*
-the source. Each `overrides:` entry matches by `espn_id` (exact) else `player`
-name (accent/punctuation-insensitive); a match rewrites status / return date /
-detail, `remove: true` deletes the row, and an unmatched entry is injected as a
-new row. Ships empty.
+the source. Each `overrides:` entry matches by NHL `player_id` first, then
+`espn_id`, then `player` name (accent/punctuation-insensitive); a match rewrites
+status / return date / detail, `remove: true` deletes the row, and an unmatched
+entry is injected as a new row. Ships empty.
 
 **Graceful degradation** — a source failure (or `--no-fetch`) reuses the
 last-known `injuries.parquet` plus overrides and emits a warning instead of
@@ -481,7 +496,8 @@ regular-season points wins). Splits are strictly temporal (SPEC §6) and the see
 is fixed. The committed report at `artifacts/models/game-win/report.md` (+
 `manifest.json`) prints the held-out Brier, the market-vs-stats **ablation**, and
 the baseline comparison **honestly** — a missed target is reported, never forced
-(SPEC §7).
+(SPEC §7). Fresh reports and manifests also list priced/total games for every
+train, validation, and test season, explicitly marking zero-coverage seasons.
 
 ## Best-of-7 series simulator (`models/series_sim.py`)
 
@@ -743,11 +759,11 @@ Leave-one-season-out **roster-membership accuracy**: refit on the other seasons,
 each held-out event with the true snake order and drafted pool, and measure the fraction
 of each manager's actual roster the model reproduces — compared against the greedy
 fallback, per season. Where the true pick order exists (the 2026 app export), we also
-report teacher-forced per-pick top-1 / top-K accuracy. On the committed data the fitted
-model beats the fallback on membership in every season (2024 .269 vs .194, 2025 .261 vs
-.216, 2026 .180 vs .159) and on per-pick top-1 (.126 vs .112) — honest, modest gains
-driven almost entirely by the strong positive affinity coefficient the greedy model
-ignores.
+report teacher-forced per-pick top-1 / top-K accuracy. Current measured values and
+per-season wins/losses live in `artifacts/models/opponent/report.md` and
+`manifest.json`; those generated artifacts are the canonical evidence. Do not duplicate
+their numbers here, because every data-correction refit may move them. The dominant
+positive affinity coefficient remains the main signal absent from the greedy fallback.
 
 ## Multi-step pick recommendation (`optimize/recommend.py`)
 

@@ -5,8 +5,9 @@ This module is the Python mirror of the app's rules engine
 Every projection, simulation, and backtest scores through these functions so the
 Python pipeline is byte-for-byte identical to the real app (SPEC §1).
 
-Golden vectors are copied from ``packages/utils/src/lib/utils.test.ts`` in the
-test suite; keep both in sync when either language changes.
+Golden vectors in the test suite are equivalent to those in
+``packages/utils/src/lib/utils.test.ts``; keep both in sync when either language
+changes.
 """
 
 from __future__ import annotations

@@ -247,6 +247,9 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
 - Game-win labels come from normalized `team_games.win`, never goal comparison.
   Shootout rows have equal `goals_for`; `_pivot_games` must retain them and warn when
   a game lacks exactly one archive winner.
+- Game-win reports/manifests must list priced/total market coverage for every temporal
+  split season and explicitly mark zero-coverage seasons. Normalize `season_end_year`
+  keys before integer conversion because odds joins can promote them to floats.
 - Odds cross-validation compares each source's `home_implied`, never favorite-probability
   magnitudes; opposite favorites can otherwise look equal. Market joins are
   orientation-sensitive even though game-type lookup is not, so reverse-only archive

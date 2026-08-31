@@ -11,20 +11,22 @@ the parsers; it documents every trap handled here):
   partial) - both-side Open/Close American moneylines. Preferred where present:
   a two-sided price de-vigs exactly with the proportional method.
 * **Kaggle/ESPN** (``kaggle-nhl-historical/nhl_data_extensive.csv.gz``, 2004 -
-  Dec 2025) - favorite-side moneyline only. The favorite's row carries the
-  negative ``spread`` (PROVENANCE §8), which identifies the priced side.
+  Dec 2025) - favorite-side moneyline only. Its two team rows repeat one
+  game-level spread, so the favorite cannot be attributed reliably; rows remain
+  uncovered rather than guessed.
 * **ESPN 2025-26 completion** (``espn-2025-26-completion/games.csv``, Dec 2025 -
-  Jun 2026 incl. the 2026 playoffs) - favorite-side moneyline only; ESPN's
-  ``spread`` is home-relative (PROVENANCE §9), so ``spread < 0`` ⇒ home favorite.
+  Jun 2026 incl. the 2026 playoffs) - favorite-side moneyline only, attributed
+  from each game's cached raw-summary favorite flag.
 
 Favorite-only prices cannot be de-vigged exactly (no underdog price). We NEVER
 fabricate an underdog American price; instead we remove a documented standard
 two-way overround (``STANDARD_OVERROUND``) from the favorite's raw implied
 probability and take the complement for the underdog (SPEC §5).
 
-Playoffs are tagged by the real per-season windows (PROVENANCE §5) - never a
-fixed April-June rule, which mislabels the 2020 bubble (Aug-Sep) and 2021
-(May-Jul). Games not covered by any archive are flagged, never imputed.
+Archive dates are normalized to the NHL archive's local date, and playoff labels
+come from its authoritative ``gameTypeId`` join. Per-season placeholder-price
+guards and cross-source home-probability validation blank suspect rows. Games
+without trustworthy, joinable coverage are flagged, never imputed.
 
 Live/future odds:
 

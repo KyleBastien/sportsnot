@@ -241,8 +241,7 @@ def _pivot_games(team_games: pd.DataFrame) -> pd.DataFrame:
     undecided_count = int((~decided).sum())
     if undecided_count:
         warnings.warn(
-            f"_pivot_games excluded {undecided_count} games without exactly one "
-            "archive winner",
+            f"_pivot_games excluded {undecided_count} games without exactly one archive winner",
             RuntimeWarning,
             stacklevel=2,
         )
@@ -523,6 +522,7 @@ class GameWinResult:
     n_val: int
     n_test: int
     test_market_coverage: float
+    market_coverage_by_season: dict[int, SeasonMarketCoverage]
 
     @property
     def beats_coin_flip(self) -> bool:
@@ -561,6 +561,10 @@ class GameWinResult:
                 "higher_points": self.test_brier_higher_points,
             },
             "test_market_coverage": self.test_market_coverage,
+            "market_coverage_by_season": {
+                str(year): coverage.manifest()
+                for year, coverage in sorted(self.market_coverage_by_season.items())
+            },
             "beats_coin_flip": self.beats_coin_flip,
             "beats_higher_points": self.beats_higher_points,
             "beats_both_baselines": self.beats_both_baselines,
@@ -614,14 +618,24 @@ class GameWinResult:
             f"- Market improves Brier: {'yes' if self.market_helps else 'no'}"
             f" (delta {self.test_brier_stats_only - self.test_brier_market:+.4f}).",
             "",
+            "## Market coverage by season",
+            "Coverage uses the modeled rows after the pre-game-history filter.",
         ]
+        for year, coverage in sorted(self.market_coverage_by_season.items()):
+            uncovered = " - uncovered" if coverage.uncovered else ""
+            lines.append(
+                f"- {year} ({coverage.split}): {coverage.priced_games}/"
+                f"{coverage.total_games} games priced ({coverage.fraction:.1%})"
+                f"{uncovered}"
+            )
+        lines.append("")
         if not self.beats_both_baselines:
             lines += [
                 "## Honest note on a missed target",
                 "The headline model did not beat both baselines on this split. Reported",
                 "as-is (SPEC section 7): baselines, splits, and seeds are unchanged. One",
-                "plausible improvement: add rest/schedule-density and goalie-availability",
-                "features (US-010 team-series matrix) and probability calibration",
+                "plausible improvement: add rest/schedule-density and explicit goalie-",
+                "availability features, plus probability calibration",
                 "(isotonic / Platt) on the validation fold before scoring the test set.",
                 "",
             ]
@@ -637,6 +651,54 @@ class GameWinConfig:
     n_val_seasons: int = 1
     n_test_seasons: int = 2
     elo_config: EloConfig | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class SeasonMarketCoverage:
+    """Market-price availability for one modeled season and temporal split."""
+
+    split: str
+    priced_games: int
+    total_games: int
+
+    @property
+    def fraction(self) -> float:
+        return self.priced_games / self.total_games if self.total_games else 0.0
+
+    @property
+    def uncovered(self) -> bool:
+        return self.priced_games == 0
+
+    def manifest(self) -> dict[str, object]:
+        """JSON-safe coverage counts with explicit zero-coverage state."""
+        return {
+            "split": self.split,
+            "priced_games": self.priced_games,
+            "total_games": self.total_games,
+            "coverage": self.fraction,
+            "uncovered": self.uncovered,
+        }
+
+
+def _market_coverage_by_season(
+    dataset: pd.DataFrame, split: TemporalSplit
+) -> dict[int, SeasonMarketCoverage]:
+    """Summarize market availability for every train/validation/test season."""
+    split_by_year = {
+        **dict.fromkeys(split.train_years, "train"),
+        **dict.fromkeys(split.val_years, "validation"),
+        **dict.fromkeys(split.test_years, "test"),
+    }
+    coverage: dict[int, SeasonMarketCoverage] = {}
+    for raw_year, rows in dataset.groupby("season_end_year", sort=True):
+        year = int(float(str(raw_year)))
+        priced_games = int(pd.to_numeric(rows["market_available"]).gt(0).sum())
+        coverage[year] = SeasonMarketCoverage(
+            split=split_by_year[year],
+            priced_games=priced_games,
+            total_games=len(rows),
+        )
+    return coverage
 
 
 def _train_variant(
@@ -709,6 +771,7 @@ def train_game_win_model(
     test_brier_coin = brier_score(coin_flip_probs(len(test)), test["home_win"])
     test_brier_points = brier_score(baseline_higher_points_probs(test), test["home_win"])
     coverage = float(test["market_available"].mean()) if len(test) else 0.0
+    coverage_by_season = _market_coverage_by_season(dataset, split)
 
     # Production model: chosen type, market features, all available seasons.
     production = _train_variant(
@@ -735,6 +798,7 @@ def train_game_win_model(
         n_val=len(val),
         n_test=len(test),
         test_market_coverage=coverage,
+        market_coverage_by_season=coverage_by_season,
     )
 
 

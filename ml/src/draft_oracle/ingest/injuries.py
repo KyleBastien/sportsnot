@@ -456,11 +456,12 @@ def _as_str(value: Any) -> str | None:
 def apply_overrides(source: pd.DataFrame, overrides: Iterable[InjuryOverride]) -> pd.DataFrame:
     """Merge overrides over ``source`` — overrides are the final authority.
 
-    Matching precedence per override: ``espn_id`` (exact) first, else normalized
-    ``player`` name. A matched override rewrites the row's status / return date /
-    detail and stamps ``source='override'``; ``remove: true`` deletes the matched
-    row. An unmatched override is injected as a brand-new override row so the
-    owner can assert an injury the feed omitted entirely.
+    Matching precedence per override: NHL ``player_id`` first, then legacy
+    ``espn_id``, then normalized ``player`` name. A matched override rewrites the
+    row's status / return date / detail and stamps ``source='override'``;
+    ``remove: true`` deletes the matched row. An unmatched override is injected
+    as a brand-new override row so the owner can assert an injury the feed
+    omitted entirely.
     """
     df = source.copy()
     if df.empty:

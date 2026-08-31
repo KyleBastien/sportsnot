@@ -28,7 +28,7 @@ from draft_oracle.models import (
     matchup_feature_row,
     train_game_win_model,
 )
-from draft_oracle.models.game_win import _pivot_games
+from draft_oracle.models.game_win import _market_coverage_by_season, _pivot_games
 
 TEAMS = ["AAA", "BBB", "CCC", "DDD"]
 # Latent strengths drive who wins; the model should recover the ordering.
@@ -333,6 +333,23 @@ def test_default_temporal_split_requires_enough_seasons() -> None:
         default_temporal_split([2022, 2023], n_val=1, n_test=2)
 
 
+def test_market_coverage_accepts_float_season_keys_from_odds_join() -> None:
+    dataset = pd.DataFrame(
+        {
+            "season_end_year": [2025.0, 2026.0, 2026.0],
+            "market_available": [0.0, 1.0, 0.0],
+        }
+    )
+    split = default_temporal_split([2023, 2024, 2025, 2026], n_val=1, n_test=2)
+
+    coverage = _market_coverage_by_season(dataset, split)
+
+    assert coverage[2025].uncovered is True
+    assert coverage[2025].split == "test"
+    assert coverage[2026].priced_games == 1
+    assert coverage[2026].total_games == 2
+
+
 # ── End-to-end train ───────────────────────────────────────────────────────
 
 
@@ -382,9 +399,50 @@ def test_train_game_win_runs_stats_only_without_odds() -> None:
 def test_train_game_win_manifest_records_seed_and_split() -> None:
     seasons = [20182019, 20192020, 20202021, 20212022, 20222023]
     team_games = _synthetic_team_games(seasons=seasons, seed=1)
-    result = train_game_win_model(team_games, config=GameWinConfig(seed=1, min_pregame_games=0))
+    home_games = team_games.loc[team_games["home_road"] == "H"]
+    priced_games = home_games.groupby("season_id", sort=True).first().reset_index()
+    odds = pd.DataFrame(
+        [
+            {
+                "season_end_year": int(game["season_id"]) % 10000,
+                "game_date": game["game_date"],
+                "home_team_id": int(game["team_id"]),
+                "away_team_id": TEAMS.index(str(game["opponent_team_abbrev"])) + 1,
+                "home_implied": 0.6,
+            }
+            for game in priced_games.to_dict("records")
+            if int(game["season_id"]) in {20182019, 20222023}
+        ]
+    )
+    result = train_game_win_model(
+        team_games,
+        odds=odds,
+        config=GameWinConfig(seed=1, min_pregame_games=0),
+    )
     manifest = result.manifest()
     assert manifest["seed"] == 1
     assert manifest["split"]["test_years"] == [2022, 2023]
     assert "market_plus_stats" in manifest["test_brier"]
     assert manifest["model_version"] == "game-win-v1"
+
+    coverage = manifest["market_coverage_by_season"]
+    assert coverage["2019"] == {
+        "split": "train",
+        "priced_games": 1,
+        "total_games": 19,
+        "coverage": pytest.approx(1 / 19),
+        "uncovered": False,
+    }
+    assert coverage["2022"] == {
+        "split": "test",
+        "priced_games": 0,
+        "total_games": 19,
+        "coverage": 0.0,
+        "uncovered": True,
+    }
+    assert coverage["2023"]["split"] == "test"
+    assert coverage["2023"]["priced_games"] == 1
+
+    report = "\n".join(result.report_lines())
+    assert "2019 (train): 1/19 games priced (5.3%)" in report
+    assert "2022 (test): 0/19 games priced (0.0%) - uncovered" in report
