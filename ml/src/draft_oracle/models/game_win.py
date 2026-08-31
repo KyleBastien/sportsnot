@@ -33,6 +33,7 @@ pass.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -224,14 +225,29 @@ def matchup_feature_row(
 def _pivot_games(team_games: pd.DataFrame) -> pd.DataFrame:
     """One row per game (home + away), sorted chronologically.
 
-    The home/away split uses the archive's ``home_road`` flag. Ties are dropped
-    (real regular-season and playoff games are always decided in OT/SO).
+    The home/away split uses the archive's ``home_road`` flag and the winner
+    comes from its ``win`` column. Shootouts retain tied goal totals because the
+    deciding shootout goal is not counted in ``goals_for``. Rows without exactly
+    one archive winner are excluded with a warning.
     """
     tg = team_games.copy()
     tg["game_date"] = pd.to_datetime(tg["game_date"])
     home = tg.loc[tg["home_road"] == "H"]
     away = tg.loc[tg["home_road"] == "R"]
     merged = home.merge(away, on="game_id", suffixes=("_home", "_away"))
+    home_won = merged["win_home"].fillna(False).astype(bool)
+    away_won = merged["win_away"].fillna(False).astype(bool)
+    decided = home_won.ne(away_won)
+    undecided_count = int((~decided).sum())
+    if undecided_count:
+        warnings.warn(
+            f"_pivot_games excluded {undecided_count} games without exactly one "
+            "archive winner",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    merged = merged.loc[decided].copy()
+    home_won = home_won.loc[decided]
 
     games = pd.DataFrame(
         {
@@ -248,10 +264,9 @@ def _pivot_games(team_games: pd.DataFrame) -> pd.DataFrame:
             "away_goals": merged["goals_for_away"].astype(int),
             "home_points": merged["points_home"].astype(int),
             "away_points": merged["points_away"].astype(int),
+            "home_win": home_won.astype(int),
         }
     )
-    games = games.loc[games["home_goals"] != games["away_goals"]]
-    games["home_win"] = (games["home_goals"] > games["away_goals"]).astype(int)
     return games.sort_values(["game_date", "game_id"], kind="stable").reset_index(drop=True)
 
 

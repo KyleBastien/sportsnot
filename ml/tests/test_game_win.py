@@ -8,10 +8,13 @@ must beat the coin-flip baseline on a held-out season.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
 
+from draft_oracle.ingest.normalize import normalize_team_games
 from draft_oracle.models import (
     MARKET_FEATURE_COLUMNS,
     STAT_FEATURE_COLUMNS,
@@ -25,6 +28,7 @@ from draft_oracle.models import (
     matchup_feature_row,
     train_game_win_model,
 )
+from draft_oracle.models.game_win import _pivot_games
 
 TEAMS = ["AAA", "BBB", "CCC", "DDD"]
 # Latent strengths drive who wins; the model should recover the ordering.
@@ -264,6 +268,54 @@ def test_build_game_dataset_market_join_sets_available_flag() -> None:
     # Unmatched games fall back to the neutral imputation + off flag.
     unmatched = dataset.loc[dataset["market_available"] == 0.0]
     assert (unmatched["market_home_prob"] == 0.5).all()
+
+
+def test_pivot_games_retains_real_shootout_with_archive_winner() -> None:
+    raw = pd.read_csv(Path("data/raw/nhl-archive/team-games-2020-21.csv.gz"))
+    team_games = normalize_team_games(raw)
+
+    game = _pivot_games(team_games).loc[lambda frame: frame["game_id"] == 2020020007]
+
+    assert len(game) == 1
+    assert game.iloc[0]["home_goals"] == game.iloc[0]["away_goals"] == 2
+    assert game.iloc[0]["home_team_abbrev"] == "NJD"
+    assert game.iloc[0]["away_team_abbrev"] == "BOS"
+    assert game.iloc[0]["home_win"] == 0
+
+
+@pytest.mark.parametrize(
+    ("season_label", "expected_games"),
+    [("2020-21", 952), ("2024-25", 1398)],
+)
+def test_pivot_games_matches_real_decided_game_count(
+    season_label: str, expected_games: int
+) -> None:
+    raw = pd.read_csv(Path(f"data/raw/nhl-archive/team-games-{season_label}.csv.gz"))
+    team_games = normalize_team_games(raw)
+    archive_winners = team_games.groupby("game_id")["win"].sum()
+
+    assert int(archive_winners.eq(1).sum()) == expected_games
+    assert len(_pivot_games(team_games)) == expected_games
+
+
+def test_pivot_games_warns_and_excludes_game_without_winner() -> None:
+    team_games = pd.DataFrame(
+        _game_rows(
+            game_id=1,
+            game_date="2021-01-01",
+            season_id=20202021,
+            game_type_id=2,
+            home="AAA",
+            away="BBB",
+            home_goals=2,
+            away_goals=2,
+        )
+    )
+
+    with pytest.warns(RuntimeWarning, match="without exactly one archive winner"):
+        games = _pivot_games(team_games)
+
+    assert games.empty
 
 
 # ── Temporal split ─────────────────────────────────────────────────────────

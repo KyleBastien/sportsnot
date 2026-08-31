@@ -3,6 +3,9 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
 ---
 
 ## Codebase Patterns
+- Game-win targets come from normalized `team_games.win`, not goal comparison:
+  shootouts have equal `goals_for` totals. `_pivot_games` retains rows with exactly
+  one archive winner and warns before excluding malformed/undecided rows.
 - League draft consumers must call `dedupe_duplicate_events` before aggregation and
   use shared `event_keys` grouping; real events are keyed by
   `(season, league_name, draft_event)`, never season/event alone. Dedupe preserves
@@ -776,4 +779,43 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
     downstream fixture, while the committed correction lives in `name_overrides.yaml`.
   - Committed backtest reports remain untouched; US-211 owns final clean-HEAD evidence
     regeneration.
+---
+
+## 2026-08-31T03:00:10Z - US-203
+- What was implemented: Reworked `_pivot_games` to derive `home_win` from the
+  normalized archive `win` flags instead of comparing goal totals. Equal-score
+  shootouts now enter the training/evaluation frame and Elo updates. Games without
+  exactly one archive winner emit a `RuntimeWarning` and are excluded. Added real
+  archive regressions for shootout game `2020020007`, full decided-game counts in
+  2020-21 (952) and 2024-25 (1,398), and loud undecided-game exclusion.
+- Files changed:
+  - `ml/src/draft_oracle/models/game_win.py`
+  - `ml/tests/test_game_win.py`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Real-data verification: all 65 previously dropped 2020-21 shootout games now attach
+  their market prices, raising attached 2021 games from 887 to 952. Across normalized
+  data, every season's pivot count now equals its unique decided-game count. Elo and
+  pregame state consume those rows through the same chronological dataset loop.
+- Honest retrain at unchanged seed `20260827`, unchanged splits, and unchanged
+  `min_pregame_games=5`: logistic regression remained selected. Train/validation/test
+  rows moved from 8,892/1,232/2,421 to 9,648/1,315/2,619. Held-out market+stats Brier
+  moved from 0.2410 to 0.2427; stats-only moved from 0.2413 to 0.2433; coin-flip stayed
+  0.2500; higher-points moved from 0.4450 to 0.4493; market coverage moved from 34.3%
+  to 34.4%. Temporary output went to a gitignored check directory. Committed game-win
+  artifacts remain untouched for US-211.
+- Quality checks: ML ruff passed; ML mypy passed (69 files); ML pytest passed (662
+  tests); monorepo lint passed (11 projects); monorepo typecheck passed (10 projects);
+  monorepo unit tests passed (9 projects, web 380 tests); web production build passed;
+  Playwright passed 96/96. Normal commit hook found no affected Nx tasks, then failed
+  only because `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was unavailable; commit
+  retried with `--no-verify` per Ralph's CodeScene authentication exception.
+- **Learnings for future iterations:**
+  - NHL archive shootout totals remain tied because the deciding shootout goal is not
+    counted; `wins`/normalized `win` is the authoritative decision field.
+  - Restoring shootouts changes both direct row coverage and later pregame state, so
+    downstream training-row counts can increase by more than the raw shootout count.
+  - Model metrics moved slightly worse after restoring the unbiased decided-game
+    universe; preserve the fixed split/seed and report that movement rather than tune.
 ---
