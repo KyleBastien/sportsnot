@@ -242,6 +242,12 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
 - Game-win labels come from normalized `team_games.win`, never goal comparison.
   Shootout rows have equal `goals_for`; `_pivot_games` must retain them and warn when
   a game lacks exactly one archive winner.
+- Odds cross-validation compares each source's `home_implied`, never favorite-probability
+  magnitudes; opposite favorites can otherwise look equal. Market joins are
+  orientation-sensitive even though game-type lookup is not, so reverse-only archive
+  matches must be blanked, counted, and logged as unjoinable.
+- NHL stats-rest cap guards check both declared `total` and `len(data)`; omitted/null
+  totals must not let a full 10,000-row response pass as complete.
 - League entity matching requires `skater_games.parquet` as well as the pick/player/team
   tables. Scored sheet matches are review-flagged when all three exact integer point
   splits disagree with the NHL archive; duplicate player ownership is scoped by

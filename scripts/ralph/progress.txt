@@ -3,6 +3,11 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
 ---
 
 ## Codebase Patterns
+- Odds source cross-validation must compare one consistent side (`home_implied`), not
+  each source's favorite-probability magnitude. Game-type lookup may index both
+  orientations, but market joins are orientation-specific; reverse-only archive matches
+  must be retained as uncovered and counted. NHL stats-rest truncation guards check both
+  declared `total` and `len(data)` because capped responses can omit `total`.
 - Combined-event regression tests must assert concrete cross-round numbers, not only
   `scored_rounds` metadata. Guard roster actuals, conditional goalie valuation, and
   league comparisons independently so one working leg cannot mask another regression.
@@ -898,4 +903,41 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
     public-helper-only assertion would not kill an internal grouping regression.
   - More affinity coverage improved 2024/2025 held-out membership but reduced 2026;
     preserve honest per-season movement instead of reporting only aggregate wins.
+---
+
+## 2026-08-31T03:42:23Z - US-206
+- What was implemented: Removed ESPN completion's no-signal away-favorite guess; missing
+  or zero home spread now produces a retained unattributed/uncovered row. Changed odds
+  cross-validation to compare home-side implied probability so equal-magnitude opposite
+  favorites fail the gate. Added NHL skater-summary truncation detection from response
+  length when `total` is absent/null. Added explicit reverse-orientation detection and
+  accounting: archive-unjoinable rows are blanked, retained, counted, and surfaced by the
+  CLI. Fixed a prior-story test variable shadow that blocked repository-wide mypy.
+- Files changed:
+  - `ml/src/draft_oracle/ingest/odds.py`
+  - `ml/src/draft_oracle/ingest/nhl_api.py`
+  - `ml/src/draft_oracle/cli/project.py`
+  - `ml/tests/test_odds.py`
+  - `ml/tests/test_nhl_api.py`
+  - `ml/tests/test_opponents.py`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Real-data verification: committed ESPN completion remains 903/903 covered with zero
+  unattributed rows. The 2019-20 SBR corpus now reports exactly one archive-unjoinable
+  row: the documented 2020-01-17 PIT/DET reversed orientation; it remains present but
+  uncovered. The remaining 1,211 SBR games stay covered.
+- Quality checks: ML ruff passed; ML mypy passed (69 source files); ML pytest passed
+  (671 tests); monorepo affected lint and typecheck passed; all Nx unit tests passed
+  (9 projects, web 380 tests); web production build passed; Playwright passed 96/96.
+  Normal commit hook passed affected lint/typecheck/unit stages (no Nx tasks), then
+  failed only because `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was unavailable;
+  commit retried with `--no-verify` per Ralph's CodeScene authentication exception.
+- **Learnings for future iterations:**
+  - Cross-source price agreement needs a fixed frame of reference. Comparing each
+    source's favorite probability hides favorite-side disagreement.
+  - Side-invariant archive metadata can create false confidence for side-sensitive
+    consumers. Audit the exact downstream join key before calling a source row matched.
+  - NHL bulk responses can signal truncation through payload length alone; nullable
+    metadata is not a sufficient cap guard.
 ---

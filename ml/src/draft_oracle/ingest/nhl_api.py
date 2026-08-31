@@ -405,7 +405,10 @@ class NHLApiClient:
         }
         data = self._get_json(self.stats_base, "/skater/summary", params)
         response = SkaterSummaryResponse.model_validate(data)
-        if response.total is not None and response.total >= SKATER_SUMMARY_ROW_CAP:
+        if (
+            (response.total is not None and response.total >= SKATER_SUMMARY_ROW_CAP)
+            or len(response.data) >= SKATER_SUMMARY_ROW_CAP
+        ):
             raise NHLApiError(
                 "NHL skater summary reached the 10,000-row response cap; "
                 "partition the request by date to avoid silent truncation"

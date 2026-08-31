@@ -51,6 +51,7 @@ from draft_oracle.ingest.odds import (
 )
 
 REAL_SBR_2016_17 = Path("data/raw/odds-archive/nhl-odds-2016-17.xlsx")
+REAL_SBR_2019_20 = Path("data/raw/odds-archive/nhl-odds-2019-20.xlsx")
 REAL_KAGGLE_EXTENSIVE = Path(
     "data/raw/odds-archive/kaggle-nhl-historical/nhl_data_extensive.csv.gz"
 )
@@ -401,6 +402,45 @@ def test_parse_espn_completion_home_relative_spread(tmp_path: Path) -> None:
     assert row["away_ml"] == -115
     assert row["home_ml"] is None
     assert row["away_implied"] > row["home_implied"]
+
+
+def test_parse_espn_completion_missing_favorite_signal_is_uncovered(
+    tmp_path: Path,
+) -> None:
+    frame = _favorite_csv(
+        [
+            {
+                "game_id": 401874176,
+                "date": "2026-06-15 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Vegas Golden Knights",
+                "is_home": 1,
+                "spread": float("nan"),
+                "favorite_moneyline": -115,
+            },
+            {
+                "game_id": 401874176,
+                "date": "2026-06-15 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Carolina Hurricanes",
+                "is_home": 0,
+                "spread": float("nan"),
+                "favorite_moneyline": -115,
+            },
+        ]
+    )
+    path = tmp_path / "games.csv"
+    frame.to_csv(path, index=False)
+
+    df = parse_espn_completion(path)
+
+    assert len(df) == 1
+    row = df.iloc[0]
+    assert not bool(row["covered"])
+    assert row["favorite_side"] is None
+    assert row["home_implied"] is None
+    assert row["away_implied"] is None
+    assert df.attrs["unattributed_uncovered_rows"] == 1
 
 
 def test_parse_kaggle_extensive_unattributed_when_spreads_identical(
@@ -881,6 +921,34 @@ def test_consolidate_excludes_rows_with_no_archive_game() -> None:
     assert out.attrs["unmatched_uncovered_rows"] == 1
 
 
+def test_consolidate_counts_real_reversed_orientation_as_unjoinable() -> None:
+    """The documented 2020 PIT/DET SBR row cannot attach in its recorded orientation."""
+    from draft_oracle.ingest.normalize import DEFAULT_ARCHIVE_DIR
+
+    sbr = parse_sbr_workbook(REAL_SBR_2019_20)
+    pit = resolve_team_id("Pittsburgh Penguins")
+    det = resolve_team_id("Detroit Red Wings")
+    assert pit is not None and det is not None
+    flipped = sbr.loc[
+        (sbr["game_date"] == "2020-01-17")
+        & (sbr["home_team_id"] == pit)
+        & (sbr["away_team_id"] == det)
+    ]
+    assert len(flipped) == 1
+
+    dates = load_local_game_dates(DEFAULT_ARCHIVE_DIR)
+    types = load_archive_game_types(DEFAULT_ARCHIVE_DIR)
+    assert date(2020, 1, 17) not in dates.get((2020, pit, det), ())
+    assert date(2020, 1, 17) in dates[(2020, det, pit)]
+
+    out = consolidate_odds(flipped, local_game_dates=dates, local_game_types=types)
+
+    assert len(out) == 1
+    assert not bool(out.iloc[0]["covered"])
+    assert out.attrs["unmatched_uncovered_rows"] == 1
+    assert out.attrs["orientation_unmatched_rows"] == 1
+
+
 def test_playoff_labels_match_committed_archive_gametypeid() -> None:
     """CODE_REVIEW M-4/m-12 against committed data: labels follow gameTypeId.
 
@@ -1135,6 +1203,56 @@ def test_consolidate_xval_gate_flags_source_disagreement() -> None:
     assert not bool(row["covered"])  # flagged out of covered market probabilities
     assert pd.isna(row["home_implied"])
     assert pd.isna(row["away_implied"])
+    assert consolidated.attrs["xval_flagged_rows"] == 1
+
+
+def test_consolidate_xval_gate_flags_opposite_favorite_sides() -> None:
+    from draft_oracle.ingest.odds import (
+        XVAL_DELTA_THRESHOLD,
+        _favorite_rows_from_games,
+        _finalize,
+    )
+
+    # SBR makes Toronto the -165 home favorite.
+    sbr = parse_sbr_workbook_from_rows(
+        season="2019-20",
+        rows=[
+            [501, 1, "V", "Boston", 1, 0, 0, 1, 145, 145, 1.5, -130, 6, -110, 6, -115],
+            [501, 2, "H", "Toronto", 2, 1, 0, 3, -165, -165, -1.5, 110, 6, -110, 6, -120],
+        ],
+    )
+    # Kaggle names Boston the -165 away favorite for the same game.
+    kaggle_frame = pd.DataFrame(
+        [
+            {
+                "game_id": 9,
+                "date": "2020-05-01 02:00:00+00:00",
+                "season": 2020,
+                "team_name": "Toronto Maple Leafs",
+                "is_home": 1,
+                "spread": 1.5,
+                "favorite_moneyline": -165,
+            },
+            {
+                "game_id": 9,
+                "date": "2020-05-01 02:00:00+00:00",
+                "season": 2020,
+                "team_name": "Boston Bruins",
+                "is_home": 0,
+                "spread": -1.5,
+                "favorite_moneyline": -165,
+            },
+        ]
+    )
+    kaggle = _finalize(_favorite_rows_from_games(kaggle_frame, source=SOURCE_KAGGLE))
+
+    consolidated = consolidate_odds(pd.concat([sbr, kaggle], ignore_index=True))
+
+    assert len(consolidated) == 1
+    row = consolidated.iloc[0]
+    assert row["source_count"] == 2
+    assert row["xval_delta"] > XVAL_DELTA_THRESHOLD
+    assert not bool(row["covered"])
     assert consolidated.attrs["xval_flagged_rows"] == 1
 
 

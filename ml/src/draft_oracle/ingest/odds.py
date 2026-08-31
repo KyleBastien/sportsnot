@@ -112,11 +112,11 @@ PLACEHOLDER_MODAL_FRACTION = 0.50
 # placeholder (and would false-positive on legitimate single-price fixtures).
 PLACEHOLDER_MIN_SEASON_ROWS = 10
 
-# ``xval_delta`` (max-min de-vigged favourite probability across the sources
-# covering a game) is now a *consumed* cross-source sanity gate: when covering
-# sources disagree on the favourite's win probability by more than this many
-# points the consolidated price is untrustworthy, so it is flagged uncovered
-# (excluded from covered market probabilities) rather than silently published.
+# ``xval_delta`` (max-min de-vigged HOME probability across the sources covering
+# a game) is a *consumed* cross-source sanity gate. Comparing one consistent side
+# is required: favorite-probability magnitudes can look equal when two sources
+# name opposite favorites. When sources disagree by more than this many points,
+# the consolidated price is flagged uncovered rather than silently published.
 XVAL_DELTA_THRESHOLD = 0.15
 
 # Consolidation priority (higher wins) when several sources cover a game.
@@ -789,9 +789,7 @@ def _favorite_side_from_pair_spreads(
 
 def _kaggle_favorite_side(_game_id: object, home: pd.Series, away: pd.Series) -> str | None:
     """Kaggle favorite resolver: trust only a genuine per-team spread pair."""
-    return _favorite_side_from_pair_spreads(
-        _american(home["spread"]), _american(away["spread"])
-    )
+    return _favorite_side_from_pair_spreads(_american(home["spread"]), _american(away["spread"]))
 
 
 # A resolver maps (game_id, home_row, away_row) -> favored side, or ``None``
@@ -937,9 +935,7 @@ def _pickcenter_favorite_side(pickcenter: Mapping[str, Any]) -> str | None:
     return None
 
 
-def _espn_completion_favorite_sides(
-    summary_dir: Path, game_ids: Iterable[int]
-) -> dict[int, str]:
+def _espn_completion_favorite_sides(summary_dir: Path, game_ids: Iterable[int]) -> dict[int, str]:
     """Read authoritative favorite sides from committed raw ESPN summaries.
 
     Each ``{event_id}.json.gz`` under ``summary_dir`` carries a ``pickcenter``
@@ -967,24 +963,21 @@ def _espn_completion_favorite_sides(
     return sides
 
 
-def parse_espn_completion(
-    path: Path, *, summary_dir: Path | None = None
-) -> pd.DataFrame:
+def parse_espn_completion(path: Path, *, summary_dir: Path | None = None) -> pd.DataFrame:
     """Parse the ESPN 2025-26 completion ``games.csv`` favorite-only odds file.
 
     The favorite is read from the committed raw ESPN summaries'
     ``homeTeamOdds.favorite`` flag (``raw/summary/{event_id}.json.gz`` beside the
     CSV - CODE_REVIEW C-1). When a summary is absent the parser falls back to
     ESPN's home-relative ``spread`` convention (``spread < 0`` ⇒ home favorite -
-    PROVENANCE §9), which the completion CSV documents per-game. Season labels
-    are ENDING years.
+    PROVENANCE §9), which the completion CSV documents per-game. A missing or
+    zero spread carries no favorite signal and is emitted uncovered rather than
+    guessed. Season labels are ENDING years.
     """
     raw = pd.read_csv(path, usecols=list(_FAVORITE_CSV_COLUMNS))
     if summary_dir is None:
         summary_dir = path.parent / "raw" / "summary"
-    game_ids = (
-        pd.to_numeric(raw["game_id"], errors="coerce").dropna().astype(int).unique()
-    )
+    game_ids = pd.to_numeric(raw["game_id"], errors="coerce").dropna().astype(int).unique()
     favorite_sides = _espn_completion_favorite_sides(Path(summary_dir), game_ids)
 
     def resolve(game_id: object, home: pd.Series, _away: pd.Series) -> str | None:
@@ -992,12 +985,15 @@ def parse_espn_completion(
         if gid is not None and int(gid) in favorite_sides:
             return favorite_sides[int(gid)]
         home_spread = _american(home["spread"])
-        return "home" if (home_spread is not None and home_spread < 0) else "away"
+        if home_spread is None:
+            return None
+        return "home" if home_spread < 0 else "away"
 
-    rows = _favorite_rows_from_games(
-        raw, source=SOURCE_ESPN_COMPLETION, resolve_favorite=resolve
-    )
-    return _finalize(rows)
+    rows = _favorite_rows_from_games(raw, source=SOURCE_ESPN_COMPLETION, resolve_favorite=resolve)
+    unattributed = sum(1 for row in rows if row.get("_unattributed"))
+    frame = _finalize(rows)
+    frame.attrs["unattributed_uncovered_rows"] = unattributed
+    return frame
 
 
 # ── Build + consolidate ──────────────────────────────────────────────────
@@ -1039,8 +1035,8 @@ def consolidate_odds(
     be one calendar day ahead of SBR's local dates - PROVENANCE §9). Each
     cluster keeps at most one row per source, so two same-matchup games on
     adjacent days are never merged. The highest-priority covering source wins
-    (SBR Close preferred); the de-vigged favorite probability of every covering
-    source is cross-validated and the disagreement recorded in ``xval_delta``.
+    (SBR Close preferred); every covering source's de-vigged home probability is
+    cross-validated and the disagreement recorded in ``xval_delta``.
 
     When ``local_game_dates`` is supplied (the NHL archive's local game dates,
     keyed by ``(season_end_year, home_id, away_id)``), each consolidated row's
@@ -1055,15 +1051,19 @@ def consolidate_odds(
     April windows that mislabel late-April regular-season games (CODE_REVIEW
     M-4). A priced row that matches no archive game is flagged ``is_playoff=None``
     and blanked to uncovered (kept and counted in ``attrs["unmatched_uncovered_rows"]``,
-    never dropped silently) so it leaves the covered market universe - this also
-    closes the early-October preseason leak (m-12), since preseason games are
-    absent from the archive's regular-season set.
+    never dropped silently) so it leaves the covered market universe. Rows that
+    match only the reverse home/away orientation are likewise excluded and also
+    counted in ``attrs["orientation_unmatched_rows"]``: game type is
+    side-invariant, but the downstream market join is not. This also closes the
+    early-October preseason leak (m-12), since preseason games are absent from
+    the archive's regular-season set.
     """
     keep = [*list(_ODDS_COLUMNS), "xval_delta", "source_count"]
     if source_odds.empty:
         out = pd.DataFrame(columns=keep)
         out.attrs["xval_flagged_rows"] = 0
         out.attrs["unmatched_uncovered_rows"] = 0
+        out.attrs["orientation_unmatched_rows"] = 0
         return out
 
     raw_records = source_odds.to_dict("records")
@@ -1073,9 +1073,7 @@ def consolidate_odds(
         rec["_date"] = _parse_date_str(str(rec["game_date"]))
         rec["_pos"] = i
         rec["_used"] = False
-        home_imp = rec.get("home_implied")
-        away_imp = rec.get("away_implied")
-        rec["_fav_prob"] = _max_prob(home_imp, away_imp)
+        rec["_home_prob"] = rec.get("home_implied")
 
     # Bucket by (season, away, home) for candidate lookup.
     buckets: dict[tuple[int, int, int], list[dict[str, Any]]] = {}
@@ -1095,6 +1093,7 @@ def consolidate_odds(
     out_rows: list[dict[str, Any]] = []
     xval_flagged = 0
     unmatched_uncovered = 0
+    orientation_unmatched = 0
     for anchor in order:
         if anchor["_used"]:
             continue
@@ -1110,19 +1109,22 @@ def consolidate_odds(
         members = _cluster_members(anchor, buckets.get(key, []))
         for member in members:
             member["_used"] = True
-        fav_probs = [
-            float(m["_fav_prob"])
+        home_probs = [
+            float(m["_home_prob"])
             for m in members
-            if bool(m["covered"]) and m["_fav_prob"] is not None and not pd.isna(m["_fav_prob"])
+            if bool(m["covered"]) and m["_home_prob"] is not None and not pd.isna(m["_home_prob"])
         ]
         best = {col: anchor[col] for col in _ODDS_COLUMNS}
-        xval_delta = (max(fav_probs) - min(fav_probs)) if len(fav_probs) > 1 else 0.0
+        xval_delta = (max(home_probs) - min(home_probs)) if len(home_probs) > 1 else 0.0
         best["xval_delta"] = xval_delta
         best["source_count"] = len(members)
-        _snap_to_local_date(best, local_game_dates)
-        if _label_playoff_from_archive(best, local_game_types) and bool(best["covered"]):
+        reversed_only = _snap_to_local_date(best, local_game_dates)
+        archive_unmatched = _label_playoff_from_archive(best, local_game_types)
+        if (archive_unmatched or reversed_only) and bool(best["covered"]):
             _blank_market_fields(best)
             unmatched_uncovered += 1
+            if reversed_only:
+                orientation_unmatched += 1
         if bool(best["covered"]) and xval_delta > XVAL_DELTA_THRESHOLD:
             _blank_market_fields(best)
             xval_flagged += 1
@@ -1133,6 +1135,7 @@ def consolidate_odds(
     out = out.reset_index(drop=True)
     out.attrs["xval_flagged_rows"] = xval_flagged
     out.attrs["unmatched_uncovered_rows"] = unmatched_uncovered
+    out.attrs["orientation_unmatched_rows"] = orientation_unmatched
     return out
 
 
@@ -1174,7 +1177,7 @@ def _parse_date_str(value: str) -> date | None:
 def _snap_to_local_date(
     row: dict[str, Any],
     local_game_dates: Mapping[tuple[int, int, int], tuple[date, ...]] | None,
-) -> None:
+) -> bool:
     """Rewrite ``game_date`` to the NHL-archive local date (CODE_REVIEW M-2).
 
     Kaggle/ESPN stamp UTC calendar dates (an evening game lands on the next
@@ -1182,27 +1185,31 @@ def _snap_to_local_date(
     same matchup sits within ±1 day, snap ``game_date`` (and ``game_key``) onto
     it so the exact-date market join attaches. Rows already on a local date, or
     with no archive match, are left untouched - one documented convention, never
-    a fabricated date.
+    a fabricated date. Returns ``True`` when only the reverse home/away
+    orientation matches within one day. Such a row can receive a side-invariant
+    game type but cannot attach to the orientation-sensitive market join, so the
+    caller must report and exclude it (R2-m14).
     """
     if not local_game_dates:
-        return
+        return False
     home_id = row.get("home_team_id")
     away_id = row.get("away_team_id")
     if home_id is None or away_id is None or pd.isna(home_id) or pd.isna(away_id):
-        return
+        return False
     key = (int(row["season_end_year"]), int(home_id), int(away_id))
     candidates = local_game_dates.get(key)
-    if not candidates:
-        return
     current = _parse_date_str(str(row["game_date"]))
-    if current is None or current in candidates:
-        return
-    within = [d for d in candidates if abs((d - current).days) <= 1]
-    if not within:
-        return
-    nearest = min(within, key=lambda d: (abs((d - current).days), d.toordinal()))
-    row["game_date"] = nearest.isoformat()
-    row["game_key"] = _game_key(key[0], nearest, int(away_id), int(home_id))
+    if current is None:
+        return False
+    if candidates:
+        within = [d for d in candidates if abs((d - current).days) <= 1]
+        if within:
+            nearest = min(within, key=lambda d: (abs((d - current).days), d.toordinal()))
+            row["game_date"] = nearest.isoformat()
+            row["game_key"] = _game_key(key[0], nearest, int(away_id), int(home_id))
+            return False
+    reversed_candidates = local_game_dates.get((key[0], key[2], key[1]), ())
+    return any(abs((d - current).days) <= 1 for d in reversed_candidates)
 
 
 def load_local_game_dates(
@@ -1344,18 +1351,6 @@ def _label_playoff_from_archive(
     return False
 
 
-def _max_prob(home_imp: object, away_imp: object) -> float | None:
-    values: list[float] = []
-    for v in (home_imp, away_imp):
-        if v is None or not isinstance(v, (int, float)):
-            continue
-        as_float = float(v)
-        if pd.isna(as_float):
-            continue
-        values.append(as_float)
-    return max(values) if values else None
-
-
 @dataclass
 class OddsResult:
     """Outcome of :func:`build_odds_table`."""
@@ -1368,6 +1363,7 @@ class OddsResult:
     placeholder_uncovered_rows: int = 0
     xval_flagged_rows: int = 0
     unmatched_uncovered_rows: int = 0
+    orientation_unmatched_rows: int = 0
 
 
 def build_odds_table(
@@ -1409,6 +1405,7 @@ def build_odds_table(
         placeholder_uncovered_rows=int(source_odds.attrs.get("placeholder_uncovered_rows", 0)),
         xval_flagged_rows=int(consolidated.attrs.get("xval_flagged_rows", 0)),
         unmatched_uncovered_rows=int(consolidated.attrs.get("unmatched_uncovered_rows", 0)),
+        orientation_unmatched_rows=int(consolidated.attrs.get("orientation_unmatched_rows", 0)),
     )
 
 

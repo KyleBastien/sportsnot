@@ -136,7 +136,8 @@ def odds(
     typer.echo(
         f"  guards: {result.placeholder_uncovered_rows} placeholder rows rejected, "
         f"{result.xval_flagged_rows} cross-source-disagreement rows flagged, "
-        f"{result.unmatched_uncovered_rows} rows with no archive game excluded"
+        f"{result.unmatched_uncovered_rows} archive-unjoinable rows excluded "
+        f"({result.orientation_unmatched_rows} reversed-orientation)"
     )
 
 

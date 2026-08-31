@@ -454,12 +454,12 @@ def test_dedupe_recovers_missing_app_skater_team_from_sheet_copy() -> None:
         & deduped["position"].eq("F")
     ].iloc[0]
     assert int(kyle["team_id"]) == 5
-    goalie = deduped.loc[
+    deduped_goalie = deduped.loc[
         deduped["league_name"].eq("The Gemmell Cup")
         & deduped["manager"].eq("ben")
         & deduped["position"].eq("G")
     ].iloc[0]
-    assert int(goalie["team_id"]) == 30
+    assert int(deduped_goalie["team_id"]) == 30
 
 
 def test_choice_pools_are_isolated_by_league() -> None:

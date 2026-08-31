@@ -188,6 +188,28 @@ def test_skater_summary_rejects_response_at_row_cap(
         client.skater_summary(20252026, 2)
 
 
+@pytest.mark.parametrize("include_null_total", [False, True])
+def test_skater_summary_rejects_data_length_at_cap_without_total(
+    make_client: Callable[[dict[str, dict[str, object]], list[int]], NHLApiClient],
+    *,
+    include_null_total: bool,
+) -> None:
+    calls = [0]
+    payload = _load("skater_summary.json")
+    rows = payload["data"]
+    assert isinstance(rows, list)
+    payload["data"] = rows * 5_000
+    if include_null_total:
+        payload["total"] = None
+    else:
+        payload.pop("total", None)
+    routes = {"/stats/rest/en/skater/summary": payload}
+    client = make_client(routes, calls)
+
+    with pytest.raises(NHLApiError, match="10,000-row response cap"):
+        client.skater_summary(20252026, 2)
+
+
 def test_playoff_bracket_parses_recorded_response(
     make_client: Callable[[dict[str, dict[str, object]], list[int]], NHLApiClient],
 ) -> None:
