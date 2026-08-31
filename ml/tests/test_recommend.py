@@ -300,6 +300,79 @@ def _advance(state: DraftState, picks: int) -> None:
         state.apply_pick(legal[0])
 
 
+def _tied_opponent_state() -> tuple[DraftState, DraftAsset]:
+    """State where projection order conflicts with object-model tie-breaking."""
+    pool = _pool(3, False)
+    pool.extend(
+        [
+            DraftAsset(
+                key="FA",
+                name="FA",
+                position="F",
+                rank_value=50.0,
+                player_id=9001,
+                team_id=9,
+                projection=9.0,
+            ),
+            DraftAsset(
+                key="FB",
+                name="FB",
+                position="F",
+                rank_value=50.0,
+                player_id=9002,
+                team_id=9,
+                projection=40.0,
+            ),
+        ]
+    )
+    state = DraftState.new(["m0", "m1", "m2"], pool, allow_ir=False)
+    state.apply_pick(state.available["F0"])
+    # m2 has exactly one F slot and one G slot open at its snake turn-around.
+    # Its first pick is the tied FA/FB choice; its second is forced to G, leaving
+    # the other tied forward for owner m1's greedy tail.
+    for key in ("F1", "F2", "F3", "F4", "D0", "D1", "D2"):
+        state.place("m2", state.available[key])
+    return state, state.available["D3"]
+
+
+def test_fast_paths_match_object_rank_then_key_tie_break() -> None:
+    # R2-m15 regression: both tied assets have rank_value=50, but FA projection=9
+    # and FB projection=40. Object policies take FA by key; fast paths must not use
+    # their projection-ordered array position and take FB instead.
+    state, candidate = _tied_opponent_state()
+    replacement = replacement_levels(state, 3)
+    config = RecommendConfig(rollouts=2, depth=1, seed=1)
+
+    greedy = GreedyOpponentModel(temperature=0.0, need_weight=4.0)
+    greedy_mapping = dict.fromkeys(state.rosters, greedy)
+    greedy_fast = _vectorized_greedy_expected(
+        state, "m1", [candidate], greedy, replacement, config
+    )
+    greedy_object = [
+        _expected_value(state, "m1", candidate, greedy_mapping, replacement, config)
+    ]
+
+    fitted_mapping = {
+        manager: FittedOpponentModel(
+            coefficients=Coefficients(rank=1.0, affinity=0.0),
+            affinity={},
+            need_weight=4.0,
+        )
+        for manager in state.rosters
+    }
+    fitted_fast = _vectorized_fitted_expected(
+        state, "m1", [candidate], fitted_mapping, replacement, config
+    )
+    fitted_object = [
+        _expected_value(state, "m1", candidate, fitted_mapping, replacement, config)
+    ]
+
+    assert greedy_object == pytest.approx([205.0])
+    assert greedy_fast == pytest.approx(greedy_object, abs=1e-9)
+    assert fitted_object == pytest.approx([205.0])
+    assert fitted_fast == pytest.approx(fitted_object, abs=1e-9)
+
+
 def test_fast_path_scores_opponents_by_rank_value_and_matches_object(
 ) -> None:
     # m-7 + m-8: with rank_value != projection and the owner already holding picks,
@@ -391,6 +464,35 @@ def test_vectorized_fitted_matches_object_path() -> None:
     vec = _vectorized_fitted_expected(state, "m0", candidates, models, repl, cfg)
     obj = [_expected_value(state, "m0", asset, mapping, repl, cfg) for asset in candidates]
     assert vec == pytest.approx(obj, abs=1e-9)
+
+
+def test_vectorized_fitted_uses_each_managers_need_weight() -> None:
+    # R2-m11 regression: the old kernel overwrote one scalar in this loop and used
+    # m3's 3.5 weight for every seat. Heterogeneous object policies are authoritative.
+    state = DraftState.new([f"m{i}" for i in range(4)], _pool(4, False), allow_ir=False)
+    weights = dict(zip(state.rosters, (1.0, 0.2, 8.0, 3.5), strict=True))
+    mapping = {
+        manager: FittedOpponentModel(
+            coefficients=Coefficients(rank=0.5, affinity=1.2),
+            affinity={1: 0.6, 2: 0.3, 3: 0.1},
+            need_weight=weights[manager],
+        )
+        for manager in state.rosters
+    }
+    replacement = replacement_levels(state, 4)
+    candidates = [candidate.asset for candidate in _prune_candidates(state, "m0", replacement, 6)]
+    config = RecommendConfig(rollouts=3, depth=1, seed=11)
+
+    fast = _vectorized_fitted_expected(
+        state, "m0", candidates, mapping, replacement, config
+    )
+    object_path = [
+        _expected_value(state, "m0", asset, mapping, replacement, config)
+        for asset in candidates
+    ]
+
+    assert object_path == pytest.approx([205.0, 204.0, 203.0, 201.0, 201.0, 201.0])
+    assert fast == pytest.approx(object_path, abs=1e-9)
 
 
 def test_recommend_pick_uses_fitted_fast_path() -> None:

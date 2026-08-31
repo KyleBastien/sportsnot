@@ -439,11 +439,22 @@ def test_session_rejects_unknown_opponents() -> None:
         _make_session(opponents="wat")
 
 
-def test_recommend_reports_fitted_opponents(tmp_path: Path) -> None:
+def test_recommend_reports_mixed_fitted_opponents(tmp_path: Path) -> None:
     session = _fitted_session(tmp_path)
     result = session.recommend(depth=1)
     assert result.ok
-    assert "fitted opponents" in result.message
+    assert result.message == (
+        "recommendation (fitted opponents: mixed per-manager and league-average)"
+    )
+
+
+def test_recommend_reports_default_seats_without_per_manager_affinity(tmp_path: Path) -> None:
+    session = _fitted_session(tmp_path, managers=list(SEATS))
+    result = session.recommend(depth=1)
+    assert result.ok
+    assert result.message == (
+        "recommendation (fitted opponents: league-average, no per-manager affinity)"
+    )
 
 
 def test_recommend_reports_greedy_opponents() -> None:
@@ -500,7 +511,10 @@ def test_run_loop_end_to_end_uses_fitted_model(tmp_path: Path) -> None:
         echo=echoed.append,
     )
 
-    assert any("recommendation (fitted opponents)" in line for line in echoed)
+    assert any(
+        "recommendation (fitted opponents: mixed per-manager and league-average)" in line
+        for line in echoed
+    )
     model = final.build_opponent_model()
     assert isinstance(model, Mapping)
     assert all(isinstance(m, FittedOpponentModel) for m in model.values())

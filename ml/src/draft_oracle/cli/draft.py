@@ -523,6 +523,22 @@ class DraftSession:
             return self.fitted.as_mapping(self.managers)
         return GreedyOpponentModel(temperature=self.temperature, need_weight=DEFAULT_NEED_WEIGHT)
 
+    def opponent_label(self) -> str:
+        """Visible label for the opponent policy actually attached to these seats."""
+        if self.opponents == OPPONENTS_GREEDY:
+            return "greedy opponents"
+        if self.fitted is None:
+            raise ValueError("fitted opponents requested but no artifact is loaded")
+        attached = [
+            manager in self.fitted.per_manager or bool(self.fitted.affinity.get(manager))
+            for manager in self.managers
+        ]
+        if all(attached):
+            return "fitted opponents"
+        if any(attached):
+            return "fitted opponents: mixed per-manager and league-average"
+        return "fitted opponents: league-average, no per-manager affinity"
+
     def recommend(self, depth: int | None = None) -> ActionResult:
         """Top-5 explained recommendations for whoever is on the clock (US-021)."""
         if self.state.is_complete:
@@ -539,7 +555,7 @@ class DraftSession:
             self.state, current, model, config=config, managers=self.manager_count
         )
         return ActionResult(
-            True, f"recommendation ({self.opponents} opponents)", recommendation.report_lines()
+            True, f"recommendation ({self.opponent_label()})", recommendation.report_lines()
         )
 
     # ── Persistence (replayable session log) ─────────────────────────────

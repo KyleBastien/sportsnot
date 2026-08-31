@@ -256,6 +256,10 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   `event_keys`. App rows remain authoritative, but missing app skater `team_id` values
   inherit an unambiguous sheet match on `(league event, manager, player_id)` before
   sheet rows are dropped; existing app ids and goalie/team rows stay untouched.
+- Recommend vectorized kernels must match object policies on exact ties
+  (`rank_value` descending, then asset key ascending) and keep fitted `need_weight`
+  per manager. Fitted CLI output must disclose league-average/no-affinity fallback
+  when seat ids do not match committed per-manager keys.
 
 ## Ralph Agent System
 

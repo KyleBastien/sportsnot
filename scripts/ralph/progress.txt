@@ -61,6 +61,11 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
   base_owner_value=0 hides the m-8 bug) and, to exercise the dry-raise, make the
   OWNER the last snake seat on the clock (object stops at owner-full, so an opponent
   that only runs dry afterward won't raise).
+  Exact opponent-utility ties use `rank_value` descending then asset key ascending;
+  never inherit vector array order (currently projection-sorted). Fitted kernels keep
+  `need_weight` in a manager-indexed array alongside rank/affinity coefficients. CLI
+  labels must disclose league-average/no-affinity behavior when `seatN` ids match no
+  fitted per-manager keys.
 - Odds favorite attribution (US-102, `ingest/odds.py`): favorite-only rows go
   through `_favorite_rows_from_games(grouped, source=, resolve_favorite=,
   placeholder_seasons=)`. `resolve_favorite: FavoriteResolver` = `(game_id,
@@ -940,4 +945,41 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
     consumers. Audit the exact downstream join key before calling a source row matched.
   - NHL bulk responses can signal truncation through payload length alone; nullable
     metadata is not a sufficient cap guard.
+---
+
+## 2026-08-31T03:55:57Z - US-207
+- What was implemented: Made both vectorized recommendation kernels resolve exact
+  opponent-utility ties like the object policies (`rank_value` descending, then asset
+  key ascending), instead of inheriting projection-sorted array order. Changed the
+  fitted kernel to carry one `need_weight` per manager. Added honest draft-assistant
+  labels for mixed fitted/league-average mappings and default `seatN` mappings whose
+  per-manager affinity is entirely absent.
+- Files changed:
+  - `ml/src/draft_oracle/optimize/recommend.py`
+  - `ml/src/draft_oracle/cli/draft.py`
+  - `ml/tests/test_recommend.py`
+  - `ml/tests/test_draft.py`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Regression verification: Before the fix, the FA/FB fixture (`rank_value` 50/50,
+  projection 9/40) produced 186.0 from each fast path versus the object path's 205.0.
+  The heterogeneous `{1.0, 0.2, 8.0, 3.5}` weight fixture reproduced the review's
+  fast `[205, 204, 203, 203, 203, 203]` versus object
+  `[205, 204, 203, 201, 201, 201]`. Both now match the object path.
+- Quality checks: ML ruff passed; ML mypy passed (69 source files); ML pytest passed
+  (674 tests); monorepo affected lint and typecheck passed; all Nx unit tests passed
+  (9 projects, web 380 tests); web production build passed; Playwright passed 96/96.
+  Normal commit hook passed affected lint/typecheck/unit stages (no Nx tasks), then
+  failed only because `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was unavailable;
+  commit retried with `--no-verify` per Ralph's CodeScene authentication exception.
+- **Learnings for future iterations:**
+  - Array sort order is not a valid deterministic tie-break when fast and object
+    policies consume different primary values. Apply every tie-break axis explicitly.
+  - Any per-manager fitted parameter must share the manager index used by coefficient
+    and affinity arrays; a scalar assigned inside the model loop silently becomes the
+    final manager's value.
+  - A loaded fitted artifact does not imply fitted per-manager behavior. Default
+    `seatN` ids receive league coefficients and zero affinity unless users pass matching
+    manager names, so user-visible labels must state that fallback.
 ---

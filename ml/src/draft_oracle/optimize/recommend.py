@@ -450,6 +450,23 @@ def _require_legal_rows(legal: np.ndarray, manager: str) -> None:
         raise ValueError(f"manager {manager!r} has no legal asset to draft")
 
 
+def _rank_key_argmax(
+    scores: np.ndarray,
+    legal: np.ndarray,
+    rank_value: np.ndarray,
+    key_order: np.ndarray,
+) -> np.ndarray:
+    """Row-wise score argmax with object-model ``rank_value``/key tie-breaks."""
+    neg_inf = float("-inf")
+    masked = np.where(legal, scores, neg_inf)
+    best_score = masked.max(axis=1)
+    tied = legal & (scores == best_score[:, None])
+    tied_rank = np.where(tied, rank_value[None, :], neg_inf)
+    best_rank = tied_rank.max(axis=1)
+    tied &= rank_value[None, :] == best_rank[:, None]
+    return np.argmin(np.where(tied, key_order[None, :], len(key_order)), axis=1)
+
+
 def _vec_fill_owner(
     alive: np.ndarray,
     counts: np.ndarray,
@@ -504,6 +521,8 @@ def _vectorized_greedy_expected(
     key_to_idx = {asset.key: i for i, asset in enumerate(pool)}
     val = np.array([asset_value(a) for a in pool], dtype="float64")
     rank_val = np.array([a.rank_value for a in pool], dtype="float64")
+    key_order = np.empty(n_assets, dtype="int64")
+    key_order[np.argsort([a.key for a in pool])] = np.arange(n_assets)
     posc = np.array([_POS_INDEX[a.position] for a in pool], dtype="int64")
     repl_arr = np.array([replacement["F"], replacement["D"], replacement["G"]], dtype="float64")
     vor_owner = val - repl_arr[posc]
@@ -581,8 +600,7 @@ def _vectorized_greedy_expected(
                 # ``GreedyOpponentModel.pick``; ``val`` (projection) would diverge.
                 scores = rank_val[None, :] + bump[:, posc]
                 if gmodel.temperature <= 0.0:
-                    masked = np.where(legal, scores, neg_inf)
-                    choice = np.argmax(masked, axis=1)
+                    choice = _rank_key_argmax(scores, legal, rank_val, key_order)
                 else:
                     gumbel = -np.log(-np.log(rng.random((rollouts, n_assets))))
                     noisy = np.where(legal, scores / gmodel.temperature + gumbel, neg_inf)
@@ -641,6 +659,8 @@ def _vectorized_fitted_expected(
     key_to_idx = {asset.key: i for i, asset in enumerate(pool)}
     val = np.array([asset_value(a) for a in pool], dtype="float64")
     rank_val = np.array([a.rank_value for a in pool], dtype="float64")
+    key_order = np.empty(n_assets, dtype="int64")
+    key_order[np.argsort([a.key for a in pool])] = np.arange(n_assets)
     posc = np.array([_POS_INDEX[a.position] for a in pool], dtype="int64")
     repl_arr = np.array([replacement["F"], replacement["D"], replacement["G"]], dtype="float64")
     vor_owner = val - repl_arr[posc]
@@ -664,12 +684,12 @@ def _vectorized_fitted_expected(
     coef_rank = np.zeros(n_managers, dtype="float64")
     coef_aff = np.zeros(n_managers, dtype="float64")
     aff_matrix = np.zeros((n_managers, n_assets), dtype="float64")
-    need_weight = 1.0
+    need_weight = np.zeros(n_managers, dtype="float64")
     for manager, model in models.items():
         idx = mid_to_idx[manager]
         coef_rank[idx] = model.coefficients.rank
         coef_aff[idx] = model.coefficients.affinity
-        need_weight = model.need_weight
+        need_weight[idx] = model.need_weight
         aff_matrix[idx] = [
             float(model.affinity.get(int(a.team_id), 0.0)) if a.team_id is not None else 0.0
             for a in pool
@@ -746,10 +766,9 @@ def _vectorized_fitted_expected(
                 utility = (
                     coef_rank[mgr_i] * rank_z
                     + coef_aff[mgr_i] * aff_matrix[mgr_i][None, :]
-                    + need_weight * urgency[:, posc]
+                    + need_weight[mgr_i] * urgency[:, posc]
                 )
-                masked = np.where(legal, utility, neg_inf)
-                choice = np.argmax(masked, axis=1)
+                choice = _rank_key_argmax(utility, legal, rank_val, key_order)
             alive[rows, choice] = False
             counts[rows, mgr_i, posc[choice]] += 1
 
