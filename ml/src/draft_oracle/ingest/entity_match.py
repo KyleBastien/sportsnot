@@ -19,6 +19,13 @@ What it does:
 * **Low-confidence and unresolved names** are emitted to a reviewable report and
   are fixable via ``data/overrides/name_overrides.yaml`` — the honesty rule
   (SPEC §7) forbids closing a gap by dropping rows or weakening the bar.
+* **Scored sheet picks** are cross-checked against archive playoff point splits.
+  Because goals and assists are integer counts, the tolerance is exactly zero;
+  a match is flagged only when ``points_when_drafted``, ``points_for_round``, and
+  ``current_total_points`` all contradict the matched player's archive values.
+* **Ownership validation** flags every copy of a player owned by more than one
+  manager in the same league, season, and draft event. Duplicate source copies
+  owned by the same manager are not conflicts.
 
 The output ``league_draft_picks`` table keeps the season / draft_event / manager /
 snake_slot / position / pick_number provenance plus the resolved ``player_id`` /
@@ -53,10 +60,21 @@ REVIEW_THRESHOLD = 0.80
 # match even when the full-string ratio is low; report it at this confidence.
 LASTNAME_CONFIDENCE = 0.90
 
+# Point columns and archive goals/assists are exact integer counts. A non-zero
+# tolerance would hide real entity mismatches, so only equality counts as agreement.
+POINT_CROSSCHECK_TOLERANCE = 0
+
 # The four canonical Gemmell Cup managers (SCHEMA §6 / SPEC §2).
 CANONICAL_MANAGERS: frozenset[str] = frozenset({"ben", "judah", "kyle", "levi"})
 
 _SKATER_POSITIONS: frozenset[str] = frozenset({"F", "D", "IR_F", "IR_D"})
+
+# (rounds scored by the event, rounds completed before the event's draft).
+_DRAFT_EVENT_ROUNDS: dict[str, tuple[tuple[int, ...], tuple[int, ...]]] = {
+    "R1": ((1,), ()),
+    "R2": ((2,), (1,)),
+    "R3_4": ((3, 4), (1, 2)),
+}
 
 
 # ── Name normalization ───────────────────────────────────────────────────
@@ -419,6 +437,9 @@ class LeagueEntityMatchResult:
     picks: pd.DataFrame
     seasons: list[SeasonMatchReport] = field(default_factory=list)
     review_path: Path | None = None
+    duplicate_ownerships: int = 0
+    duplicate_ownership_rows: int = 0
+    point_mismatches: int = 0
 
     @property
     def total(self) -> int:
@@ -445,6 +466,12 @@ class LeagueEntityMatchResult:
                 f"({season.match_rate * 100:.1f}%), "
                 f"{season.unmatched} unmatched, {season.review} to review"
             )
+        lines.append(
+            "  validation: "
+            f"{self.duplicate_ownerships} duplicate-ownership asset(s) "
+            f"across {self.duplicate_ownership_rows} row(s), "
+            f"{self.point_mismatches} point-split mismatch(es)"
+        )
         if self.review_path is not None:
             lines.append(f"  review report: {self.review_path}")
         else:
@@ -458,6 +485,90 @@ def _is_matched(position: str, player_id: int | None, team_id: int | None) -> bo
     return player_id is not None
 
 
+def _playoff_round(game_id: Any) -> int | None:
+    """Return the best-of-seven round encoded in an NHL playoff ``game_id``."""
+    text = str(game_id).strip()
+    if len(text) != 10 or not text.isdigit() or text[7] not in "1234":
+        return None
+    return int(text[7])
+
+
+def _archive_round_points(skater_games: pd.DataFrame) -> dict[tuple[int, int, int], int]:
+    """Map ``(season_end_year, player_id, round)`` to archive goals + assists."""
+    points: dict[tuple[int, int, int], int] = {}
+    playoff_games = skater_games.loc[skater_games["game_type_id"].astype(int) == 3]
+    for rec in playoff_games.to_dict("records"):
+        playoff_round = _playoff_round(rec["game_id"])
+        if playoff_round is None:
+            continue
+        key = (
+            int(rec["season_id"]) % 10000,
+            int(rec["player_id"]),
+            playoff_round,
+        )
+        points[key] = points.get(key, 0) + int(rec["goals"]) + int(rec["assists"])
+    return points
+
+
+def _point_columns_contradict(
+    record: dict[str, Any],
+    archive_points: dict[tuple[int, int, int], int],
+) -> bool:
+    """Whether all three sheet point columns contradict the matched player.
+
+    The zero-point tolerance is deliberate: every compared value is an exact integer
+    goals-plus-assists count. Requiring all three comparisons to disagree avoids
+    flagging legitimate sheet adjustments that perturb only one value while still
+    catching a wrong entity whose before/event/total split is wholly incompatible.
+    """
+    if (
+        record["source"] != "sheet"
+        or record["position"] == "G"
+        or record["player_id"] is None
+        or not record["is_scored"]
+        or record["draft_event"] not in _DRAFT_EVENT_ROUNDS
+    ):
+        return False
+    columns = (
+        record["points_for_round"],
+        record["points_when_drafted"],
+        record["current_total_points"],
+    )
+    if any(value is None for value in columns):
+        return False
+    event_rounds, prior_rounds = _DRAFT_EVENT_ROUNDS[str(record["draft_event"])]
+    season = int(record["season"])
+    player_id = int(record["player_id"])
+    event_points = sum(
+        archive_points.get((season, player_id, playoff_round), 0) for playoff_round in event_rounds
+    )
+    prior_points = sum(
+        archive_points.get((season, player_id, playoff_round), 0) for playoff_round in prior_rounds
+    )
+    expected = (event_points, prior_points, event_points + prior_points)
+    observed = tuple(int(value) for value in columns)
+    return all(
+        abs(actual - wanted) > POINT_CROSSCHECK_TOLERANCE
+        for actual, wanted in zip(observed, expected, strict=True)
+    )
+
+
+def _mark_duplicate_ownership(frame: pd.DataFrame) -> tuple[int, int]:
+    """Flag assets owned by multiple managers within one league draft event."""
+    skaters = frame.loc[frame["player_id"].notna() & (frame["position"] != "G")]
+    group_columns = ["league_name", "season", "draft_event", "player_id"]
+    conflicting_keys: list[tuple[Any, ...]] = []
+    conflicting_rows: set[int] = set()
+    for key, group in skaters.groupby(group_columns, dropna=False, sort=False):
+        if group["manager"].nunique() <= 1:
+            continue
+        conflicting_keys.append(key if isinstance(key, tuple) else (key,))
+        conflicting_rows.update(int(index) for index in group.index)
+    if conflicting_rows:
+        frame.loc[list(conflicting_rows), "needs_review"] = True
+    return len(conflicting_keys), len(conflicting_rows)
+
+
 def build_league_draft_picks(
     normalized_dir: Path = DEFAULT_NORMALIZED_DIR,
     overrides_dir: Path = DEFAULT_OVERRIDES_DIR,
@@ -465,14 +576,15 @@ def build_league_draft_picks(
 ) -> LeagueEntityMatchResult:
     """Match ``league_picks`` to NHL ids and write ``league_draft_picks.parquet``.
 
-    Reads ``league_picks.parquet`` / ``players.parquet`` / ``teams.parquet`` from
-    ``normalized_dir`` and the override files from ``overrides_dir``. Fails loudly
-    if a required input is missing.
+    Reads ``league_picks.parquet`` / ``players.parquet`` / ``teams.parquet`` /
+    ``skater_games.parquet`` from ``normalized_dir`` and the override files from
+    ``overrides_dir``. Fails loudly if a required input is missing.
     """
     picks_path = normalized_dir / "league_picks.parquet"
     players_path = normalized_dir / "players.parquet"
     teams_path = normalized_dir / "teams.parquet"
-    for required in (picks_path, players_path, teams_path):
+    skater_games_path = normalized_dir / "skater_games.parquet"
+    for required in (picks_path, players_path, teams_path, skater_games_path):
         if not required.exists():
             raise FileNotFoundError(
                 f"required normalized table missing: {required} "
@@ -482,10 +594,12 @@ def build_league_draft_picks(
     league_picks = pd.read_parquet(picks_path)
     players = pd.read_parquet(players_path)
     teams = pd.read_parquet(teams_path)
+    skater_games = pd.read_parquet(skater_games_path)
 
     index = build_player_index(players)
     manager_aliases = load_manager_aliases(overrides_dir / "manager_aliases.yaml")
     overrides = load_name_overrides(overrides_dir / "name_overrides.yaml")
+    archive_points = _archive_round_points(skater_games)
 
     team_names: dict[int, str] = {
         _as_int(r.team_id): str(r.team_full_name) for r in teams.itertuples(index=False)
@@ -522,40 +636,44 @@ def build_league_draft_picks(
             # Best-effort associated team for skater slots (never affects review).
             team_id = resolve_team(team_name, None, overrides)
 
-        records.append(
-            {
-                "season": _as_int(row.season),
-                "source": row.source,
-                "league_name": row.league_name,
-                "draft_event": row.draft_event,
-                "manager": resolve_manager(str(row.manager), manager_aliases),
-                "snake_slot": _to_int(row.snake_slot),
-                "pick_number": _to_int(row.pick_number),
-                "position": position,
-                "slot_label": row.slot_label,
-                "player_or_team_name": raw_name,
-                "matched_name": match.matched_name,
-                "player_id": player_id,
-                "team_id": team_id,
-                "points_for_round": _to_int(row.points_for_round),
-                "points_when_drafted": _to_int(row.points_when_drafted),
-                "current_total_points": _to_int(row.current_total_points),
-                "status": row.status,
-                "points_excluded": bool(row.points_excluded),
-                "ir_activated": bool(row.ir_activated),
-                "swap_partner": row.swap_partner,
-                "note": row.note,
-                "is_scored": bool(row.is_scored),
-                "match_method": match.method,
-                "match_confidence": float(match.confidence),
-                "needs_review": bool(match.needs_review),
-            }
-        )
+        record: dict[str, Any] = {
+            "season": _as_int(row.season),
+            "source": row.source,
+            "league_name": row.league_name,
+            "draft_event": row.draft_event,
+            "manager": resolve_manager(str(row.manager), manager_aliases),
+            "snake_slot": _to_int(row.snake_slot),
+            "pick_number": _to_int(row.pick_number),
+            "position": position,
+            "slot_label": row.slot_label,
+            "player_or_team_name": raw_name,
+            "matched_name": match.matched_name,
+            "player_id": player_id,
+            "team_id": team_id,
+            "points_for_round": _to_int(row.points_for_round),
+            "points_when_drafted": _to_int(row.points_when_drafted),
+            "current_total_points": _to_int(row.current_total_points),
+            "status": row.status,
+            "points_excluded": bool(row.points_excluded),
+            "ir_activated": bool(row.ir_activated),
+            "swap_partner": row.swap_partner,
+            "note": row.note,
+            "is_scored": bool(row.is_scored),
+            "match_method": match.method,
+            "match_confidence": float(match.confidence),
+            "needs_review": bool(match.needs_review),
+        }
+        if _point_columns_contradict(record, archive_points):
+            record["needs_review"] = True
+        records.append(record)
 
     frame = _picks_frame(records)
+    point_mismatches = sum(_point_columns_contradict(record, archive_points) for record in records)
+    duplicate_ownerships, duplicate_ownership_rows = _mark_duplicate_ownership(frame)
 
-    matched_values: list[bool] = [
-        _is_matched(str(r["position"]), r["player_id"], r["team_id"]) for r in records
+    frame_records = frame.to_dict("records")
+    matched_values = [
+        _is_matched(str(r["position"]), r["player_id"], r["team_id"]) for r in frame_records
     ]
     matched_series = pd.Series(matched_values, index=frame.index)
     seasons: list[SeasonMatchReport] = []
@@ -563,7 +681,7 @@ def build_league_draft_picks(
         idx = [i for i, r in enumerate(records) if int(r["season"]) == season]
         total = len(idx)
         matched = sum(1 for i in idx if matched_values[i])
-        review = sum(1 for i in idx if records[i]["needs_review"])
+        review = sum(1 for i in idx if bool(frame.iloc[i]["needs_review"]))
         seasons.append(SeasonMatchReport(season, total, matched, review))
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -580,6 +698,9 @@ def build_league_draft_picks(
         picks=frame,
         seasons=seasons,
         review_path=review_path,
+        duplicate_ownerships=duplicate_ownerships,
+        duplicate_ownership_rows=duplicate_ownership_rows,
+        point_mismatches=point_mismatches,
     )
 
 

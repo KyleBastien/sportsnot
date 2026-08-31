@@ -14,6 +14,7 @@ import pytest
 
 from draft_oracle.ingest.entity_match import (
     HIGH_CONFIDENCE,
+    POINT_CROSSCHECK_TOLERANCE,
     NameOverrides,
     PlayerIndex,
     build_league_draft_picks,
@@ -176,6 +177,7 @@ def index() -> PlayerIndex:
     players = pd.DataFrame(
         [
             {"player_id": 8478402, "player_name": "Connor McDavid", "position": "F"},
+            {"player_id": 8477934, "player_name": "Leon Draisaitl", "position": "F"},
             {"player_id": 8477956, "player_name": "David Pastrnak", "position": "F"},
             {"player_id": 8480012, "player_name": "Elias Pettersson", "position": "F"},
             {"player_id": 8477932, "player_name": "Aaron Ekblad", "position": "D"},
@@ -275,6 +277,7 @@ def _write_normalized(normalized_dir: Path) -> None:
     players = pd.DataFrame(
         [
             {"player_id": 8478402, "player_name": "Connor McDavid", "position": "F"},
+            {"player_id": 8477934, "player_name": "Leon Draisaitl", "position": "F"},
             {"player_id": 8477956, "player_name": "David Pastrnak", "position": "F"},
             {"player_id": 8477932, "player_name": "Aaron Ekblad", "position": "D"},
         ]
@@ -287,6 +290,35 @@ def _write_normalized(normalized_dir: Path) -> None:
         ]
     )
     teams.to_parquet(normalized_dir / "teams.parquet", index=False)
+    pd.DataFrame(
+        columns=[
+            "season_id",
+            "game_type_id",
+            "game_id",
+            "player_id",
+            "goals",
+            "assists",
+        ]
+    ).to_parquet(normalized_dir / "skater_games.parquet", index=False)
+
+
+def _write_playoff_points(
+    normalized_dir: Path,
+    player_id: int,
+    round_points: dict[int, int],
+) -> None:
+    rows = [
+        {
+            "season_id": 20232024,
+            "game_type_id": 3,
+            "game_id": int(f"2023030{playoff_round}01"),
+            "player_id": player_id,
+            "goals": points,
+            "assists": 0,
+        }
+        for playoff_round, points in round_points.items()
+    ]
+    pd.DataFrame(rows).to_parquet(normalized_dir / "skater_games.parquet", index=False)
 
 
 def _league_pick(**kw: object) -> dict[str, object]:
@@ -341,7 +373,7 @@ def _write_league_picks(normalized_dir: Path) -> None:
         _league_pick(
             manager="Evi",  # alias -> levi
             player_or_team_name="Makar",
-            corrected_name="Connor McDavid",  # corrected_name wins
+            corrected_name="Leon Draisaitl",  # corrected_name wins
             team_name="Oilers",
         ),
     ]
@@ -372,7 +404,7 @@ def test_build_league_draft_picks_end_to_end(tmp_path: Path) -> None:
     assert pd.isna(goalie["player_id"])
     # corrected_name wins over the raw name.
     corrected = result.picks[result.picks["player_or_team_name"] == "Makar"].iloc[0]
-    assert corrected["player_id"] == 8478402
+    assert corrected["player_id"] == 8477934
     # No review report when everything matches confidently.
     assert result.review_path is None
     # Per-season report present.
@@ -425,6 +457,90 @@ def test_build_league_draft_picks_override_closes_gap(tmp_path: Path) -> None:
     assert result.matched == 1
     assert result.picks.iloc[0]["player_id"] == 8478402
     assert result.picks.iloc[0]["match_method"] == "override"
+
+
+def test_point_split_crosscheck_flags_wrong_2024_mcdavid_match(tmp_path: Path) -> None:
+    """Row 99's 24/7/31 split contradicts Connor McDavid in all three fields."""
+    normalized = tmp_path / "normalized"
+    _write_normalized(normalized)
+    _write_playoff_points(normalized, 8478402, {1: 12, 2: 9, 3: 10, 4: 11})
+    pd.DataFrame(
+        [
+            _league_pick(
+                season=2024,
+                draft_event="R3_4",
+                manager="levi",
+                player_or_team_name="McDavid",
+                points_for_round=7,
+                points_when_drafted=24,
+                current_total_points=31,
+            )
+        ]
+    ).to_parquet(normalized / "league_picks.parquet", index=False)
+    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
+    (tmp_path / "name_overrides.yaml").write_text("players: {}\nteams: {}\n", encoding="utf-8")
+
+    result = build_league_draft_picks(
+        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=tmp_path / "out"
+    )
+
+    assert POINT_CROSSCHECK_TOLERANCE == 0
+    assert result.point_mismatches == 1
+    assert result.picks.iloc[0]["player_id"] == 8478402
+    assert bool(result.picks.iloc[0]["needs_review"]) is True
+
+
+def test_duplicate_player_ownership_flags_every_manager_copy(tmp_path: Path) -> None:
+    normalized = tmp_path / "normalized"
+    _write_normalized(normalized)
+    pd.DataFrame(
+        [
+            _league_pick(manager="ben"),
+            _league_pick(manager="levi", slot_label="Forward 2"),
+        ]
+    ).to_parquet(normalized / "league_picks.parquet", index=False)
+    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
+    (tmp_path / "name_overrides.yaml").write_text("players: {}\nteams: {}\n", encoding="utf-8")
+
+    result = build_league_draft_picks(
+        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=tmp_path / "out"
+    )
+
+    assert result.duplicate_ownerships == 1
+    assert result.duplicate_ownership_rows == 2
+    assert result.picks["needs_review"].tolist() == [True, True]
+    assert "1 duplicate-ownership asset(s)" in "\n".join(result.report_lines())
+
+
+def test_real_2024_override_resolves_draisaitl_without_ownership_conflict(
+    tmp_path: Path,
+) -> None:
+    normalized = Path("data/normalized")
+    if not (normalized / "league_picks.parquet").exists():
+        pytest.skip("committed normalized league picks not present")
+
+    result = build_league_draft_picks(
+        normalized_dir=normalized,
+        overrides_dir=Path("data/overrides"),
+        out_dir=tmp_path,
+    )
+    event = result.picks.loc[
+        (result.picks["season"] == 2024) & (result.picks["draft_event"] == "R3_4")
+    ]
+    levi = event.loc[
+        (event["manager"] == "levi") & (event["player_or_team_name"] == "McDavid")
+    ].iloc[0]
+    judah = event.loc[
+        (event["manager"] == "judah") & (event["player_or_team_name"] == "Connor McDavid")
+    ].iloc[0]
+
+    assert int(levi["player_id"]) == 8477934
+    assert levi["matched_name"] == "Leon Draisaitl"
+    assert levi["match_method"] == "override"
+    assert bool(levi["needs_review"]) is False
+    assert int(judah["player_id"]) == 8478402
+    assert result.duplicate_ownerships == 0
+    assert result.point_mismatches == 0
 
 
 def test_build_league_draft_picks_missing_input_raises(tmp_path: Path) -> None:

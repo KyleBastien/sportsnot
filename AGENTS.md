@@ -239,6 +239,10 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
 - Team outcome features belong to `draft_oracle.models.game_win`; shared Elo math
   lives in `draft_oracle.features.elo`. Do not recreate a parallel team/series
   matrix unless a production model consumes and evaluates it.
+- League entity matching requires `skater_games.parquet` as well as the pick/player/team
+  tables. Scored sheet matches are review-flagged when all three exact integer point
+  splits disagree with the NHL archive; duplicate player ownership is scoped by
+  `(league_name, season, draft_event)` and ignores same-manager source copies.
 
 ## Ralph Agent System
 

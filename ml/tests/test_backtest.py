@@ -802,6 +802,39 @@ def test_real_2026_league_comparisons_never_pool_leagues() -> None:
     assert 72.0 not in kyle_points.values()
 
 
+def test_real_2024_levi_r3_4_roster_scores_corrected_64_points() -> None:
+    """The raw "McDavid" row is Draisaitl; Connor remains on judah's roster."""
+    normalized = Path("data/normalized")
+    league_picks = pd.read_parquet(normalized / "league_draft_picks.parquet")
+    series = pd.read_parquet(normalized / "series.parquet")
+    skater_actual = skater_actual_points(
+        pd.read_parquet(normalized / "skater_games.parquet"), series
+    )
+    team_actual = team_actual_goalie_points(
+        pd.read_parquet(normalized / "team_games.parquet"), series
+    )
+    roster = league_picks.loc[
+        (league_picks["season"] == 2024)
+        & (league_picks["league_name"] == "The Gemmell Cup")
+        & (league_picks["draft_event"] == "R3_4")
+        & (league_picks["manager"] == "levi")
+    ]
+    corrected = roster.loc[roster["player_or_team_name"] == "McDavid"].iloc[0]
+
+    assert int(corrected["player_id"]) == 8477934
+    assert corrected["matched_name"] == "Leon Draisaitl"
+    assert (
+        _score_league_roster(
+            roster,
+            skater_actual,
+            team_actual,
+            season_id=20232024,
+            scored_rounds=[3, 4],
+        )
+        == 64.0
+    )
+
+
 # ── Market-series benchmark (US-109, CODE_REVIEW M-5) ───────────────────────
 
 

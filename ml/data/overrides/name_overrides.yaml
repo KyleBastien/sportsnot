@@ -12,9 +12,10 @@
 # Keys are normalized (accent-stripped, lowercased, punctuation removed) on
 # load, so "Montréal Canadiens" and "montreal canadiens" collide to one entry.
 #
-# The committed 2024-2026 snapshots currently match at 100% via fuzzy matching,
-# so both maps are intentionally empty. Add entries as new seasons surface
-# names the matcher misses.
+# The bare 2024 R3+4 "McDavid" row carries Draisaitl's exact 24/7/31 point split;
+# Connor McDavid is already owned by another manager in that event. Preserve the
+# raw sheet and correct the entity here.
 
-players: {}
+players:
+  McDavid: 8477934
 teams: {}

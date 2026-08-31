@@ -348,11 +348,15 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
   collisions (two Sebastian Aho) disambiguated by the pick's roster position — always
   pass position into match_skater. Team resolve = odds.resolve_team_id (city/full/abbrev)
   + a nickname index (Panthers->FLA, Maple Leafs->TOR) scanning ALL tokens surname-first.
-  Committed 2024-2026 snapshots match at 100% (489 exact/56 team/6 fuzzy/1 lastname), so
-  the override files ship EMPTY. Config lives in `ml/data/overrides/` (NOT gitignored —
-  data/raw,features,normalized are, overrides are committed): `manager_aliases.yaml`
-  (canonical->alias list, evi=levi) and `name_overrides.yaml` (players/teams raw-name->id;
-  close gaps by ADDING here, never by dropping rows). Run `uv run oracle match-drafts`.
+  Config lives in `ml/data/overrides/` (NOT gitignored — data/raw,features,normalized
+  are, overrides are committed): `manager_aliases.yaml` (canonical->alias list,
+  evi=levi) and `name_overrides.yaml` (players/teams raw-name->id; close gaps by ADDING
+  here, never by dropping rows). The 2024 bare `McDavid` row is overridden to Draisaitl.
+  Entity validation also needs `skater_games.parquet`: a scored sheet match is review-
+  flagged when all three exact integer point splits disagree with the archive, and every
+  row of a player owned by multiple managers within `(league_name, season, draft_event)`
+  is review-flagged; same-manager app/sheet copies are not conflicts. Run
+  `uv run oracle match-drafts`.
 - Injuries go through `draft_oracle.ingest.injuries` (US-008). ESPN public JSON is the
   ONLY injury URL location: injuries feed `site.api.espn.com/.../nhl/injuries` (top-level
   `injuries` = list of TEAM GROUPS, each with nested `injuries` list) + core athlete
@@ -738,4 +742,38 @@ Started: 2026-08-31 (round-3 fix round from ml/CODE_REVIEW_R2.md; fix-round log 
     R2 Alex Tuch flag.
   - No committed 2026 backtest artifact was regenerated; US-211 owns final clean-HEAD
     artifact regeneration after all scoring fixes.
+---
+
+## 2026-08-31T02:49:23Z - US-202
+- What was implemented: Added the committed bare-name override mapping levi's 2024
+  R3_4 `McDavid` row to Leon Draisaitl (8477934). Added exact archive point-split
+  validation and league/event-scoped duplicate-ownership validation; both mark affected
+  rows `needs_review` and report counts. Regenerated the ignored normalized
+  `league_draft_picks.parquet`: 552/552 matched, zero review rows, zero ownership
+  conflicts, zero point mismatches. Verified levi's corrected 2024 R3_4 roster scores
+  64.0 and judah retains Connor McDavid.
+- Files changed:
+  - `ml/data/overrides/name_overrides.yaml`
+  - `ml/src/draft_oracle/ingest/entity_match.py`
+  - `ml/tests/test_entity_match.py`
+  - `ml/tests/test_backtest.py`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Quality checks: ML ruff passed; ML mypy passed (69 files); ML pytest passed (658
+  tests); monorepo lint passed (11 projects); monorepo typecheck passed (10 projects);
+  monorepo unit tests passed (9 projects, web 380 tests); web production build passed;
+  Playwright passed 96/96. Normal commit hook reached CodeScene after affected checks,
+  then failed only because `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was unavailable;
+  commit retried with `--no-verify` per Ralph's CodeScene authentication exception.
+- **Learnings for future iterations:**
+  - Goals+assists and all three sheet point columns are integers, so cross-check tolerance
+    is zero. Flag only when event, pre-event, and cumulative values all disagree; this
+    catches the wrong entity without flagging one-column manual scoring adjustments.
+  - Ownership conflicts must count distinct managers, not duplicate source rows for one
+    manager. Scope them by league, season, and draft event.
+  - `ml/data/normalized/` is gitignored. `oracle match-drafts` refreshes the local
+    downstream fixture, while the committed correction lives in `name_overrides.yaml`.
+  - Committed backtest reports remain untouched; US-211 owns final clean-HEAD evidence
+    regeneration.
 ---
