@@ -91,6 +91,12 @@ def test_snake_order_from_state() -> None:
     assert len(state.order) == 27
 
 
+@pytest.mark.parametrize("managers", [["ben", "ben"], ["ben", "Ben"]])
+def test_draft_state_rejects_duplicate_manager_ids(managers: list[str]) -> None:
+    with pytest.raises(ValueError, match="managers must be unique"):
+        DraftState.new(managers, _exact_pool(2, False), allow_ir=False)
+
+
 def test_full_forwards_must_pick_other_position() -> None:
     state = DraftState.new(["a"], _exact_pool(1, False), allow_ir=False)
     # Fill the manager's 5 forward slots.
@@ -154,9 +160,7 @@ def test_unresolved_team_skater_dropped_once_teams_eliminated() -> None:
     open_state = DraftState.new(["a"], pool, allow_ir=False)
     assert "F_unknown" in open_state.available
     # Once a team is eliminated, the unresolved skater is removed fail-safe.
-    elim_state = DraftState.new(
-        ["a"], pool, allow_ir=False, eliminated_team_ids=frozenset({99})
-    )
+    elim_state = DraftState.new(["a"], pool, allow_ir=False, eliminated_team_ids=frozenset({99}))
     assert "F_unknown" not in elim_state.available
     assert "F2" in elim_state.available  # a resolved, non-eliminated skater survives
 

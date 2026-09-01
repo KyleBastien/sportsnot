@@ -204,6 +204,9 @@ class DraftState:
         """
         if not managers:
             raise ValueError("managers must be non-empty")
+        normalized_managers = [manager.casefold() for manager in managers]
+        if len(set(normalized_managers)) != len(normalized_managers):
+            raise ValueError("managers must be unique (case-insensitive)")
         capacity = roster_capacity(allow_ir)
         order = tuple(snake_order(managers, capacity.total))
         available: dict[str, DraftAsset] = {}

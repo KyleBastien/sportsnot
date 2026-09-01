@@ -41,8 +41,8 @@
     "All Playwright tests pass (even if it's outside of your changes)"
    ],
    "priority": 2,
-   "passes": false,
-   "notes": ""
+   "passes": true,
+   "notes": "Draft/recommend now reject duplicate manager ids; DraftState validates uniqueness; eliminated tokens fail loudly; new sessions refuse existing logs; standalone recommend shares the honest fitted-opponent coverage label."
   },
   {
    "id": "US-303",

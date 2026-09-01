@@ -274,6 +274,10 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   (`rank_value` descending, then asset key ascending) and keep fitted `need_weight`
   per manager. Fitted CLI output must disclose league-average/no-affinity fallback
   when seat ids do not match committed per-manager keys.
+- Draft-night CLI validation is shared by `draft` and `recommend`: manager ids must
+  be unique case-insensitively, eliminated-team abbreviations must all resolve, and
+  `DraftState.new` repeats manager uniqueness validation. A new draft refuses any
+  existing session path; users must pass `--resume` or choose another `--session`.
 
 ## Ralph Agent System
 

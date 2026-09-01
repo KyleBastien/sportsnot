@@ -375,6 +375,32 @@ def test_parse_managers_rejects_too_few_names() -> None:
         parse_managers("ben")
 
 
+@pytest.mark.parametrize("managers", ["ben,ben,kyle,levi", "ben,Ben,kyle,levi"])
+def test_parse_managers_rejects_duplicate_ids(managers: str) -> None:
+    with pytest.raises(Exception, match=r"duplicate id.*ben"):
+        parse_managers(managers)
+
+
+@pytest.mark.parametrize(
+    "command,artifact_flag",
+    [("draft", "--artifact"), ("recommend", "--artifact-dir")],
+)
+def test_cli_commands_reject_duplicate_managers(command: str, artifact_flag: str) -> None:
+    artifact = Path(__file__).parents[1] / "artifacts" / "2026-r1"
+    result = runner.invoke(
+        app,
+        [
+            command,
+            artifact_flag,
+            str(artifact),
+            "--managers",
+            "ben,ben,kyle,levi",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "duplicate id(s): ben" in result.output
+
+
 def test_resolve_opponents_kind_auto_detects(tmp_path: Path) -> None:
     assert resolve_opponents_kind("auto", tmp_path) == "greedy"
     (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
@@ -464,6 +490,32 @@ def test_recommend_reports_greedy_opponents() -> None:
     assert "greedy opponents" in result.message
 
 
+@pytest.mark.parametrize("managers", ["4", "Ben,seat2,seat3,seat4"])
+def test_recommend_command_discloses_no_per_manager_affinity(tmp_path: Path, managers: str) -> None:
+    (tmp_path / "manifest.json").write_text(json.dumps(_fitted().manifest()), encoding="utf-8")
+    artifact = Path(__file__).parents[1] / "artifacts" / "2026-r1"
+    result = runner.invoke(
+        app,
+        [
+            "recommend",
+            "--artifact-dir",
+            str(artifact),
+            "--managers",
+            managers,
+            "--rollouts",
+            "1",
+            "--depth",
+            "1",
+            "--opponents",
+            "fitted",
+            "--opponent-artifact",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "fitted opponents: league-average, no per-manager affinity" in result.output
+
+
 def test_opponents_survive_save_resume(tmp_path: Path) -> None:
     session = _fitted_session(tmp_path)
     # A real committed manifest lives at the artifact dir so resume can reload it.
@@ -519,3 +571,35 @@ def test_run_loop_end_to_end_uses_fitted_model(tmp_path: Path) -> None:
     assert isinstance(model, Mapping)
     assert all(isinstance(m, FittedOpponentModel) for m in model.values())
     assert len(final.picks) == 1
+
+
+def test_eliminated_abbrevs_are_case_insensitive_and_unknowns_are_loud() -> None:
+    pool = build_synthetic_pool(MANAGERS, allow_ir=False)
+    target = next(asset for asset in pool if asset.team_id is not None)
+    assert draft_module._resolve_eliminated(pool, [target.team_abbrev.lower()]) == frozenset(
+        {target.team_id}
+    )
+    with pytest.raises(Exception, match=r"MON, XYZ"):
+        draft_module._resolve_eliminated(pool, ["MON", "xyz"])
+
+
+def test_new_session_refuses_to_clobber_existing_pick_log(tmp_path: Path) -> None:
+    existing = _make_session()
+    for _ in range(2):
+        current = existing.state.current_manager
+        pick = existing.state.legal_assets(current)[0]
+        assert existing.record_pick(current, pick.name).ok
+    path = tmp_path / "draft-session.json"
+    existing.save(path)
+    before = path.read_bytes()
+
+    with pytest.raises(Exception, match="use --resume"):
+        draft_module.draft(
+            artifact=tmp_path / "unused-artifact",
+            managers="4",
+            session=path,
+            opponents="greedy",
+        )
+
+    assert path.read_bytes() == before
+    assert len(json.loads(path.read_text(encoding="utf-8"))["picks"]) == 2

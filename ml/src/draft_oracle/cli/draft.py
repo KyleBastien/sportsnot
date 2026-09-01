@@ -54,6 +54,7 @@ __all__ = [
     "ParsedCommand",
     "RecordedPick",
     "draft",
+    "opponent_label",
     "parse_command",
     "resolve_asset",
     "resolve_manager",
@@ -86,6 +87,15 @@ def parse_managers(managers: str) -> list[str]:
     names = [token.strip() for token in stripped.split(",") if token.strip()]
     if not 2 <= len(names) <= 12:
         raise typer.BadParameter("--managers must name 2..12 seats (or give a count)")
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for name in names:
+        normalized = name.casefold()
+        if normalized in seen and normalized not in duplicates:
+            duplicates.append(normalized)
+        seen.add(normalized)
+    if duplicates:
+        raise typer.BadParameter(f"--managers contains duplicate id(s): {', '.join(duplicates)}")
     return names
 
 
@@ -108,6 +118,7 @@ def resolve_opponents_kind(opponents: str, artifact_dir: Path) -> str:
             )
         return kind
     raise typer.BadParameter(f"--opponents must be greedy, fitted, or auto (got {opponents!r})")
+
 
 # A resolution is treated as unambiguous only when the best fuzzy match clears
 # the runner-up by this margin; otherwise the pick is rejected as ambiguous.
@@ -308,11 +319,34 @@ def _resolve_eliminated(pool: list[DraftAsset], abbrevs: list[str]) -> frozenset
     wanted = {abbrev.strip().upper() for abbrev in abbrevs if abbrev.strip()}
     if not wanted:
         return frozenset()
-    return frozenset(
-        asset.team_id
-        for asset in pool
-        if asset.team_id is not None and asset.team_abbrev.upper() in wanted
-    )
+    team_ids: dict[str, set[int]] = defaultdict(set)
+    for asset in pool:
+        if asset.team_id is not None:
+            team_ids[asset.team_abbrev.upper()].add(asset.team_id)
+    unknown = sorted(wanted - team_ids.keys())
+    if unknown:
+        raise typer.BadParameter(f"--eliminated unknown team abbrev(s): {', '.join(unknown)}")
+    return frozenset(team_id for abbrev in wanted for team_id in team_ids[abbrev])
+
+
+def opponent_label(
+    opponents: str,
+    fitted: FittedLeagueOpponents | None,
+    managers: list[str],
+) -> str:
+    """Describe fitted-policy coverage for the supplied manager ids honestly."""
+    if opponents == OPPONENTS_GREEDY:
+        return "greedy opponents"
+    if fitted is None:
+        raise ValueError("fitted opponents requested but no artifact is loaded")
+    attached = [
+        manager in fitted.per_manager or bool(fitted.affinity.get(manager)) for manager in managers
+    ]
+    if all(attached):
+        return "fitted opponents"
+    if any(attached):
+        return "fitted opponents: mixed per-manager and league-average"
+    return "fitted opponents: league-average, no per-manager affinity"
 
 
 @dataclass
@@ -525,19 +559,7 @@ class DraftSession:
 
     def opponent_label(self) -> str:
         """Visible label for the opponent policy actually attached to these seats."""
-        if self.opponents == OPPONENTS_GREEDY:
-            return "greedy opponents"
-        if self.fitted is None:
-            raise ValueError("fitted opponents requested but no artifact is loaded")
-        attached = [
-            manager in self.fitted.per_manager or bool(self.fitted.affinity.get(manager))
-            for manager in self.managers
-        ]
-        if all(attached):
-            return "fitted opponents"
-        if any(attached):
-            return "fitted opponents: mixed per-manager and league-average"
-        return "fitted opponents: league-average, no per-manager affinity"
+        return opponent_label(self.opponents, self.fitted, self.managers)
 
     def recommend(self, depth: int | None = None) -> ActionResult:
         """Top-5 explained recommendations for whoever is on the clock (US-021)."""
@@ -728,9 +750,7 @@ def draft(
     ] = None,
     managers: Annotated[
         str,
-        typer.Option(
-            help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."
-        ),
+        typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."),
     ] = "4",
     slot: Annotated[int, typer.Option("--slot", help="Your snake seat (1-based).")] = 1,
     ir: Annotated[
@@ -787,6 +807,12 @@ def draft(
     manager_count = len(manager_ids)
     if not 1 <= slot <= manager_count:
         raise typer.BadParameter(f"slot must be in 1..{manager_count}")
+    session_path = session or Path("draft-session.json")
+    if session_path.exists():
+        raise typer.BadParameter(
+            f"session log already exists at {session_path}; use --resume {session_path} "
+            "or choose a different --session path"
+        )
     eliminated_teams = [token for token in eliminated.split(",") if token.strip()]
     opponents_kind = resolve_opponents_kind(opponents, opponent_artifact)
     new_session = DraftSession.from_artifact(
@@ -802,5 +828,4 @@ def draft(
         opponents=opponents_kind,
         opponent_artifact_dir=opponent_artifact,
     )
-    session_path = session or Path("draft-session.json")
     _run_loop(new_session, session_path)

@@ -596,7 +596,11 @@ def recommend(
     import random as _random
     from collections.abc import Mapping
 
-    from draft_oracle.cli.draft import parse_managers, resolve_opponents_kind
+    from draft_oracle.cli.draft import (
+        opponent_label,
+        parse_managers,
+        resolve_opponents_kind,
+    )
     from draft_oracle.optimize.opponents import load_committed_opponents
     from draft_oracle.optimize.recommend import (
         RecommendConfig,
@@ -615,6 +619,7 @@ def recommend(
     state = DraftState.new(manager_ids, pool, allow_ir=ir)
 
     opponent_model: OpponentModel | Mapping[str, OpponentModel]
+    fitted = None
     if opponents_kind == "fitted":
         fitted = load_committed_opponents(opponent_artifact)
         if fitted is None:
@@ -637,9 +642,8 @@ def recommend(
         state.apply_pick(_model_for(current).pick(state, current, rng))
     config = RecommendConfig(rollouts=rollouts, depth=depth or None, seed=seed)
     result = recommend_pick(state, owner, opponent_model, config=config, managers=manager_count)
-    typer.echo(
-        f"Recommendation for {owner} (pick #{state.pick_index + 1}, {opponents_kind} opponents):"
-    )
+    label = opponent_label(opponents_kind, fitted, manager_ids)
+    typer.echo(f"Recommendation for {owner} (pick #{state.pick_index + 1}, {label}):")
     for line in result.report_lines():
         typer.echo(line)
 

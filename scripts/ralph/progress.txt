@@ -3,6 +3,11 @@ Started: 2026-09-01 (round-4 final fix round from ml/CODE_REVIEW_R3.md; prior lo
 ---
 
 ## Codebase Patterns
+- Draft-night inputs fail closed at the shared CLI boundary: `parse_managers` rejects
+  case-insensitive duplicate ids for both `draft` and `recommend`, `_resolve_eliminated`
+  rejects every unmatched abbreviation, and `DraftState.new` validates uniqueness
+  again. New sessions never overwrite an existing path; use `--resume` or a distinct
+  `--session`. Both recommend entry points share the fitted-opponent coverage label.
 - Game-win reports/manifests record per-season priced/total market coverage with the
   temporal split and explicit zero-coverage state. Odds joins can promote
   `season_end_year` to float, so normalize group keys before integer conversion.
@@ -781,4 +786,37 @@ Started: 2026-09-01 (round-4 final fix round from ml/CODE_REVIEW_R3.md; prior lo
     provides a direct training-path oracle for series replay consistency tests.
   - Model evidence must remain stale until US-305 performs one clean-HEAD regeneration;
     local metric measurement should not rewrite committed manifests mid-round.
+---
+
+## 2026-09-01T07:07:38Z - US-302
+- What was implemented: Hardened both draft-night commands against case-insensitive
+  duplicate manager ids, added defense-in-depth uniqueness validation to
+  `DraftState.new`, made `--eliminated` reject and name every unmatched abbreviation,
+  refused to start a new draft over an existing session log, and reused the interactive
+  three-state fitted-opponent label in standalone `oracle recommend` (including default
+  `seatN` and case-typo manager ids).
+- Files changed:
+  - `ml/src/draft_oracle/cli/draft.py`
+  - `ml/src/draft_oracle/cli/project.py`
+  - `ml/src/draft_oracle/optimize/simulator.py`
+  - `ml/tests/test_draft.py`
+  - `ml/tests/test_simulator.py`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Quality checks: ML ruff clean; mypy strict clean; 713 pytest tests passed; Nx
+  affected lint/typecheck passed; web build passed; all Nx unit tests passed; all
+  96 Playwright tests passed.
+- Commit note: Normal pre-commit hook reached CodeScene and failed only because
+  `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was unavailable. All required checks
+  passed independently, so commit retried with `--no-verify` per Ralph policy.
+- **Learnings for future iterations:**
+  - Treat manager ids as case-insensitive at validation because interactive manager
+    resolution is case-insensitive and case-only duplicates otherwise create two seats
+    backed by conflicting roster identities.
+  - Compute fitted-opponent coverage from exact committed manager keys; case typos must
+    remain visible as league-average fallback rather than silently claiming a fitted
+    per-manager policy.
+  - Guard a new session path before loading the artifact or entering the loop so even a
+    quit-only invocation cannot rewrite a prior pick log.
 ---
