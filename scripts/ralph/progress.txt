@@ -3,6 +3,12 @@ Started: 2026-09-01 (round-4 final fix round from ml/CODE_REVIEW_R3.md; prior lo
 ---
 
 ## Codebase Patterns
+- Guard globally keyed player-name overrides with a structured `player_id` plus
+  `expected_matches`; `match-drafts` validates the raw-name corpus count before
+  matching. Legacy scalar ids remain supported for unguarded overrides.
+- When parser diagnostics live in pandas `DataFrame.attrs`, aggregate them before
+  concatenation and copy them into the command result object; pandas operations do not
+  provide durable user-facing accounting by themselves.
 - Committed evidence provenance is grouped by regeneration pass: every manifest SHA
   must be an ancestor of HEAD, models plus backtests share one SHA, and the four 2026
   projection fixtures may share a separate SHA. Skip ancestry checks only when Git or
@@ -866,4 +872,42 @@ Started: 2026-09-01 (round-4 final fix round from ml/CODE_REVIEW_R3.md; prior lo
     catches a call-site that bypasses league-aware grouping.
   - Goalie ownership represents an NHL team, so duplicate validation must use `team_id`;
     `player_id` exists only for skater assets.
+---
+
+## 2026-09-01T07:29:59Z - US-304
+- What was implemented: Added structured player-name overrides with an
+  `expected_matches` corpus guard and migrated the Draisaitl correction to require
+  exactly one raw `McDavid` row. Ignored draft-session autosaves at the ML root and
+  inside committed 2026 fixtures. Corrected README/SPEC facts for 2026 artifacts,
+  autosave clobber protection, shipped overrides, Press Play-offs IR, and ESPN live
+  favorite attribution. Aggregated unattributed odds rows into `OddsResult` and the
+  `oracle odds` guard summary.
+- Files changed:
+  - `ml/src/draft_oracle/ingest/entity_match.py`
+  - `ml/data/overrides/name_overrides.yaml`
+  - `ml/src/draft_oracle/ingest/odds.py`
+  - `ml/src/draft_oracle/cli/project.py`
+  - `ml/tests/test_entity_match.py`
+  - `ml/tests/test_odds.py`
+  - `ml/tests/test_cli.py`
+  - `ml/.gitignore`
+  - `ml/README.md`
+  - `ml/SPEC.md`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Quality checks: ML ruff clean; mypy strict clean; 735 pytest tests passed; Nx
+  affected lint/typecheck passed; web build passed; all 480 Nx unit tests passed; all
+  96 Playwright tests passed. `git check-ignore` verified both `ml/draft-session.json`
+  and `ml/artifacts/2026-r1/draft-session.json` use the intended rules.
+- Commit note: Normal pre-commit hook reached CodeScene and failed only because
+  `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was unavailable. All required checks
+  passed independently, so commit retried with `--no-verify` per Ralph policy.
+- **Learnings for future iterations:**
+  - Global raw-name overrides need an explicit corpus cardinality contract; otherwise a
+    future same-name row can silently inherit a high-confidence wrong id.
+  - `DataFrame.attrs` diagnostics must be summed before `pd.concat`; otherwise parser
+    counts can disappear even when individual parser tests stay green.
+  - Gitignore exclusions for generated files inside re-included artifact trees must
+    appear after the negation rules.
 ---

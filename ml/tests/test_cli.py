@@ -6,7 +6,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
 from typer.testing import CliRunner
 
 from draft_oracle import __version__
@@ -19,6 +21,30 @@ def test_version_command() -> None:
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
     assert __version__ in result.stdout
+
+
+def test_odds_command_reports_unattributed_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    from draft_oracle.ingest import odds as odds_module
+
+    def fake_build_odds_table(**_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            source_rows=10,
+            game_rows=5,
+            covered_rows=3,
+            uncovered_rows=2,
+            placeholder_uncovered_rows=1,
+            unattributed_uncovered_rows=7,
+            xval_flagged_rows=2,
+            unmatched_uncovered_rows=4,
+            orientation_unmatched_rows=1,
+        )
+
+    monkeypatch.setattr(odds_module, "build_odds_table", fake_build_odds_table)
+
+    result = runner.invoke(app, ["odds"])
+
+    assert result.exit_code == 0
+    assert "7 unattributed-price rows flagged" in result.stdout
 
 
 def test_draft_commands_start_without_training_or_network_stack() -> None:

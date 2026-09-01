@@ -1018,9 +1018,13 @@ def build_source_odds(archive_dir: Path = DEFAULT_ODDS_ARCHIVE_DIR) -> pd.DataFr
     placeholder_uncovered = sum(
         int(f.attrs.get("placeholder_uncovered_rows", 0)) for f in non_empty
     )
+    unattributed_uncovered = sum(
+        int(f.attrs.get("unattributed_uncovered_rows", 0)) for f in non_empty
+    )
     out = pd.concat(non_empty, ignore_index=True)
     out = out.reset_index(drop=True)
     out.attrs["placeholder_uncovered_rows"] = placeholder_uncovered
+    out.attrs["unattributed_uncovered_rows"] = unattributed_uncovered
     return out
 
 
@@ -1366,6 +1370,7 @@ class OddsResult:
     xval_flagged_rows: int = 0
     unmatched_uncovered_rows: int = 0
     orientation_unmatched_rows: int = 0
+    unattributed_uncovered_rows: int = 0
 
 
 def build_odds_table(
@@ -1408,6 +1413,9 @@ def build_odds_table(
         xval_flagged_rows=int(consolidated.attrs.get("xval_flagged_rows", 0)),
         unmatched_uncovered_rows=int(consolidated.attrs.get("unmatched_uncovered_rows", 0)),
         orientation_unmatched_rows=int(consolidated.attrs.get("orientation_unmatched_rows", 0)),
+        unattributed_uncovered_rows=int(
+            source_odds.attrs.get("unattributed_uncovered_rows", 0)
+        ),
     )
 
 
@@ -1641,8 +1649,10 @@ ESPN_SUMMARY_BASE = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl"
 class EspnGameOddsClient:
     """ESPN public ``summary`` endpoint client for a single future game.
 
-    Reads the ``pickcenter`` block (favorite moneyline + home-relative spread,
-    PROVENANCE §9). Favorite-only, so de-vigged with the standard-overround
+    Reads the ``pickcenter`` block's favorite moneyline. Unlike the committed
+    completion parser, live favorite attribution is inferred from the
+    home-relative spread because raw summary-side favorite flags are not retained
+    by this client. Favorite-only, so de-vigged with the standard-overround
     approximation. Caching/rate-limiting mirror :class:`NHLApiClient`; ESPN 403s
     browser-like User-Agents, so the default httpx UA is used. No key required.
     """

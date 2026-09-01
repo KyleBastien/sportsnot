@@ -123,6 +123,23 @@ def test_load_name_overrides_normalizes_keys(tmp_path: Path) -> None:
     assert ov.teams["montrealcanadiens"] == 8
 
 
+def test_load_name_overrides_reads_expected_match_guard(tmp_path: Path) -> None:
+    path = tmp_path / "ov.yaml"
+    path.write_text(
+        "players:\n"
+        "  McDavid:\n"
+        "    player_id: 8477934\n"
+        "    expected_matches: 1\n"
+        "teams: {}\n",
+        encoding="utf-8",
+    )
+
+    ov = load_name_overrides(path)
+
+    assert ov.players["mcdavid"] == 8477934
+    assert ov.player_expected_matches == {"mcdavid": 1}
+
+
 def test_load_name_overrides_missing_file_is_empty(tmp_path: Path) -> None:
     ov = load_name_overrides(tmp_path / "absent.yaml")
     assert ov == NameOverrides()
@@ -448,7 +465,12 @@ def test_build_league_draft_picks_override_closes_gap(tmp_path: Path) -> None:
     )
     _write_manager_aliases(tmp_path / "manager_aliases.yaml")
     (tmp_path / "name_overrides.yaml").write_text(
-        "players:\n  'Mystery Man': 8478402\nteams: {}\n", encoding="utf-8"
+        "players:\n"
+        "  'Mystery Man':\n"
+        "    player_id: 8478402\n"
+        "    expected_matches: 1\n"
+        "teams: {}\n",
+        encoding="utf-8",
     )
 
     result = build_league_draft_picks(
@@ -457,6 +479,39 @@ def test_build_league_draft_picks_override_closes_gap(tmp_path: Path) -> None:
     assert result.matched == 1
     assert result.picks.iloc[0]["player_id"] == 8478402
     assert result.picks.iloc[0]["match_method"] == "override"
+
+
+def test_name_override_expected_match_guard_rejects_second_raw_name(
+    tmp_path: Path,
+) -> None:
+    normalized = tmp_path / "normalized"
+    _write_normalized(normalized)
+    pd.DataFrame(
+        [
+            _league_pick(manager="ben", player_or_team_name="McDavid"),
+            _league_pick(
+                manager="levi",
+                slot_label="Forward 2",
+                player_or_team_name="McDavid",
+            ),
+        ]
+    ).to_parquet(normalized / "league_picks.parquet", index=False)
+    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
+    (tmp_path / "name_overrides.yaml").write_text(
+        "players:\n"
+        "  McDavid:\n"
+        "    player_id: 8477934\n"
+        "    expected_matches: 1\n"
+        "teams: {}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"expected 1 league-pick match.*found 2"):
+        build_league_draft_picks(
+            normalized_dir=normalized,
+            overrides_dir=tmp_path,
+            out_dir=tmp_path / "out",
+        )
 
 
 def test_point_split_crosscheck_flags_wrong_2024_mcdavid_match(tmp_path: Path) -> None:

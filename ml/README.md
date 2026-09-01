@@ -63,9 +63,9 @@ All commands run from the `ml/` directory.
 | Batch projection| `uv run oracle project --season 2026 --round 1` |
 | Projection + IR | `uv run oracle project --season 2026 --round 1 --managers 4 --ir` |
 | Slot strategies | `uv run oracle project --season 2026 --round 1 --managers 12` (emits `slot_strategies.md`) |
-| Recommend pick  | `uv run oracle recommend --artifact-dir artifacts/2025-r1 --managers 6 --seat 3` |
+| Recommend pick  | `uv run oracle recommend --artifact-dir artifacts/2026-r1 --managers 6 --seat 3` |
 | Compare drafters| `uv run oracle compare-strategies`       |
-| Draft assistant | `uv run oracle draft --artifact artifacts/2025-r1 --managers 4 --slot 1 [--ir]` |
+| Draft assistant | `uv run oracle draft --artifact artifacts/2026-r1 --managers 4 --slot 1 [--ir]` |
 | Backtest replay | `uv run oracle backtest --seasons 2022` |
 
 Most tests use self-contained fixtures. Real-data regression tests skip when generated
@@ -266,9 +266,10 @@ sources leave the underdog `null`), `favorite_side`, `both_sides`, `covered`,
   headers are captured on the client. Caching + rate-limiting mirror the NHL API
   client, so repeated calls reuse the on-disk cache.
 - `EspnGameOddsClient` — ESPN's public `summary` endpoint (`pickcenter` block,
-  favorite-only) for individual future games; the same source as the committed
-  2025-26 completion, so semantics match. ESPN 403s browser-like User-Agents, so
-  the default httpx UA is used.
+  favorite-only) for individual future games. It infers the favorite from the
+  home-relative spread; unlike the committed completion parser, it does not use
+  retained per-side favorite flags. ESPN 403s browser-like User-Agents, so the
+  default httpx UA is used.
 
 ## League drafts (`ingest/league_drafts.py`)
 
@@ -354,8 +355,9 @@ uv run oracle match-drafts     # build data/normalized/league_draft_picks.parque
 - `name_overrides.yaml` — `players`/`teams` maps of raw name → id for anything
   the matcher misses. Overrides take precedence. Per the honesty rule (SPEC §7),
   gaps are closed by **adding overrides, never by dropping rows or lowering the
-  bar**. The committed 2024–2026 snapshots match at **100%** via fuzzy matching,
-  so both maps ship empty.
+  bar**. The shipped player override corrects the 2024 R3+4 bare `McDavid` row to
+  Leon Draisaitl and declares `expected_matches: 1`; `match-drafts` fails loudly
+  if future input changes that match count.
 
 **`league_draft_picks` table** — the `league_picks` provenance (season, source,
 draft_event, manager, snake_slot, pick_number, position, slot_label, points
@@ -801,7 +803,7 @@ that will, times a goalie slot correctly, and respects forced picks.
   turns are simulated against live opponents before a fast greedy tail fill.
 
 ```
-uv run oracle recommend --artifact-dir artifacts/2025-r1 --managers 6 --seat 3
+uv run oracle recommend --artifact-dir artifacts/2026-r1 --managers 6 --seat 3
 uv run oracle recommend ... --rollouts 800 --depth 2   # tune accuracy/speed
 uv run oracle recommend ... --managers ben,judah,levi,kyle --opponents fitted  # real seats
 ```
@@ -868,10 +870,10 @@ projection artifact: no network, no model training at draft time. Every valuatio
 routes through the US-021 recommender and the rules-enforcing simulator.
 
 ```
-uv run oracle draft --artifact artifacts/2025-r1 --managers 4 --slot 1        # start
-uv run oracle draft --artifact artifacts/2025-r1 --managers 4 --slot 2 --ir   # IR league
-uv run oracle draft --artifact artifacts/2025-r1 --managers ben,judah,levi,kyle --slot 1  # fitted seats
-uv run oracle draft --resume artifacts/2025-r1/draft-session.json             # resume a log
+uv run oracle draft --artifact artifacts/2026-r1 --managers 4 --slot 1        # start
+uv run oracle draft --artifact artifacts/2026-r1 --managers 4 --slot 2 --ir   # IR league
+uv run oracle draft --artifact artifacts/2026-r1 --managers ben,judah,levi,kyle --slot 1  # fitted seats
+uv run oracle draft --resume draft-session.json                               # resume a log
 ```
 
 Session commands:
@@ -890,8 +892,9 @@ Illegal actions are rejected **with the reason** — not your turn, already draf
 position full, or on an eliminated team (`--eliminated ABC,DEF`). `recommend` returns
 in under 10 s at any state with full-depth rollouts (under 5 s with `--depth 1`). The
 session autosaves to a replayable JSON log after every pick (default
-`<artifact>/draft-session.json`, override with `--session`), so a draft can be
-replayed for post-hoc analysis.
+`./draft-session.json`, override with `--session`), so a draft can be replayed
+for post-hoc analysis. Starting a new session refuses to overwrite an existing
+log; use `--resume` or choose a different `--session` path.
 
 ## Backtest replay engine (`backtest/replay.py`)
 

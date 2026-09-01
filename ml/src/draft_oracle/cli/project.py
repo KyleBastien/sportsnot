@@ -135,6 +135,7 @@ def odds(
     typer.echo(f"  priced: {result.covered_rows}  flagged: {result.uncovered_rows}")
     typer.echo(
         f"  guards: {result.placeholder_uncovered_rows} placeholder rows rejected, "
+        f"{result.unattributed_uncovered_rows} unattributed-price rows flagged, "
         f"{result.xval_flagged_rows} cross-source-disagreement rows flagged, "
         f"{result.unmatched_uncovered_rows} archive-unjoinable rows excluded "
         f"({result.orientation_unmatched_rows} reversed-orientation)"

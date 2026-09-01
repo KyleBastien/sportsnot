@@ -38,6 +38,10 @@ artifacts/models/*
 !artifacts/models/*/report.md
 !artifacts/models/*/manifest.json
 
+# Draft-night autosave logs are local state, including inside committed fixtures.
+draft-session.json
+artifacts/2026-r*/draft-session.json
+
 # Secrets / env
 .env
 .env.*

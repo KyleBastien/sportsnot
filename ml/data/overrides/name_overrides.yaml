@@ -5,7 +5,9 @@
 # Overrides take precedence over exact/fuzzy matching.
 #
 # `players`: raw draft name (as it appears in the sheet/app export) -> NHL
-#   player_id (an integer from `players.parquet`). Used for F/D/IR skater slots.
+#   player_id (an integer from `players.parquet`). A mapping may also declare
+#   `expected_matches`; match-drafts then fails if corpus row count changes.
+#   Used for F/D/IR skater slots.
 # `teams`: raw team/goalie name -> NHL team_id (an integer from `teams.parquet`).
 #   Used for goalie/team slots.
 #
@@ -17,5 +19,7 @@
 # raw sheet and correct the entity here.
 
 players:
-  McDavid: 8477934
+  McDavid:
+    player_id: 8477934
+    expected_matches: 1
 teams: {}

@@ -41,7 +41,8 @@ in the sheets was a one-time favor). The simulator and optimizer must never assu
 - Sheet-era seasons (2024, 2025, 2026 drafts) have **three draft events**: R1, R2, and
   R3+4 combined. The app era has four. Sheet rows are **not** in pick order —
   `pick_number` exists only in the 2026 app export.
-- IR slots: used in 2025, disabled for 2026.
+- IR slots: used in 2025. For 2026, Gemmell Cup disables IR; Press Play-offs
+  enables IR and drafts 11 picks per manager.
 - All sheet-era source data, its schema, and every known data correction live in
   `ml/data/raw/league-drafts/` (`SCHEMA.md`, `OPEN_QUESTIONS.md`, `APP_EXPORT.md`).
   Read those before touching parsing code (story US-006/US-007).

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -151,6 +152,31 @@ class NameOverrides:
 
     players: dict[str, int] = field(default_factory=dict)
     teams: dict[str, int] = field(default_factory=dict)
+    player_expected_matches: dict[str, int] = field(default_factory=dict)
+
+
+def _load_override_section(
+    raw_section: Mapping[str, Any], *, id_key: str
+) -> tuple[dict[str, int], dict[str, int]]:
+    ids: dict[str, int] = {}
+    expected_matches: dict[str, int] = {}
+    for raw_name, value in raw_section.items():
+        name = normalize_name(raw_name)
+        if isinstance(value, Mapping):
+            if id_key not in value:
+                raise ValueError(f"name override {raw_name!r} is missing {id_key!r}")
+            ids[name] = int(value[id_key])
+            expected = value.get("expected_matches")
+            if expected is not None:
+                count = int(expected)
+                if count < 1:
+                    raise ValueError(
+                        f"name override {raw_name!r} expected_matches must be >= 1"
+                    )
+                expected_matches[name] = count
+        else:
+            ids[name] = int(value)
+    return ids, expected_matches
 
 
 def load_name_overrides(
@@ -164,9 +190,39 @@ def load_name_overrides(
     if not path.exists():
         return NameOverrides()
     raw: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    players = {normalize_name(k): int(v) for k, v in (raw.get("players") or {}).items()}
-    teams = {normalize_name(k): int(v) for k, v in (raw.get("teams") or {}).items()}
-    return NameOverrides(players=players, teams=teams)
+    players, player_expected_matches = _load_override_section(
+        raw.get("players") or {}, id_key="player_id"
+    )
+    teams, _team_expected_matches = _load_override_section(
+        raw.get("teams") or {}, id_key="team_id"
+    )
+    return NameOverrides(
+        players=players,
+        teams=teams,
+        player_expected_matches=player_expected_matches,
+    )
+
+
+def _validate_player_override_match_counts(
+    league_picks: pd.DataFrame, overrides: NameOverrides
+) -> None:
+    """Fail when a guarded raw-name override matches an unexpected row count."""
+    if not overrides.player_expected_matches:
+        return
+    actual = dict.fromkeys(overrides.player_expected_matches, 0)
+    for row in league_picks.itertuples(index=False):
+        if str(row.position) not in _SKATER_POSITIONS:
+            continue
+        key = normalize_name(str(row.player_or_team_name))
+        if key in actual:
+            actual[key] += 1
+    for key, expected in overrides.player_expected_matches.items():
+        observed = actual[key]
+        if observed != expected:
+            raise ValueError(
+                f"name override {key!r} expected {expected} league-pick match(es), "
+                f"found {observed}"
+            )
 
 
 # ── Team-id resolution (extends odds.resolve_team_id with nicknames) ──────
@@ -606,6 +662,7 @@ def build_league_draft_picks(
     index = build_player_index(players)
     manager_aliases = load_manager_aliases(overrides_dir / "manager_aliases.yaml")
     overrides = load_name_overrides(overrides_dir / "name_overrides.yaml")
+    _validate_player_override_match_counts(league_picks, overrides)
     archive_points = _archive_round_points(skater_games)
 
     team_names: dict[int, str] = {

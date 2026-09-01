@@ -82,8 +82,8 @@
     "All Playwright tests pass (even if it's outside of your changes)"
    ],
    "priority": 4,
-   "passes": false,
-   "notes": ""
+   "passes": true,
+   "notes": "Name overrides now support expected-match guards; draft autosaves are ignored; docs reflect current fixtures, IR, and session safety; odds unattributed rows are surfaced through OddsResult and CLI."
   },
   {
    "id": "US-305",

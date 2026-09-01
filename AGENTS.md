@@ -267,6 +267,8 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
 - League entity matching requires `skater_games.parquet` as well as the pick/player/team
   tables. Scored sheet matches are review-flagged when all three exact integer point
   splits disagree with the NHL archive; goalie/team rows skip this skater-points check.
+  Guard globally keyed player-name overrides with `expected_matches` in
+  `name_overrides.yaml`; `match-drafts` must fail if the raw-name corpus count changes.
   Duplicate asset ownership is scoped by `(league_name, season, draft_event)`, keyed by
   `player_id` for skaters and `team_id` for goalie/team slots, and ignores same-manager
   source copies.

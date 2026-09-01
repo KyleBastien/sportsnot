@@ -1280,6 +1280,39 @@ def test_build_odds_table_writes_parquet(tmp_path: Path) -> None:
     assert loaded.iloc[0]["home_team_id"] == resolve_team_id("Ottawa")
 
 
+def test_build_odds_table_reports_unattributed_rows(tmp_path: Path) -> None:
+    archive = tmp_path / "odds-archive"
+    completion = archive / "espn-2025-26-completion"
+    completion.mkdir(parents=True)
+    frame = _favorite_csv(
+        [
+            {
+                "game_id": 401874176,
+                "date": "2026-06-15 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Vegas Golden Knights",
+                "is_home": 1,
+                "spread": float("nan"),
+                "favorite_moneyline": -115,
+            },
+            {
+                "game_id": 401874176,
+                "date": "2026-06-15 00:00:00+00:00",
+                "season": 2026,
+                "team_name": "Carolina Hurricanes",
+                "is_home": 0,
+                "spread": float("nan"),
+                "favorite_moneyline": -115,
+            },
+        ]
+    )
+    frame.to_csv(completion / "games.csv", index=False)
+
+    result = build_odds_table(archive_dir=archive, out_dir=tmp_path / "normalized")
+
+    assert result.unattributed_uncovered_rows == 1
+
+
 # ── Live: The Odds API (MockTransport, no network) ───────────────────────
 
 
