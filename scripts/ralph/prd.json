@@ -103,8 +103,8 @@
     "All Playwright tests pass (even if it's outside of your changes)"
    ],
    "priority": 5,
-   "passes": false,
-   "notes": ""
+   "passes": true,
+   "notes": "Regenerated all four 2026 projection fixtures, all eight model artifacts, and both backtests from clean SHA 6f56cf8 at fixed seed; honest metrics and draft-board movement are committed, and all structural and project quality suites pass."
   }
  ]
 }

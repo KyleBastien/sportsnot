@@ -243,6 +243,8 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
 - Committed projection CSV/parquet twins must contain the same ordered rows and
   columns. Compare them with blank-string/null normalization and a `1e-12` float
   tolerance in `test_committed_projection_artifacts.py`.
+- Combined-event manifest components are independently serialized to six decimal
+  places. Formula decomposition assertions need `3e-6` absolute tolerance.
 - Keep imports in `draft_oracle.cli.project` lightweight. Import training and HTTP
   modules inside command bodies so draft-time commands start without LightGBM,
   scikit-learn, or httpx. Keep `draft_oracle.optimize` package re-exports lazy and

@@ -30,6 +30,8 @@ Started: 2026-09-01 (round-4 final fix round from ml/CODE_REVIEW_R3.md; prior lo
 - Committed projection artifacts ship CSV/parquet twins. Structural tests must compare
   ordered rows and columns after blank-string/null normalization, with `1e-12` relative
   and absolute float tolerance for CSV round trips.
+- Combined-event manifest components are independently serialized to six decimal
+  places; formula decomposition tests need `3e-6` absolute tolerance.
 - Odds source cross-validation must compare one consistent side (`home_implied`), not
   each source's favorite-probability magnitude. Game-type lookup may index both
   orientations, but market joins are orientation-specific; reverse-only archive matches
@@ -910,4 +912,57 @@ Started: 2026-09-01 (round-4 final fix round from ml/CODE_REVIEW_R3.md; prior lo
     counts can disappear even when individual parser tests stay green.
   - Gitignore exclusions for generated files inside re-included artifact trees must
     appear after the negation rules.
+---
+
+## 2026-09-01T04:29:56-07:00 - US-305
+- What was implemented: Regenerated the `2026-r1` through `2026-r4` projection
+  fixtures, all eight model evidence manifests/reports, and both committed backtests
+  from clean detached SHA `6f56cf8d69647135ce0a4b0e58c272b994b34008` with pinned
+  seed `20260827`. Every regenerated manifest reports that SHA with
+  `git_dirty=false`. Added a draft-board regression and widened only the combined-
+  event decomposition tolerance for independently rounded six-decimal components.
+  Reproduced R4 end to end: CSV, parquet, and cheatsheet bytes matched; manifest
+  differed only by generation timestamp.
+- Honest metric movement:
+  - Shutout rows moved from `8958/1238/2432` to `9696/1319/2626` across
+    train/validation/test. Model Brier improved `0.098091` to `0.092262`; baseline
+    improved `0.097892` to `0.092105`, so model remains slightly worse than baseline.
+  - Series-sim Brier improved `0.230753` to `0.229047`; predicted round 1-4 shutouts
+    moved from `9.9856/4.9186/2.4257/1.1899` to
+    `9.3929/4.6407/2.2765/1.1291`. Game-win metrics stayed numerically unchanged.
+  - Skater projection MAE moved `1.375097` to `1.375668`; Spearman moved
+    `0.592939` to `0.592667`.
+  - Maximum projection deltas for R1/R2/R3/R4 were series-win probability
+    `0.088500/0.078682/0.038237/0.002463`, goalie points
+    `0.526309/0.560418/0.552222/0.050196`, and skater points
+    `0.08425/0.093/0.237/0.0025`. R1 rank 4 changed from goalie COL to D Evan
+    Bouchard; goalie COL moved to rank 5. Goalie replacement value moved `6.71` to
+    `6.89`; best slot moved 1 to 4.
+  - 2026 backtest projection MAE moved `1.646` to `1.651`, Spearman `0.491` to
+    `0.490`, goalie MAE `3.160` to `3.232`, goalie Spearman `0.329` to `0.331`, and
+    stats-only series Brier `0.2224` to `0.2241`; market Brier stayed `0.2339`.
+    Oracle league means moved R1 `53.75` to `53.875`, R2 `66.50` to `66.25`, and
+    R3_4 `36.03125` to `32.96875`; best scores moved `55/72/54` to `55/68/54`.
+    Historical 2023-2025 oracle comparisons also moved and are recorded verbatim in
+    the regenerated report; actual league totals stayed unchanged.
+- Files changed: `ml/artifacts/2026-r1..r4`, `ml/artifacts/models/*`, both committed
+  `ml/artifacts/backtests/*` evidence directories,
+  `ml/tests/test_committed_projection_artifacts.py`, `AGENTS.md`,
+  `scripts/ralph/prd.json`, and `scripts/ralph/progress.txt`.
+- Quality checks: ML ruff clean; strict mypy clean; 736 ML pytest tests passed; all
+  45 committed-evidence structural tests passed; Nx affected lint/typecheck passed;
+  web build passed; all nine Nx unit-test targets passed; all 96 Playwright tests
+  passed. Initial Nx E2E launch hit the documented Windows `ERR_CONNECTION_REFUSED`
+  race; explicit static-server readiness followed by direct Playwright succeeded.
+- Commit note: Normal pre-commit hook passed all runnable affected lint, typecheck,
+  and test steps, then failed only because `CODESCENE_PAT` /
+  `CODESCENE_ACCESS_TOKEN` was unavailable. All required checks passed independently,
+  so commit retried with `--no-verify` per Ralph policy.
+- **Learnings for future iterations:**
+  - Provenance requires both clean worktree and process CWD inside it; external output
+    preserves cleanliness across sequential artifact generation.
+  - Six-decimal serialized components can accumulate nearly `3e-6` decomposition
+    error even when each input is correct.
+  - Evidence regeneration can honestly improve calibration while degrading downstream
+    fantasy projections; preserve fixed configs and report both directions.
 ---

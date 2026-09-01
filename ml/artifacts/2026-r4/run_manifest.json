@@ -13,9 +13,9 @@
     "VGK"
   ],
   "feature_version": "skater-v1",
-  "generated_at": "2026-08-30T16:38:53.482862+00:00",
+  "generated_at": "2026-09-01T07:38:16.243283+00:00",
   "git_dirty": false,
-  "git_sha": "8000f5bc02872032833dd93c2775421c4e08151b",
+  "git_sha": "6f56cf8d69647135ce0a4b0e58c272b994b34008",
   "ir_stash": {
     "candidates": 0,
     "enabled": false,
@@ -35,8 +35,8 @@
     "ir": false,
     "managers": 4,
     "replacement_level": {
-      "D": 1.39775,
-      "F": 2.2475,
+      "D": 1.39875,
+      "F": 2.248,
       "G": 0.0
     },
     "roster_demand": {
@@ -53,7 +53,5 @@
   },
   "slot_strategies": null,
   "snapshot_id": "live-44src-12769611b",
-  "warnings": [
-    "slot strategies skipped: pool too small to fill every roster (have F37/D20/G2, need F20/D12/G4)"
-  ]
+  "warnings": []
 }

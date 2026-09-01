@@ -16,7 +16,7 @@ win replaces a normal win: 4 pts vs 2).
 
 ## Series-winner calibration (held out)
 Brier score for P(higher seed wins the series), lower is better:
-- series simulator:        0.2308
+- series simulator:        0.2290
 - baseline higher seed=1:  0.5000
 - baseline coin flip=0.5:  0.2500
 - Beats higher-seed baseline: yes
@@ -25,25 +25,25 @@ Brier score for P(higher seed wins the series), lower is better:
 ### Reliability bins (predicted P(higher seed wins) -> observed)
 | predicted range | n | mean predicted | observed |
 | --- | --- | --- | --- |
-| 0.40-0.60 | 13 | 0.526 | 0.231 |
-| 0.60-0.80 | 16 | 0.674 | 0.688 |
-| 0.80-1.00 | 1 | 0.811 | 1.000 |
+| 0.40-0.60 | 14 | 0.517 | 0.214 |
+| 0.60-0.80 | 15 | 0.655 | 0.733 |
+| 0.80-1.00 | 1 | 0.817 | 1.000 |
 
 ## Series-length distribution: predicted vs. observed
 | games | predicted | observed |
 | --- | --- | --- |
-| 4 | 0.140 | 0.133 |
-| 5 | 0.259 | 0.300 |
-| 6 | 0.306 | 0.400 |
-| 7 | 0.295 | 0.167 |
+| 4 | 0.137 | 0.133 |
+| 5 | 0.258 | 0.300 |
+| 6 | 0.307 | 0.400 |
+| 7 | 0.298 | 0.167 |
 
 ## Shutouts per playoff round: predicted E[shutouts] vs. observed
 | round | predicted | observed |
 | --- | --- | --- |
-| 1 | 9.99 | 7 |
-| 2 | 4.92 | 8 |
-| 3 | 2.43 | 4 |
-| 4 | 1.19 | 1 |
+| 1 | 9.39 | 7 |
+| 2 | 4.64 | 8 |
+| 3 | 2.28 | 4 |
+| 4 | 1.13 | 1 |
 
 ## Honesty note (SPEC section 7)
 Metrics are reported exactly as measured. With ~40 playoff series held out the

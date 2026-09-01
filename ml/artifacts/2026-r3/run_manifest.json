@@ -10,31 +10,31 @@
     ],
     "teams": [
       {
-        "e_goalie_points_combined": 12.200249,
-        "e_goalie_points_r3": 7.402427,
-        "e_goalie_points_r4": 6.947272,
-        "p_advance": 0.690605,
+        "e_goalie_points_combined": 11.648027,
+        "e_goalie_points_r3": 7.177916,
+        "e_goalie_points_r4": 6.85213,
+        "p_advance": 0.652368,
         "team_abbrev": "CAR"
       },
       {
-        "e_goalie_points_combined": 7.001489,
-        "e_goalie_points_r3": 5.177872,
-        "e_goalie_points_r4": 5.894142,
-        "p_advance": 0.309395,
+        "e_goalie_points_combined": 7.490786,
+        "e_goalie_points_r3": 5.400266,
+        "e_goalie_points_r4": 6.0136,
+        "p_advance": 0.347632,
         "team_abbrev": "MTL"
       },
       {
-        "e_goalie_points_combined": 12.420671,
-        "e_goalie_points_r3": 7.718985,
-        "e_goalie_points_r4": 6.538812,
-        "p_advance": 0.719043,
+        "e_goalie_points_combined": 12.39826,
+        "e_goalie_points_r3": 7.670584,
+        "e_goalie_points_r4": 6.535621,
+        "p_advance": 0.723371,
         "team_abbrev": "COL"
       },
       {
-        "e_goalie_points_combined": 6.348534,
-        "e_goalie_points_r3": 4.938818,
-        "e_goalie_points_r4": 5.017548,
-        "p_advance": 0.280957,
+        "e_goalie_points_combined": 6.251687,
+        "e_goalie_points_r3": 4.871973,
+        "e_goalie_points_r4": 4.987589,
+        "p_advance": 0.276629,
         "team_abbrev": "VGK"
       }
     ]
@@ -52,9 +52,9 @@
     "VGK"
   ],
   "feature_version": "skater-v1",
-  "generated_at": "2026-08-30T16:38:34.462297+00:00",
+  "generated_at": "2026-09-01T07:37:43.346076+00:00",
   "git_dirty": false,
-  "git_sha": "8000f5bc02872032833dd93c2775421c4e08151b",
+  "git_sha": "6f56cf8d69647135ce0a4b0e58c272b994b34008",
   "ir_stash": {
     "candidates": 0,
     "enabled": false,
@@ -74,8 +74,8 @@
     "ir": false,
     "managers": 4,
     "replacement_level": {
-      "D": 2.99975,
-      "F": 5.086,
+      "D": 2.99825,
+      "F": 5.0855,
       "G": 0.0
     },
     "roster_demand": {
@@ -91,7 +91,7 @@
     "n_sims": 4000
   },
   "slot_strategies": {
-    "best_slot": 3,
+    "best_slot": 1,
     "fitted_opponents": false,
     "ir": false,
     "managers": 4,
@@ -113,7 +113,7 @@
           32,
           33
         ],
-        "projected_total": 60.101921,
+        "projected_total": 60.17501,
         "slot": 1
       },
       {
@@ -129,7 +129,7 @@
           31,
           34
         ],
-        "projected_total": 59.324921,
+        "projected_total": 59.16226,
         "slot": 2
       },
       {
@@ -145,7 +145,7 @@
           30,
           35
         ],
-        "projected_total": 60.153249,
+        "projected_total": 58.73576,
         "slot": 3
       },
       {
@@ -161,7 +161,7 @@
           29,
           36
         ],
-        "projected_total": 57.981671,
+        "projected_total": 57.49376,
         "slot": 4
       }
     ]

@@ -27,9 +27,9 @@
     "VGK"
   ],
   "feature_version": "skater-v1",
-  "generated_at": "2026-08-30T16:37:46.174826+00:00",
+  "generated_at": "2026-09-01T07:36:38.881964+00:00",
   "git_dirty": false,
-  "git_sha": "8000f5bc02872032833dd93c2775421c4e08151b",
+  "git_sha": "6f56cf8d69647135ce0a4b0e58c272b994b34008",
   "ir_stash": {
     "candidates": 0,
     "enabled": false,
@@ -49,9 +49,9 @@
     "ir": false,
     "managers": 4,
     "replacement_level": {
-      "D": 3.63125,
+      "D": 3.67,
       "F": 4.783,
-      "G": 6.707952353820153
+      "G": 6.887019667496585
     },
     "roster_demand": {
       "defense_per_manager": 3,
@@ -66,7 +66,7 @@
     "n_sims": 4000
   },
   "slot_strategies": {
-    "best_slot": 1,
+    "best_slot": 4,
     "fitted_opponents": false,
     "ir": false,
     "managers": 4,
@@ -88,7 +88,7 @@
           32,
           33
         ],
-        "projected_total": 49.516177,
+        "projected_total": 48.867697,
         "slot": 1
       },
       {
@@ -104,7 +104,7 @@
           31,
           34
         ],
-        "projected_total": 49.099927,
+        "projected_total": 48.757697,
         "slot": 2
       },
       {
@@ -120,11 +120,11 @@
           30,
           35
         ],
-        "projected_total": 48.801677,
+        "projected_total": 48.718059,
         "slot": 3
       },
       {
-        "first_pick": "Nathan MacKinnon",
+        "first_pick": "COL",
         "pick_numbers": [
           4,
           5,
@@ -136,7 +136,7 @@
           29,
           36
         ],
-        "projected_total": 49.161427,
+        "projected_total": 49.045809,
         "slot": 4
       }
     ]

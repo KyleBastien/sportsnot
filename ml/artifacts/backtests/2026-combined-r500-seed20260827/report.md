@@ -1,7 +1,7 @@
 # Backtest report — run `2026-combined-r500-seed20260827`
 
 - Package version: 0.1.0
-- Generated: 2026-08-31T21:03:32.996681+00:00
+- Generated: 2026-09-01T11:22:22.608409+00:00
 - Seasons: 2026
 - Rounds replayed: 3
 - League size: 4 managers; IR slots: False
@@ -18,8 +18,8 @@ MAE is mean absolute error of projected vs. actual round fantasy points (lower i
 
 | Season | Skaters n | Skater MAE | Skater rho | Teams n | Team MAE | Team rho |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026 | 808 | 1.646 | 0.491 | 28 | 3.160 | 0.329 |
-| ALL | 808 | 1.646 | 0.491 | 28 | 3.160 | 0.329 |
+| 2026 | 808 | 1.651 | 0.490 | 28 | 3.232 | 0.331 |
+| ALL | 808 | 1.651 | 0.490 | 28 | 3.232 | 0.331 |
 
 ## Series-model calibration (Brier score, lower is better)
 
@@ -27,8 +27,8 @@ Track 1 — **stat-only** (the probabilities the projection artifact actually dr
 
 | Season | Series n | Series model | Higher seed=1 | Coin flip=0.5 |
 | --- | --- | --- | --- | --- |
-| 2026 | 14 | 0.2224 | 0.4286 | 0.2500 |
-| ALL | 14 | 0.2224 | 0.4286 | 0.2500 |
+| 2026 | 14 | 0.2241 | 0.4286 | 0.2500 |
+| ALL | 14 | 0.2241 | 0.4286 | 0.2500 |
 
 Aggregate stat-only series model beats both baselines: **True**.
 
@@ -47,10 +47,10 @@ Mean actual roster points and win rate (fraction of drafts where the roster stri
 
 | Strategy | Drafts | Mean points | Win rate |
 | --- | --- | --- | --- |
-| oracle | 96 | 52.09 | 77.1% |
-| greedy_vor | 96 | 50.41 | 75.0% |
-| one_step | 96 | 51.17 | 72.9% |
-| random_legal | 96 | 19.90 | 19.8% |
+| oracle | 96 | 51.03 | 75.0% |
+| greedy_vor | 96 | 50.88 | 75.0% |
+| one_step | 96 | 51.00 | 74.0% |
+| random_legal | 96 | 20.42 | 18.8% |
 
 Oracle mean-points beats: greedy_vor, one_step, random_legal.
 
@@ -58,10 +58,10 @@ Oracle mean-points beats: greedy_vor, one_step, random_legal.
 
 | Seat | Drafts | Mean points | Win rate |
 | --- | --- | --- | --- |
-| 1 | 24 | 52.17 | 83.3% |
-| 2 | 24 | 52.83 | 75.0% |
-| 3 | 24 | 52.79 | 79.2% |
-| 4 | 24 | 50.58 | 70.8% |
+| 1 | 24 | 50.00 | 75.0% |
+| 2 | 24 | 50.83 | 79.2% |
+| 3 | 24 | 52.33 | 75.0% |
+| 4 | 24 | 50.96 | 70.8% |
 
 ## League comparison
 
@@ -69,12 +69,12 @@ Where a backtested season overlaps the league's real drafts, the oracle's simula
 
 | Season | League | Round | Oracle mean | Oracle best | League mean | League best |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026 | Press Play-offs | r1 (R1) | 53.75 | 55.00 | 49.50 | 59.00 |
-| 2026 | The Gemmell Cup | r1 (R1) | 53.75 | 55.00 | 49.25 | 56.00 |
-| 2026 | Press Play-offs | r2 (R2) | 66.50 | 72.00 | 43.50 | 49.00 |
-| 2026 | The Gemmell Cup | r2 (R2) | 66.50 | 72.00 | 42.50 | 47.00 |
-| 2026 | Press Play-offs | r3 (R3_4) | 36.03 | 54.00 | 38.25 | 62.00 |
-| 2026 | The Gemmell Cup | r3 (R3_4) | 36.03 | 54.00 | 35.50 | 74.00 |
+| 2026 | Press Play-offs | r1 (R1) | 53.88 | 55.00 | 49.50 | 59.00 |
+| 2026 | The Gemmell Cup | r1 (R1) | 53.88 | 55.00 | 49.25 | 56.00 |
+| 2026 | Press Play-offs | r2 (R2) | 66.25 | 68.00 | 43.50 | 49.00 |
+| 2026 | The Gemmell Cup | r2 (R2) | 66.25 | 68.00 | 42.50 | 47.00 |
+| 2026 | Press Play-offs | r3 (R3_4) | 32.97 | 54.00 | 38.25 | 62.00 |
+| 2026 | The Gemmell Cup | r3 (R3_4) | 32.97 | 54.00 | 35.50 | 74.00 |
 
 ### Real league rosters (actual points)
 

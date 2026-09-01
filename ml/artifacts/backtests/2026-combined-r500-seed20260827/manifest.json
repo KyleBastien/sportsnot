@@ -4,7 +4,7 @@
   "seasons": [
     2026
   ],
-  "generated_at": "2026-08-31T21:03:32.996681+00:00",
+  "generated_at": "2026-09-01T11:22:22.608409+00:00",
   "config": {
     "seed": 20260827,
     "managers": 4,
@@ -56,7 +56,7 @@
       "playoff_round": 1,
       "draft_event": "R1",
       "league_name": "Press Play-offs",
-      "oracle_mean_points": 53.75,
+      "oracle_mean_points": 53.875,
       "oracle_best_points": 55.0,
       "league_mean_points": 49.5,
       "league_best_points": 59.0,
@@ -84,7 +84,7 @@
       "playoff_round": 1,
       "draft_event": "R1",
       "league_name": "The Gemmell Cup",
-      "oracle_mean_points": 53.75,
+      "oracle_mean_points": 53.875,
       "oracle_best_points": 55.0,
       "league_mean_points": 49.25,
       "league_best_points": 56.0,
@@ -112,8 +112,8 @@
       "playoff_round": 2,
       "draft_event": "R2",
       "league_name": "Press Play-offs",
-      "oracle_mean_points": 66.5,
-      "oracle_best_points": 72.0,
+      "oracle_mean_points": 66.25,
+      "oracle_best_points": 68.0,
       "league_mean_points": 43.5,
       "league_best_points": 49.0,
       "managers": [
@@ -140,8 +140,8 @@
       "playoff_round": 2,
       "draft_event": "R2",
       "league_name": "The Gemmell Cup",
-      "oracle_mean_points": 66.5,
-      "oracle_best_points": 72.0,
+      "oracle_mean_points": 66.25,
+      "oracle_best_points": 68.0,
       "league_mean_points": 42.5,
       "league_best_points": 47.0,
       "managers": [
@@ -168,7 +168,7 @@
       "playoff_round": 3,
       "draft_event": "R3_4",
       "league_name": "Press Play-offs",
-      "oracle_mean_points": 36.03125,
+      "oracle_mean_points": 32.96875,
       "oracle_best_points": 54.0,
       "league_mean_points": 38.25,
       "league_best_points": 62.0,
@@ -196,7 +196,7 @@
       "playoff_round": 3,
       "draft_event": "R3_4",
       "league_name": "The Gemmell Cup",
-      "oracle_mean_points": 36.03125,
+      "oracle_mean_points": 32.96875,
       "oracle_best_points": 54.0,
       "league_mean_points": 35.5,
       "league_best_points": 74.0,
@@ -221,6 +221,6 @@
     }
   ],
   "leakage_ok": true,
-  "git_sha": "da5e568a7f564697934e63ab1005f56e19968726",
+  "git_sha": "6f56cf8d69647135ce0a4b0e58c272b994b34008",
   "git_dirty": false
 }

@@ -18,7 +18,7 @@ the series length and per-game Poisson scoring variance.
 - Skater-rounds projected: 1096 (skipped for an unsimulated series: 107).
 
 ## Held-out test error vs. fixed baselines (total round points)
-- projection model:            MAE 1.3751, Spearman 0.5929
+- projection model:            MAE 1.3757, Spearman 0.5927
 - baseline (a) reg-ppg x 5.5:  MAE 1.4955, Spearman 0.5796
 - baseline (b) previous round: MAE 1.6474, Spearman 0.5032
 
@@ -29,10 +29,10 @@ Baseline (b) uses the player's actual fantasy points in the previous playoff
 round; for round 1 (no previous round) it falls back to reg-ppg x 5.5.
 
 ## Uncertainty band (held-out means)
-- mean expected points: 2.374
-- mean p10: 0.530   mean p90: 4.422
+- mean expected points: 2.378
+- mean p10: 0.533   mean p90: 4.424
 
 ## Per held-out season (MAE, Spearman rank correlation)
-- 2025: n=536, MAE 1.3386, Spearman 0.6160
-- 2026: n=560, MAE 1.4100, Spearman 0.5729
+- 2025: n=536, MAE 1.3386, Spearman 0.6167
+- 2026: n=560, MAE 1.4111, Spearman 0.5719
 

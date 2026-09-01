@@ -19,9 +19,9 @@
     "VGK"
   ],
   "feature_version": "skater-v1",
-  "generated_at": "2026-08-30T16:38:11.746562+00:00",
+  "generated_at": "2026-09-01T07:37:12.583576+00:00",
   "git_dirty": false,
-  "git_sha": "8000f5bc02872032833dd93c2775421c4e08151b",
+  "git_sha": "6f56cf8d69647135ce0a4b0e58c272b994b34008",
   "ir_stash": {
     "candidates": 0,
     "enabled": false,
@@ -41,9 +41,9 @@
     "ir": false,
     "managers": 4,
     "replacement_level": {
-      "D": 2.23525,
-      "F": 3.63275,
-      "G": 5.856566119349985
+      "D": 2.278,
+      "F": 3.699,
+      "G": 5.944197116232469
     },
     "roster_demand": {
       "defense_per_manager": 3,
@@ -80,7 +80,7 @@
           32,
           33
         ],
-        "projected_total": 43.58151,
+        "projected_total": 44.118398,
         "slot": 1
       },
       {
@@ -96,7 +96,7 @@
           31,
           34
         ],
-        "projected_total": 43.33676,
+        "projected_total": 43.820398,
         "slot": 2
       },
       {
@@ -112,7 +112,7 @@
           30,
           35
         ],
-        "projected_total": 43.24051,
+        "projected_total": 43.658648,
         "slot": 3
       },
       {
@@ -128,7 +128,7 @@
           29,
           36
         ],
-        "projected_total": 42.67426,
+        "projected_total": 42.49835,
         "slot": 4
       }
     ]

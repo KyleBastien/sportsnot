@@ -38,6 +38,8 @@ EXPECTED_TEAMS = {
 }
 CSV_FLOAT_RTOL = 1e-12
 CSV_FLOAT_ATOL = 1e-12
+# Combined-event components are independently serialized to six decimal places.
+MANIFEST_COMBINED_ATOL = 3e-6
 
 
 def _artifact(round_number: int) -> tuple[Path, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
@@ -132,7 +134,17 @@ def test_committed_2026_r3_combined_event_decomposition() -> None:
         expected = team["e_goalie_points_r3"] + (
             team["p_advance"] * team["e_goalie_points_r4"]
         )
-        assert team["e_goalie_points_combined"] == pytest.approx(expected, abs=2e-6)
+        assert team["e_goalie_points_combined"] == pytest.approx(
+            expected, abs=MANIFEST_COMBINED_ATOL
+        )
+
+
+def test_committed_2026_r1_board_reflects_regenerated_model_inputs() -> None:
+    artifact_dir, _, _, _ = _artifact(1)
+    cheatsheet = (artifact_dir / "cheatsheet.md").read_text(encoding="utf-8")
+
+    assert "| 4 | D | Evan Bouchard | EDM |" in cheatsheet
+    assert "| 5 | G | COL | COL |" in cheatsheet
 
 
 @pytest.mark.parametrize("round_number", [1, 2, 3])
