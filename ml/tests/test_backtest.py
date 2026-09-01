@@ -855,9 +855,22 @@ def test_combined_league_comparison_scores_rounds_three_and_four() -> None:
     assert actual_points > round_three_only
 
 
+def _require_real_backtest_tables(normalized: Path) -> None:
+    required = (
+        "league_draft_picks.parquet",
+        "series.parquet",
+        "skater_games.parquet",
+        "team_games.parquet",
+    )
+    missing = [name for name in required if not (normalized / name).exists()]
+    if missing:
+        pytest.skip(f"generated normalized tables not present: {', '.join(missing)}")
+
+
 def test_real_2026_league_comparisons_never_pool_leagues() -> None:
     """Committed two-league fixture keeps kyle's real R1 rosters independent."""
     normalized = Path("data/normalized")
+    _require_real_backtest_tables(normalized)
     league_picks = pd.read_parquet(normalized / "league_draft_picks.parquet")
     series = pd.read_parquet(normalized / "series.parquet")
     skater_actual = skater_actual_points(
@@ -906,6 +919,7 @@ def test_real_2026_league_comparisons_never_pool_leagues() -> None:
 def test_real_2024_levi_r3_4_roster_scores_corrected_64_points() -> None:
     """The raw "McDavid" row is Draisaitl; Connor remains on judah's roster."""
     normalized = Path("data/normalized")
+    _require_real_backtest_tables(normalized)
     league_picks = pd.read_parquet(normalized / "league_draft_picks.parquet")
     series = pd.read_parquet(normalized / "series.parquet")
     skater_actual = skater_actual_points(

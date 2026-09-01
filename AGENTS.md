@@ -233,11 +233,13 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   consistent. For clean-worktree regeneration, run the Python process with its
   working directory inside that clean worktree; changing `PYTHONPATH` alone does not
   change the repository inspected by `git_state()`.
-- `test_committed_model_evidence.py` guards committed model/backtest provenance,
-  seeds, coverage, and league-comparison structure. Regenerate each report/manifest
-  pair together at a fixed seed. The 2026 `r500` backtest can run for roughly seven
-  CPU hours and writes its artifact only when the run completes; quiet output is
-  normal while the process remains active.
+- `test_committed_model_evidence.py` guards committed model/backtest/projection
+  provenance, seeds, coverage, and league-comparison structure. Every manifest SHA
+  must be an ancestor of HEAD; models plus backtests share one evidence-pass SHA,
+  while all four 2026 projection fixtures may share a separate SHA. Regenerate each
+  report/manifest pair together at a fixed seed. The 2026 `r500` backtest can run for
+  roughly seven CPU hours and writes its artifact only when the run completes; quiet
+  output is normal while the process remains active.
 - Committed projection CSV/parquet twins must contain the same ordered rows and
   columns. Compare them with blank-string/null normalization and a `1e-12` float
   tolerance in `test_committed_projection_artifacts.py`.
@@ -264,8 +266,10 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   totals must not let a full 10,000-row response pass as complete.
 - League entity matching requires `skater_games.parquet` as well as the pick/player/team
   tables. Scored sheet matches are review-flagged when all three exact integer point
-  splits disagree with the NHL archive; duplicate player ownership is scoped by
-  `(league_name, season, draft_event)` and ignores same-manager source copies.
+  splits disagree with the NHL archive; goalie/team rows skip this skater-points check.
+  Duplicate asset ownership is scoped by `(league_name, season, draft_event)`, keyed by
+  `player_id` for skaters and `team_id` for goalie/team slots, and ignores same-manager
+  source copies.
 - Opponent fitting must call `dedupe_duplicate_events` and group through league-aware
   `event_keys`. App rows remain authoritative, but missing app skater `team_id` values
   inherit an unambiguous sheet match on `(league event, manager, player_id)` before

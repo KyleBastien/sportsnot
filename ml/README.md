@@ -68,6 +68,18 @@ All commands run from the `ml/` directory.
 | Draft assistant | `uv run oracle draft --artifact artifacts/2025-r1 --managers 4 --slot 1 [--ir]` |
 | Backtest replay | `uv run oracle backtest --seasons 2022` |
 
+Most tests use self-contained fixtures. Real-data regression tests skip when generated
+`data/normalized/*.parquet` tables are absent. Run all real-data checks after generating
+normalization, matched league drafts, and odds:
+
+```bash
+uv run oracle normalize --force
+uv run oracle league-drafts
+uv run oracle match-drafts
+uv run oracle odds
+uv run pytest
+```
+
 ## Package layout
 
 The `draft_oracle` package (under `src/`) is organized by pipeline stage. Each

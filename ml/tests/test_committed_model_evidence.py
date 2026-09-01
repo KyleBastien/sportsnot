@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
@@ -26,6 +27,7 @@ BACKTEST_ARTIFACTS = (
     "2023-2024-2025-seed20260827",
     "2026-combined-r500-seed20260827",
 )
+PROJECTION_ARTIFACTS = ("2026-r1", "2026-r2", "2026-r3", "2026-r4")
 EXPECTED_SEED = 20260827
 
 
@@ -34,6 +36,37 @@ def _manifest(path: Path) -> dict[str, Any]:
         dict[str, Any],
         json.loads((path / "manifest.json").read_text(encoding="utf-8")),
     )
+
+
+def _manifest_file(path: Path) -> dict[str, Any]:
+    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+
+
+MODEL_MANIFESTS = tuple(
+    ARTIFACTS_ROOT / "models" / name / "manifest.json" for name in MODEL_ARTIFACTS
+)
+BACKTEST_MANIFESTS = tuple(
+    ARTIFACTS_ROOT / "backtests" / name / "manifest.json" for name in BACKTEST_ARTIFACTS
+)
+PROJECTION_MANIFESTS = tuple(
+    ARTIFACTS_ROOT / name / "run_manifest.json" for name in PROJECTION_ARTIFACTS
+)
+ALL_EVIDENCE_MANIFESTS = MODEL_MANIFESTS + BACKTEST_MANIFESTS + PROJECTION_MANIFESTS
+
+
+def _require_git_checkout() -> None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            cwd=ML_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        pytest.skip("git executable not available; cannot verify artifact ancestry")
+    if result.returncode != 0 or result.stdout.strip() != "true":
+        pytest.skip("not inside a git checkout; cannot verify artifact ancestry")
 
 
 def _values_for_key(value: object, key: str) -> list[object]:
@@ -48,6 +81,39 @@ def _values_for_key(value: object, key: str) -> list[object]:
             found.extend(_values_for_key(item, key))
         return found
     return []
+
+
+@pytest.mark.parametrize("manifest_path", ALL_EVIDENCE_MANIFESTS)
+def test_committed_evidence_git_sha_is_ancestor_of_head(manifest_path: Path) -> None:
+    manifest = _manifest_file(manifest_path)
+    git_sha = str(manifest["git_sha"])
+    assert re.fullmatch(r"[0-9a-f]{40}", git_sha)
+    _require_git_checkout()
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", git_sha, "HEAD"],
+        cwd=ML_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, (
+        f"{manifest_path.relative_to(ML_ROOT)} git_sha {git_sha} is not an ancestor "
+        f"of HEAD: {result.stderr.strip()}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("evidence_pass", "manifest_paths"),
+    (
+        ("models-and-backtests", MODEL_MANIFESTS + BACKTEST_MANIFESTS),
+        ("2026-projection-fixtures", PROJECTION_MANIFESTS),
+    ),
+)
+def test_evidence_pass_uses_one_shared_git_sha(
+    evidence_pass: str, manifest_paths: tuple[Path, ...]
+) -> None:
+    shas = {str(_manifest_file(path)["git_sha"]) for path in manifest_paths}
+    assert len(shas) == 1, f"{evidence_pass} carries mixed provenance: {sorted(shas)}"
 
 
 @pytest.mark.parametrize("artifact_name", MODEL_ARTIFACTS)

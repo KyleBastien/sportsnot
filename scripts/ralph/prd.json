@@ -61,8 +61,8 @@
     "All Playwright tests pass (even if it's outside of your changes)"
    ],
    "priority": 3,
-   "passes": false,
-   "notes": ""
+   "passes": true,
+   "notes": "Fresh-clone real-data tests now skip cleanly; evidence SHAs must be HEAD ancestors and shared per regeneration pass; _build_choices has a call-site league-isolation mutation guard; goalie/team duplicate ownership is review-flagged."
   },
   {
    "id": "US-304",

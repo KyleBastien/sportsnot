@@ -512,6 +512,41 @@ def test_duplicate_player_ownership_flags_every_manager_copy(tmp_path: Path) -> 
     assert "1 duplicate-ownership asset(s)" in "\n".join(result.report_lines())
 
 
+def test_duplicate_goalie_team_ownership_flags_every_manager_copy(tmp_path: Path) -> None:
+    normalized = tmp_path / "normalized"
+    _write_normalized(normalized)
+    pd.DataFrame(
+        [
+            _league_pick(
+                manager="ben",
+                position="G",
+                slot_label="Goalie",
+                player_or_team_name="Panthers Goalie",
+                team_name="Panthers",
+            ),
+            _league_pick(
+                manager="levi",
+                position="G",
+                slot_label="Goalie",
+                player_or_team_name="Florida Panthers",
+                team_name="Panthers",
+            ),
+        ]
+    ).to_parquet(normalized / "league_picks.parquet", index=False)
+    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
+    (tmp_path / "name_overrides.yaml").write_text("players: {}\nteams: {}\n", encoding="utf-8")
+
+    result = build_league_draft_picks(
+        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=tmp_path / "out"
+    )
+
+    assert set(result.picks["team_id"].astype(int)) == {13}
+    assert result.duplicate_ownerships == 1
+    assert result.duplicate_ownership_rows == 2
+    assert result.point_mismatches == 0
+    assert result.picks["needs_review"].tolist() == [True, True]
+
+
 def test_real_2024_override_resolves_draisaitl_without_ownership_conflict(
     tmp_path: Path,
 ) -> None:

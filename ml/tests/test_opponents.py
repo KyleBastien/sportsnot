@@ -472,6 +472,15 @@ def test_choice_pools_are_isolated_by_league() -> None:
     assert all(pool["league_name"].nunique() == 1 for _, pool in pools)
 
 
+def test_build_choices_call_site_keeps_league_pools_isolated() -> None:
+    """Mutation guard: _build_choices itself must group through _event_keys."""
+    prepared = opponents_module._prepare_picks(_dup_frame())
+    choices = opponents_module._build_choices(prepared, {})
+
+    assert len(choices) == 4
+    assert {choice.features.shape for choice in choices} == {(2, 2)}
+
+
 def test_dedupe_is_noop_without_source_or_league_columns() -> None:
     frame = _affinity_league((2024,))
     pd.testing.assert_frame_equal(dedupe_duplicate_events(frame), frame)

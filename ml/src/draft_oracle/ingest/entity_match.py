@@ -520,6 +520,9 @@ def _point_columns_contradict(
     goals-plus-assists count. Requiring all three comparisons to disagree avoids
     flagging legitimate sheet adjustments that perturb only one value while still
     catching a wrong entity whose before/event/total split is wholly incompatible.
+    Goalie/team rows are deliberately skipped because their sheet points come from
+    team wins and shutouts, while this archive cross-check uses skater goals and
+    assists keyed by ``player_id``.
     """
     if (
         record["source"] != "sheet"
@@ -555,15 +558,19 @@ def _point_columns_contradict(
 
 def _mark_duplicate_ownership(frame: pd.DataFrame) -> tuple[int, int]:
     """Flag assets owned by multiple managers within one league draft event."""
-    skaters = frame.loc[frame["player_id"].notna() & (frame["position"] != "G")]
-    group_columns = ["league_name", "season", "draft_event", "player_id"]
     conflicting_keys: list[tuple[Any, ...]] = []
     conflicting_rows: set[int] = set()
-    for key, group in skaters.groupby(group_columns, dropna=False, sort=False):
-        if group["manager"].nunique() <= 1:
-            continue
-        conflicting_keys.append(key if isinstance(key, tuple) else (key,))
-        conflicting_rows.update(int(index) for index in group.index)
+    asset_frames = (
+        ("player_id", frame.loc[frame["player_id"].notna() & (frame["position"] != "G")]),
+        ("team_id", frame.loc[frame["team_id"].notna() & (frame["position"] == "G")]),
+    )
+    for asset_column, assets in asset_frames:
+        group_columns = ["league_name", "season", "draft_event", asset_column]
+        for key, group in assets.groupby(group_columns, dropna=False, sort=False):
+            if group["manager"].nunique() <= 1:
+                continue
+            conflicting_keys.append(key if isinstance(key, tuple) else (key,))
+            conflicting_rows.update(int(index) for index in group.index)
     if conflicting_rows:
         frame.loc[list(conflicting_rows), "needs_review"] = True
     return len(conflicting_keys), len(conflicting_rows)
