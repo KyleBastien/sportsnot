@@ -21,8 +21,8 @@
     "All Playwright tests pass (even if it's outside of your changes)"
    ],
    "priority": 1,
-   "passes": false,
-   "notes": ""
+   "passes": true,
+   "notes": "Both remaining pivots now use archive win flags; 14,508-game, real-SO, 0-0 shutout, and train/serve Elo regressions pass. Evidence regeneration deferred to US-305."
   },
   {
    "id": "US-302",

@@ -17,9 +17,10 @@ Started: 2026-09-01 (round-4 final fix round from ml/CODE_REVIEW_R3.md; prior lo
 - Combined-event regression tests must assert concrete cross-round numbers, not only
   `scored_rounds` metadata. Guard roster actuals, conditional goalie valuation, and
   league comparisons independently so one working leg cannot mask another regression.
-- Game-win targets come from normalized `team_games.win`, not goal comparison:
-  shootouts have equal `goals_for` totals. `_pivot_games` retains rows with exactly
-  one archive winner and warns before excluding malformed/undecided rows.
+- Every team-game pivot derives winners from normalized `team_games.win`, not goal
+  comparison. This includes game-win training, series-sim replay, and shutout
+  training. Shootouts can have equal `goals_for`; pivots retain rows with exactly
+  one archive winner and warn before excluding malformed/undecided rows.
 - League draft consumers must call `dedupe_duplicate_events` before aggregation and
   use shared `event_keys` grouping; real events are keyed by
   `(season, league_name, draft_event)`, never season/event alone. Dedupe preserves
@@ -737,4 +738,47 @@ Started: 2026-09-01 (round-4 final fix round from ml/CODE_REVIEW_R3.md; prior lo
   (`_tables_present` checks `teams` too), so a from-normalized test fixture that only
   writes the 4 projection tables must also drop a `teams.parquet` before snapshotting.
 
+---
+
+## 2026-09-01T06:57:15Z - US-301
+- What was implemented: Reworked `series_sim._pivot_all_games` and
+  `shutout._pivot_games` to derive winners from normalized archive `win` flags,
+  retain tied-goal shootouts, emit `RuntimeWarning` for rows without exactly one
+  winner, and carry `home_win` through series replay and shutout dataset framing.
+  Added real-archive regressions proving both pivots retain all 14,508 decided games,
+  SO game 2020020007 selects BOS over NJD at tied goals, all 16 real 0-0 shootout
+  wins become shutouts (including EDM over MTL in 2016020785), and 2021 WSH/BOS
+  pre-series Elo matches `build_game_dataset`'s training trajectory to `1e-12`.
+- Files changed:
+  - `ml/src/draft_oracle/models/series_sim.py`
+  - `ml/src/draft_oracle/models/shutout.py`
+  - `ml/tests/test_series_sim.py`
+  - `ml/tests/test_shutout.py`
+  - `AGENTS.md`
+  - `scripts/ralph/prd.json`
+  - `scripts/ralph/progress.txt`
+- Honest metric movement at unchanged seed/splits/baselines:
+  - Game-win unchanged: test market+stats Brier `0.2427390320`, stats-only
+    `0.2432638245` (its pivot already included shootouts).
+  - Shutout rows increased from train/val/test `8958/1238/2432` to
+    `9696/1319/2626`; test model Brier moved `0.0980912677` -> `0.0922619817`,
+    while base-rate Brier moved `0.0978923101` -> `0.0921045402`. Model still does
+    not beat base rate.
+  - Series-sim test Brier moved `0.2307527151` -> `0.2290467434`; predicted
+    shutouts by rounds 1-4 moved from `9.9856/4.9186/2.4257/1.1899` to
+    `9.3929/4.6407/2.2765/1.1291`. Committed evidence regeneration remains deferred
+    to US-305.
+- Quality checks: ML ruff clean; mypy strict clean; 703 pytest tests passed; Nx
+  affected lint/typecheck passed; web build passed; all Nx unit tests passed; all
+  96 Playwright tests passed.
+- Commit note: Normal pre-commit hook reached CodeScene and failed only because
+  `CODESCENE_PAT` / `CODESCENE_ACCESS_TOKEN` was unavailable. All required checks
+  passed independently, so commit retried with `--no-verify` per Ralph policy.
+- **Learnings for future iterations:**
+  - Equal `goals_for` does not mean undecided: NHL shootout deciding goals are absent
+    from archive goal totals. Exactly-one `win` flag is authoritative everywhere.
+  - `build_game_dataset(..., min_pregame_games=0)` exposes `home_elo`/`away_elo` and
+    provides a direct training-path oracle for series replay consistency tests.
+  - Model evidence must remain stale until US-305 performs one clean-HEAD regeneration;
+    local metric measurement should not rewrite committed manifests mid-round.
 ---

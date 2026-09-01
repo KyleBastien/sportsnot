@@ -36,6 +36,7 @@ every metric is reported as measured.
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -302,12 +303,30 @@ class _MatchupRecord:
 
 
 def _pivot_all_games(team_games: pd.DataFrame) -> pd.DataFrame:
-    """One row per decided game (home + away paired), sorted chronologically."""
+    """One row per archive-decided game, sorted chronologically.
+
+    Shootouts retain tied goal totals because their deciding goal is absent from
+    ``goals_for``. The archive's ``win`` column is therefore authoritative; rows
+    without exactly one winner are excluded with a warning.
+    """
     tg = team_games.copy()
     tg["game_date"] = pd.to_datetime(tg["game_date"])
     home = tg.loc[tg["home_road"] == "H"]
     away = tg.loc[tg["home_road"] == "R"]
     merged = home.merge(away, on="game_id", suffixes=("_home", "_away"))
+    home_won = merged["win_home"].fillna(False).astype(bool)
+    away_won = merged["win_away"].fillna(False).astype(bool)
+    decided = home_won.ne(away_won)
+    undecided_count = int((~decided).sum())
+    if undecided_count:
+        warnings.warn(
+            f"_pivot_all_games excluded {undecided_count} games without exactly one "
+            "archive winner",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    merged = merged.loc[decided].copy()
+    home_won = home_won.loc[decided]
     games = pd.DataFrame(
         {
             "game_id": merged["game_id"],
@@ -325,9 +344,9 @@ def _pivot_all_games(team_games: pd.DataFrame) -> pd.DataFrame:
             "away_points": merged["points_away"].fillna(0).astype(int),
             "home_shots_against": merged["shots_against_home"].fillna(0).astype(int),
             "away_shots_against": merged["shots_against_away"].fillna(0).astype(int),
+            "home_win": home_won.astype(int),
         }
     )
-    games = games.loc[games["home_goals"] != games["away_goals"]]
     return games.sort_values(["game_date", "game_id"], kind="stable").reset_index(drop=True)
 
 
@@ -488,7 +507,7 @@ def reconstruct_series_matchups(
 
         home_goals = int(record["home_goals"])
         away_goals = int(record["away_goals"])
-        home_won = home_goals > away_goals
+        home_won = bool(record["home_win"])
 
         is_qualifying = _playoff_round_digit(record["game_id"]) == QUALIFYING_ROUND_GAME_DIGIT
         if int(record["game_type_id"]) == PLAYOFF_GAME_TYPE and not is_qualifying:

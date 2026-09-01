@@ -1,22 +1,26 @@
 """Tests for draft_oracle.models.series_sim (US-013).
 
-All fixtures are in-memory synthetic games/series -- no network, no committed
-archive dependency (SPEC section 7). The pure simulator is checked against
-known-probability edge cases (p=0.5 symmetric, p=1.0/0.0 sweeps), the 2-2-1-1-1
-home-ice ordering, exact-vs-Monte-Carlo agreement, and goalie-slot valuation
-through the rules engine. The evaluation path is exercised end-to-end on a small
-multi-season synthetic league.
+Most fixtures are in-memory synthetic games/series. Focused shootout and replay
+consistency regressions read the committed NHL archive; no network is used (SPEC
+section 7). The pure simulator is checked against known-probability edge cases
+(p=0.5 symmetric, p=1.0/0.0 sweeps), the 2-2-1-1-1 home-ice ordering,
+exact-vs-Monte-Carlo agreement, and goalie-slot valuation through the rules engine.
+The evaluation path is exercised end-to-end on a small multi-season synthetic league.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from draft_oracle.ingest.normalize import normalize_team_games
 from draft_oracle.models import (
     HOME_ICE_PATTERN,
     SeriesSimConfig,
+    build_game_dataset,
     evaluate_series_sim,
     expected_goalie_points,
     game_win_probs,
@@ -24,7 +28,7 @@ from draft_oracle.models import (
     simulate_series,
     simulate_series_monte_carlo,
 )
-from draft_oracle.models.series_sim import reconstruct_series_matchups
+from draft_oracle.models.series_sim import _pivot_all_games, reconstruct_series_matchups
 from draft_oracle.rules import goalie_series_points
 
 # ── Home-ice pattern + per-game probability schedule ───────────────────────
@@ -305,6 +309,89 @@ def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFr
 # ── Reconstruction (leakage-free pre-series states) ────────────────────────
 
 
+def _real_team_games(season_label: str | None = None) -> pd.DataFrame:
+    archive_dir = Path("data/raw/nhl-archive")
+    paths = (
+        [archive_dir / f"team-games-{season_label}.csv.gz"]
+        if season_label is not None
+        else sorted(archive_dir.glob("team-games-*.csv.gz"))
+    )
+    return pd.concat(
+        [normalize_team_games(pd.read_csv(path)) for path in paths],
+        ignore_index=True,
+    )
+
+
+def test_pivot_all_games_matches_all_real_archive_decisions() -> None:
+    team_games = _real_team_games()
+    archive_winners = team_games.groupby("game_id")["win"].sum()
+
+    assert int(archive_winners.eq(1).sum()) == 14_508
+    assert len(_pivot_all_games(team_games)) == 14_508
+
+
+def test_pivot_all_games_retains_real_shootout_winner() -> None:
+    team_games = _real_team_games("2020-21")
+    game = _pivot_all_games(team_games).loc[lambda frame: frame["game_id"] == 2020020007]
+
+    assert len(game) == 1
+    assert game.iloc[0]["home_goals"] == game.iloc[0]["away_goals"] == 2
+    assert game.iloc[0]["home_abbrev"] == "NJD"
+    assert game.iloc[0]["away_abbrev"] == "BOS"
+    assert game.iloc[0]["home_win"] == 0
+
+
+def test_pivot_all_games_warns_and_excludes_game_without_winner() -> None:
+    team_games = pd.DataFrame(
+        _game_rows(
+            season_id=20202021,
+            game_type_id=2,
+            game_id=1,
+            game_date="2021-01-01",
+            home="AAA",
+            away="BBB",
+            home_goals=2,
+            away_goals=2,
+        )
+    )
+
+    with pytest.warns(RuntimeWarning, match="without exactly one archive winner"):
+        games = _pivot_all_games(team_games)
+
+    assert games.empty
+
+
+def test_reconstruct_elo_matches_game_win_training_path_at_real_series_cutoff() -> None:
+    team_games = _real_team_games("2020-21")
+    series = pd.DataFrame(
+        [
+            {
+                "season_id": 20202021,
+                "top_seed_abbrev": "WSH",
+                "bottom_seed_abbrev": "BOS",
+                "playoff_round": 1,
+            }
+        ]
+    )
+    game_id = 2020030121
+    game_rows = team_games.loc[team_games["game_id"] == game_id].set_index("home_road")
+    home_id = int(str(game_rows.loc["H", "team_id"]))
+    away_id = int(str(game_rows.loc["R", "team_id"]))
+    training_row = build_game_dataset(team_games, min_pregame_games=0).loc[
+        lambda frame: frame["game_id"] == float(game_id)
+    ].iloc[0]
+    matchup = reconstruct_series_matchups(team_games, series=series)[
+        (2021, min(home_id, away_id), max(home_id, away_id))
+    ]
+
+    assert matchup.win_snapshots[home_id]["elo"] == pytest.approx(
+        training_row["home_elo"], abs=1e-12
+    )
+    assert matchup.win_snapshots[away_id]["elo"] == pytest.approx(
+        training_row["away_elo"], abs=1e-12
+    )
+
+
 def test_reconstruct_captures_pre_series_snapshots_and_shutouts() -> None:
     team_games, _ = _synthetic_league([2019], seed=3)
     matchups = reconstruct_series_matchups(team_games)
@@ -347,6 +434,7 @@ def _overlap_row(
         "goals_against": ga,
         "shots_against": SHOTS,
         "points": 2 if won else 0,
+        "win": won,
     }
 
 

@@ -1,18 +1,22 @@
 """Tests for draft_oracle.models.shutout (US-012).
 
-All fixtures are in-memory synthetic games -- no network, no committed-archive
-dependency (SPEC section 7). The suite covers the base-rate baseline, the
-leakage-free running goaltending state, the feature row + missing flags, the
-winner-framed dataset build, probability bounds, monotonicity in goalie quality,
-and an end-to-end train that beats the base-rate baseline on a held-out season.
+Most fixtures are in-memory synthetic games. Focused shootout regressions read the
+committed NHL archive; no network is used (SPEC section 7). The suite covers the
+base-rate baseline, the leakage-free running goaltending state, the feature row +
+missing flags, the winner-framed dataset build, probability bounds, monotonicity in
+goalie quality, and an end-to-end train that beats the base-rate baseline on a
+held-out season.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from draft_oracle.ingest.normalize import normalize_team_games
 from draft_oracle.models import (
     NEUTRAL_SAVE_PCT,
     SHUTOUT_FEATURE_COLUMNS,
@@ -23,6 +27,7 @@ from draft_oracle.models import (
     shutout_feature_row,
     train_shutout_model,
 )
+from draft_oracle.models.shutout import _pivot_games
 
 TEAMS = ["AAA", "BBB", "CCC", "DDD"]
 # Latent win strength (who wins) and defence quality (how often the winner
@@ -212,6 +217,81 @@ def test_feature_row_supplied_backup_and_risk_are_flagged() -> None:
 
 
 # ── Dataset build (leakage-free, winner-framed) ────────────────────────────
+
+
+def _real_team_games(season_label: str | None = None) -> pd.DataFrame:
+    archive_dir = Path("data/raw/nhl-archive")
+    paths = (
+        [archive_dir / f"team-games-{season_label}.csv.gz"]
+        if season_label is not None
+        else sorted(archive_dir.glob("team-games-*.csv.gz"))
+    )
+    return pd.concat(
+        [normalize_team_games(pd.read_csv(path)) for path in paths],
+        ignore_index=True,
+    )
+
+
+def test_pivot_games_matches_all_real_archive_decisions() -> None:
+    team_games = _real_team_games()
+    archive_winners = team_games.groupby("game_id")["win"].sum()
+
+    assert int(archive_winners.eq(1).sum()) == 14_508
+    assert len(_pivot_games(team_games)) == 14_508
+
+
+def test_pivot_games_retains_real_shootout_winner() -> None:
+    team_games = _real_team_games("2020-21")
+    game = _pivot_games(team_games).loc[lambda frame: frame["game_id"] == 2020020007]
+
+    assert len(game) == 1
+    assert game.iloc[0]["home_goals"] == game.iloc[0]["away_goals"] == 2
+    assert game.iloc[0]["home_abbrev"] == "NJD"
+    assert game.iloc[0]["away_abbrev"] == "BOS"
+    assert game.iloc[0]["home_win"] == 0
+
+
+def test_build_dataset_counts_zero_zero_shootout_wins_as_shutouts() -> None:
+    team_games = _real_team_games()
+    games = _pivot_games(team_games)
+    zero_zero_ids = (
+        games
+        .loc[lambda frame: frame["home_goals"].eq(0) & frame["away_goals"].eq(0), "game_id"]
+        .astype(int)
+    )
+    dataset = build_shutout_dataset(team_games, min_pregame_games=0)
+    zero_zero_shutouts = dataset.loc[
+        dataset["game_id"].astype(int).isin(zero_zero_ids), "is_shutout"
+    ]
+
+    assert len(zero_zero_ids) == 16
+    assert len(zero_zero_shutouts) == 16
+    assert zero_zero_shutouts.eq(1.0).all()
+    assert 2016020785 in dataset["game_id"].astype(int).to_numpy()
+    example = games.loc[games["game_id"] == 2016020785].iloc[0]
+    assert example["home_abbrev"] == "MTL"
+    assert example["away_abbrev"] == "EDM"
+    assert example["home_win"] == 0
+
+
+def test_pivot_games_warns_and_excludes_game_without_winner() -> None:
+    team_games = pd.DataFrame(
+        _game_rows(
+            game_id=1,
+            game_date="2021-01-01",
+            season_id=20202021,
+            game_type_id=2,
+            home="AAA",
+            away="BBB",
+            home_goals=2,
+            away_goals=2,
+        )
+    )
+
+    with pytest.warns(RuntimeWarning, match="without exactly one archive winner"):
+        games = _pivot_games(team_games)
+
+    assert games.empty
 
 
 def test_build_dataset_first_game_has_no_pregame_leakage() -> None:
