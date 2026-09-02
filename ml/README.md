@@ -885,7 +885,7 @@ Session commands:
 | `board` | Remaining assets grouped by position, best projection first. |
 | `roster [manager]` | A roster (yours by default). |
 | `recommend [--depth N]` | Top-5 explained picks (VOR, survival, need, delta vs #2). Full multi-step lookahead by default; `--depth 1` is the fast path. |
-| `save <path>` / `resume <path>` | Write / reload the session JSON. |
+| `save <path>` / `resume <path>` | Write / reload the session JSON. In-loop resume switches autosave to the resumed path. |
 | `help`, `quit` | Help and exit. |
 
 Illegal actions are rejected **with the reason** — not your turn, already drafted,
@@ -895,6 +895,10 @@ session autosaves to a replayable JSON log after every pick (default
 `./draft-session.json`, override with `--session`), so a draft can be replayed
 for post-hoc analysis. Starting a new session refuses to overwrite an existing
 log; use `--resume` or choose a different `--session` path.
+Resuming autosaves in place by default. `--resume A --session B` may create a new
+autosave copy at `B`, but refuses when a distinct `B` already exists. An in-loop
+`resume <path>` switches all later autosaves to that resumed path, leaving the launch
+log untouched.
 
 ## Backtest replay engine (`backtest/replay.py`)
 

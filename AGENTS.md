@@ -287,6 +287,8 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   be unique case-insensitively, eliminated-team abbreviations must all resolve, and
   `DraftState.new` repeats manager uniqueness validation. A new draft refuses any
   existing session path; users must pass `--resume` or choose another `--session`.
+  `--resume A --session B` refuses an existing distinct `B`; in-loop
+  `resume <path>` switches autosave to that resumed path.
 
 ## Ralph Agent System
 

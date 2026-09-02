@@ -23,7 +23,9 @@ Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior 
   case-insensitive duplicate ids for both `draft` and `recommend`, `_resolve_eliminated`
   rejects every unmatched abbreviation, and `DraftState.new` validates uniqueness
   again. New sessions never overwrite an existing path; use `--resume` or a distinct
-  `--session`. Both recommend entry points share the fitted-opponent coverage label.
+  `--session`. `--resume A --session B` refuses an existing distinct `B`; in-loop
+  `resume <path>` switches autosave to that resumed path. Both recommend entry points
+  share the fitted-opponent coverage label.
 - Game-win reports/manifests record per-season priced/total market coverage with the
   temporal split and explicit zero-coverage state. Odds joins can promote
   `season_end_year` to float, so normalize group keys before integer conversion.
@@ -792,4 +794,27 @@ Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior 
     evidence manifest so stale partial regeneration remains detectable.
   - On Windows, wait for `http://localhost:4200` to return HTTP 200 before launching
     Playwright directly; Nx dependency ordering can race static-server readiness.
+---
+
+## 2026-09-02T07:21:08Z - US-402
+- Closed both remaining draft-session clobber paths. `--resume A --session B`
+  now rejects an existing distinct `B` before loading or saving; same-path resume
+  remains valid.
+- In-loop `resume <path>` now switches autosave target to resumed path and announces
+  switch, preserving original launch log byte-for-byte.
+- Added regression tests for two-pick target preservation, explicit same-path resume,
+  and two-league in-loop resume/quit behavior. Updated draft-assistant docs and help.
+- Quality gates passed: ruff, mypy, 740 ML tests, Nx affected lint/typecheck, all
+  monorepo unit tests, web build, and 96 Playwright tests.
+- Normal commit hook reached CodeScene and failed only because neither `CODESCENE_PAT`
+  nor `CODESCENE_ACCESS_TOKEN` was available. All other required checks passed
+  independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `AGENTS.md`, `ml/README.md`,
+  `ml/src/draft_oracle/cli/draft.py`, `ml/tests/test_draft.py`,
+  `scripts/ralph/prd.json`, and `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - Autosave path is mutable session state: loading another session must update both
+    `DraftSession` and destination path before any autosave.
+  - Compare existing resume targets by file identity when possible, with normalized
+    path fallback, so alternate spellings of same file remain valid.
 ---

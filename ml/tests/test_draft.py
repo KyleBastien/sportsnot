@@ -603,3 +603,91 @@ def test_new_session_refuses_to_clobber_existing_pick_log(tmp_path: Path) -> Non
 
     assert path.read_bytes() == before
     assert len(json.loads(path.read_text(encoding="utf-8"))["picks"]) == 2
+
+
+def test_resume_refuses_to_clobber_different_existing_session(tmp_path: Path) -> None:
+    resumed = _make_session()
+    resume_path = tmp_path / "league-a.json"
+    resumed.save(resume_path)
+
+    existing = _make_session()
+    for _ in range(2):
+        current = existing.state.current_manager
+        pick = existing.state.legal_assets(current)[0]
+        assert existing.record_pick(current, pick.name).ok
+    session_path = tmp_path / "league-b.json"
+    existing.save(session_path)
+    before = session_path.read_bytes()
+
+    with pytest.raises(Exception, match="differs from resumed log"):
+        draft_module.draft(
+            resume=resume_path,
+            session=session_path,
+            opponents="greedy",
+        )
+
+    assert session_path.read_bytes() == before
+    assert len(json.loads(session_path.read_text(encoding="utf-8"))["picks"]) == 2
+
+
+def test_resume_allows_same_session_as_explicit_autosave_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    resumed = _make_session()
+    resume_path = tmp_path / "league-a.json"
+    resumed.save(resume_path)
+    observed: list[tuple[DraftSession, Path | None]] = []
+    monkeypatch.setattr(
+        DraftSession,
+        "resume",
+        classmethod(lambda _cls, _path: resumed),
+    )
+    monkeypatch.setattr(
+        draft_module,
+        "_run_loop",
+        lambda loaded, path: observed.append((loaded, path)),
+    )
+
+    draft_module.draft(resume=resume_path, session=resume_path, opponents="greedy")
+
+    assert observed == [(resumed, resume_path)]
+
+
+def test_in_loop_resume_switches_autosave_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    launch = _make_session()
+    for _ in range(2):
+        current = launch.state.current_manager
+        pick = launch.state.legal_assets(current)[0]
+        assert launch.record_pick(current, pick.name).ok
+    launch_path = tmp_path / "league-one.json"
+    launch.save(launch_path)
+    launch_before = launch_path.read_bytes()
+
+    resumed = _make_session()
+    resumed_path = tmp_path / "league-two.json"
+    resumed.save(resumed_path)
+    monkeypatch.setattr(
+        DraftSession,
+        "resume",
+        classmethod(lambda _cls, path: resumed if path == resumed_path else launch),
+    )
+    commands = iter([f"resume {resumed_path}", "quit"])
+    echoed: list[str] = []
+
+    final = draft_module._run_loop(
+        launch,
+        launch_path,
+        input_fn=lambda _prompt: next(commands),
+        echo=echoed.append,
+    )
+
+    assert final is resumed
+    assert launch_path.read_bytes() == launch_before
+    assert resumed_path.read_text(encoding="utf-8") == json.dumps(
+        resumed.to_dict(), indent=2
+    )
+    assert any(
+        f"autosave target switched to {resumed_path}" in line for line in echoed
+    )

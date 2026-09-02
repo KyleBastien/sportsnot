@@ -661,7 +661,7 @@ _HELP_LINES = [
     "  roster [manager]        a roster (yours by default)",
     "  recommend [--depth N]   top-5 explained picks (full lookahead by default)",
     "  save <path>             write the session JSON",
-    "  resume <path>           replace the session from a saved JSON",
+    "  resume <path>           replace session and switch autosave to that JSON",
     "  help                    show this help",
     "  quit                    exit",
 ]
@@ -708,8 +708,13 @@ def _run_loop(
             continue
         if parsed.name == "resume":
             assert parsed.path is not None
-            session = DraftSession.resume(Path(parsed.path))
-            echo(f"resumed {len(session.picks)} pick(s) from {parsed.path}")
+            resume_path = Path(parsed.path)
+            session = DraftSession.resume(resume_path)
+            session_path = resume_path
+            echo(
+                f"resumed {len(session.picks)} pick(s) from {parsed.path}; "
+                f"autosave target switched to {parsed.path}"
+            )
             _autosave()
             continue
         if parsed.name == "save":
@@ -797,6 +802,11 @@ def draft(
     to their real seat.
     """
     if resume is not None:
+        if session is not None and session.exists() and not _same_path(resume, session):
+            raise typer.BadParameter(
+                f"session log already exists at {session} and differs from resumed log "
+                f"{resume}; omit --session to resume in place or choose a new path"
+            )
         loaded = DraftSession.resume(resume)
         session_path = session or resume
         _run_loop(loaded, session_path)
@@ -829,3 +839,11 @@ def draft(
         opponent_artifact_dir=opponent_artifact,
     )
     _run_loop(new_session, session_path)
+
+
+def _same_path(left: Path, right: Path) -> bool:
+    """Return whether two paths identify the same file or normalized location."""
+    try:
+        return left.samefile(right)
+    except (FileNotFoundError, OSError):
+        return left.resolve(strict=False) == right.resolve(strict=False)
