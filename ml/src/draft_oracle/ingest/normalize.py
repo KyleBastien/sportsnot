@@ -524,32 +524,58 @@ def normalize_archive(
     if not archive_dir.exists():
         raise FileNotFoundError(f"NHL archive directory not found: {archive_dir}")
 
-    labels = list(seasons) if seasons is not None else discover_season_labels(archive_dir)
-    if not labels:
-        raise FileNotFoundError(f"No season archives found under {archive_dir}")
-
+    labels = _resolve_archive_labels(archive_dir, seasons)
     signature = _source_signature(archive_dir, labels)
-    manifest = _read_manifest(out_dir)
-    if (
-        not force
-        and manifest is not None
-        and manifest.get("sources") == signature
-        and _tables_present(out_dir)
-    ):
-        counts = manifest.get("row_counts")
-        cached_counts = counts if isinstance(counts, dict) else {}
-        return NormalizeResult(
-            out_dir=out_dir, seasons=labels, row_counts=cached_counts, skipped=True
-        )
+    cached = _cached_normalize_result(out_dir, labels, signature, force)
+    if cached is not None:
+        return cached
 
     tables = build_tables(archive_dir, labels)
     out_dir.mkdir(parents=True, exist_ok=True)
+    row_counts = _write_normalized_tables(tables, out_dir)
+    _write_normalize_manifest(out_dir, labels, signature, row_counts)
+    return NormalizeResult(out_dir=out_dir, seasons=labels, row_counts=row_counts)
+
+
+def _resolve_archive_labels(
+    archive_dir: Path, seasons: Iterable[str] | None
+) -> list[str]:
+    labels = list(seasons) if seasons is not None else discover_season_labels(archive_dir)
+    if labels:
+        return labels
+    raise FileNotFoundError(f"No season archives found under {archive_dir}")
+
+
+def _cached_normalize_result(
+    out_dir: Path, labels: list[str], signature: Mapping[str, int], force: bool
+) -> NormalizeResult | None:
+    if force:
+        return None
+    manifest = _read_manifest(out_dir)
+    if manifest is None or manifest.get("sources") != signature or not _tables_present(out_dir):
+        return None
+    counts = manifest.get("row_counts")
+    cached_counts = counts if isinstance(counts, dict) else {}
+    return NormalizeResult(out_dir=out_dir, seasons=labels, row_counts=cached_counts, skipped=True)
+
+
+def _write_normalized_tables(
+    tables: Mapping[str, pd.DataFrame], out_dir: Path
+) -> dict[str, int]:
     row_counts: dict[str, int] = {}
     for name in TABLE_NAMES:
         frame = tables[name]
         frame.to_parquet(out_dir / f"{name}.parquet", index=False)
         row_counts[name] = len(frame)
+    return row_counts
 
+
+def _write_normalize_manifest(
+    out_dir: Path,
+    labels: list[str],
+    signature: Mapping[str, int],
+    row_counts: Mapping[str, int],
+) -> None:
     manifest_out: dict[str, object] = {
         "generated_at": datetime.now(UTC).isoformat(),
         "seasons": labels,
@@ -559,7 +585,6 @@ def normalize_archive(
     (out_dir / MANIFEST_NAME).write_text(
         json.dumps(manifest_out, indent=2, sort_keys=True), encoding="utf-8"
     )
-    return NormalizeResult(out_dir=out_dir, seasons=labels, row_counts=row_counts)
 
 
 def create_snapshot(

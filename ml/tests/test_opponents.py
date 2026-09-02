@@ -91,6 +91,19 @@ def _frame(rows: list[dict[str, object]]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=_PICK_COLUMNS)
 
 
+def _manager_event_picks(
+    season: int, event: str, manager: str, slot: int, team: int, pid: int
+) -> tuple[list[dict[str, object]], int]:
+    """One manager's picks for one event: 3 F + 1 D, all from their own team."""
+    picks: list[dict[str, object]] = []
+    for _ in range(3):
+        picks.append(_pick(season, event, manager, slot, "F", pid, team, points=float(pid % 7)))
+        pid += 1
+    picks.append(_pick(season, event, manager, slot, "D", pid, team, points=float(pid % 5)))
+    pid += 1
+    return picks, pid
+
+
 def _affinity_league(seasons: tuple[int, ...]) -> pd.DataFrame:
     """Two managers who each *always* draft their favourite team's players.
 
@@ -100,21 +113,12 @@ def _affinity_league(seasons: tuple[int, ...]) -> pd.DataFrame:
     """
     rows: list[dict[str, object]] = []
     pid = 1000
+    seats = [("home", 1), ("away", 2)]
     for season in seasons:
         for event in ("R1", "R2"):
-            for slot, (manager, team) in enumerate([("home", 1), ("away", 2)], start=1):
-                # each manager takes 3 F from their own team + 1 D from their own team
-                for _ in range(3):
-                    rows.append(
-                        _pick(season, event, manager, slot, "F", pid, team, points=float(pid % 7))
-                    )
-                    pid += 1
-                rows.append(
-                    _pick(season, event, manager, slot, "D", pid, team, points=float(pid % 5))
-                )
-                pid += 1
-            # cross pollute the pool: each manager COULD have taken the other's players,
-            # they simply never do -> pure affinity signal.
+            for slot, (manager, team) in enumerate(seats, start=1):
+                picks, pid = _manager_event_picks(season, event, manager, slot, team, pid)
+                rows.extend(picks)
     return _frame(rows)
 
 

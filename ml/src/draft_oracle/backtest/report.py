@@ -45,16 +45,20 @@ __all__ = [
 
 def _fmt(value: float, digits: int = 3) -> str:
     """Fixed-point string, or ``n/a`` for a missing/NaN value."""
-    if value is None or (isinstance(value, float) and math.isnan(value)):
+    if _missing_number(value):
         return "n/a"
     return f"{value:.{digits}f}"
 
 
 def _pct(value: float) -> str:
     """Percentage string, or ``n/a`` for a missing/NaN value."""
-    if value is None or (isinstance(value, float) and math.isnan(value)):
+    if _missing_number(value):
         return "n/a"
     return f"{value * 100:.1f}%"
+
+
+def _missing_number(value: float | None) -> bool:
+    return value is None or (isinstance(value, float) and math.isnan(value))
 
 
 def _mean(values: list[float]) -> float:

@@ -13,7 +13,7 @@ changes.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -182,19 +182,20 @@ def _composition_reasons(slots: Sequence[RosterSlot], allow_ir_slots: bool) -> l
 
 
 def _duplicate_reasons(slots: Sequence[RosterSlot]) -> list[str]:
-    reasons: list[str] = []
+    return [
+        *_count_duplicates(slot.player_id for slot in slots if slot.player_id is not None),
+        *_count_duplicates(
+            (slot.team_id for slot in slots if slot.team_id is not None), label="Team"
+        ),
+    ]
 
-    player_counts = Counter(slot.player_id for slot in slots if slot.player_id is not None)
-    for player_id, count in player_counts.items():
-        if count > 1:
-            reasons.append(f"Player {player_id} is drafted {count} times")
 
-    team_counts = Counter(slot.team_id for slot in slots if slot.team_id is not None)
-    for team_id, count in team_counts.items():
-        if count > 1:
-            reasons.append(f"Team {team_id} is drafted {count} times")
-
-    return reasons
+def _count_duplicates(ids: Iterable[int], label: str = "Player") -> list[str]:
+    return [
+        f"{label} {asset_id} is drafted {count} times"
+        for asset_id, count in Counter(ids).items()
+        if count > 1
+    ]
 
 
 def _eliminated_reasons(

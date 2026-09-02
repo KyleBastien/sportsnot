@@ -43,25 +43,28 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from draft_oracle.models.game_win import GameWinConfig, train_game_win_model
+from draft_oracle.models._projection_evaluation import (
+    _previous_round_points as _previous_round_points,
+)
+from draft_oracle.models._projection_evaluation import (
+    _row_seed as _row_seed,
+)
+from draft_oracle.models._projection_evaluation import (
+    _series_length_by_team as _series_length_by_team,
+)
+from draft_oracle.models._projection_evaluation import (
+    _team_id_by_abbrev as _team_id_by_abbrev,
+)
+from draft_oracle.models._projection_evaluation import (
+    evaluate_projection_model,
+)
 from draft_oracle.models.series_sim import (
-    _matchup_key,
-    _predict_series,
-    reconstruct_series_matchups,
     series_length_labels,
 )
-from draft_oracle.models.shutout import ShutoutConfig, train_shutout_model
 from draft_oracle.models.skater_production import (
-    LABEL_COLUMN,
     SkaterProductionConfig,
-    build_production_dataset,
-    mean_absolute_error,
-    skater_round_production,
-    spearman_correlation,
-    train_skater_production_model,
 )
 from draft_oracle.provenance import add_git_provenance
-from draft_oracle.rules import player_points
 
 __all__ = [
     "BASELINE_REG_GAMES",
@@ -464,67 +467,6 @@ class ProjectionResult:
         return lines
 
 
-def _row_seed(base_seed: int, season_id: int, playoff_round: int, player_id: int) -> int:
-    """Deterministic per-skater RNG seed from the projection keys (reproducible)."""
-    combined = (
-        (int(base_seed) & 0xFFFFFFFF)
-        ^ ((int(season_id) & 0xFFFFF) << 20)
-        ^ ((int(playoff_round) & 0xF) << 16)
-        ^ (int(player_id) & 0xFFFF)
-    )
-    return int(combined & 0x7FFFFFFF)
-
-
-def _team_id_by_abbrev(team_games: pd.DataFrame) -> dict[str, int]:
-    """Map ``team_abbrev -> team_id`` from the team-games table."""
-    pairs = team_games[["team_abbrev", "team_id"]].drop_duplicates()
-    return {str(rec["team_abbrev"]): int(rec["team_id"]) for rec in pairs.to_dict("records")}
-
-
-def _series_length_by_team(
-    series: pd.DataFrame,
-    matchups: dict[tuple[int, int, int], Any],
-    win_model: Any,
-    shutout_model: Any,
-    test_year_set: set[int],
-) -> dict[tuple[int, int, int], dict[int, float]]:
-    """Length distribution per ``(year, round, team_id)`` for held-out series."""
-    out: dict[tuple[int, int, int], dict[int, float]] = {}
-    held_out = series.loc[series["year"].isin(test_year_set)]
-    for row in held_out.to_dict("records"):
-        top_id = row["top_seed_team_id"]
-        bottom_id = row["bottom_seed_team_id"]
-        if pd.isna(top_id) or pd.isna(bottom_id):
-            continue
-        top_id = int(top_id)
-        bottom_id = int(bottom_id)
-        year = int(row["year"])
-        key = _matchup_key(year, top_id, bottom_id)
-        matchup = matchups.get(key)
-        if (
-            matchup is None
-            or top_id not in matchup.win_snapshots
-            or bottom_id not in matchup.win_snapshots
-        ):
-            continue
-        outcome, _sho_top, _sho_bottom = _predict_series(
-            win_model, shutout_model, matchup, top_id, bottom_id
-        )
-        rnd = int(row["playoff_round"]) if not pd.isna(row["playoff_round"]) else 0
-        out[(year, rnd, top_id)] = dict(outcome.length_probs)
-        out[(year, rnd, bottom_id)] = dict(outcome.length_probs)
-    return out
-
-
-def _previous_round_points(labels: pd.DataFrame) -> dict[tuple[int, int, int], float]:
-    """Map ``(season_id, playoff_round, player_id) -> actual round fantasy points``."""
-    out: dict[tuple[int, int, int], float] = {}
-    for rec in labels.to_dict("records"):
-        key = (int(rec["season_id"]), int(rec["playoff_round"]), int(rec["player_id"]))
-        out[key] = float(player_points(int(rec["round_goals"]), int(rec["round_assists"])))
-    return out
-
-
 def evaluate_skater_projections(
     skater_games: pd.DataFrame,
     players: pd.DataFrame,
@@ -542,124 +484,41 @@ def evaluate_skater_projections(
     totals against actual round fantasy points and the two fixed baselines. Every
     reported number is carried on the returned :class:`ProjectionResult`.
     """
-    config = config or ProjectionConfig()
-    prod_config = config.production_config or SkaterProductionConfig(seed=config.seed)
-
-    years = sorted({int(y) for y in series["year"].dropna().unique()})
-    if len(years) <= config.n_test_seasons:
-        raise ValueError("not enough seasons to hold out a projection test set")
-    test_years = tuple(years[-config.n_test_seasons :])
-    test_year_set = set(test_years)
-
-    def _keep_train(frame: pd.DataFrame, year_col: pd.Series) -> pd.DataFrame:
-        return frame.loc[~year_col.isin(test_year_set)]
-
-    train_sk = _keep_train(skater_games, skater_games["season_id"] % 10000)
-    train_tg = _keep_train(team_games, team_games["season_id"] % 10000)
-    train_series = _keep_train(series, series["year"].astype(int))
-    if train_sk.empty or train_tg.empty or train_series.empty:
-        raise ValueError("no training seasons remain after holding out the test set")
-
-    prod_result = train_skater_production_model(
-        train_sk, players, train_tg, train_series, config=prod_config
+    resolved_config = config or ProjectionConfig()
+    evaluation = evaluate_projection_model(
+        skater_games,
+        players,
+        team_games,
+        series,
+        config=resolved_config,
+        project_round=project_skater_round,
+        baseline_reg_games=BASELINE_REG_GAMES,
     )
-    prod_model = prod_result.model
-    win_model = train_game_win_model(
-        train_tg, odds=None, config=GameWinConfig(seed=config.seed)
-    ).model
-    shutout_model = train_shutout_model(train_tg, config=ShutoutConfig(seed=config.seed)).model
-
-    matchups = reconstruct_series_matchups(team_games, series=series)
-    length_by_team = _series_length_by_team(
-        series, matchups, win_model, shutout_model, test_year_set
-    )
-    abbrev_to_id = _team_id_by_abbrev(team_games)
-    labels = skater_round_production(skater_games, series)
-    prev_points = _previous_round_points(labels)
-
-    # Build the held-out feature x label rows and project each skater-round.
-    dataset = build_production_dataset(
-        skater_games, players, team_games, series, config=prod_config
-    )
-    test = dataset.loc[dataset["season_end_year"].isin(test_year_set)].reset_index(drop=True)
-    if test.empty:
-        raise ValueError("no held-out skater-round rows available to project")
-    projected = prod_model.project(test)
-
-    rows: list[dict[str, Any]] = []
-    n_skipped = 0
-    for rec in projected.to_dict("records"):
-        season_id = int(rec["season_id"])
-        year = season_id % 10000
-        rnd = int(rec["playoff_round"])
-        player_id = int(rec["player_id"])
-        team_id = abbrev_to_id.get(str(rec["team_abbrev"]))
-        length_probs = length_by_team.get((year, rnd, team_id)) if team_id is not None else None
-        if length_probs is None:
-            n_skipped += 1
-            continue
-
-        ppg = float(rec["projected_points_per_game"])
-        projection = project_skater_round(
-            ppg,
-            length_probs,
-            seed=_row_seed(config.seed, season_id, rnd, player_id),
-            n_sims=config.n_sims,
-            horizon=config.horizon,
+    per_season = [
+        SeasonMetrics(
+            season_end_year=m.season_end_year,
+            n=m.n,
+            mae=m.mae,
+            spearman=m.spearman,
         )
-        actual_points = float(rec[LABEL_COLUMN]) * float(rec["round_games"])
-        baseline_reg = float(rec["points_per_game"]) * BASELINE_REG_GAMES
-        prev_key = (season_id, rnd - 1, player_id)
-        baseline_prev = prev_points.get(prev_key, baseline_reg)
-        rows.append(
-            {
-                "season_end_year": year,
-                "expected_points": projection.expected_points,
-                "actual_points": actual_points,
-                "baseline_reg": baseline_reg,
-                "baseline_prev": baseline_prev,
-                "p10": projection.p10,
-                "p90": projection.p90,
-            }
-        )
-
-    if not rows:
-        raise ValueError("no skater-round could be projected (all series unsimulated)")
-    scored = pd.DataFrame(rows)
-    model_pred = scored["expected_points"].to_numpy(dtype=float)
-    actual = scored["actual_points"].to_numpy(dtype=float)
-    base_reg = scored["baseline_reg"].to_numpy(dtype=float)
-    base_prev = scored["baseline_prev"].to_numpy(dtype=float)
-
-    per_season: list[SeasonMetrics] = []
-    for year in sorted(test_year_set):
-        mask = scored["season_end_year"].to_numpy() == int(year)
-        if not mask.any():
-            continue
-        per_season.append(
-            SeasonMetrics(
-                season_end_year=int(year),
-                n=int(mask.sum()),
-                mae=mean_absolute_error(model_pred[mask], actual[mask]),
-                spearman=spearman_correlation(model_pred[mask], actual[mask]),
-            )
-        )
+        for m in evaluation.per_season
+    ]
 
     return ProjectionResult(
-        config=config,
-        test_years=test_years,
-        n_projected=len(scored),
-        n_skipped_no_series=n_skipped,
-        test_mae_model=mean_absolute_error(model_pred, actual),
-        test_mae_baseline_reg=mean_absolute_error(base_reg, actual),
-        test_mae_baseline_prev=mean_absolute_error(base_prev, actual),
-        test_spearman_model=spearman_correlation(model_pred, actual),
-        test_spearman_baseline_reg=spearman_correlation(base_reg, actual),
-        test_spearman_baseline_prev=spearman_correlation(base_prev, actual),
+        config=resolved_config,
+        test_years=evaluation.test_years,
+        n_projected=evaluation.n_projected,
+        n_skipped_no_series=evaluation.n_skipped_no_series,
+        test_mae_model=evaluation.test_mae_model,
+        test_mae_baseline_reg=evaluation.test_mae_baseline_reg,
+        test_mae_baseline_prev=evaluation.test_mae_baseline_prev,
+        test_spearman_model=evaluation.test_spearman_model,
+        test_spearman_baseline_reg=evaluation.test_spearman_baseline_reg,
+        test_spearman_baseline_prev=evaluation.test_spearman_baseline_prev,
         per_season=per_season,
-        mean_expected_points=float(scored["expected_points"].mean()),
-        mean_p10=float(scored["p10"].mean()),
-        mean_p90=float(scored["p90"].mean()),
+        mean_expected_points=evaluation.mean_expected_points,
+        mean_p10=evaluation.mean_p10,
+        mean_p90=evaluation.mean_p90,
     )
 
 

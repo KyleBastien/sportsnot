@@ -37,40 +37,36 @@ every metric is reported as measured.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from draft_oracle.features.elo import (
-    EloConfig,
-    expected_score,
-    regress_to_mean,
-    update_rating,
+from draft_oracle.models._games import pivot_decided_games as pivot_decided_games
+from draft_oracle.models._series_reconstruct import (
+    _matchup_key as _matchup_key,
 )
-from draft_oracle.models._games import pivot_decided_games
+from draft_oracle.models._series_reconstruct import (
+    _MatchupRecord,
+)
+from draft_oracle.models._series_reconstruct import (
+    _pivot_all_games as _pivot_all_games,
+)
+from draft_oracle.models._series_reconstruct import (
+    reconstruct_series_matchups as reconstruct_series_matchups,
+)
 from draft_oracle.models.game_win import (
-    PLAYOFF_GAME_TYPE,
-    REGULAR_SEASON_GAME_TYPE,
     GameWinConfig,
     GameWinModel,
-    TeamState,
     brier_score,
     train_game_win_model,
 )
 from draft_oracle.models.shutout import (
     ShutoutConfig,
     ShutoutModel,
-    ShutoutTeamState,
     train_shutout_model,
-)
-from draft_oracle.models.skater_production import (
-    QUALIFYING_ROUND_GAME_DIGIT,
-    _playoff_round_digit,
-    _series_round_map,
-    playoff_round_cutoffs,
 )
 from draft_oracle.provenance import add_git_provenance
 from draft_oracle.rules import SHUTOUT_POINTS, WIN_POINTS
@@ -92,6 +88,8 @@ __all__ = [
     "simulate_series_monte_carlo",
     "train_series_sim_from_normalized",
 ]
+
+reconstruct_series_matchups.__module__ = __name__
 
 SERIES_SIM_VERSION = "series-sim-v1"
 
@@ -287,275 +285,6 @@ def simulate_series_monte_carlo(
         e_goalie_points_a=expected_goalie_points(e_wins_a, shutout_prob_a),
         e_goalie_points_b=expected_goalie_points(e_wins_b, shutout_prob_b),
     )
-
-
-# ── Historical series reconstruction (leakage-free pre-series states) ───────
-
-
-@dataclass
-class _MatchupRecord:
-    """Captured pre-series team snapshots + observed playoff shutouts for a matchup."""
-
-    win_snapshots: dict[int, dict[str, float]] = field(default_factory=dict)
-    shutout_snapshots: dict[int, dict[str, float]] = field(default_factory=dict)
-    observed_shutouts: int = 0
-    playoff_games: int = 0
-
-
-def _pivot_all_games(team_games: pd.DataFrame) -> pd.DataFrame:
-    """Adapt shared decided-game rows to series replay's column contract."""
-    games = pivot_decided_games(team_games).rename(
-        columns={
-            "home_team_abbrev": "home_abbrev",
-            "away_team_abbrev": "away_abbrev",
-        }
-    )
-    columns = [
-        "game_id",
-        "season_id",
-        "season_end_year",
-        "game_type_id",
-        "game_date",
-        "home_team_id",
-        "away_team_id",
-        "home_abbrev",
-        "away_abbrev",
-        "home_goals",
-        "away_goals",
-        "home_points",
-        "away_points",
-        "home_shots_against",
-        "away_shots_against",
-        "home_win",
-    ]
-    return games.loc[:, columns]
-
-
-def _matchup_key(year: int, team_a: int, team_b: int) -> tuple[int, int, int]:
-    """Order-independent key for a season's matchup between two team ids."""
-    lo, hi = sorted((int(team_a), int(team_b)))
-    return (int(year), lo, hi)
-
-
-@dataclass
-class _MatchupPlan:
-    """A real best-of-seven matchup's declared round cutoff and its two teams."""
-
-    cutoff: pd.Timestamp
-    year: int
-    id_a: int
-    id_b: int
-    abbrev_a: str
-    abbrev_b: str
-    frozen: bool = False
-
-
-def _matchup_cutoff_plan(team_games: pd.DataFrame, series: pd.DataFrame) -> list[_MatchupPlan]:
-    """Every real series' pre-round freeze target: its declared round-start cutoff.
-
-    Freezing a matchup's pre-series snapshot at the *round's* start (not the
-    matchup's own first game) keeps a slower series from absorbing games played on
-    or after the declared ``as_of_cutoff`` when rounds overlap (CODE_REVIEW m-3). A
-    round with no games yet (a genuine pre-round build) freezes at the previous
-    round's completion boundary instead of its own first game (CODE_REVIEW M-1).
-    """
-    round_map = _series_round_map(series)
-    round_starts = playoff_round_cutoffs(team_games, series)
-
-    abbrev_to_id: dict[tuple[int, str], int] = {}
-    tg = team_games[["season_id", "team_abbrev", "team_id"]]
-    for rec in tg.drop_duplicates().to_dict("records"):
-        abbrev_to_id[(int(rec["season_id"]), str(rec["team_abbrev"]))] = int(rec["team_id"])
-
-    plans: list[_MatchupPlan] = []
-    for (season_id, pair), rnd in round_map.items():
-        cutoff_str = round_starts.get(season_id, {}).get(rnd)
-        if cutoff_str is None:
-            continue
-        id_a = abbrev_to_id.get((season_id, pair[0]))
-        id_b = abbrev_to_id.get((season_id, pair[1]))
-        if id_a is None or id_b is None:
-            continue
-        plans.append(
-            _MatchupPlan(
-                cutoff=pd.Timestamp(cutoff_str),
-                year=season_id % 10000,
-                id_a=id_a,
-                id_b=id_b,
-                abbrev_a=pair[0],
-                abbrev_b=pair[1],
-            )
-        )
-    plans.sort(key=lambda p: p.cutoff)
-    return plans
-
-
-def _freeze_due_matchups(
-    plans: list[_MatchupPlan],
-    records: dict[tuple[int, int, int], _MatchupRecord],
-    win_states: dict[str, TeamState],
-    sho_states: dict[str, ShutoutTeamState],
-    as_of: pd.Timestamp,
-    *,
-    initial_elo: float,
-) -> None:
-    """Freeze pre-series snapshots for every planned matchup whose cutoff has arrived."""
-    for plan in plans:
-        if plan.frozen or plan.cutoff > as_of:
-            continue
-        a_win = win_states.setdefault(plan.abbrev_a, TeamState(elo=initial_elo))
-        b_win = win_states.setdefault(plan.abbrev_b, TeamState(elo=initial_elo))
-        a_sho = sho_states.setdefault(plan.abbrev_a, ShutoutTeamState())
-        b_sho = sho_states.setdefault(plan.abbrev_b, ShutoutTeamState())
-        key = _matchup_key(plan.year, plan.id_a, plan.id_b)
-        matchup = records.get(key)
-        if matchup is None:
-            matchup = _MatchupRecord()
-            records[key] = matchup
-        matchup.win_snapshots[plan.id_a] = a_win.snapshot()
-        matchup.win_snapshots[plan.id_b] = b_win.snapshot()
-        matchup.shutout_snapshots[plan.id_a] = a_sho.snapshot()
-        matchup.shutout_snapshots[plan.id_b] = b_sho.snapshot()
-        plan.frozen = True
-
-
-def reconstruct_series_matchups(
-    team_games: pd.DataFrame,
-    *,
-    series: pd.DataFrame | None = None,
-    elo_config: EloConfig | None = None,
-) -> dict[tuple[int, int, int], _MatchupRecord]:
-    """Replay all games once, capturing pre-series states + observed shutouts.
-
-    A single chronological pass maintains, per team, the win model's
-    :class:`~draft_oracle.models.game_win.TeamState` (Elo + offensive proxies) and
-    the shutout model's :class:`~draft_oracle.models.shutout.ShutoutTeamState`
-    (goaltending proxies), using the exact same update rules as those models so the
-    features line up.
-
-    When ``series`` is supplied each matchup's pre-series snapshot is frozen at its
-    **round's declared start cutoff** (the earliest game of that round), so a series
-    that starts later than its round cannot absorb games played on or after that
-    cutoff (CODE_REVIEW m-3). Without ``series`` the legacy per-series freeze (at the
-    matchup's own first game) is used. In both modes the 2019-20 bubble qualifying
-    round and round-robin games (``game_id`` round digit ``0``) never form or count
-    toward a matchup (CODE_REVIEW m-6); they still feed Elo like any played game.
-    Snapshots read only games strictly before the freeze point, so there is no
-    leakage (SPEC section 6).
-    """
-    elo_config = elo_config or EloConfig()
-    games = _pivot_all_games(team_games)
-
-    win_states: dict[str, TeamState] = {}
-    sho_states: dict[str, ShutoutTeamState] = {}
-    records: dict[tuple[int, int, int], _MatchupRecord] = {}
-    last_season: int | None = None
-
-    plans = _matchup_cutoff_plan(team_games, series) if series is not None else None
-
-    for record in games.to_dict("records"):
-        season = int(record["season_id"])
-        if last_season is not None and season != last_season:
-            for win_state in win_states.values():
-                win_state.elo = regress_to_mean(
-                    win_state.elo, elo_config.initial, elo_config.season_regression
-                )
-                win_state.reg_games = 0
-                win_state.reg_points = 0
-                win_state.reg_goals_for = 0
-                win_state.reg_goals_against = 0
-                win_state.reg_wins = 0
-            for sho_state in sho_states.values():
-                sho_state.reset_season()
-        last_season = season
-
-        home_abbrev = str(record["home_abbrev"])
-        away_abbrev = str(record["away_abbrev"])
-        home_win = win_states.setdefault(home_abbrev, TeamState(elo=elo_config.initial))
-        away_win = win_states.setdefault(away_abbrev, TeamState(elo=elo_config.initial))
-        home_sho = sho_states.setdefault(home_abbrev, ShutoutTeamState())
-        away_sho = sho_states.setdefault(away_abbrev, ShutoutTeamState())
-
-        if plans is not None:
-            _freeze_due_matchups(
-                plans,
-                records,
-                win_states,
-                sho_states,
-                pd.Timestamp(record["game_date"]),
-                initial_elo=elo_config.initial,
-            )
-
-        home_goals = int(record["home_goals"])
-        away_goals = int(record["away_goals"])
-        home_won = bool(record["home_win"])
-
-        is_qualifying = _playoff_round_digit(record["game_id"]) == QUALIFYING_ROUND_GAME_DIGIT
-        if int(record["game_type_id"]) == PLAYOFF_GAME_TYPE and not is_qualifying:
-            year = int(record["season_end_year"])
-            home_id = int(record["home_team_id"])
-            away_id = int(record["away_team_id"])
-            key = _matchup_key(year, home_id, away_id)
-            matchup = records.get(key)
-            if matchup is None and plans is None:
-                matchup = _MatchupRecord()
-                matchup.win_snapshots[home_id] = home_win.snapshot()
-                matchup.win_snapshots[away_id] = away_win.snapshot()
-                matchup.shutout_snapshots[home_id] = home_sho.snapshot()
-                matchup.shutout_snapshots[away_id] = away_sho.snapshot()
-                records[key] = matchup
-            if matchup is not None:
-                matchup.playoff_games += 1
-                if (home_won and away_goals == 0) or (not home_won and home_goals == 0):
-                    matchup.observed_shutouts += 1
-
-        # Elo update (all games), then regular-season-only counters + goalie state.
-        exp_home = expected_score(home_win.elo, away_win.elo, elo_config.home_advantage)
-        actual_home = 1.0 if home_won else 0.0
-        home_win.elo = update_rating(home_win.elo, exp_home, actual_home, elo_config.k)
-        away_win.elo = update_rating(away_win.elo, 1.0 - exp_home, 1.0 - actual_home, elo_config.k)
-        if int(record["game_type_id"]) == REGULAR_SEASON_GAME_TYPE:
-            home_win.record_regular_season(
-                points=int(record["home_points"]),
-                goals_for=home_goals,
-                goals_against=away_goals,
-                won=home_won,
-            )
-            away_win.record_regular_season(
-                points=int(record["away_points"]),
-                goals_for=away_goals,
-                goals_against=home_goals,
-                won=not home_won,
-            )
-            home_sho.record_regular_season(
-                goals_for=home_goals,
-                goals_against=away_goals,
-                shots_against=int(record["home_shots_against"]),
-                won=home_won,
-            )
-            away_sho.record_regular_season(
-                goals_for=away_goals,
-                goals_against=home_goals,
-                shots_against=int(record["away_shots_against"]),
-                won=not home_won,
-            )
-
-    if plans is not None:
-        # Freeze any matchup whose declared cutoff is after every played game -- a
-        # genuine pre-round build (round N has no games yet) freezes at the state
-        # reached after the previous round, the correct pre-round-N snapshot
-        # (CODE_REVIEW M-1). In backtests over complete seasons no such matchup
-        # exists, so this pass is a no-op.
-        _freeze_due_matchups(
-            plans,
-            records,
-            win_states,
-            sho_states,
-            pd.Timestamp.max,
-            initial_elo=elo_config.initial,
-        )
-
-    return records
 
 
 # ── Calibration on held-out seasons ─────────────────────────────────────────

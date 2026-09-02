@@ -32,6 +32,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from draft_oracle.ingest import _league_drafts_order as _league_drafts_order_module
 from draft_oracle.ingest.normalize import DEFAULT_NORMALIZED_DIR
 
 # ── Directory contract (SPEC §4) ─────────────────────────────────────────
@@ -225,45 +226,8 @@ def detect_draft_order(rows: list[list[str]]) -> dict[str, int] | None:
     Returns ``{canonical_manager: snake_slot}`` (1-based) or ``None`` when a tab records
     no order (``sheet2__round-1.csv``). Raises if two conflicting orders are found.
     """
-    ncols = max((len(row) for row in rows), default=0)
-    runs: list[tuple[str, ...]] = []
 
-    # Horizontal runs (order written across a row).
-    for row in rows:
-        col = 5
-        while col < len(row):
-            if _is_manager_token(_cell(row, col)):
-                run: list[str] = []
-                while col < len(row) and _is_manager_token(_cell(row, col)):
-                    run.append(canonical_manager(_cell(row, col)))
-                    col += 1
-                if len(run) >= 4:
-                    runs.append(tuple(run[:4]))
-            else:
-                col += 1
-
-    # Vertical runs (order written down a column).
-    for col in range(5, ncols):
-        r = 0
-        while r < len(rows):
-            if _is_manager_token(_cell(rows[r], col)):
-                run = []
-                while r < len(rows) and _is_manager_token(_cell(rows[r], col)):
-                    run.append(canonical_manager(_cell(rows[r], col)))
-                    r += 1
-                if len(run) >= 4:
-                    runs.append(tuple(run[:4]))
-            else:
-                r += 1
-
-    valid = {run for run in runs if set(run) == LEAGUE_MANAGERS}
-    if not valid:
-        return None
-    if len(valid) > 1:
-        raise ValueError(f"ambiguous draft-order lists detected: {sorted(valid)}")
-    order = next(iter(valid))
-    return {manager: slot for slot, manager in enumerate(order, start=1)}
-
+    return _league_drafts_order_module.detect_draft_order(rows)
 
 # ── Sheet-block splitting ────────────────────────────────────────────────
 

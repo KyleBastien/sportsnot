@@ -33,6 +33,7 @@ pass.
 
 from __future__ import annotations
 
+from collections.abc import Hashable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -50,6 +51,7 @@ from draft_oracle.features.elo import (
     regress_to_mean,
     update_rating,
 )
+from draft_oracle.models._game_win_report import game_win_report_lines
 from draft_oracle.models._games import pivot_decided_games
 from draft_oracle.provenance import add_git_provenance
 
@@ -72,12 +74,10 @@ __all__ = [
 ]
 
 GAME_WIN_MODEL_VERSION = "game-win-v1"
-
 REGULAR_SEASON_GAME_TYPE = 2
 PLAYOFF_GAME_TYPE = 3
 COIN_FLIP_PROB = 0.5
 
-# Difference features shared by both model variants (home minus away).
 STAT_FEATURE_COLUMNS: tuple[str, ...] = (
     "elo_diff",
     "goal_diff_per_game_diff",
@@ -88,7 +88,6 @@ STAT_FEATURE_COLUMNS: tuple[str, ...] = (
     "is_playoff",
 )
 
-# Market variant adds the de-vigged home implied probability + its missing flag.
 MARKET_FEATURE_COLUMNS: tuple[str, ...] = (
     *STAT_FEATURE_COLUMNS,
     "market_home_prob",
@@ -265,6 +264,22 @@ def _attach_market(games: pd.DataFrame, odds: pd.DataFrame | None) -> pd.DataFra
     return out
 
 
+@dataclass
+class _GameReplay:
+    elo_config: EloConfig
+    states: dict[str, TeamState] = field(default_factory=dict)
+    rows: list[dict[str, float]] = field(default_factory=list)
+    last_season: int | None = None
+
+
+@dataclass(frozen=True)
+class _PregameTeams:
+    home: TeamState
+    away: TeamState
+    home_snapshot: dict[str, float]
+    away_snapshot: dict[str, float]
+
+
 def build_game_dataset(
     team_games: pd.DataFrame,
     *,
@@ -281,83 +296,133 @@ def build_game_dataset(
     dropped (their pre-game rates are pure cold-start noise); playoff games always
     qualify because a full regular season precedes them.
     """
-    elo_config = elo_config or EloConfig()
-    games = _pivot_games(team_games)
-    games = _attach_market(games, odds)
-
-    states: dict[str, TeamState] = {}
-    last_season: int | None = None
-    rows: list[dict[str, float]] = []
-
+    replay = _GameReplay(elo_config=elo_config or EloConfig())
+    games = _attach_market(_pivot_games(team_games), odds)
     for record in games.to_dict("records"):
-        season = int(record["season_id"])
-        if last_season is not None and season != last_season:
-            for state in states.values():
-                state.elo = regress_to_mean(
-                    state.elo, elo_config.initial, elo_config.season_regression
-                )
-                state.reg_games = 0
-                state.reg_points = 0
-                state.reg_goals_for = 0
-                state.reg_goals_against = 0
-                state.reg_wins = 0
-        last_season = season
+        _replay_game(replay, record)
 
-        home_abbrev = str(record["home_team_abbrev"])
-        away_abbrev = str(record["away_team_abbrev"])
-        home_state = states.setdefault(home_abbrev, TeamState(elo=elo_config.initial))
-        away_state = states.setdefault(away_abbrev, TeamState(elo=elo_config.initial))
-
-        home_snap = home_state.snapshot()
-        away_snap = away_state.snapshot()
-        is_playoff = int(record["game_type_id"]) == PLAYOFF_GAME_TYPE
-        market_raw = record["market_home_prob"]
-        market_home_prob = None if pd.isna(market_raw) else float(market_raw)
-
-        feature_row = matchup_feature_row(
-            home_snap, away_snap, is_playoff=is_playoff, market_home_prob=market_home_prob
-        )
-        row: dict[str, float] = dict(feature_row)
-        for key in _STATE_PRIMITIVES:
-            row[f"home_{key}"] = home_snap[key]
-            row[f"away_{key}"] = away_snap[key]
-        row["game_id"] = float(record["game_id"])
-        row["season_end_year"] = float(record["season_end_year"])
-        row["game_type_id"] = float(record["game_type_id"])
-        row["home_win"] = float(record["home_win"])
-        row["home_pregame_games"] = float(home_state.reg_games)
-        row["away_pregame_games"] = float(away_state.reg_games)
-        rows.append(row)
-
-        # Elo update (both teams), then in-season regular-season counters.
-        exp_home = expected_score(home_state.elo, away_state.elo, elo_config.home_advantage)
-        actual_home = float(record["home_win"])
-        home_state.elo = update_rating(home_state.elo, exp_home, actual_home, elo_config.k)
-        away_state.elo = update_rating(
-            away_state.elo, 1.0 - exp_home, 1.0 - actual_home, elo_config.k
-        )
-        if int(record["game_type_id"]) == REGULAR_SEASON_GAME_TYPE:
-            home_won = bool(record["home_win"])
-            home_state.record_regular_season(
-                points=int(record["home_points"]),
-                goals_for=int(record["home_goals"]),
-                goals_against=int(record["away_goals"]),
-                won=home_won,
-            )
-            away_state.record_regular_season(
-                points=int(record["away_points"]),
-                goals_for=int(record["away_goals"]),
-                goals_against=int(record["home_goals"]),
-                won=not home_won,
-            )
-
-    dataset = pd.DataFrame(rows)
+    dataset = pd.DataFrame(replay.rows)
     if dataset.empty:
         return dataset
     keep = (dataset["home_pregame_games"] >= min_pregame_games) & (
         dataset["away_pregame_games"] >= min_pregame_games
     )
     return dataset.loc[keep].reset_index(drop=True)
+
+
+def _replay_game(replay: _GameReplay, record: Mapping[Hashable, Any]) -> None:
+    _reset_game_states_if_new_season(replay, int(record["season_id"]))
+    teams = _pregame_teams(replay, record)
+    replay.rows.append(_game_dataset_row(record, teams))
+    _update_game_state(replay, record, teams)
+
+
+def _reset_game_states_if_new_season(replay: _GameReplay, season: int) -> None:
+    if replay.last_season is None or season == replay.last_season:
+        replay.last_season = season
+        return
+    for state in replay.states.values():
+        _reset_team_state(state, replay.elo_config)
+    replay.last_season = season
+
+
+def _reset_team_state(state: TeamState, elo_config: EloConfig) -> None:
+    state.elo = regress_to_mean(state.elo, elo_config.initial, elo_config.season_regression)
+    state.reg_games = 0
+    state.reg_points = 0
+    state.reg_goals_for = 0
+    state.reg_goals_against = 0
+    state.reg_wins = 0
+
+
+def _pregame_teams(replay: _GameReplay, record: Mapping[Hashable, Any]) -> _PregameTeams:
+    home_abbrev = str(record["home_team_abbrev"])
+    away_abbrev = str(record["away_team_abbrev"])
+    home_state = replay.states.setdefault(
+        home_abbrev, TeamState(elo=replay.elo_config.initial)
+    )
+    away_state = replay.states.setdefault(
+        away_abbrev, TeamState(elo=replay.elo_config.initial)
+    )
+    return _PregameTeams(
+        home=home_state,
+        away=away_state,
+        home_snapshot=home_state.snapshot(),
+        away_snapshot=away_state.snapshot(),
+    )
+
+
+def _game_dataset_row(
+    record: Mapping[Hashable, Any],
+    teams: _PregameTeams,
+) -> dict[str, float]:
+    market_raw = record["market_home_prob"]
+    market_home_prob = None if pd.isna(market_raw) else float(market_raw)
+    row = matchup_feature_row(
+        teams.home_snapshot,
+        teams.away_snapshot,
+        is_playoff=int(record["game_type_id"]) == PLAYOFF_GAME_TYPE,
+        market_home_prob=market_home_prob,
+    )
+    for key in _STATE_PRIMITIVES:
+        row[f"home_{key}"] = teams.home_snapshot[key]
+        row[f"away_{key}"] = teams.away_snapshot[key]
+    row["game_id"] = float(record["game_id"])
+    row["season_end_year"] = float(record["season_end_year"])
+    row["game_type_id"] = float(record["game_type_id"])
+    row["home_win"] = float(record["home_win"])
+    row["home_pregame_games"] = float(teams.home.reg_games)
+    row["away_pregame_games"] = float(teams.away.reg_games)
+    return row
+
+
+def _update_game_state(
+    replay: _GameReplay,
+    record: Mapping[Hashable, Any],
+    teams: _PregameTeams,
+) -> None:
+    _update_game_elo(replay, record, teams)
+    if int(record["game_type_id"]) == REGULAR_SEASON_GAME_TYPE:
+        _record_regular_season_game(record, teams)
+
+
+def _update_game_elo(
+    replay: _GameReplay,
+    record: Mapping[Hashable, Any],
+    teams: _PregameTeams,
+) -> None:
+    exp_home = expected_score(
+        teams.home.elo,
+        teams.away.elo,
+        replay.elo_config.home_advantage,
+    )
+    actual_home = float(record["home_win"])
+    teams.home.elo = update_rating(teams.home.elo, exp_home, actual_home, replay.elo_config.k)
+    teams.away.elo = update_rating(
+        teams.away.elo,
+        1.0 - exp_home,
+        1.0 - actual_home,
+        replay.elo_config.k,
+    )
+
+
+def _record_regular_season_game(
+    record: Mapping[Hashable, Any],
+    teams: _PregameTeams,
+) -> None:
+    home_won = bool(record["home_win"])
+    teams.home.record_regular_season(
+        points=int(record["home_points"]),
+        goals_for=int(record["home_goals"]),
+        goals_against=int(record["away_goals"]),
+        won=home_won,
+    )
+    teams.away.record_regular_season(
+        points=int(record["away_points"]),
+        goals_for=int(record["away_goals"]),
+        goals_against=int(record["home_goals"]),
+        won=not home_won,
+    )
 
 
 # ── Temporal splits ────────────────────────────────────────────────────────
@@ -547,73 +612,7 @@ class GameWinResult:
 
     def report_lines(self) -> list[str]:
         """Human-readable evaluation report (Markdown; ASCII only)."""
-        cfg = self.config
-        lines = [
-            f"# Per-game win model ({GAME_WIN_MODEL_VERSION})",
-            "",
-            "Single-game `P(home beats away)` model, home/away aware, trained on",
-            "historical regular-season and playoff games. Features are home-minus-away",
-            "differences of a cross-season Elo rating and in-season regular-season rates,",
-            "plus an optional de-vigged betting-market home probability.",
-            "",
-            "## Reproducibility",
-            f"- Seed: {cfg.seed}",
-            f"- Min pre-game regular-season games per team: {cfg.min_pregame_games}",
-            f"- Train seasons (end year): {list(self.split.train_years)} ({self.n_train} games)",
-            f"- Validation seasons: {list(self.split.val_years)} ({self.n_val} games)",
-            f"- Test seasons (held out): {list(self.split.test_years)} ({self.n_test} games)",
-            "- Splits are strictly temporal: no test-season game touches training or",
-            "  model selection (SPEC section 6).",
-            "",
-            "## Model selection (validation Brier, lower is better)",
-        ]
-        for model_type, brier in sorted(self.val_brier_by_model.items()):
-            marker = "  <- chosen" if model_type == self.chosen_model_type else ""
-            lines.append(f"- {model_type}: {brier:.4f}{marker}")
-        lines += [
-            "",
-            f"Chosen model: **{self.chosen_model_type}** (lowest validation Brier).",
-            "It is refit on train + validation seasons before the held-out test.",
-            "",
-            "## Held-out test Brier vs. fixed baselines",
-            f"- market + stats model: {self.test_brier_market:.4f}",
-            f"- stats-only model:     {self.test_brier_stats_only:.4f}",
-            f"- baseline (a) coin flip:              {self.test_brier_coin_flip:.4f}",
-            f"- baseline (b) higher reg-season pts:  {self.test_brier_higher_points:.4f}",
-            "",
-            f"- Beats coin flip: {'yes' if self.beats_coin_flip else 'NO'}",
-            f"- Beats higher-points baseline: {'yes' if self.beats_higher_points else 'NO'}",
-            f"- Beats both baselines: {'yes' if self.beats_both_baselines else 'NO'}",
-            "",
-            "## Ablation: does the market help? (test seasons with odds coverage)",
-            f"- Test-set market coverage: {self.test_market_coverage:.1%} of games priced.",
-            f"- market + stats Brier: {self.test_brier_market:.4f}",
-            f"- stats-only Brier:     {self.test_brier_stats_only:.4f}",
-            f"- Market improves Brier: {'yes' if self.market_helps else 'no'}"
-            f" (delta {self.test_brier_stats_only - self.test_brier_market:+.4f}).",
-            "",
-            "## Market coverage by season",
-            "Coverage uses the modeled rows after the pre-game-history filter.",
-        ]
-        for year, coverage in sorted(self.market_coverage_by_season.items()):
-            uncovered = " - uncovered" if coverage.uncovered else ""
-            lines.append(
-                f"- {year} ({coverage.split}): {coverage.priced_games}/"
-                f"{coverage.total_games} games priced ({coverage.fraction:.1%})"
-                f"{uncovered}"
-            )
-        lines.append("")
-        if not self.beats_both_baselines:
-            lines += [
-                "## Honest note on a missed target",
-                "The headline model did not beat both baselines on this split. Reported",
-                "as-is (SPEC section 7): baselines, splits, and seeds are unchanged. One",
-                "plausible improvement: add rest/schedule-density and explicit goalie-",
-                "availability features, plus probability calibration",
-                "(isotonic / Platt) on the validation fold before scoring the test set.",
-                "",
-            ]
-        return lines
+        return game_win_report_lines(self, GAME_WIN_MODEL_VERSION)
 
 
 @dataclass(frozen=True)

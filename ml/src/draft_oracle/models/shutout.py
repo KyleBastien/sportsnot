@@ -52,9 +52,26 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from draft_oracle.models._games import pivot_decided_games
+from draft_oracle.models._games import pivot_decided_games as pivot_decided_games
+from draft_oracle.models._shutout_dataset import (
+    NEUTRAL_SAVE_PCT as NEUTRAL_SAVE_PCT,
+)
+from draft_oracle.models._shutout_dataset import (
+    ShutoutTeamState,
+)
+from draft_oracle.models._shutout_dataset import (
+    _pivot_games as _pivot_games,
+)
+from draft_oracle.models._shutout_dataset import (
+    _save_pct as _save_pct,
+)
+from draft_oracle.models._shutout_dataset import (
+    build_shutout_dataset as build_shutout_dataset,
+)
+from draft_oracle.models._shutout_dataset import (
+    shutout_feature_row as shutout_feature_row,
+)
 from draft_oracle.models.game_win import (
-    REGULAR_SEASON_GAME_TYPE,
     TemporalSplit,
     brier_score,
     default_temporal_split,
@@ -77,11 +94,10 @@ __all__ = [
     "train_shutout_model",
 ]
 
-SHUTOUT_MODEL_VERSION = "shutout-v1"
+for public_obj in (ShutoutTeamState, build_shutout_dataset, shutout_feature_row):
+    public_obj.__module__ = __name__
 
-# League-average team save percentage; the neutral prior for the backup split when
-# no per-goalie data is available (the archive has none -- SPEC section 1).
-NEUTRAL_SAVE_PCT = 0.9
+SHUTOUT_MODEL_VERSION = "shutout-v1"
 
 # Feature order is fixed so it lines up with the LightGBM monotone constraints.
 SHUTOUT_FEATURE_COLUMNS: tuple[str, ...] = (
@@ -161,206 +177,6 @@ def _select_shrinkage_weight(
             best_brier = score
             best_weight = weight
     return best_weight, by_weight
-
-
-# ── Pre-game team state (leakage-free running goaltending proxies) ──────────
-
-
-@dataclass
-class ShutoutTeamState:
-    """Mutable per-team running regular-season state accumulated from earlier games.
-
-    All proxies are team-level (the league's goalie slot is a team's goaltending)
-    and reset each season. ``save_pct`` before a team faces any shots is ``0.0``;
-    the ``min_pregame_games`` filter drops those cold-start rows.
-    """
-
-    games: int = 0
-    goals_for: int = 0
-    goals_against: int = 0
-    shots_against: int = 0
-    shutout_wins: int = 0
-    recent: list[tuple[int, int]] = field(default_factory=list)
-    last_n: int = 15
-
-    def snapshot(self) -> dict[str, float]:
-        """Pre-game goaltending + offence proxies from the state accumulated so far."""
-        games = self.games
-        if games == 0:
-            return {
-                "save_pct_season": 0.0,
-                "save_pct_l15": 0.0,
-                "team_shutout_rate": 0.0,
-                "goals_for_per_game": 0.0,
-            }
-        recent_ga = sum(ga for ga, _ in self.recent)
-        recent_sa = sum(sa for _, sa in self.recent)
-        return {
-            "save_pct_season": _save_pct(self.goals_against, self.shots_against),
-            "save_pct_l15": _save_pct(recent_ga, recent_sa),
-            "team_shutout_rate": self.shutout_wins / games,
-            "goals_for_per_game": self.goals_for / games,
-        }
-
-    def record_regular_season(
-        self, *, goals_for: int, goals_against: int, shots_against: int, won: bool
-    ) -> None:
-        """Fold a completed regular-season game into the running counters."""
-        self.games += 1
-        self.goals_for += goals_for
-        self.goals_against += goals_against
-        self.shots_against += shots_against
-        self.shutout_wins += int(won and goals_against == 0)
-        self.recent.append((goals_against, shots_against))
-        if len(self.recent) > self.last_n:
-            self.recent = self.recent[-self.last_n :]
-
-    def reset_season(self) -> None:
-        """Clear per-season counters at a season boundary."""
-        self.games = 0
-        self.goals_for = 0
-        self.goals_against = 0
-        self.shots_against = 0
-        self.shutout_wins = 0
-        self.recent = []
-
-
-def _save_pct(goals_against: float, shots_against: float) -> float:
-    """Team save percentage ``1 - GA / shots-against`` (``0.0`` with no shots)."""
-    if shots_against <= 0:
-        return 0.0
-    return 1.0 - (float(goals_against) / float(shots_against))
-
-
-def shutout_feature_row(
-    winner: dict[str, float],
-    loser: dict[str, float],
-    *,
-    backup_save_pct: float | None = None,
-    starter_unavailability_risk: float = 0.0,
-    goalie_injury_data_available: bool = False,
-) -> dict[str, float]:
-    """Build the model feature row for a winner/loser matchup from state snapshots.
-
-    ``winner`` / ``loser`` are :meth:`ShutoutTeamState.snapshot` dicts. When no
-    per-goalie backup save % is available it is imputed to :data:`NEUTRAL_SAVE_PCT`
-    and flagged (``goalie_split_available = 0``); the unavailability risk defaults to
-    ``0`` with its own availability flag so the live pipeline can override both.
-    """
-    return {
-        "winner_save_pct_season": winner["save_pct_season"],
-        "winner_save_pct_l15": winner["save_pct_l15"],
-        "winner_team_shutout_rate": winner["team_shutout_rate"],
-        "opponent_goals_for_per_game": loser["goals_for_per_game"],
-        "backup_save_pct": (
-            NEUTRAL_SAVE_PCT if backup_save_pct is None else float(backup_save_pct)
-        ),
-        "goalie_split_available": 0.0 if backup_save_pct is None else 1.0,
-        "starter_unavailability_risk": float(starter_unavailability_risk),
-        "goalie_injury_data_available": 1.0 if goalie_injury_data_available else 0.0,
-    }
-
-
-def _pivot_games(team_games: pd.DataFrame) -> pd.DataFrame:
-    """Adapt shared decided-game rows to shutout's column contract."""
-    games = pivot_decided_games(team_games).rename(
-        columns={
-            "home_team_abbrev": "home_abbrev",
-            "away_team_abbrev": "away_abbrev",
-        }
-    )
-    columns = [
-        "game_id",
-        "season_id",
-        "season_end_year",
-        "game_type_id",
-        "game_date",
-        "home_abbrev",
-        "away_abbrev",
-        "home_goals",
-        "away_goals",
-        "home_shots_against",
-        "away_shots_against",
-        "home_win",
-    ]
-    return games.loc[:, columns]
-
-
-def build_shutout_dataset(
-    team_games: pd.DataFrame,
-    *,
-    last_n: int = 15,
-    min_pregame_games: int = 5,
-) -> pd.DataFrame:
-    """Assemble the winner-framed shutout modelling frame with pre-game features.
-
-    One row per decided game, framed from the winner, with the goaltending-situation
-    features, both teams' pre-game proxies, and the ``is_shutout`` label (the winner
-    held the loser scoreless). Games where the winner has fewer than
-    ``min_pregame_games`` regular-season games so far are dropped (pure cold-start
-    save-percentage noise); playoff games always qualify because a full regular
-    season precedes them.
-    """
-    games = _pivot_games(team_games)
-
-    states: dict[str, ShutoutTeamState] = {}
-    last_season: int | None = None
-    rows: list[dict[str, float]] = []
-
-    for record in games.to_dict("records"):
-        season = int(record["season_id"])
-        if last_season is not None and season != last_season:
-            for state in states.values():
-                state.reset_season()
-        last_season = season
-
-        home_abbrev = str(record["home_abbrev"])
-        away_abbrev = str(record["away_abbrev"])
-        home_state = states.setdefault(home_abbrev, ShutoutTeamState(last_n=last_n))
-        away_state = states.setdefault(away_abbrev, ShutoutTeamState(last_n=last_n))
-
-        home_goals = int(record["home_goals"])
-        away_goals = int(record["away_goals"])
-        home_won = bool(record["home_win"])
-        if home_won:
-            winner_state, loser_state = home_state, away_state
-            winner_ga = away_goals
-            winner_pregame = home_state.games
-        else:
-            winner_state, loser_state = away_state, home_state
-            winner_ga = home_goals
-            winner_pregame = away_state.games
-
-        feature_row = shutout_feature_row(winner_state.snapshot(), loser_state.snapshot())
-        row: dict[str, float] = dict(feature_row)
-        row["game_id"] = float(record["game_id"])
-        row["season_end_year"] = float(record["season_end_year"])
-        row["game_type_id"] = float(record["game_type_id"])
-        row["is_shutout"] = float(winner_ga == 0)
-        row["winner_pregame_games"] = float(winner_pregame)
-        rows.append(row)
-
-        # Update running state from regular-season games only (playoff games are
-        # scored off the regular-season proxies that precede them).
-        if int(record["game_type_id"]) == REGULAR_SEASON_GAME_TYPE:
-            home_state.record_regular_season(
-                goals_for=home_goals,
-                goals_against=away_goals,
-                shots_against=int(record["home_shots_against"]),
-                won=home_won,
-            )
-            away_state.record_regular_season(
-                goals_for=away_goals,
-                goals_against=home_goals,
-                shots_against=int(record["away_shots_against"]),
-                won=not home_won,
-            )
-
-    dataset = pd.DataFrame(rows)
-    if dataset.empty:
-        return dataset
-    keep = dataset["winner_pregame_games"] >= min_pregame_games
-    return dataset.loc[keep].reset_index(drop=True)
 
 
 def _rows_for_years(dataset: pd.DataFrame, years: tuple[int, ...]) -> pd.DataFrame:
@@ -610,94 +426,130 @@ class ShutoutResult:
 
     def report_lines(self) -> list[str]:
         """Human-readable evaluation report (Markdown; ASCII only)."""
-        cfg = self.config
-        lines = [
-            f"# Shutout probability model ({SHUTOUT_MODEL_VERSION})",
-            "",
-            "`P(the win is a shutout | a team wins this game)`, framed from the winning",
-            "team. Features are the winner's team-level goaltending proxies (season and",
-            "last-15-game save %, team shutout rate), the loser's goals-for per game, and",
-            "backup-save-% / starter-unavailability terms with explicit missing-flags. The",
-            "model is monotone in goalie quality. Shutout wins are worth 4 fantasy points",
-            "vs. 2 for a normal win, so this prices the goalie slot's upside (SPEC 1).",
-            "",
-            "## Reproducibility",
-            f"- Seed: {cfg.seed}",
-            f"- Min pre-game regular-season games (winner): {cfg.min_pregame_games}",
-            f"- Save-% recency window: last {cfg.last_n} games",
-            f"- Train seasons (end year): {list(self.split.train_years)} ({self.n_train} games)",
-            f"- Validation seasons: {list(self.split.val_years)} ({self.n_val} games)",
-            f"- Test seasons (held out): {list(self.split.test_years)} ({self.n_test} games)",
-            "- Splits are strictly temporal: no test-season game touches training or",
-            "  model selection (SPEC section 6).",
-            "",
-            "## Model selection (validation Brier, lower is better)",
-        ]
-        for model_type, brier in sorted(self.val_brier_by_model.items()):
-            marker = "  <- chosen" if model_type == self.chosen_model_type else ""
-            lines.append(f"- {model_type}: {brier:.4f}{marker}")
-        shrink_note = (
-            "shrinkage adopted"
-            if self.shrinkage_adopted
-            else "no shrinkage -- pure model wins on validation"
-        )
-        lines += [
-            "",
-            f"Chosen model: **{self.chosen_model_type}** (lowest validation Brier).",
-            "It is refit on train + validation seasons before the held-out test.",
-            "",
-            "## Base-rate shrinkage (validation-selected, US-105)",
-            "The raw model shows little to no held-out skill over the playoff base",
-            "rate (CODE_REVIEW observation), so a shrinkage weight `w` blending",
-            "`w*model + (1-w)*base_rate` is selected on the validation fold only",
-            "(never the held-out test). `w=1.0` keeps the pure model; `w=0.0`",
-            "collapses onto the base rate.",
-            "",
-            f"- Selected weight: **{self.shrinkage_weight:.2f}** ({shrink_note})",
-            f"- Shrinkage base rate (train+val shutout rate): {self.shrinkage_base_rate:.4f}",
-            "- Validation Brier by weight (1.00 = pure model):",
-        ]
-        for weight_key in sorted(self.val_brier_by_shrinkage, key=float, reverse=True):
-            marker = "  <- chosen" if abs(float(weight_key) - self.shrinkage_weight) < 1e-9 else ""
-            brier = self.val_brier_by_shrinkage[weight_key]
-            lines.append(f"  - w={weight_key}: {brier:.4f}{marker}")
-        lines += [
-            "",
-            "## Held-out test Brier vs. base-rate baseline",
-            f"- shutout model (w={self.shrinkage_weight:.2f}): {self.test_brier_model:.4f}",
-            f"- shutout model (unshrunk, w=1.00):  {self.test_brier_model_unshrunk:.4f}",
-            f"- baseline (train shutout rate {self.train_shutout_rate:.3f}): "
-            f"{self.test_brier_base_rate:.4f}",
-            f"- Beats base rate: {'yes' if self.beats_base_rate else 'NO'}",
-            "",
-            "## Calibration: predicted vs. observed shutout frequency (held out)",
-            f"- Observed shutout rate:  {self.test_observed_rate:.4f}",
-            f"- Predicted shutout rate: {self.test_predicted_rate:.4f}",
-            f"- Relative error: {self.calibration_rel_error:.1%} "
-            f"(target within +/-{cfg.calibration_tolerance:.0%})",
-            f"- Within target: {'yes' if self.calibrated_within_tolerance else 'NO'}",
-            "",
-            "### Reliability bins (predicted bucket -> observed rate)",
-            "| predicted range | n | mean predicted | observed |",
-            "| --- | --- | --- | --- |",
-        ]
-        for b in self.calibration_bins:
-            lines.append(
-                f"| {b.lower:.3f}-{b.upper:.3f} | {b.count} | "
-                f"{b.mean_predicted:.3f} | {b.observed_rate:.3f} |"
-            )
-        lines.append("")
-        if not self.calibrated_within_tolerance:
-            lines += [
-                "## Honest note on a missed target",
-                "Overall calibration missed the +/-25% target on this split. Reported",
-                "as-is (SPEC section 7): baselines, splits, and seeds are unchanged. One",
-                "plausible improvement: fit isotonic / Platt calibration on the validation",
-                "fold before scoring the test set, and add real per-goalie starter/backup",
-                "save-% and injury availability (US-008) once that data is wired in.",
-                "",
-            ]
+        lines = _shutout_report_intro(self)
+        lines.extend(_shutout_model_selection_lines(self))
+        lines.extend(_shutout_shrinkage_lines(self))
+        lines.extend(_shutout_test_lines(self))
+        lines.extend(_shutout_calibration_lines(self))
+        lines.extend(_shutout_honest_note_lines(self))
         return lines
+
+
+def _shutout_report_intro(result: ShutoutResult) -> list[str]:
+    cfg = result.config
+    return [
+        f"# Shutout probability model ({SHUTOUT_MODEL_VERSION})",
+        "",
+        "`P(the win is a shutout | a team wins this game)`, framed from the winning",
+        "team. Features are the winner's team-level goaltending proxies (season and",
+        "last-15-game save %, team shutout rate), the loser's goals-for per game, and",
+        "backup-save-% / starter-unavailability terms with explicit missing-flags. The",
+        "model is monotone in goalie quality. Shutout wins are worth 4 fantasy points",
+        "vs. 2 for a normal win, so this prices the goalie slot's upside (SPEC 1).",
+        "",
+        "## Reproducibility",
+        f"- Seed: {cfg.seed}",
+        f"- Min pre-game regular-season games (winner): {cfg.min_pregame_games}",
+        f"- Save-% recency window: last {cfg.last_n} games",
+        f"- Train seasons (end year): {list(result.split.train_years)} "
+        f"({result.n_train} games)",
+        f"- Validation seasons: {list(result.split.val_years)} ({result.n_val} games)",
+        f"- Test seasons (held out): {list(result.split.test_years)} "
+        f"({result.n_test} games)",
+        "- Splits are strictly temporal: no test-season game touches training or",
+        "  model selection (SPEC section 6).",
+        "",
+        "## Model selection (validation Brier, lower is better)",
+    ]
+
+
+def _shutout_model_selection_lines(result: ShutoutResult) -> list[str]:
+    lines: list[str] = []
+    for model_type, brier in sorted(result.val_brier_by_model.items()):
+        marker = "  <- chosen" if model_type == result.chosen_model_type else ""
+        lines.append(f"- {model_type}: {brier:.4f}{marker}")
+    lines += [
+        "",
+        f"Chosen model: **{result.chosen_model_type}** (lowest validation Brier).",
+        "It is refit on train + validation seasons before the held-out test.",
+    ]
+    return lines
+
+
+def _shutout_shrinkage_lines(result: ShutoutResult) -> list[str]:
+    shrink_note = (
+        "shrinkage adopted"
+        if result.shrinkage_adopted
+        else "no shrinkage -- pure model wins on validation"
+    )
+    lines = [
+        "",
+        "## Base-rate shrinkage (validation-selected, US-105)",
+        "The raw model shows little to no held-out skill over the playoff base",
+        "rate (CODE_REVIEW observation), so a shrinkage weight `w` blending",
+        "`w*model + (1-w)*base_rate` is selected on the validation fold only",
+        "(never the held-out test). `w=1.0` keeps the pure model; `w=0.0`",
+        "collapses onto the base rate.",
+        "",
+        f"- Selected weight: **{result.shrinkage_weight:.2f}** ({shrink_note})",
+        f"- Shrinkage base rate (train+val shutout rate): {result.shrinkage_base_rate:.4f}",
+        "- Validation Brier by weight (1.00 = pure model):",
+    ]
+    for weight_key in sorted(result.val_brier_by_shrinkage, key=float, reverse=True):
+        marker = "  <- chosen" if abs(float(weight_key) - result.shrinkage_weight) < 1e-9 else ""
+        brier = result.val_brier_by_shrinkage[weight_key]
+        lines.append(f"  - w={weight_key}: {brier:.4f}{marker}")
+    return lines
+
+
+def _shutout_test_lines(result: ShutoutResult) -> list[str]:
+    return [
+        "",
+        "## Held-out test Brier vs. base-rate baseline",
+        f"- shutout model (w={result.shrinkage_weight:.2f}): {result.test_brier_model:.4f}",
+        f"- shutout model (unshrunk, w=1.00):  {result.test_brier_model_unshrunk:.4f}",
+        f"- baseline (train shutout rate {result.train_shutout_rate:.3f}): "
+        f"{result.test_brier_base_rate:.4f}",
+        f"- Beats base rate: {'yes' if result.beats_base_rate else 'NO'}",
+    ]
+
+
+def _shutout_calibration_lines(result: ShutoutResult) -> list[str]:
+    cfg = result.config
+    lines = [
+        "",
+        "## Calibration: predicted vs. observed shutout frequency (held out)",
+        f"- Observed shutout rate:  {result.test_observed_rate:.4f}",
+        f"- Predicted shutout rate: {result.test_predicted_rate:.4f}",
+        f"- Relative error: {result.calibration_rel_error:.1%} "
+        f"(target within +/-{cfg.calibration_tolerance:.0%})",
+        f"- Within target: {'yes' if result.calibrated_within_tolerance else 'NO'}",
+        "",
+        "### Reliability bins (predicted bucket -> observed rate)",
+        "| predicted range | n | mean predicted | observed |",
+        "| --- | --- | --- | --- |",
+    ]
+    for b in result.calibration_bins:
+        lines.append(
+            f"| {b.lower:.3f}-{b.upper:.3f} | {b.count} | "
+            f"{b.mean_predicted:.3f} | {b.observed_rate:.3f} |"
+        )
+    lines.append("")
+    return lines
+
+
+def _shutout_honest_note_lines(result: ShutoutResult) -> list[str]:
+    if result.calibrated_within_tolerance:
+        return []
+    return [
+        "## Honest note on a missed target",
+        "Overall calibration missed the +/-25% target on this split. Reported",
+        "as-is (SPEC section 7): baselines, splits, and seeds are unchanged. One",
+        "plausible improvement: fit isotonic / Platt calibration on the validation",
+        "fold before scoring the test set, and add real per-goalie starter/backup",
+        "save-% and injury availability (US-008) once that data is wired in.",
+        "",
+    ]
 
 
 def train_shutout_model(

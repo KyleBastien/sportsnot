@@ -281,6 +281,86 @@ def _player_meta(players: pd.DataFrame, as_of_date: str | pd.Timestamp) -> pd.Da
     return meta[["player_id", "player_name", "position", "age_years"]]
 
 
+def _empty_feature_frame() -> pd.DataFrame:
+    return pd.DataFrame(columns=list(FEATURE_COLUMNS))
+
+
+def _season_as_of_skaters(
+    skater_games: pd.DataFrame, season_id: int, cutoff: pd.Timestamp
+) -> pd.DataFrame:
+    season_skaters = skater_games.loc[skater_games["season_id"] == season_id]
+    before = as_of(season_skaters, cutoff)
+    assert_no_leakage(before, cutoff)
+    return before
+
+
+def _regular_feature_rates(reg_agg: pd.DataFrame) -> pd.DataFrame:
+    reg_agg = reg_agg.copy()
+    games_played = reg_agg["games_played"]
+    goals = reg_agg["goals"]
+    assists = reg_agg["assists"]
+    reg_agg["goals_per_game"] = [
+        per_game(g, n) for g, n in zip(goals, games_played, strict=True)
+    ]
+    reg_agg["assists_per_game"] = [
+        per_game(a, n) for a, n in zip(assists, games_played, strict=True)
+    ]
+    reg_agg["points_per_game"] = [
+        per_game(g + a, n) for g, a, n in zip(goals, assists, games_played, strict=True)
+    ]
+    reg_agg["pp_points_per_game"] = [
+        per_game(p, n) for p, n in zip(reg_agg["pp_points"], games_played, strict=True)
+    ]
+    reg_agg["pp_point_share"] = [
+        pp_point_share(p, g + a)
+        for p, g, a in zip(reg_agg["pp_points"], goals, assists, strict=True)
+    ]
+    reg_agg["shots_per_game"] = [
+        per_game(s, n) for s, n in zip(reg_agg["shots"], games_played, strict=True)
+    ]
+    reg_agg["shooting_pct"] = [
+        shooting_pct(g, s) for g, s in zip(goals, reg_agg["shots"], strict=True)
+    ]
+    reg_agg["avg_toi_seconds"] = reg_agg["toi_seconds"].fillna(0.0).astype(float)
+    return reg_agg
+
+
+def _team_offense_for_cutoff(
+    team_games: pd.DataFrame, season_id: int, cutoff: pd.Timestamp
+) -> pd.DataFrame:
+    team_scope = as_of(team_games.loc[team_games["season_id"] == season_id], cutoff)
+    reg_team_games = team_scope.loc[
+        lambda df: df["game_type_id"] == REGULAR_SEASON_GAME_TYPE
+    ]
+    return _team_offense_rates(reg_team_games)
+
+
+def _final_feature_frame(
+    out: pd.DataFrame,
+    *,
+    season_id: int,
+    playoff_round: int | None,
+    cutoff: pd.Timestamp,
+) -> pd.DataFrame:
+    out["season_id"] = season_id
+    out["playoff_round"] = playoff_round
+    out["as_of_date"] = cutoff.strftime("%Y-%m-%d")
+    out = out.fillna(
+        {
+            "goals_per_game_l25": 0.0,
+            "assists_per_game_l25": 0.0,
+            "points_per_game_l25": 0.0,
+            "linemate_ppg": 0.0,
+            "team_goals_for_per_game": 0.0,
+            "age_years": 0.0,
+        }
+    )
+    out = out.reindex(columns=list(FEATURE_COLUMNS))
+    return out.sort_values(["points_per_game", "player_id"], ascending=[False, True]).reset_index(
+        drop=True
+    )
+
+
 def build_skater_features(
     skater_games: pd.DataFrame,
     players: pd.DataFrame,
@@ -301,57 +381,23 @@ def build_skater_features(
     config = config or SkaterFeatureConfig()
     cutoff = to_cutoff(as_of_date)
 
-    season_skaters = skater_games.loc[skater_games["season_id"] == season_id]
-    before = as_of(season_skaters, cutoff)
-    assert_no_leakage(before, cutoff)
-
+    before = _season_as_of_skaters(skater_games, season_id, cutoff)
     reg = before.loc[before["game_type_id"] == REGULAR_SEASON_GAME_TYPE]
     reg_agg = _regular_aggregates(reg)
     reg_agg = reg_agg.loc[reg_agg["games_played"] >= config.min_games]
 
     if reg_agg.empty:
-        return pd.DataFrame(columns=list(FEATURE_COLUMNS))
+        return _empty_feature_frame()
 
-    reg_agg["goals_per_game"] = [
-        per_game(g, n) for g, n in zip(reg_agg["goals"], reg_agg["games_played"], strict=True)
-    ]
-    reg_agg["assists_per_game"] = [
-        per_game(a, n) for a, n in zip(reg_agg["assists"], reg_agg["games_played"], strict=True)
-    ]
-    reg_agg["points_per_game"] = [
-        per_game(g + a, n)
-        for g, a, n in zip(
-            reg_agg["goals"], reg_agg["assists"], reg_agg["games_played"], strict=True
-        )
-    ]
-    reg_agg["pp_points_per_game"] = [
-        per_game(p, n) for p, n in zip(reg_agg["pp_points"], reg_agg["games_played"], strict=True)
-    ]
-    reg_agg["pp_point_share"] = [
-        pp_point_share(p, g + a)
-        for p, g, a in zip(reg_agg["pp_points"], reg_agg["goals"], reg_agg["assists"], strict=True)
-    ]
-    reg_agg["shots_per_game"] = [
-        per_game(s, n) for s, n in zip(reg_agg["shots"], reg_agg["games_played"], strict=True)
-    ]
-    reg_agg["shooting_pct"] = [
-        shooting_pct(g, s) for g, s in zip(reg_agg["goals"], reg_agg["shots"], strict=True)
-    ]
-    reg_agg["avg_toi_seconds"] = reg_agg["toi_seconds"].fillna(0.0).astype(float)
-
+    reg_agg = _regular_feature_rates(reg_agg)
     meta = _player_meta(players, cutoff)
     reg_agg = reg_agg.merge(meta, on="player_id", how="left")
     reg_agg = reg_agg.loc[reg_agg["position"].isin(["F", "D"])]
     if reg_agg.empty:
-        return pd.DataFrame(columns=list(FEATURE_COLUMNS))
+        return _empty_feature_frame()
 
     last_n = _last_n_rates(before, config.last_n_games)
-    team_offense = _team_offense_rates(
-        as_of(team_games.loc[team_games["season_id"] == season_id], cutoff).loc[
-            lambda df: df["game_type_id"] == REGULAR_SEASON_GAME_TYPE
-        ]
-    )
-    # Linemate quality averages only pooled skaters (goalies already dropped).
+    team_offense = _team_offense_for_cutoff(team_games, season_id, cutoff)
     linemates = _linemate_frame(reg_agg)
 
     out = (
@@ -359,24 +405,8 @@ def build_skater_features(
         .merge(linemates, on="player_id", how="left")
         .merge(team_offense, on="team_abbrev", how="left")
     )
-
-    out["season_id"] = season_id
-    out["playoff_round"] = playoff_round
-    out["as_of_date"] = cutoff.strftime("%Y-%m-%d")
-
-    numeric_defaults = {
-        "goals_per_game_l25": 0.0,
-        "assists_per_game_l25": 0.0,
-        "points_per_game_l25": 0.0,
-        "linemate_ppg": 0.0,
-        "team_goals_for_per_game": 0.0,
-        "age_years": 0.0,
-    }
-    out = out.fillna(numeric_defaults)
-
-    out = out.reindex(columns=list(FEATURE_COLUMNS))
-    return out.sort_values(["points_per_game", "player_id"], ascending=[False, True]).reset_index(
-        drop=True
+    return _final_feature_frame(
+        out, season_id=season_id, playoff_round=playoff_round, cutoff=cutoff
     )
 
 

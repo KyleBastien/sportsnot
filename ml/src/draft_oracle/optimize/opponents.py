@@ -370,6 +370,40 @@ def _pool_rank_z(pool: pd.DataFrame) -> dict[str, float]:
     return z
 
 
+def _pool_choices(
+    pool: pd.DataFrame,
+    affinity: Mapping[str, Mapping[int, float]],
+    managers: frozenset[str] | None,
+) -> list[_Choice]:
+    """Conditional-logit choices for one ``(event, base_position)`` pool.
+
+    One choice per in-pool pick by a modelled manager over the pool's unique-asset
+    feature rows. Returns nothing for pools too small to be a choice.
+    """
+    unique = pool.drop_duplicates(subset="asset_key")
+    if len(unique) < 2:
+        return []
+    rank_z = _pool_rank_z(unique)
+    keys = list(unique["asset_key"].astype(str))
+    team_ids = [
+        int(t) if pd.notna(t) else None for t in unique["team_id"].to_numpy(dtype=object)
+    ]
+    index_of = {key: i for i, key in enumerate(keys)}
+    base = np.array([[rank_z[key], 0.0] for key in keys], dtype="float64")
+    choices: list[_Choice] = []
+    for _, pick in pool.iterrows():
+        manager = str(pick["manager"])
+        if managers is not None and manager not in managers:
+            continue
+        chosen = index_of.get(str(pick["asset_key"]))
+        if chosen is None:
+            continue
+        features = base.copy()
+        features[:, 1] = [_affinity_for(affinity, manager, tid) for tid in team_ids]
+        choices.append(_Choice(features=features, chosen=chosen))
+    return choices
+
+
 def _build_choices(
     picks: pd.DataFrame,
     affinity: Mapping[str, Mapping[int, float]],
@@ -385,26 +419,7 @@ def _build_choices(
     choices: list[_Choice] = []
     grouped = picks.groupby([*_event_keys(picks), "base_position"], sort=True)
     for _, pool in grouped:
-        unique = pool.drop_duplicates(subset="asset_key")
-        if len(unique) < 2:
-            continue
-        rank_z = _pool_rank_z(unique)
-        keys = list(unique["asset_key"].astype(str))
-        team_ids = [
-            int(t) if pd.notna(t) else None for t in unique["team_id"].to_numpy(dtype=object)
-        ]
-        index_of = {key: i for i, key in enumerate(keys)}
-        base = np.array([[rank_z[key], 0.0] for key in keys], dtype="float64")
-        for _, pick in pool.iterrows():
-            manager = str(pick["manager"])
-            if managers is not None and manager not in managers:
-                continue
-            chosen = index_of.get(str(pick["asset_key"]))
-            if chosen is None:
-                continue
-            features = base.copy()
-            features[:, 1] = [_affinity_for(affinity, manager, tid) for tid in team_ids]
-            choices.append(_Choice(features=features, chosen=chosen))
+        choices.extend(_pool_choices(pool, affinity, managers))
     return choices
 
 

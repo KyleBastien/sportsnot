@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -50,6 +50,39 @@ from sklearn.preprocessing import StandardScaler
 from draft_oracle.features.skater import (
     SkaterFeatureConfig,
     build_skater_features,
+)
+from draft_oracle.models._skater_rounds import (
+    LABEL_COLUMN as LABEL_COLUMN,
+)
+from draft_oracle.models._skater_rounds import (
+    PLAYOFF_GAME_TYPE as PLAYOFF_GAME_TYPE,
+)
+from draft_oracle.models._skater_rounds import (
+    QUALIFYING_ROUND_GAME_DIGIT as QUALIFYING_ROUND_GAME_DIGIT,
+)
+from draft_oracle.models._skater_rounds import (
+    REGULAR_SEASON_GAME_TYPE as REGULAR_SEASON_GAME_TYPE,
+)
+from draft_oracle.models._skater_rounds import (
+    _assign_rounds as _assign_rounds,
+)
+from draft_oracle.models._skater_rounds import (
+    _pair_key as _pair_key,
+)
+from draft_oracle.models._skater_rounds import (
+    _playoff_round_digit as _playoff_round_digit,
+)
+from draft_oracle.models._skater_rounds import (
+    _series_round_map as _series_round_map,
+)
+from draft_oracle.models._skater_rounds import (
+    playoff_round_cutoffs as playoff_round_cutoffs,
+)
+from draft_oracle.models._skater_rounds import (
+    playoff_round_starts as playoff_round_starts,
+)
+from draft_oracle.models._skater_rounds import (
+    skater_round_production as skater_round_production,
 )
 from draft_oracle.models.game_win import TemporalSplit, default_temporal_split
 from draft_oracle.provenance import add_git_provenance
@@ -76,11 +109,10 @@ __all__ = [
     "train_skater_production_model",
 ]
 
-SKATER_PRODUCTION_VERSION = "skater-production-v1"
+for public_obj in (playoff_round_cutoffs, playoff_round_starts, skater_round_production):
+    public_obj.__module__ = __name__
 
-PLAYOFF_GAME_TYPE = 3
-REGULAR_SEASON_GAME_TYPE = 2
-LABEL_COLUMN = "actual_points_per_game"
+SKATER_PRODUCTION_VERSION = "skater-production-v1"
 
 # Numeric predictors drawn from the US-009 skater-v1 matrix, plus a derived
 # ``is_defense`` indicator. ``games_played`` is kept as a sample-size signal.
@@ -172,172 +204,6 @@ def shrink_to_prior(estimate: float, prior: float, n_games: float, k: float) -> 
     """
     w = credibility_weight(n_games, k)
     return w * float(estimate) + (1.0 - w) * float(prior)
-
-
-# ── Playoff-round reconstruction (round windows + labels) ────────────────
-
-
-def _pair_key(team_a: Any, team_b: Any) -> tuple[str, str]:
-    """Order-independent key for the two teams in a series/game."""
-    a, b = str(team_a), str(team_b)
-    return (a, b) if a <= b else (b, a)
-
-
-#: Round digit of a 2019-20 bubble qualifying-round / round-robin game id.
-QUALIFYING_ROUND_GAME_DIGIT = "0"
-
-
-def _playoff_round_digit(game_id: Any) -> str | None:
-    """The round digit of a 10-char NHL playoff game id, or ``None`` if unparseable.
-
-    NHL playoff game ids are ``SSSS03RMGG`` where the 8th character (index 7) is the
-    round: ``1``-``4`` for the four best-of-seven rounds. The 2019-20 bubble's
-    qualifying round *and* seeding round-robin both carry digit ``0`` and must never
-    be attributed to a best-of-seven series — their team pairs collide with real
-    later-round matchups (e.g. a round-robin game between two teams that also meet in
-    round 2), which the team-pair round map would otherwise mislabel (CODE_REVIEW
-    m-6).
-    """
-    text = str(game_id).strip()
-    if len(text) != 10 or not text.isdigit():
-        return None
-    return text[7]
-
-
-def _series_round_map(series: pd.DataFrame) -> dict[tuple[int, tuple[str, str]], int]:
-    """Map ``(season_id, {team_a, team_b}) -> playoff_round`` from the series table."""
-    out: dict[tuple[int, tuple[str, str]], int] = {}
-    cols = ["season_id", "top_seed_abbrev", "bottom_seed_abbrev", "playoff_round"]
-    for rec in series[cols].to_dict("records"):
-        key = (int(rec["season_id"]), _pair_key(rec["top_seed_abbrev"], rec["bottom_seed_abbrev"]))
-        out[key] = int(rec["playoff_round"])
-    return out
-
-
-def _assign_rounds(
-    games: pd.DataFrame, round_map: dict[tuple[int, tuple[str, str]], int]
-) -> list[int | None]:
-    """Look up each playoff game's round via its (season, team-pair); ``None`` if unknown.
-
-    A 2019-20 qualifying-round / round-robin game (``game_id`` round digit ``0``) is
-    always ``None`` regardless of the team-pair map, so a round-robin game whose two
-    teams also meet in a real later series is never mislabeled as that series' round
-    (CODE_REVIEW m-6).
-    """
-    has_game_id = "game_id" in games.columns
-    read_cols = ["season_id", "team_abbrev", "opponent_team_abbrev"]
-    if has_game_id:
-        read_cols = ["game_id", *read_cols]
-    result: list[int | None] = []
-    for rec in games[read_cols].to_dict("records"):
-        if has_game_id and _playoff_round_digit(rec["game_id"]) == QUALIFYING_ROUND_GAME_DIGIT:
-            result.append(None)
-            continue
-        key = (int(rec["season_id"]), _pair_key(rec["team_abbrev"], rec["opponent_team_abbrev"]))
-        result.append(round_map.get(key))
-    return result
-
-
-def playoff_round_starts(
-    team_games: pd.DataFrame, series: pd.DataFrame
-) -> dict[int, dict[int, str]]:
-    """Earliest game date of each playoff round, per season.
-
-    Returns ``{season_id: {playoff_round: "YYYY-MM-DD"}}``. The start date is the
-    exclusive as-of cutoff for that round's features. Games whose team pair matches
-    no series row (e.g. the 2019-20 bubble round-robin) are ignored.
-    """
-    po = team_games.loc[team_games["game_type_id"] == PLAYOFF_GAME_TYPE].copy()
-    if po.empty:
-        return {}
-    po["game_date"] = pd.to_datetime(po["game_date"])
-    po["playoff_round"] = _assign_rounds(po, _series_round_map(series))
-    po = po.dropna(subset=["playoff_round"])
-    grouped = po.groupby(["season_id", "playoff_round"])["game_date"].min().reset_index()
-    starts: dict[int, dict[int, str]] = {}
-    for rec in grouped.to_dict("records"):
-        season = int(rec["season_id"])
-        rnd = int(rec["playoff_round"])
-        starts.setdefault(season, {})[rnd] = pd.Timestamp(rec["game_date"]).strftime("%Y-%m-%d")
-    return starts
-
-
-def playoff_round_cutoffs(
-    team_games: pd.DataFrame, series: pd.DataFrame
-) -> dict[int, dict[int, str]]:
-    """As-of cutoffs per round, extended with a *pre-round* cutoff for the next round.
-
-    Returns ``{season_id: {playoff_round: "YYYY-MM-DD"}}`` like
-    :func:`playoff_round_starts`, but so a genuinely pre-round artifact can be built
-    (CODE_REVIEW M-1): the round drafts *before* it starts, so its own first game does
-    not exist yet. For every season the round *after* the latest played playoff round
-    gets a cutoff of the day AFTER that round's final game -- the previous round's
-    completion / bracket-announcement boundary. When no playoff games exist yet, round
-    1 gets the day after the regular season's final game.
-
-    Rounds that have already been played keep their own first-game cutoff untouched,
-    so backtests over complete seasons are byte-for-byte identical: the only added
-    entries are for rounds with no games in the archive.
-    """
-    starts = playoff_round_starts(team_games, series)
-    tg = team_games.copy()
-    tg["game_date"] = pd.to_datetime(tg["game_date"])
-
-    def _next_day(value: pd.Timestamp) -> str:
-        return (pd.Timestamp(value) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-
-    for season_id, group in tg.groupby("season_id"):
-        season = int(cast(Any, season_id))
-        played = starts.setdefault(season, {})
-        if played:
-            latest_round = max(played)
-            po = group.loc[group["game_type_id"] == PLAYOFF_GAME_TYPE]
-            if po.empty:
-                continue
-            played.setdefault(latest_round + 1, _next_day(po["game_date"].max()))
-        else:
-            reg = group.loc[group["game_type_id"] == REGULAR_SEASON_GAME_TYPE]
-            if reg.empty:
-                continue
-            played.setdefault(1, _next_day(reg["game_date"].max()))
-    return starts
-
-
-def skater_round_production(skater_games: pd.DataFrame, series: pd.DataFrame) -> pd.DataFrame:
-    """Observed goals+assists per game for each skater in each playoff round.
-
-    One row per ``(season_id, playoff_round, player_id)`` with the round's goals,
-    assists, games, and ``actual_points_per_game = (G + A) / GP``. This is the label
-    the model learns; it uses only that round's playoff games.
-    """
-    po = skater_games.loc[skater_games["game_type_id"] == PLAYOFF_GAME_TYPE].copy()
-    if po.empty:
-        return pd.DataFrame(
-            columns=[
-                "season_id",
-                "playoff_round",
-                "player_id",
-                "round_goals",
-                "round_assists",
-                "round_games",
-                LABEL_COLUMN,
-            ]
-        )
-    po["playoff_round"] = _assign_rounds(po, _series_round_map(series))
-    po = po.dropna(subset=["playoff_round"])
-    grouped = po.groupby(["season_id", "playoff_round", "player_id"], as_index=False).agg(
-        round_goals=("goals", "sum"),
-        round_assists=("assists", "sum"),
-        round_games=("game_id", "nunique"),
-    )
-    grouped["playoff_round"] = grouped["playoff_round"].astype(int)
-    grouped[LABEL_COLUMN] = [
-        (g + a) / n if n else 0.0
-        for g, a, n in zip(
-            grouped["round_goals"], grouped["round_assists"], grouped["round_games"], strict=True
-        )
-    ]
-    return grouped
 
 
 # ── Dataset assembly (features x labels, leakage-free per round) ──────────
@@ -745,6 +611,118 @@ def _count_cold_cases(labels: pd.DataFrame, dataset: pd.DataFrame, years: tuple[
     return int(merged["_covered"].isna().sum())
 
 
+@dataclass(frozen=True)
+class _ProductionSplitFrames:
+    split: TemporalSplit
+    train: pd.DataFrame
+    val: pd.DataFrame
+    test: pd.DataFrame
+    train_val: pd.DataFrame
+
+
+@dataclass(frozen=True)
+class _ProductionEvaluation:
+    test_mae_model: float
+    test_mae_raw: float
+    test_mae_baseline_reg: float
+    test_mae_baseline_mean: float
+    test_spearman_model: float
+    test_spearman_baseline_reg: float
+    per_season: list[SeasonMetrics]
+
+
+def _split_production_dataset(
+    dataset: pd.DataFrame, config: SkaterProductionConfig
+) -> _ProductionSplitFrames:
+    years = [int(y) for y in dataset["season_end_year"].unique()]
+    split = default_temporal_split(years, n_val=config.n_val_seasons, n_test=config.n_test_seasons)
+    train = _rows_for_years(dataset, split.train_years)
+    val = _rows_for_years(dataset, split.val_years)
+    test = _rows_for_years(dataset, split.test_years)
+    return _ProductionSplitFrames(
+        split=split,
+        train=train,
+        val=val,
+        test=test,
+        train_val=pd.concat([train, val], ignore_index=True),
+    )
+
+
+def _validation_mae_by_model(
+    train: pd.DataFrame, val: pd.DataFrame, seed: int
+) -> dict[str, float]:
+    val_mae: dict[str, float] = {}
+    for model_type in ("poisson", "lightgbm"):
+        fitted = _fit(_build_estimator(model_type, seed), train)
+        val_mae[model_type] = mean_absolute_error(_predict_raw(fitted, val), val[LABEL_COLUMN])
+    return val_mae
+
+
+def _fit_skater_model(
+    model_type: str,
+    frame: pd.DataFrame,
+    config: SkaterProductionConfig,
+) -> SkaterProductionModel:
+    return SkaterProductionModel(
+        estimator=_fit(_build_estimator(model_type, config.seed), frame),
+        model_type=model_type,
+        priors=fit_priors(frame),
+        shrink_k=config.shrink_k,
+        min_confident_games=config.min_confident_games,
+    )
+
+
+def _evaluate_production_model(
+    model: SkaterProductionModel,
+    frames: _ProductionSplitFrames,
+) -> _ProductionEvaluation:
+    projected = model.project(frames.test)
+    test_pred = projected["projected_points_per_game"].to_numpy(dtype=float)
+    test_raw = projected["raw_points_per_game"].to_numpy(dtype=float)
+    test_actual = frames.test[LABEL_COLUMN].to_numpy(dtype=float)
+    baseline_reg = frames.test["points_per_game"].to_numpy(dtype=float)
+    baseline_mean = float(frames.train_val[LABEL_COLUMN].mean())
+
+    return _ProductionEvaluation(
+        test_mae_model=mean_absolute_error(test_pred, test_actual),
+        test_mae_raw=mean_absolute_error(test_raw, test_actual),
+        test_mae_baseline_reg=mean_absolute_error(baseline_reg, test_actual),
+        test_mae_baseline_mean=mean_absolute_error(
+            np.full(len(frames.test), baseline_mean), test_actual
+        ),
+        test_spearman_model=spearman_correlation(test_pred, test_actual),
+        test_spearman_baseline_reg=spearman_correlation(baseline_reg, test_actual),
+        per_season=_per_season_metrics(
+            frames.test,
+            frames.split.test_years,
+            test_pred,
+            test_actual,
+        ),
+    )
+
+
+def _per_season_metrics(
+    test: pd.DataFrame,
+    test_years: tuple[int, ...],
+    test_pred: np.ndarray,
+    test_actual: np.ndarray,
+) -> list[SeasonMetrics]:
+    per_season: list[SeasonMetrics] = []
+    for year in sorted(test_years):
+        mask = test["season_end_year"].to_numpy() == int(year)
+        if not mask.any():
+            continue
+        per_season.append(
+            SeasonMetrics(
+                season_end_year=int(year),
+                n=int(mask.sum()),
+                mae=mean_absolute_error(test_pred[mask], test_actual[mask]),
+                spearman=spearman_correlation(test_pred[mask], test_actual[mask]),
+            )
+        )
+    return per_season
+
+
 def train_skater_production_model(
     skater_games: pd.DataFrame,
     players: pd.DataFrame,
@@ -769,87 +747,31 @@ def train_skater_production_model(
 
     labels = skater_round_production(skater_games, series)
 
-    years = [int(y) for y in dataset["season_end_year"].unique()]
-    split = default_temporal_split(years, n_val=config.n_val_seasons, n_test=config.n_test_seasons)
-    train = _rows_for_years(dataset, split.train_years)
-    val = _rows_for_years(dataset, split.val_years)
-    test = _rows_for_years(dataset, split.test_years)
-    train_val = pd.concat([train, val], ignore_index=True)
-
-    # Model selection on validation MAE.
-    val_mae: dict[str, float] = {}
-    for model_type in ("poisson", "lightgbm"):
-        fitted = _fit(_build_estimator(model_type, config.seed), train)
-        val_mae[model_type] = mean_absolute_error(_predict_raw(fitted, val), val[LABEL_COLUMN])
+    frames = _split_production_dataset(dataset, config)
+    val_mae = _validation_mae_by_model(frames.train, frames.val, config.seed)
     chosen = min(val_mae, key=lambda k: val_mae[k])
 
-    # Refit the chosen model on train+val; build the evaluation model (priors from
-    # train+val only, so the test labels never leak into the shrinkage target).
-    eval_estimator = _fit(_build_estimator(chosen, config.seed), train_val)
-    eval_model = SkaterProductionModel(
-        estimator=eval_estimator,
-        model_type=chosen,
-        priors=fit_priors(train_val),
-        shrink_k=config.shrink_k,
-        min_confident_games=config.min_confident_games,
-    )
-
-    projected = eval_model.project(test)
-    test_pred = projected["projected_points_per_game"].to_numpy(dtype=float)
-    test_raw = projected["raw_points_per_game"].to_numpy(dtype=float)
-    test_actual = test[LABEL_COLUMN].to_numpy(dtype=float)
-    baseline_reg = test["points_per_game"].to_numpy(dtype=float)
-    baseline_mean = float(train_val[LABEL_COLUMN].mean())
-
-    test_mae_model = mean_absolute_error(test_pred, test_actual)
-    test_mae_raw = mean_absolute_error(test_raw, test_actual)
-    test_mae_baseline_reg = mean_absolute_error(baseline_reg, test_actual)
-    test_mae_baseline_mean = mean_absolute_error(np.full(len(test), baseline_mean), test_actual)
-    test_spearman_model = spearman_correlation(test_pred, test_actual)
-    test_spearman_baseline_reg = spearman_correlation(baseline_reg, test_actual)
-
-    per_season: list[SeasonMetrics] = []
-    for year in sorted(split.test_years):
-        mask = test["season_end_year"].to_numpy() == int(year)
-        if not mask.any():
-            continue
-        per_season.append(
-            SeasonMetrics(
-                season_end_year=int(year),
-                n=int(mask.sum()),
-                mae=mean_absolute_error(test_pred[mask], test_actual[mask]),
-                spearman=spearman_correlation(test_pred[mask], test_actual[mask]),
-            )
-        )
-
-    cold_cases = _count_cold_cases(labels, dataset, split.test_years)
-
-    # Shipped model: chosen type, all seasons, all-data priors.
-    production_estimator = _fit(_build_estimator(chosen, config.seed), dataset)
-    model = SkaterProductionModel(
-        estimator=production_estimator,
-        model_type=chosen,
-        priors=fit_priors(dataset),
-        shrink_k=config.shrink_k,
-        min_confident_games=config.min_confident_games,
-    )
+    eval_model = _fit_skater_model(chosen, frames.train_val, config)
+    evaluation = _evaluate_production_model(eval_model, frames)
+    cold_cases = _count_cold_cases(labels, dataset, frames.split.test_years)
+    model = _fit_skater_model(chosen, dataset, config)
 
     return SkaterProductionResult(
         model=model,
         config=config,
-        split=split,
+        split=frames.split,
         chosen_model_type=chosen,
         val_mae_by_model=val_mae,
-        test_mae_model=test_mae_model,
-        test_mae_raw=test_mae_raw,
-        test_mae_baseline_reg=test_mae_baseline_reg,
-        test_mae_baseline_mean=test_mae_baseline_mean,
-        test_spearman_model=test_spearman_model,
-        test_spearman_baseline_reg=test_spearman_baseline_reg,
-        per_season=per_season,
-        n_train=len(train),
-        n_val=len(val),
-        n_test=len(test),
+        test_mae_model=evaluation.test_mae_model,
+        test_mae_raw=evaluation.test_mae_raw,
+        test_mae_baseline_reg=evaluation.test_mae_baseline_reg,
+        test_mae_baseline_mean=evaluation.test_mae_baseline_mean,
+        test_spearman_model=evaluation.test_spearman_model,
+        test_spearman_baseline_reg=evaluation.test_spearman_baseline_reg,
+        per_season=evaluation.per_season,
+        n_train=len(frames.train),
+        n_val=len(frames.val),
+        n_test=len(frames.test),
         n_cold_cases_test=cold_cases,
     )
 

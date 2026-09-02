@@ -52,6 +52,15 @@ from draft_oracle.ingest.injuries import (
     STATUS_OUT,
     InjuryOverride,
 )
+from draft_oracle.models._returns_absence import (
+    AbsenceSpellConfig as AbsenceSpellConfig,
+)
+from draft_oracle.models._returns_absence import (
+    derive_absence_spells as derive_absence_spells,
+)
+from draft_oracle.models._returns_absence import (
+    spells_from_sequence as spells_from_sequence,
+)
 from draft_oracle.provenance import add_git_provenance
 
 __all__ = [
@@ -72,9 +81,10 @@ __all__ = [
     "train_return_time_model",
 ]
 
-RETURN_TIME_MODEL_VERSION = "return-time-v1"
+for public_obj in (AbsenceSpellConfig, derive_absence_spells, spells_from_sequence):
+    public_obj.__module__ = __name__
 
-REGULAR_SEASON_GAME_TYPE = 2
+RETURN_TIME_MODEL_VERSION = "return-time-v1"
 DEFAULT_HORIZON = 7  # best-of-7 round (SPEC section 1)
 
 # Documented status -> mean absence (games) assumption (SPEC section 7). The archive
@@ -85,135 +95,6 @@ STATUS_MEAN_GAMES: dict[str, float] = {
     STATUS_OUT: 3.0,
     STATUS_IR: 8.0,
 }
-
-_SPELL_COLUMNS: tuple[str, ...] = (
-    "season_id",
-    "team_abbrev",
-    "player_id",
-    "spell_length",
-    "median_toi_seconds",
-    "n_appearances",
-)
-
-
-# ── Absence-spell derivation (the calibration data) ──────────────────────
-
-
-@dataclass(frozen=True)
-class AbsenceSpellConfig:
-    """Filters that turn appearance gaps into credible injury spells.
-
-    Every threshold is a documented healthy-scratch guard (SPEC section 7):
-
-    * ``min_spell`` -- ignore gaps shorter than this many games (a single missed
-      game is usually a healthy scratch, not an injury). This biases the retained
-      distribution toward genuine absences; the bias is intentional and reported.
-    * ``min_appearances`` -- the player must appear in at least this many of the
-      team's games that season to count as an established regular.
-    * ``min_median_toi`` -- the player's median ice time across appearances must
-      clear this floor (seconds), excluding fringe skaters whose gaps are scratches.
-    * ``min_team_games`` -- skip teams with too few games to bookend a spell.
-    """
-
-    min_spell: int = 2
-    min_appearances: int = 20
-    min_median_toi: float = 600.0
-    min_team_games: int = 40
-
-
-def spells_from_sequence(present: list[bool], min_spell: int) -> list[int]:
-    """Bookended missed-game run lengths from a team's appear/miss sequence.
-
-    ``present[i]`` is whether the player played the team's i-th game. Only runs of
-    missed games that fall *between two appearances* are returned (a run is closed by
-    a later appearance, so the player provably came back). Leading gaps (before the
-    first appearance -- pre-debut/trade) and trailing gaps (after the last -- season
-    ends / season-ending injury with no observed return) are excluded. Runs shorter
-    than ``min_spell`` are dropped as likely healthy scratches.
-    """
-    idxs = [i for i, p in enumerate(present) if p]
-    if len(idxs) < 2:
-        return []
-    first, last = idxs[0], idxs[-1]
-    spells: list[int] = []
-    run = 0
-    for i in range(first + 1, last + 1):
-        if present[i]:
-            if run >= min_spell:
-                spells.append(run)
-            run = 0
-        else:
-            run += 1
-    return spells
-
-
-def _team_game_sequence(team_games: pd.DataFrame) -> list[str]:
-    """Chronological ``game_id`` list for one team-season's regular-season games."""
-    ordered = team_games.sort_values(["game_date", "game_id"], kind="stable")
-    return [str(g) for g in ordered["game_id"]]
-
-
-def _spells_for_team_player(
-    game_seq: list[str],
-    player_games: pd.DataFrame,
-    config: AbsenceSpellConfig,
-) -> tuple[int, float, list[int]] | None:
-    """Absence spells for one player on one team-season, or ``None`` if filtered out."""
-    appearances = {str(g) for g in player_games["game_id"]}
-    n_app = len(appearances)
-    if n_app < config.min_appearances:
-        return None
-    median_toi = float(player_games["toi_seconds"].median())
-    if median_toi < config.min_median_toi:
-        return None
-    present = [g in appearances for g in game_seq]
-    return n_app, median_toi, spells_from_sequence(present, config.min_spell)
-
-
-def derive_absence_spells(
-    skater_games: pd.DataFrame,
-    team_games: pd.DataFrame,
-    *,
-    config: AbsenceSpellConfig | None = None,
-) -> pd.DataFrame:
-    """Derive injury absence spells from normalized archive tables.
-
-    For each ``(season, team)`` the team's regular-season games are ordered
-    chronologically; each established skater's appearances mark which games they
-    played; a maximal bookended run of missed games is one spell (see
-    :func:`spells_from_sequence`). Returns one row per spell with its length in games
-    and the sample-size / ice-time context that admitted it.
-    """
-    config = config or AbsenceSpellConfig()
-    sg = skater_games.loc[skater_games["game_type_id"] == REGULAR_SEASON_GAME_TYPE]
-    tg = team_games.loc[team_games["game_type_id"] == REGULAR_SEASON_GAME_TYPE]
-
-    rows: list[dict[str, Any]] = []
-    for (season, team), team_grp in tg.groupby(["season_id", "team_abbrev"], sort=False):
-        game_seq = _team_game_sequence(team_grp)
-        if len(game_seq) < config.min_team_games:
-            continue
-        season_id = int(season)  # type: ignore[call-overload]
-        team_abbrev = str(team)
-        players = sg.loc[(sg["season_id"] == season) & (sg["team_abbrev"] == team)]
-        for player_id, player_games in players.groupby("player_id", sort=False):
-            result = _spells_for_team_player(game_seq, player_games, config)
-            if result is None:
-                continue
-            n_app, median_toi, spells = result
-            for length in spells:
-                rows.append(
-                    {
-                        "season_id": season_id,
-                        "team_abbrev": team_abbrev,
-                        "player_id": player_id,
-                        "spell_length": int(length),
-                        "median_toi_seconds": median_toi,
-                        "n_appearances": int(n_app),
-                    }
-                )
-    return pd.DataFrame(rows, columns=list(_SPELL_COLUMNS))
-
 
 # ── Fitted return-time model ─────────────────────────────────────────────
 
@@ -323,20 +204,23 @@ def _match_override(
     name_key = normalize_name(str(player_name)) if player_name is not None else None
     by_name: InjuryOverride | None = None
     for override in overrides:
-        if (
-            override.espn_id is not None
-            and player_id is not None
-            and int(override.espn_id) == int(player_id)
-        ):
+        if _override_matches_id(override, player_id):
             return override
-        if (
-            by_name is None
-            and override.player
-            and name_key is not None
-            and normalize_name(override.player) == name_key
-        ):
+        if by_name is None and _override_matches_name(override, name_key):
             by_name = override
     return by_name
+
+
+def _override_matches_id(override: InjuryOverride, player_id: Any) -> bool:
+    if override.espn_id is None or player_id is None:
+        return False
+    return int(override.espn_id) == int(player_id)
+
+
+def _override_matches_name(override: InjuryOverride, name_key: str | None) -> bool:
+    if not override.player or name_key is None:
+        return False
+    return normalize_name(override.player) == name_key
 
 
 def _availability_for_row(

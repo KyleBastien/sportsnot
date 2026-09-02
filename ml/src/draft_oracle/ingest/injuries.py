@@ -35,29 +35,22 @@ return-time calibration lives in US-015, not here.
 
 from __future__ import annotations
 
-import time
-from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import httpx
 import pandas as pd
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from draft_oracle.ingest import _injuries_build as _injuries_build_module
 from draft_oracle.ingest.entity_match import (
     DEFAULT_OVERRIDES_DIR,
     PlayerIndex,
     build_player_index,
     last_name_key,
     normalize_name,
-)
-from draft_oracle.ingest.nhl_api import (
-    DEFAULT_MAX_ATTEMPTS,
-    DEFAULT_TIMEOUT,
-    NHLApiError,
-    ResponseCache,
 )
 from draft_oracle.ingest.normalize import DEFAULT_NORMALIZED_DIR
 from draft_oracle.ingest.odds import resolve_team_id
@@ -169,21 +162,42 @@ def normalize_status(status_raw: str | None, type_name: str | None = None) -> st
     uninterpretable status.
     """
     type_key = (type_name or "").strip().upper()
-    if type_key:
-        if "INJURED_RESERVE" in type_key or type_key.endswith("_IR") or "LTIR" in type_key:
-            return STATUS_IR
-        if "DAY_TO_DAY" in type_key or "QUESTIONABLE" in type_key or "GTD" in type_key:
-            return STATUS_DAY_TO_DAY
-        if "OUT" in type_key or "SUSPEN" in type_key:
-            return STATUS_OUT
-        if "ACTIVE" in type_key or "HEALTHY" in type_key:
-            return STATUS_HEALTHY
+    normalized_type = _normalize_type_status(type_key)
+    if normalized_type is not None:
+        return normalized_type
 
-    text = (status_raw or "").strip().lower()
-    collapsed = text.replace("-", " ").replace("_", " ")
-    collapsed = " ".join(collapsed.split())
+    collapsed = _collapse_status_text(status_raw)
     if not collapsed:
         return STATUS_HEALTHY
+    normalized_text = _normalize_text_status(collapsed)
+    if normalized_text is not None:
+        return normalized_text
+    # Unknown but non-empty statuses are conservatively treated as day-to-day so
+    # they surface for review rather than silently reading as healthy.
+    return STATUS_DAY_TO_DAY
+
+
+def _normalize_type_status(type_key: str) -> str | None:
+    if not type_key:
+        return None
+    if "INJURED_RESERVE" in type_key or type_key.endswith("_IR") or "LTIR" in type_key:
+        return STATUS_IR
+    if "DAY_TO_DAY" in type_key or "QUESTIONABLE" in type_key or "GTD" in type_key:
+        return STATUS_DAY_TO_DAY
+    if "OUT" in type_key or "SUSPEN" in type_key:
+        return STATUS_OUT
+    if "ACTIVE" in type_key or "HEALTHY" in type_key:
+        return STATUS_HEALTHY
+    return None
+
+
+def _collapse_status_text(status_raw: str | None) -> str:
+    text = (status_raw or "").strip().lower()
+    collapsed = text.replace("-", " ").replace("_", " ")
+    return " ".join(collapsed.split())
+
+
+def _normalize_text_status(collapsed: str) -> str | None:
     if "injured reserve" in collapsed or collapsed in {"ir", "ltir"} or "long term" in collapsed:
         return STATUS_IR
     if "day to day" in collapsed or "questionable" in collapsed or "gtd" in collapsed:
@@ -192,9 +206,7 @@ def normalize_status(status_raw: str | None, type_name: str | None = None) -> st
         return STATUS_OUT
     if "active" in collapsed or "healthy" in collapsed or "probable" in collapsed:
         return STATUS_HEALTHY
-    # Unknown but non-empty statuses are conservatively treated as day-to-day so
-    # they surface for review rather than silently reading as healthy.
-    return STATUS_DAY_TO_DAY
+    return None
 
 
 # ── Feed → normalized rows ───────────────────────────────────────────────
@@ -237,6 +249,13 @@ class PlayerIdResolution:
     method: str  # exact | team | position | lastname | goalie | unresolved
 
 
+@dataclass(frozen=True)
+class _PlayerResolutionContext:
+    fantasy_pos: str
+    team_key: str | None
+    team_by_id: Mapping[int, Any]
+
+
 def resolve_espn_player_id(
     name: str | None,
     team_abbrev: str | None,
@@ -258,38 +277,51 @@ def resolve_espn_player_id(
     if fantasy_pos is None:
         return PlayerIdResolution(None, "goalie")
     norm = normalize_name(name)
-    team_key = _team_abbrev_key(team_abbrev)
-
-    def _disambiguate(candidates: list[Any], method: str) -> PlayerIdResolution | None:
-        if len(candidates) == 1:
-            return PlayerIdResolution(candidates[0].player_id, method)
-        if team_key is not None:
-            by_team = [
-                c
-                for c in candidates
-                if _team_abbrev_key(team_by_id.get(c.player_id)) == team_key
-            ]
-            if len(by_team) == 1:
-                return PlayerIdResolution(by_team[0].player_id, "team")
-            if by_team:
-                candidates = by_team
-        by_pos = [c for c in candidates if c.position == fantasy_pos]
-        if len(by_pos) == 1:
-            return PlayerIdResolution(by_pos[0].player_id, "position")
-        return None
+    context = _PlayerResolutionContext(
+        fantasy_pos=fantasy_pos,
+        team_key=_team_abbrev_key(team_abbrev),
+        team_by_id=team_by_id,
+    )
 
     exact = index.by_norm.get(norm, [])
     if exact:
-        resolved = _disambiguate(exact, "exact")
+        resolved = _disambiguate_player_id(exact, "exact", context)
         return resolved if resolved is not None else PlayerIdResolution(None, "unresolved")
 
     last = last_name_key(name)
     last_hits = index.by_last.get(last, []) if last else []
     if last_hits:
-        resolved = _disambiguate(last_hits, "lastname")
+        resolved = _disambiguate_player_id(last_hits, "lastname", context)
         if resolved is not None:
             return resolved
     return PlayerIdResolution(None, "unresolved")
+
+
+def _disambiguate_player_id(
+    candidates: list[Any], method: str, context: _PlayerResolutionContext
+) -> PlayerIdResolution | None:
+    if len(candidates) == 1:
+        return PlayerIdResolution(candidates[0].player_id, method)
+    narrowed = _team_matches(candidates, context)
+    if len(narrowed) == 1:
+        return PlayerIdResolution(narrowed[0].player_id, "team")
+    candidates = narrowed or candidates
+    by_pos = [c for c in candidates if c.position == context.fantasy_pos]
+    if len(by_pos) == 1:
+        return PlayerIdResolution(by_pos[0].player_id, "position")
+    return None
+
+
+def _team_matches(
+    candidates: list[Any], context: _PlayerResolutionContext
+) -> list[Any]:
+    if context.team_key is None:
+        return []
+    return [
+        c
+        for c in candidates
+        if _team_abbrev_key(context.team_by_id.get(c.player_id)) == context.team_key
+    ]
 
 
 def resolve_player_ids(
@@ -537,125 +569,12 @@ def _reorder(df: pd.DataFrame) -> pd.DataFrame:
     return df[list(_INJURY_COLUMNS)].reset_index(drop=True)
 
 
-# ── ESPN injuries client ─────────────────────────────────────────────────
+# ── ESPN injuries client + table builder ─────────────────────────────────
 
-
-class EspnInjuriesClient:
-    """Cached, polite client for ESPN's public NHL injury JSON (SPEC §5).
-
-    Caching / retry / injectable ``httpx.Client`` mirror
-    :class:`draft_oracle.ingest.nhl_api.NHLApiClient`; ESPN needs no API key and
-    403s browser-like User-Agents, so the default httpx UA is used. Raw responses
-    cache under ``data/raw/espn-injuries/`` (a cache hit skips the network).
-    """
-
-    def __init__(
-        self,
-        cache_dir: Path | str = DEFAULT_INJURIES_CACHE_DIR,
-        *,
-        base: str = ESPN_INJURIES_BASE,
-        core_base: str = ESPN_CORE_BASE,
-        delay: float = DEFAULT_INJURIES_DELAY,
-        max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-        retry_backoff: float = 1.0,
-        timeout: float = DEFAULT_TIMEOUT,
-        client: httpx.Client | None = None,
-        sleep: Callable[[float], None] = time.sleep,
-    ) -> None:
-        if max_attempts < 1:
-            raise ValueError("max_attempts must be >= 1")
-        self.base = base.rstrip("/")
-        self.core_base = core_base.rstrip("/")
-        self.delay = delay
-        self.max_attempts = max_attempts
-        self.retry_backoff = retry_backoff
-        self._cache = ResponseCache(Path(cache_dir))
-        self._sleep = sleep
-        self._owns_client = client is None
-        self._client = client if client is not None else httpx.Client(timeout=timeout)
-
-    def close(self) -> None:
-        if self._owns_client:
-            self._client.close()
-
-    def __enter__(self) -> EspnInjuriesClient:
-        return self
-
-    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
-        self.close()
-
-    def _get_json(self, base: str, path: str) -> dict[str, Any]:
-        cache_key = ResponseCache.key_for(base, path, None)
-        cached = self._cache.get(cache_key)
-        if cached is not None:
-            return cached
-        last_error: Exception | None = None
-        for attempt in range(self.max_attempts):
-            if self.delay > 0:
-                self._sleep(self.delay)
-            try:
-                response = self._client.get(f"{base}{path}")
-                response.raise_for_status()
-                parsed: dict[str, Any] = response.json()
-                self._cache.put(cache_key, parsed)
-                return parsed
-            except (httpx.HTTPError, ValueError) as error:
-                last_error = error
-                if attempt + 1 < self.max_attempts:
-                    self._sleep(self.retry_backoff * (2**attempt))
-        raise NHLApiError(
-            f"ESPN injuries request failed after {self.max_attempts} attempts: {path}"
-        ) from last_error
-
-    def injuries(self) -> EspnInjuriesResponse:
-        """Fetch and parse the league-wide injuries feed (current status only)."""
-        return EspnInjuriesResponse.model_validate(self._get_json(self.base, "/injuries"))
-
-    def core_athlete(self, athlete_id: int | str) -> dict[str, Any]:
-        """Raw ESPN core athlete detail (position/name gap fill, as needed)."""
-        return self._get_json(self.core_base, f"/athletes/{athlete_id}")
-
-
-# ── Build the normalized injuries table ──────────────────────────────────
-
-
-@dataclass
-class InjuriesResult:
-    """Outcome of :func:`build_injuries_table`."""
-
-    out_dir: Path
-    source_rows: int
-    override_rows: int
-    total_rows: int
-    degraded: bool
-    unresolved_player_ids: list[int] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-
-    def report_lines(self) -> list[str]:
-        lines = [
-            f"Injuries table -> {self.out_dir}",
-            f"  source rows: {self.source_rows}",
-            f"  override rows: {self.override_rows}",
-            f"  total rows: {self.total_rows}",
-        ]
-        if self.unresolved_player_ids:
-            lines.append(
-                f"  unresolved ESPN athlete ids (kept, not id-joined): "
-                f"{len(self.unresolved_player_ids)} -> {self.unresolved_player_ids}"
-            )
-        if self.degraded:
-            lines.append("  DEGRADED: source unavailable; used last-known data")
-        for warning in self.warnings:
-            lines.append(f"  WARNING: {warning}")
-        return lines
-
-
-def _load_players(normalized_dir: Path) -> pd.DataFrame | None:
-    """Load the normalized ``players`` dimension for ESPN->NHL id mapping, if present."""
-    path = normalized_dir / "players.parquet"
-    if not path.is_file():
-        return None
-    return pd.read_parquet(path)
+EspnInjuriesClient = _injuries_build_module.EspnInjuriesClient
+InjuriesResult = _injuries_build_module.InjuriesResult
+_load_players = _injuries_build_module._load_players
+_load_last_known = _injuries_build_module._load_last_known
 
 
 def build_injuries_table(
@@ -666,84 +585,11 @@ def build_injuries_table(
     players: pd.DataFrame | None = None,
     fetch: bool = True,
 ) -> InjuriesResult:
-    """Ingest injuries into ``injuries.parquet``; overrides are final authority.
-
-    The ESPN feed keys on athlete ids that are disjoint from NHL player ids, so
-    every source row is resolved to an NHL ``player_id`` via name + team matching
-    against the ``players`` dimension (loaded from ``out_dir/players.parquet``
-    when not supplied) — otherwise the ``injured`` flag and IR-stash valuation
-    could never match a real player (CODE_REVIEW M-11). Unresolved skaters are
-    kept (never dropped) and surfaced in the result.
-
-    On a source failure (or ``fetch=False``) the last-known table is reused so
-    the pipeline never stalls on a flaky feed — the overrides always merge on
-    top. Returns row counts, a ``degraded`` flag, and any warnings.
-    """
-    warnings: list[str] = []
-    degraded = False
-    unresolved: list[int] = []
-    out_path = out_dir / f"{INJURIES_TABLE_NAME}.parquet"
-
-    if players is None:
-        players = _load_players(out_dir)
-    if players is None:
-        warnings.append(
-            "no players.parquet found; ESPN athlete ids left unmapped (injured flag "
-            "will not join)"
-        )
-
-    source: pd.DataFrame | None = None
-    owns_client = fetch and client is None
-    active_client = client
-    if fetch:
-        if active_client is None:
-            active_client = EspnInjuriesClient()
-        try:
-            source = injuries_response_to_rows(active_client.injuries(), players=players)
-            unresolved = list(source.attrs.get("unresolved_espn_ids", []))
-        except NHLApiError as error:
-            warnings.append(f"ESPN injuries source failed ({error}); using last-known data")
-            degraded = True
-            source = None
-        finally:
-            if owns_client and active_client is not None:
-                active_client.close()
-    else:
-        warnings.append("fetch disabled; using last-known injuries data + overrides")
-
-    if source is None:
-        source = _load_last_known(out_path)
-        if source.empty and not warnings:
-            warnings.append("no last-known injuries table found; starting empty")
-
-    source_rows = len(source)
-    overrides = load_injury_overrides(overrides_path)
-    merged = apply_overrides(source, overrides)
-    override_rows = int((merged["source"] == SOURCE_OVERRIDE).sum()) if not merged.empty else 0
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    merged.to_parquet(out_path, index=False)
-    return InjuriesResult(
+    """Ingest injuries into ``injuries.parquet``; overrides are final authority."""
+    return _injuries_build_module.build_injuries_table(
+        client=client,
+        overrides_path=overrides_path,
         out_dir=out_dir,
-        source_rows=source_rows,
-        override_rows=override_rows,
-        total_rows=len(merged),
-        degraded=degraded,
-        unresolved_player_ids=unresolved,
-        warnings=warnings,
+        players=players,
+        fetch=fetch,
     )
-
-
-def _load_last_known(out_path: Path) -> pd.DataFrame:
-    """Load the previous ``injuries.parquet`` (relabeled last-known), or empty."""
-    if not out_path.is_file():
-        return pd.DataFrame(columns=list(_INJURY_COLUMNS))
-    df = pd.read_parquet(out_path)
-    for column in _INJURY_COLUMNS:
-        if column not in df.columns:
-            df[column] = None
-    df = df[list(_INJURY_COLUMNS)].copy()
-    # Rows previously stamped from the live source become "last-known"; committed
-    # override rows keep their authority so they merge cleanly again.
-    df.loc[df["source"] == SOURCE_ESPN, "source"] = SOURCE_LAST_KNOWN
-    return df.reset_index(drop=True)

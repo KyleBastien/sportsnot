@@ -31,6 +31,14 @@ from typing import Annotated, Any
 
 import typer
 
+from draft_oracle.cli._draft_parsing import (
+    OPPONENTS_FITTED,
+    OPPONENTS_GREEDY,
+    ParsedCommand,
+    parse_command,
+    parse_managers,
+    resolve_opponents_kind,
+)
 from draft_oracle.optimize.opponents import (
     DEFAULT_OPPONENT_ARTIFACT_DIR,
     FittedLeagueOpponents,
@@ -47,6 +55,9 @@ from draft_oracle.optimize.simulator import (
     OpponentModel,
 )
 
+for _exported in (ParsedCommand, parse_command, parse_managers, resolve_opponents_kind):
+    _exported.__module__ = __name__
+
 __all__ = [
     "ActionResult",
     "AssetResolution",
@@ -56,8 +67,10 @@ __all__ = [
     "draft",
     "opponent_label",
     "parse_command",
+    "parse_managers",
     "resolve_asset",
     "resolve_manager",
+    "resolve_opponents_kind",
 ]
 
 SESSION_VERSION = 1
@@ -66,60 +79,6 @@ DEFAULT_SEED = 20260827
 DEFAULT_ROLLOUTS = 500
 DEFAULT_NEED_WEIGHT = 4.0
 
-OPPONENTS_GREEDY = "greedy"
-OPPONENTS_FITTED = "fitted"
-_OPPONENTS_AUTO = ("", "auto")
-
-
-def parse_managers(managers: str) -> list[str]:
-    """Resolve the seat->id map from the ``--managers`` value.
-
-    Accepts either a league size (``4`` -> ``seat1..seat4``, the historical form) or a
-    comma list of real names (``ben,judah,levi,kyle``) so per-manager fitted models can
-    attach to real seats. The ``seatN`` fallback keeps the tool usable without names.
-    """
-    stripped = managers.strip()
-    if stripped.isdigit():
-        count = int(stripped)
-        if not 2 <= count <= 12:
-            raise typer.BadParameter("--managers count must be in 2..12")
-        return [f"seat{index + 1}" for index in range(count)]
-    names = [token.strip() for token in stripped.split(",") if token.strip()]
-    if not 2 <= len(names) <= 12:
-        raise typer.BadParameter("--managers must name 2..12 seats (or give a count)")
-    seen: set[str] = set()
-    duplicates: list[str] = []
-    for name in names:
-        normalized = name.casefold()
-        if normalized in seen and normalized not in duplicates:
-            duplicates.append(normalized)
-        seen.add(normalized)
-    if duplicates:
-        raise typer.BadParameter(f"--managers contains duplicate id(s): {', '.join(duplicates)}")
-    return names
-
-
-def resolve_opponents_kind(opponents: str, artifact_dir: Path) -> str:
-    """Resolve the opponent policy: explicit ``greedy``/``fitted`` or auto-detect.
-
-    ``auto`` (the default) picks ``fitted`` when the committed opponent artifact is
-    present and ``greedy`` otherwise. An explicit ``fitted`` with no artifact fails
-    loudly rather than silently falling back.
-    """
-    kind = opponents.strip().lower()
-    if kind in _OPPONENTS_AUTO:
-        has_artifact = (Path(artifact_dir) / "manifest.json").exists()
-        return OPPONENTS_FITTED if has_artifact else OPPONENTS_GREEDY
-    if kind in (OPPONENTS_GREEDY, OPPONENTS_FITTED):
-        if kind == OPPONENTS_FITTED and not (Path(artifact_dir) / "manifest.json").exists():
-            raise typer.BadParameter(
-                f"--opponents fitted needs a committed artifact at {artifact_dir} "
-                "(run `oracle train-opponents` first)"
-            )
-        return kind
-    raise typer.BadParameter(f"--opponents must be greedy, fitted, or auto (got {opponents!r})")
-
-
 # A resolution is treated as unambiguous only when the best fuzzy match clears
 # the runner-up by this margin; otherwise the pick is rejected as ambiguous.
 _FUZZY_MARGIN = 0.08
@@ -127,72 +86,6 @@ _FUZZY_FLOOR = 0.5
 
 
 # ── Pure helpers (command parsing + resolution) ───────────────────────────
-
-
-@dataclass(frozen=True)
-class ParsedCommand:
-    """A tokenized command line (pure result of :func:`parse_command`)."""
-
-    name: str
-    manager: str | None = None
-    query: str | None = None
-    path: str | None = None
-    depth: int | None = None
-    manager_name: str | None = None
-    error: str | None = None
-
-
-def parse_command(line: str) -> ParsedCommand:
-    """Tokenize one input ``line`` into a :class:`ParsedCommand`.
-
-    Blank lines yield ``name == ""``. Unknown commands and malformed arguments
-    set ``error`` (the loop echoes it and keeps going — never crashes). The pick
-    name is the whole remainder so multi-word fuzzy names survive intact.
-    """
-    stripped = line.strip()
-    if not stripped:
-        return ParsedCommand(name="")
-    tokens = stripped.split()
-    cmd = tokens[0].lower()
-    rest = tokens[1:]
-
-    if cmd in ("pick", "p"):
-        if len(rest) < 2:
-            return ParsedCommand("pick", error="usage: pick <manager> <name>")
-        return ParsedCommand("pick", manager=rest[0], query=" ".join(rest[1:]))
-    if cmd in ("undo", "u"):
-        return ParsedCommand("undo")
-    if cmd in ("board", "b"):
-        return ParsedCommand("board")
-    if cmd in ("roster", "r"):
-        return ParsedCommand("roster", manager_name=rest[0] if rest else None)
-    if cmd in ("recommend", "rec"):
-        depth: int | None = None
-        index = 0
-        while index < len(rest):
-            token = rest[index]
-            if token in ("--depth", "-d") and index + 1 < len(rest):
-                try:
-                    depth = int(rest[index + 1])
-                except ValueError:
-                    return ParsedCommand("recommend", error="depth must be an integer")
-                index += 2
-                continue
-            index += 1
-        return ParsedCommand("recommend", depth=depth)
-    if cmd == "save":
-        if not rest:
-            return ParsedCommand("save", error="usage: save <path>")
-        return ParsedCommand("save", path=" ".join(rest))
-    if cmd in ("resume", "load"):
-        if not rest:
-            return ParsedCommand("resume", error="usage: resume <path>")
-        return ParsedCommand("resume", path=" ".join(rest))
-    if cmd in ("help", "h", "?"):
-        return ParsedCommand("help")
-    if cmd in ("quit", "exit", "q"):
-        return ParsedCommand("quit")
-    return ParsedCommand(cmd, error=f"unknown command {cmd!r}")
 
 
 def resolve_manager(managers: list[str], token: str) -> str | None:

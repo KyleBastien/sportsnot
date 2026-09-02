@@ -90,20 +90,18 @@ class SlotStrategyConfig:
     need_weight: float = 4.0
 
     def __post_init__(self) -> None:
-        if self.rollouts < 1:
-            raise ValueError(f"rollouts must be >= 1, got {self.rollouts}")
-        if self.max_candidates < 1:
-            raise ValueError(f"max_candidates must be >= 1, got {self.max_candidates}")
-        if self.top_alternatives < 0:
-            raise ValueError(f"top_alternatives must be >= 0, got {self.top_alternatives}")
-        if self.contingency_turns < 0:
-            raise ValueError(f"contingency_turns must be >= 0, got {self.contingency_turns}")
-        if self.contingency_branches < 1:
-            raise ValueError(f"contingency_branches must be >= 1, got {self.contingency_branches}")
-        if self.contingency_targets < 1:
-            raise ValueError(f"contingency_targets must be >= 1, got {self.contingency_targets}")
-        if self.contingency_rollouts < 1:
-            raise ValueError(f"contingency_rollouts must be >= 1, got {self.contingency_rollouts}")
+        checks: tuple[tuple[int, str, int], ...] = (
+            (self.rollouts, "rollouts", 1),
+            (self.max_candidates, "max_candidates", 1),
+            (self.top_alternatives, "top_alternatives", 0),
+            (self.contingency_turns, "contingency_turns", 0),
+            (self.contingency_branches, "contingency_branches", 1),
+            (self.contingency_targets, "contingency_targets", 1),
+            (self.contingency_rollouts, "contingency_rollouts", 1),
+        )
+        for value, name, minimum in checks:
+            if value < minimum:
+                raise ValueError(f"{name} must be >= {minimum}, got {value}")
         if self.depth is not None and self.depth < 1:
             raise ValueError(f"depth must be >= 1 or None, got {self.depth}")
 

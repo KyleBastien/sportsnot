@@ -8,30 +8,79 @@ projection and draft-assistant commands follow in US-017/024.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 import typer
 
 from draft_oracle import __version__
+from draft_oracle.cli._project_artifact_commands import draft_cmd, project, recommend
+from draft_oracle.cli._project_defaults import (
+    DEFAULT_ARCHIVE_DIR,
+    DEFAULT_ARTIFACTS_ROOT,
+    DEFAULT_BACKTEST_ROOT,
+    DEFAULT_INJURIES_OVERRIDES,
+    DEFAULT_LEAGUE_DRAFTS_DIR,
+    DEFAULT_MODEL_ARTIFACT_DIR,
+    DEFAULT_NORMALIZED_DIR,
+    DEFAULT_ODDS_ARCHIVE_DIR,
+    DEFAULT_OPPONENT_ARTIFACT_DIR,
+    DEFAULT_OVERRIDES_DIR,
+    DEFAULT_PROJECTION_ARTIFACT_DIR,
+    DEFAULT_RETURN_TIME_ARTIFACT_DIR,
+    DEFAULT_SERIES_SIM_ARTIFACT_DIR,
+    DEFAULT_SHUTOUT_ARTIFACT_DIR,
+    DEFAULT_SKATER_PRODUCTION_ARTIFACT_DIR,
+    STRATEGIES,
+    Strategy,
+)
+from draft_oracle.cli._project_training_commands import (
+    backtest,
+    compare_strategies_cmd,
+    eval_series_sim,
+    project_skaters,
+    train_game_win,
+    train_opponents,
+    train_return_time,
+    train_shutout,
+    train_skater_production,
+)
 
-DEFAULT_ARCHIVE_DIR = Path("data/raw/nhl-archive")
-DEFAULT_NORMALIZED_DIR = Path("data/normalized")
-DEFAULT_ODDS_ARCHIVE_DIR = Path("data/raw/odds-archive")
-DEFAULT_LEAGUE_DRAFTS_DIR = Path("data/raw/league-drafts")
-DEFAULT_OVERRIDES_DIR = Path("data/overrides")
-DEFAULT_INJURIES_OVERRIDES = DEFAULT_OVERRIDES_DIR / "injuries.yaml"
-DEFAULT_MODEL_ARTIFACT_DIR = Path("artifacts/models/game-win")
-DEFAULT_SHUTOUT_ARTIFACT_DIR = Path("artifacts/models/shutout")
-DEFAULT_SKATER_PRODUCTION_ARTIFACT_DIR = Path("artifacts/models/skater-production")
-DEFAULT_RETURN_TIME_ARTIFACT_DIR = Path("artifacts/models/return-time")
-DEFAULT_SERIES_SIM_ARTIFACT_DIR = Path("artifacts/models/series-sim")
-DEFAULT_PROJECTION_ARTIFACT_DIR = Path("artifacts/models/skater-projection")
-DEFAULT_OPPONENT_ARTIFACT_DIR = Path("artifacts/models/opponent")
-DEFAULT_ARTIFACTS_ROOT = Path("artifacts")
-DEFAULT_BACKTEST_ROOT = Path("artifacts/backtests")
+_PROJECT_PUBLIC_DEFAULTS = (
+    DEFAULT_ARCHIVE_DIR,
+    DEFAULT_ARTIFACTS_ROOT,
+    DEFAULT_BACKTEST_ROOT,
+    DEFAULT_INJURIES_OVERRIDES,
+    DEFAULT_LEAGUE_DRAFTS_DIR,
+    DEFAULT_MODEL_ARTIFACT_DIR,
+    DEFAULT_NORMALIZED_DIR,
+    DEFAULT_ODDS_ARCHIVE_DIR,
+    DEFAULT_OPPONENT_ARTIFACT_DIR,
+    DEFAULT_OVERRIDES_DIR,
+    DEFAULT_PROJECTION_ARTIFACT_DIR,
+    DEFAULT_RETURN_TIME_ARTIFACT_DIR,
+    DEFAULT_SERIES_SIM_ARTIFACT_DIR,
+    DEFAULT_SHUTOUT_ARTIFACT_DIR,
+    DEFAULT_SKATER_PRODUCTION_ARTIFACT_DIR,
+    STRATEGIES,
+    Strategy,
+)
 
-Strategy = Literal["oracle", "greedy_vor", "one_step", "random_legal"]
-STRATEGIES: tuple[Strategy, ...] = ("oracle", "greedy_vor", "one_step", "random_legal")
+_PROJECT_COMMAND_EXPORTS = (
+    backtest,
+    compare_strategies_cmd,
+    draft_cmd,
+    eval_series_sim,
+    project,
+    project_skaters,
+    recommend,
+    train_game_win,
+    train_opponents,
+    train_return_time,
+    train_shutout,
+    train_skater_production,
+)
+for _exported in _PROJECT_COMMAND_EXPORTS:
+    _exported.__module__ = __name__
 
 app = typer.Typer(
     add_completion=False,
@@ -211,606 +260,22 @@ def injuries(
         typer.echo(line)
 
 
-@app.command(name="train-game-win")
-def train_game_win(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_MODEL_ARTIFACT_DIR,
-    no_odds: Annotated[
-        bool,
-        typer.Option("--no-odds", help="Train stat-only (skip the market features)."),
-    ] = False,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
-) -> None:
-    """Train the per-game win model; write the evaluation report + manifest."""
-    from draft_oracle.models.game_win import GameWinConfig, train_game_win_from_normalized
-
-    result = train_game_win_from_normalized(
-        normalized_dir=normalized_dir,
-        artifact_dir=artifact_dir,
-        config=GameWinConfig(seed=seed),
-        use_odds=not no_odds,
-    )
-    typer.echo(f"Per-game win model -> {artifact_dir}")
-    typer.echo(f"  chosen model: {result.chosen_model_type}")
-    typer.echo(
-        f"  test Brier: market+stats {result.test_brier_market:.4f} / "
-        f"stats-only {result.test_brier_stats_only:.4f}"
-    )
-    typer.echo(
-        f"  baselines: coin-flip {result.test_brier_coin_flip:.4f} / "
-        f"higher-points {result.test_brier_higher_points:.4f}"
-    )
-    typer.echo(f"  beats both baselines: {'yes' if result.beats_both_baselines else 'no'}")
 
 
-@app.command(name="train-shutout")
-def train_shutout(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_SHUTOUT_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
-) -> None:
-    """Train the shutout-probability model; write the evaluation report + manifest."""
-    from draft_oracle.models.shutout import ShutoutConfig, train_shutout_from_normalized
-
-    result = train_shutout_from_normalized(
-        normalized_dir=normalized_dir,
-        artifact_dir=artifact_dir,
-        config=ShutoutConfig(seed=seed),
-    )
-    typer.echo(f"Shutout model -> {artifact_dir}")
-    typer.echo(f"  chosen model: {result.chosen_model_type}")
-    typer.echo(
-        f"  test Brier: model {result.test_brier_model:.4f} / "
-        f"base-rate {result.test_brier_base_rate:.4f}"
-    )
-    typer.echo(
-        f"  calibration: observed {result.test_observed_rate:.4f} / "
-        f"predicted {result.test_predicted_rate:.4f} "
-        f"(rel err {result.calibration_rel_error:.1%})"
-    )
-    typer.echo(f"  within +/-25%: {'yes' if result.calibrated_within_tolerance else 'no'}")
 
 
-@app.command(name="train-skater-production")
-def train_skater_production(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_SKATER_PRODUCTION_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
-) -> None:
-    """Train the skater per-game production model; write the report + manifest."""
-    from draft_oracle.models.skater_production import (
-        SkaterProductionConfig,
-        train_skater_production_from_normalized,
-    )
-
-    result = train_skater_production_from_normalized(
-        normalized_dir=normalized_dir,
-        artifact_dir=artifact_dir,
-        config=SkaterProductionConfig(seed=seed),
-    )
-    typer.echo(f"Skater production model -> {artifact_dir}")
-    typer.echo(f"  chosen model: {result.chosen_model_type}")
-    typer.echo(
-        f"  test MAE: model {result.test_mae_model:.4f} / "
-        f"reg-ppg {result.test_mae_baseline_reg:.4f} / "
-        f"mean {result.test_mae_baseline_mean:.4f}"
-    )
-    typer.echo(
-        f"  test Spearman: model {result.test_spearman_model:.4f} / "
-        f"reg-ppg {result.test_spearman_baseline_reg:.4f}"
-    )
-    typer.echo(f"  beats reg-ppg baseline: {'yes' if result.beats_reg_baseline else 'no'}")
-    typer.echo(f"  cold cases (test): {result.n_cold_cases_test}")
-
-
-@app.command(name="train-return-time")
-def train_return_time(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_RETURN_TIME_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
-) -> None:
-    """Calibrate the injury return-time model on archive absence spells."""
-    from draft_oracle.models.returns import ReturnTimeConfig, train_return_time_from_normalized
-
-    result = train_return_time_from_normalized(
-        normalized_dir=normalized_dir,
-        artifact_dir=artifact_dir,
-        config=ReturnTimeConfig(seed=seed),
-    )
-    typer.echo(f"Return-time model -> {artifact_dir}")
-    typer.echo(f"  spells retained: {result.n_spells_total}")
-    typer.echo(
-        f"  spell length: mean {result.mean_spell:.2f} / "
-        f"median {result.median_spell:.1f} / p90 {result.p90_spell:.1f}"
-    )
-    typer.echo(f"  held-out seasons: {list(result.test_years)}")
-    typer.echo(f"  calibration MAE (survival): {result.calibration_mae:.4f}")
-
-
-@app.command(name="eval-series-sim")
-def eval_series_sim(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_SERIES_SIM_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
-) -> None:
-    """Calibrate the best-of-7 series simulator; write the report + manifest."""
-    from draft_oracle.models.series_sim import SeriesSimConfig, evaluate_series_sim_from_normalized
-
-    result = evaluate_series_sim_from_normalized(
-        normalized_dir=normalized_dir,
-        artifact_dir=artifact_dir,
-        config=SeriesSimConfig(seed=seed),
-    )
-    typer.echo(f"Series simulator -> {artifact_dir}")
-    typer.echo(f"  held-out seasons: {list(result.test_years)}")
-    typer.echo(f"  series scored: {result.n_series_scored} (skipped {result.n_series_skipped})")
-    typer.echo(
-        f"  series-winner Brier: model {result.brier_series:.4f} / "
-        f"higher-seed {result.brier_higher_seed:.4f} / coin {result.brier_coin_flip:.4f}"
-    )
-
-
-@app.command(name="project-skaters")
-def project_skaters(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_PROJECTION_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training/MC seed.")] = 20260827,
-) -> None:
-    """Evaluate skater round-point projections with uncertainty; write report + manifest."""
-    from draft_oracle.models.projections import (
-        ProjectionConfig,
-        evaluate_skater_projections_from_normalized,
-    )
-
-    result = evaluate_skater_projections_from_normalized(
-        normalized_dir=normalized_dir,
-        artifact_dir=artifact_dir,
-        config=ProjectionConfig(seed=seed),
-    )
-    typer.echo(f"Skater round projections -> {artifact_dir}")
-    typer.echo(f"  held-out seasons: {list(result.test_years)}")
-    typer.echo(
-        f"  skater-rounds projected: {result.n_projected} (skipped {result.n_skipped_no_series})"
-    )
-    typer.echo(
-        f"  test MAE: model {result.test_mae_model:.4f} / "
-        f"reg-ppg {result.test_mae_baseline_reg:.4f} / "
-        f"prev-round {result.test_mae_baseline_prev:.4f}"
-    )
-    typer.echo(
-        f"  test Spearman: model {result.test_spearman_model:.4f} / "
-        f"reg-ppg {result.test_spearman_baseline_reg:.4f} / "
-        f"prev-round {result.test_spearman_baseline_prev:.4f}"
-    )
-    typer.echo(f"  beats both baselines: {'yes' if result.beats_both_baselines else 'no'}")
-
-
-@app.command(name="train-opponents")
-def train_opponents(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_OPPONENT_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
-) -> None:
-    """Fit the league-history opponent model; write the validation report + manifest."""
-    from draft_oracle.optimize.opponents import (
-        OpponentFitConfig,
-        train_opponent_model_from_normalized,
-    )
-
-    result = train_opponent_model_from_normalized(
-        normalized_dir=normalized_dir,
-        artifact_dir=artifact_dir,
-        config=OpponentFitConfig(seed=seed),
-    )
-    fitted = result.fitted
-    evaluation = result.evaluation
-    typer.echo(f"Opponent model -> {artifact_dir}")
-    typer.echo(
-        f"  league coefficients: rank {fitted.league.rank:+.3f} / "
-        f"affinity {fitted.league.affinity:+.3f}"
-    )
-    typer.echo(
-        f"  per-manager models: {len(fitted.per_manager)} "
-        f"(min picks {fitted.config.min_manager_picks})"
-    )
-    for score in evaluation.membership:
-        typer.echo(
-            f"  {score.season} membership: fitted {score.fitted_accuracy:.3f} vs "
-            f"greedy {score.greedy_accuracy:.3f} "
-            f"({'beats' if score.fitted_beats_greedy else 'ties/loses'} fallback)"
-        )
-    if evaluation.per_pick is not None:
-        pp = evaluation.per_pick
-        typer.echo(f"  per-pick top-1: fitted {pp.fitted_top1:.3f} vs greedy {pp.greedy_top1:.3f}")
-    typer.echo(
-        f"  seasons beating fallback: "
-        f"{evaluation.seasons_beating_fallback}/{len(evaluation.membership)}"
-    )
-
-
-@app.command(name="project")
-def project(
-    season: Annotated[int, typer.Option(help="Playoff season end year, e.g. 2026.")],
-    playoff_round: Annotated[int, typer.Option("--round", help="Playoff round number (1-4).")],
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifacts_root: Annotated[
-        Path, typer.Option(help="Root directory for the written artifact.")
-    ] = DEFAULT_ARTIFACTS_ROOT,
-    snapshot: Annotated[
-        str, typer.Option(help="Pin a frozen snapshot id (defaults to the live tables).")
-    ] = "",
-    managers: Annotated[
-        int, typer.Option(help="League size (2-12); sets VOR replacement levels.")
-    ] = 4,
-    ir: Annotated[
-        bool,
-        typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D per manager)."),
-    ] = False,
-    archive_dir: Annotated[
-        Path, typer.Option(help="Committed NHL archive directory (for the ingest refresh).")
-    ] = DEFAULT_ARCHIVE_DIR,
-    no_refresh: Annotated[
-        bool,
-        typer.Option("--no-refresh", help="Skip the idempotent ingest refresh (offline)."),
-    ] = False,
-    seed: Annotated[int, typer.Option(help="Deterministic training/MC seed.")] = 20260827,
-    slot_strategies: Annotated[
-        bool,
-        typer.Option(
-            "--slot-strategies/--no-slot-strategies",
-            help="Emit slot_strategies.md (per-slot draft plan, US-023).",
-        ),
-    ] = True,
-    slot_rollouts: Annotated[
-        int, typer.Option(help="Monte-Carlo rollouts per turn in the slot report.")
-    ] = 60,
-) -> None:
-    """Precompute a self-contained projection artifact for one upcoming round.
-
-    Refreshes ingest (idempotent, offline), builds as-of features, runs inference, and
-    writes skaters/teams Parquet + CSV, cheatsheet.md, slot_strategies.md, and
-    run_manifest.json under artifacts_root/<season>-r<round>/. Eliminated teams are
-    excluded automatically.
-    """
-    from draft_oracle.ingest.normalize import normalize_archive
-    from draft_oracle.optimize.slot_strategies import SlotStrategyConfig
-    from draft_oracle.projection_artifact import (
-        ProjectArtifactConfig,
-        build_projection_artifact_from_normalized,
-    )
-
-    if not no_refresh and not snapshot:
-        normalize_archive(archive_dir=archive_dir, out_dir=normalized_dir)
-    result, out_dir = build_projection_artifact_from_normalized(
-        season=season,
-        playoff_round=playoff_round,
-        normalized_dir=normalized_dir,
-        artifacts_root=artifacts_root,
-        snapshot=snapshot or None,
-        config=ProjectArtifactConfig(
-            seed=seed,
-            managers=managers,
-            ir=ir,
-            no_refresh=no_refresh,
-            slot_strategies=slot_strategies,
-            slot_strategy_config=SlotStrategyConfig(seed=seed, rollouts=slot_rollouts),
-        ),
-    )
-    counts = result.manifest["counts"]
-    scarcity = result.manifest["scarcity"]
-    typer.echo(f"Projection artifact -> {out_dir}")
-    typer.echo(
-        f"  season {result.season} round {result.playoff_round} (as of {result.as_of_cutoff})"
-    )
-    typer.echo(
-        f"  eligible: {counts['eligible_teams']} teams / "
-        f"{counts['skaters_projected']} skaters ({counts['skaters_injured']} injured)"
-    )
-    repl = scarcity["replacement_level"]
-    typer.echo(
-        f"  VOR: {scarcity['managers']} managers, IR {'on' if scarcity['ir'] else 'off'}; "
-        f"replacement F {repl['F']:.2f} / D {repl['D']:.2f} / G {repl['G']:.2f}"
-    )
-    typer.echo(f"  snapshot id: {result.manifest['snapshot_id']}")
-    slots = result.manifest.get("slot_strategies")
-    if slots:
-        opp_label = slots.get(
-            "opponent_label",
-            "fitted" if slots["fitted_opponents"] else "greedy",
-        )
-        typer.echo(
-            f"  slot strategies: {len(slots['slots'])} slots"
-            f" ({opp_label} opponents);"
-            f" best slot {slots['best_slot']}"
-        )
-    for warning in result.warnings:
-        typer.echo(f"  warning: {warning}")
-
-
-@app.command()
-def recommend(
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Projection artifact directory (has skaters/teams parquet).")
-    ],
-    managers: Annotated[
-        str,
-        typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."),
-    ] = "4",
-    seat: Annotated[int, typer.Option(help="Owner's snake seat (1-based).")] = 1,
-    ir: Annotated[
-        bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
-    ] = False,
-    rollouts: Annotated[int, typer.Option(help="Monte-Carlo rollouts per candidate.")] = 500,
-    depth: Annotated[
-        int, typer.Option(help="Owner turns simulated vs. opponents (0 = full depth).")
-    ] = 0,
-    temperature: Annotated[float, typer.Option(help="Greedy opponent softmax temperature.")] = 0.3,
-    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
-    opponents: Annotated[
-        str,
-        typer.Option(
-            help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."
-        ),
-    ] = "auto",
-    opponent_artifact: Annotated[
-        Path, typer.Option(help="Committed opponent-model artifact directory (fitted path).")
-    ] = DEFAULT_OPPONENT_ARTIFACT_DIR,
-) -> None:
-    """Recommend the best pick right now via multi-step Monte-Carlo rollout (US-021).
-
-    Builds a fresh draft from a projection artifact, puts the owner on the clock at
-    ``seat``, and prints the top-5 explained recommendations (VOR, survival, need,
-    delta vs. #2). Opponents default to the committed *fitted* league model when its
-    artifact is present; ``--opponents greedy`` forces the vectorized fallback, and
-    passing real names to ``--managers`` attaches each manager's fitted model to their
-    real seat.
-    """
-    import random as _random
-    from collections.abc import Mapping
-
-    from draft_oracle.cli.draft import (
-        opponent_label,
-        parse_managers,
-        resolve_opponents_kind,
-    )
-    from draft_oracle.optimize.opponents import load_committed_opponents
-    from draft_oracle.optimize.recommend import (
-        RecommendConfig,
-        build_pool_from_projection_artifact,
-        recommend_pick,
-    )
-    from draft_oracle.optimize.simulator import DraftState, GreedyOpponentModel, OpponentModel
-
-    manager_ids = parse_managers(managers)
-    manager_count = len(manager_ids)
-    if not 1 <= seat <= manager_count:
-        raise typer.BadParameter(f"seat must be in 1..{manager_count}")
-    opponents_kind = resolve_opponents_kind(opponents, opponent_artifact)
-    pool = build_pool_from_projection_artifact(artifact_dir, ir=ir)
-    owner = manager_ids[seat - 1]
-    state = DraftState.new(manager_ids, pool, allow_ir=ir)
-
-    opponent_model: OpponentModel | Mapping[str, OpponentModel]
-    fitted = None
-    if opponents_kind == "fitted":
-        fitted = load_committed_opponents(opponent_artifact)
-        if fitted is None:
-            raise typer.BadParameter(
-                f"--opponents fitted needs a committed artifact at {opponent_artifact}"
-            )
-        opponent_model = fitted.as_mapping(manager_ids)
-    else:
-        opponent_model = GreedyOpponentModel(temperature=temperature, need_weight=4.0)
-
-    def _model_for(manager: str) -> OpponentModel:
-        if isinstance(opponent_model, Mapping):
-            return opponent_model[manager]
-        return opponent_model
-
-    rng = _random.Random(seed)
-    # Advance to the owner's first turn (opponents ahead of the owner draft via the model).
-    while state.current_manager != owner:
-        current = state.current_manager
-        state.apply_pick(_model_for(current).pick(state, current, rng))
-    config = RecommendConfig(rollouts=rollouts, depth=depth or None, seed=seed)
-    result = recommend_pick(state, owner, opponent_model, config=config, managers=manager_count)
-    label = opponent_label(opponents_kind, fitted, manager_ids)
-    typer.echo(f"Recommendation for {owner} (pick #{state.pick_index + 1}, {label}):")
-    for line in result.report_lines():
-        typer.echo(line)
-
-
-@app.command(name="compare-strategies")
-def compare_strategies_cmd(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    managers: Annotated[int, typer.Option(help="League size for the simulated drafts.")] = 4,
-    n_drafts: Annotated[int, typer.Option(help="Seeded simulated drafts (>=200).")] = 200,
-    rollouts: Annotated[int, typer.Option(help="Rollouts per recommendation.")] = 40,
-    max_candidates: Annotated[int, typer.Option(help="Candidates rolled out.")] = 6,
-    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
-) -> None:
-    """Run the committed multi-step vs. greedy-VOR vs. one-step comparison (US-021)."""
-    from draft_oracle.optimize.recommend import (
-        DEFAULT_RECOMMEND_ARTIFACT_DIR,
-        evaluate_recommendation_strategies_from_normalized,
-    )
-
-    result = evaluate_recommendation_strategies_from_normalized(
-        normalized_dir=normalized_dir,
-        managers=managers,
-        n_drafts=n_drafts,
-        rollouts=rollouts,
-        max_candidates=max_candidates,
-        seed=seed,
-    )
-    typer.echo(f"Strategy comparison -> {DEFAULT_RECOMMEND_ARTIFACT_DIR}")
-    for line in result.report_lines():
-        typer.echo(line)
-
-
-@app.command(name="draft")
-def draft_cmd(
-    artifact: Annotated[
-        Path | None,
-        typer.Option(help="Projection artifact directory (skaters/teams parquet)."),
-    ] = None,
-    managers: Annotated[
-        str,
-        typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."),
-    ] = "4",
-    slot: Annotated[int, typer.Option("--slot", help="Your snake seat (1-based).")] = 1,
-    ir: Annotated[
-        bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
-    ] = False,
-    eliminated: Annotated[str, typer.Option(help="Comma-separated eliminated team abbrevs.")] = "",
-    session: Annotated[
-        Path | None,
-        typer.Option(help="Session-log path (defaults to ./draft-session.json)."),
-    ] = None,
-    resume: Annotated[
-        Path | None, typer.Option("--resume", help="Resume a saved session JSON instead.")
-    ] = None,
-    temperature: Annotated[float, typer.Option(help="Greedy opponent softmax temperature.")] = 0.3,
-    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
-    rollouts: Annotated[
-        int, typer.Option(help="Monte-Carlo rollouts per candidate for recommend.")
-    ] = 500,
-    opponents: Annotated[
-        str,
-        typer.Option(
-            help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."
-        ),
-    ] = "auto",
-    opponent_artifact: Annotated[
-        Path, typer.Option(help="Committed opponent-model artifact directory (fitted path).")
-    ] = DEFAULT_OPPONENT_ARTIFACT_DIR,
-) -> None:
-    """Start the interactive, artifact-powered draft assistant (US-024)."""
-    from draft_oracle.cli.draft import draft
-
-    draft(
-        artifact=artifact,
-        managers=managers,
-        slot=slot,
-        ir=ir,
-        eliminated=eliminated,
-        session=session,
-        resume=resume,
-        temperature=temperature,
-        seed=seed,
-        rollouts=rollouts,
-        opponents=opponents,
-        opponent_artifact=opponent_artifact,
-    )
-
-
-@app.command()
-def backtest(
-    seasons: Annotated[
-        list[int], typer.Option("--seasons", help="Playoff end years to replay, e.g. 2022.")
-    ],
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    backtest_root: Annotated[
-        Path, typer.Option(help="Root directory for the written backtest run.")
-    ] = DEFAULT_BACKTEST_ROOT,
-    snapshot: Annotated[
-        str, typer.Option(help="Pin a frozen snapshot id (defaults to the live tables).")
-    ] = "",
-    managers: Annotated[int, typer.Option(help="League size (2-12).")] = 4,
-    ir: Annotated[
-        bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
-    ] = False,
-    n_drafts: Annotated[int, typer.Option(help="Seeded drafts per (round, slot).")] = 1,
-    rollouts: Annotated[int, typer.Option(help="Monte-Carlo rollouts per oracle pick.")] = 40,
-    strategies: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--strategy",
-            help="Oracle policies to seat (oracle/greedy_vor/one_step/random_legal).",
-        ),
-    ] = None,
-    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
-) -> None:
-    """Replay historical playoff rounds end-to-end and score against actuals (US-025).
-
-    Rebuilds as-of projections for every round, seats the oracle in each snake slot
-    vs. the fitted (league-history) or greedy opponent model, and scores every roster
-    with the real results through the rules engine. A hard leakage guard fails loudly
-    if any round-N game leaks into the as-of inputs. Per-round intermediates and the
-    run manifest are written under backtest_root/<run-id>/.
-    """
-    from draft_oracle.backtest.replay import BacktestConfig, run_backtest_from_normalized
-
-    resolved: tuple[Strategy, ...] = tuple(_coerce_strategy(s) for s in (strategies or ["oracle"]))
-    config = BacktestConfig(
-        seed=seed,
-        managers=managers,
-        ir=ir,
-        n_drafts=n_drafts,
-        rollouts=rollouts,
-        strategies=resolved,
-    )
-    result, out_dir = run_backtest_from_normalized(
-        seasons=seasons,
-        normalized_dir=normalized_dir,
-        backtest_root=backtest_root,
-        snapshot=snapshot or None,
-        config=config,
-    )
-    typer.echo(f"Backtest run {result.run_id} -> {out_dir}")
-    typer.echo(f"  report: {out_dir / 'report.md'}")
-    typer.echo(f"  seasons: {', '.join(str(s) for s in result.seasons)}")
-    typer.echo(f"  rounds replayed: {len(result.rounds)}")
-    typer.echo(f"  strategies: {', '.join(config.strategies)}; drafts/slot: {n_drafts}")
-    for round_result in result.rounds:
-        drafts = len(round_result.slot_results)
-        typer.echo(
-            f"  {round_result.season} r{round_result.playoff_round} "
-            f"(as of {round_result.as_of_cutoff}, {round_result.opponents_kind}): "
-            f"{drafts} draft(s), leakage_ok={round_result.leakage_ok}"
-        )
-    typer.echo(f"  leakage_ok (all rounds): {all(r.leakage_ok for r in result.rounds)}")
-
-
-def _coerce_strategy(value: str) -> Strategy:
-    if value not in STRATEGIES:
-        raise typer.BadParameter(f"unknown strategy {value!r}; choose from {list(STRATEGIES)}")
-    return value
-
+app.command(name="train-game-win")(train_game_win)
+app.command(name="train-shutout")(train_shutout)
+app.command(name="train-skater-production")(train_skater_production)
+app.command(name="train-return-time")(train_return_time)
+app.command(name="eval-series-sim")(eval_series_sim)
+app.command(name="project-skaters")(project_skaters)
+app.command(name="train-opponents")(train_opponents)
+app.command(name="project")(project)
+app.command(name="recommend")(recommend)
+app.command(name="compare-strategies")(compare_strategies_cmd)
+app.command(name="draft")(draft_cmd)
+app.command(name="backtest")(backtest)
 
 if __name__ == "__main__":  # pragma: no cover
     app()

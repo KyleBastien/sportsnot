@@ -209,18 +209,7 @@ class DraftState:
             raise ValueError("managers must be unique (case-insensitive)")
         capacity = roster_capacity(allow_ir)
         order = tuple(snake_order(managers, capacity.total))
-        available: dict[str, DraftAsset] = {}
-        for asset in pool:
-            if asset.team_id is not None and asset.team_id in eliminated_team_ids:
-                continue
-            # Fail-safe: once any team is eliminated, a skater whose ``team_id`` never
-            # resolved cannot be confirmed to survive, so it must not stay draftable
-            # (a whole-team goalie asset always carries a ``team_id``).
-            if eliminated_team_ids and asset.team_id is None:
-                continue
-            if asset.key in available:
-                raise ValueError(f"duplicate asset key in pool: {asset.key!r}")
-            available[asset.key] = asset
+        available = _build_available_pool(pool, eliminated_team_ids)
         rosters = {manager: ManagerRoster(manager) for manager in managers}
         return cls(
             order=order,
@@ -377,6 +366,53 @@ class GreedyOpponentModel(OpponentModel):
         return legal[index]
 
 
+def _asset_excluded_from_pool(asset: DraftAsset, eliminated_team_ids: frozenset[int]) -> bool:
+    """Whether ``asset`` must be dropped from a fresh pool given eliminated teams."""
+    if asset.team_id is not None and asset.team_id in eliminated_team_ids:
+        return True
+    # Fail-safe: once any team is eliminated, a skater whose ``team_id`` never resolved
+    # cannot be confirmed to survive, so it must not stay draftable (a whole-team goalie
+    # asset always carries a ``team_id``).
+    return bool(eliminated_team_ids) and asset.team_id is None
+
+
+def _build_available_pool(
+    pool: Sequence[DraftAsset], eliminated_team_ids: frozenset[int]
+) -> dict[str, DraftAsset]:
+    """Index the draftable pool by key, dropping eliminated-team assets."""
+    available: dict[str, DraftAsset] = {}
+    for asset in pool:
+        if _asset_excluded_from_pool(asset, eliminated_team_ids):
+            continue
+        if asset.key in available:
+            raise ValueError(f"duplicate asset key in pool: {asset.key!r}")
+        available[asset.key] = asset
+    return available
+
+
+def _argmax_choice(assets: Sequence[DraftAsset], scores: Sequence[float]) -> int:
+    """Deterministic argmax index, breaking ties by ``rank_value`` then ``key``."""
+    best = 0
+    for index in range(1, len(scores)):
+        if _is_better(assets[index], scores[index], assets[best], scores[best]):
+            best = index
+    return best
+
+
+def _sample_softmax(scores: Sequence[float], rng: random.Random, temperature: float) -> int:
+    """Sample an index from a numerically stable softmax over ``scores``."""
+    highest = max(scores)
+    weights = [math.exp((score - highest) / temperature) for score in scores]
+    total = sum(weights)
+    threshold = rng.random() * total
+    cumulative = 0.0
+    for index, weight in enumerate(weights):
+        cumulative += weight
+        if threshold <= cumulative:
+            return index
+    return len(weights) - 1
+
+
 def _softmax_choice(
     assets: Sequence[DraftAsset],
     scores: Sequence[float],
@@ -390,22 +426,8 @@ def _softmax_choice(
     a single ``rng`` draw.
     """
     if temperature <= 0.0:
-        best = 0
-        for index in range(1, len(scores)):
-            if _is_better(assets[index], scores[index], assets[best], scores[best]):
-                best = index
-        return best
-
-    highest = max(scores)
-    weights = [math.exp((score - highest) / temperature) for score in scores]
-    total = sum(weights)
-    threshold = rng.random() * total
-    cumulative = 0.0
-    for index, weight in enumerate(weights):
-        cumulative += weight
-        if threshold <= cumulative:
-            return index
-    return len(weights) - 1
+        return _argmax_choice(assets, scores)
+    return _sample_softmax(scores, rng, temperature)
 
 
 def _is_better(

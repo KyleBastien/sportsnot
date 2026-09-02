@@ -214,6 +214,38 @@ class CheatSheet:
         return render_cheatsheet_markdown(self).splitlines()
 
 
+def _cheatsheet_replacements(
+    skater_rows: list[dict[str, Any]],
+    team_rows: list[dict[str, Any]],
+    demand: RosterDemand,
+    managers: int,
+) -> tuple[float, float, float]:
+    """Per-position replacement levels for the cheat-sheet pool."""
+    forward_vals = [r["projection"] for r in skater_rows if r["position"] == "F"]
+    defense_vals = [r["projection"] for r in skater_rows if r["position"] == "D"]
+    team_vals = [r["projection"] for r in team_rows]
+    repl_f = replacement_level(forward_vals, demand.forwards_per_manager * managers)
+    repl_d = replacement_level(defense_vals, demand.defense_per_manager * managers)
+    repl_g = replacement_level(team_vals, demand.goalies_per_manager * managers)
+    return repl_f, repl_d, repl_g
+
+
+def _cheatsheet_frame(rows: list[dict[str, Any]]) -> pd.DataFrame:
+    """Sort priced rows into the ranked cheat-sheet frame (empty-safe)."""
+    if not rows:
+        return pd.DataFrame({col: pd.Series(dtype="object") for col in CHEATSHEET_COLUMNS})
+    frame = pd.DataFrame(rows)
+    frame = frame.sort_values(
+        ["vor", "projection", "name"],
+        ascending=[False, False, True],
+        kind="stable",
+    ).reset_index(drop=True)
+    frame.insert(0, "rank", range(1, len(frame) + 1))
+    frame = frame[list(CHEATSHEET_COLUMNS)]
+    frame["injured"] = frame["injured"].astype(bool)
+    return frame
+
+
 def build_cheatsheet(
     skaters: pd.DataFrame,
     teams: pd.DataFrame,
@@ -232,32 +264,14 @@ def build_cheatsheet(
     skater_rows = _skater_records(skaters)
     team_rows = _team_records(teams)
 
-    forward_vals = [r["projection"] for r in skater_rows if r["position"] == "F"]
-    defense_vals = [r["projection"] for r in skater_rows if r["position"] == "D"]
-    team_vals = [r["projection"] for r in team_rows]
-
-    repl_f = replacement_level(forward_vals, demand.forwards_per_manager * n)
-    repl_d = replacement_level(defense_vals, demand.defense_per_manager * n)
-    repl_g = replacement_level(team_vals, demand.goalies_per_manager * n)
+    repl_f, repl_d, repl_g = _cheatsheet_replacements(skater_rows, team_rows, demand, n)
     repl_by_pos = {"F": repl_f, "D": repl_d, "G": repl_g}
 
-    for r in [*skater_rows, *team_rows]:
+    rows = [*skater_rows, *team_rows]
+    for r in rows:
         repl = repl_by_pos[r["position"]]
         r["replacement"] = repl
         r["vor"] = r["projection"] - repl
-
-    if skater_rows or team_rows:
-        frame = pd.DataFrame([*skater_rows, *team_rows])
-        frame = frame.sort_values(
-            ["vor", "projection", "name"],
-            ascending=[False, False, True],
-            kind="stable",
-        ).reset_index(drop=True)
-        frame.insert(0, "rank", range(1, len(frame) + 1))
-        frame = frame[list(CHEATSHEET_COLUMNS)]
-        frame["injured"] = frame["injured"].astype(bool)
-    else:
-        frame = pd.DataFrame({col: pd.Series(dtype="object") for col in CHEATSHEET_COLUMNS})
 
     return CheatSheet(
         managers=n,
@@ -266,7 +280,7 @@ def build_cheatsheet(
         replacement_forward=repl_f,
         replacement_defense=repl_d,
         replacement_goalie=repl_g,
-        rows=frame,
+        rows=_cheatsheet_frame(rows),
     )
 
 

@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import json
 import random
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -38,14 +38,17 @@ from typing import Any, Literal
 import pandas as pd
 
 from draft_oracle import __version__
-from draft_oracle.features.leakage import LeakageError, assert_no_leakage
-from draft_oracle.models.series_sim import simulate_series
-from draft_oracle.models.skater_production import (
-    PLAYOFF_GAME_TYPE,
-    _assign_rounds,
-    _series_round_map,
-    skater_round_production,
+from draft_oracle.backtest._replay_leakage import (
+    assert_round_inputs_leakfree,
+    round_game_ids,
 )
+from draft_oracle.backtest._replay_scoring import (
+    _score_active_roster,
+    _score_league_roster,
+    skater_actual_points,
+    team_actual_goalie_points,
+)
+from draft_oracle.models.series_sim import simulate_series
 from draft_oracle.optimize.opponents import (
     FittedLeagueOpponents,
     OpponentFitConfig,
@@ -79,7 +82,16 @@ from draft_oracle.projection_artifact import (
     build_projection_artifact,
 )
 from draft_oracle.provenance import add_git_provenance
-from draft_oracle.rules import goalie_series_points, player_points
+
+for _exported in (
+    assert_round_inputs_leakfree,
+    round_game_ids,
+    skater_actual_points,
+    team_actual_goalie_points,
+    _score_active_roster,
+    _score_league_roster,
+):
+    _exported.__module__ = __name__
 
 __all__ = [
     "DEFAULT_BACKTEST_ROOT",
@@ -93,6 +105,8 @@ __all__ = [
     "SeriesEval",
     "SlotResult",
     "Strategy",
+    "_score_active_roster",
+    "_score_league_roster",
     "assert_round_inputs_leakfree",
     "round_game_ids",
     "run_backtest",
@@ -168,168 +182,6 @@ class BacktestConfig:
             return self.run_id
         seasons_part = "-".join(str(s) for s in sorted(seasons))
         return f"{seasons_part}-seed{self.seed}"
-
-
-# ── Actual-result scoring lookups (through the rules engine) ────────────────
-
-
-def skater_actual_points(
-    skater_games: pd.DataFrame, series: pd.DataFrame
-) -> dict[tuple[int, int, int], int]:
-    """``(season_id, playoff_round, player_id) -> actual round points`` (G + A).
-
-    Scored through :func:`draft_oracle.rules.player_points`, so every backtested
-    skater is scored byte-identically to the real app. Uses only that round's
-    observed playoff games.
-    """
-    production = skater_round_production(skater_games, series)
-    out: dict[tuple[int, int, int], int] = {}
-    for rec in production.to_dict("records"):
-        key = (int(rec["season_id"]), int(rec["playoff_round"]), int(rec["player_id"]))
-        out[key] = player_points(int(rec["round_goals"]), int(rec["round_assists"]))
-    return out
-
-
-def team_actual_goalie_points(
-    team_games: pd.DataFrame, series: pd.DataFrame
-) -> dict[tuple[int, int, int], int]:
-    """``(season_id, playoff_round, team_id) -> actual goalie-slot points``.
-
-    A team's goalie slot scores its real series through
-    :func:`draft_oracle.rules.goalie_series_points`: wins and shutout wins are
-    aggregated over the round's games, so a shutout upgrades a win from 2 to 4 (the
-    goalie slot is never scored by fantasy points directly — SPEC section 8).
-    """
-    po = team_games.loc[team_games["game_type_id"] == PLAYOFF_GAME_TYPE].copy()
-    if po.empty:
-        return {}
-    po["playoff_round"] = _assign_rounds(po, _series_round_map(series))
-    po = po.dropna(subset=["playoff_round"])
-    grouped = po.groupby(["season_id", "playoff_round", "team_id"], as_index=False).agg(
-        wins=("win", "sum"),
-        shutout_wins=("shutout_win", "sum"),
-    )
-    out: dict[tuple[int, int, int], int] = {}
-    for rec in grouped.to_dict("records"):
-        key = (int(rec["season_id"]), int(rec["playoff_round"]), int(rec["team_id"]))
-        out[key] = goalie_series_points(int(rec["wins"]), int(rec["shutout_wins"]))
-    return out
-
-
-def _score_active_roster(
-    state: DraftState,
-    manager: str,
-    skater_actual: dict[tuple[int, int, int], int],
-    team_actual: dict[tuple[int, int, int], int],
-    *,
-    season_id: int,
-    scored_rounds: Sequence[int],
-) -> float:
-    """Actual points of ``manager``'s *active* roster (F/D/G; IR slots excluded).
-
-    Sums realized production across every round in ``scored_rounds`` — a single round
-    for R1/R2, but both the conference final and the Cup Final for the combined
-    ``R3_4`` draft, so a roster keeps scoring for as long as its assets advance. IR
-    retroactive swaps depend on in-round injuries the replay does not simulate, so the
-    honest baseline scores the active roster only; an asset with no observed
-    production contributes 0.
-    """
-    total = 0.0
-    for slot in state.roster_slots(manager):
-        if slot.position in ("IR_F", "IR_D"):
-            continue
-        if slot.player_id is not None:
-            total += sum(
-                skater_actual.get((season_id, rnd, slot.player_id), 0) for rnd in scored_rounds
-            )
-        elif slot.team_id is not None:
-            total += sum(
-                team_actual.get((season_id, rnd, slot.team_id), 0) for rnd in scored_rounds
-            )
-    return total
-
-
-# ── Leakage guard (SPEC section 6) ──────────────────────────────────────────
-
-
-def round_game_ids(
-    team_games: pd.DataFrame, series: pd.DataFrame, *, season_id: int, playoff_round: int
-) -> set[int]:
-    """The ``game_id`` set of ``season_id``'s round ``playoff_round`` playoff games."""
-    po = team_games.loc[
-        (team_games["game_type_id"] == PLAYOFF_GAME_TYPE)
-        & (team_games["season_id"].astype(int) == int(season_id))
-    ].copy()
-    if po.empty:
-        return set()
-    po["playoff_round"] = _assign_rounds(po, _series_round_map(series))
-    po = po.loc[po["playoff_round"] == playoff_round]
-    return {int(gid) for gid in po["game_id"].unique()}
-
-
-def assert_round_inputs_leakfree(
-    games: pd.DataFrame,
-    round_ids: set[int],
-    cutoff: str | pd.Timestamp,
-    *,
-    date_col: str = "game_date",
-    label: str = "games",
-    authoritative_dates: pd.DataFrame | Mapping[int, Any] | None = None,
-) -> None:
-    """Fail loudly if the as-of inputs for a round contain that round's data.
-
-    Three independent checks on the as-of training slice (``date < cutoff``):
-
-    * an **independent date source** check — when ``authoritative_dates`` is given
-      (a ``game_id -> game_date`` map, or a frame with those columns), each sliced
-      row's authoritative date is compared to ``cutoff``. This catches a
-      skater/team-table *desync*: a row whose own ``game_date`` is stale/early (so it
-      survives the ``< cutoff`` filter) but whose true date is on/after the round —
-      the plain self-date check below cannot see it (CODE_REVIEW m-2);
-    * no game is dated on/after the round-start ``cutoff`` by its own ``date_col``
-      (delegated to :func:`draft_oracle.features.leakage.assert_no_leakage`); and
-    * none of the round's own ``game_id`` values appear in the slice — a direct
-      identity check that does not rely on date arithmetic.
-
-    Any violation raises :class:`~draft_oracle.features.leakage.LeakageError`, which
-    the backtest turns into a hard failure.
-    """
-    cutoff_ts = pd.Timestamp(cutoff)
-    frame = games.copy()
-    frame[date_col] = pd.to_datetime(frame[date_col])
-    train = frame.loc[frame[date_col] < cutoff_ts]
-    if authoritative_dates is not None and "game_id" in train.columns:
-        auth = _authoritative_date_map(authoritative_dates, date_col=date_col)
-        true_dates = train["game_id"].map(auth)
-        desynced = train.loc[true_dates.notna() & (true_dates >= cutoff_ts)]
-        if not desynced.empty:
-            latest = true_dates.loc[desynced.index].max()
-            raise LeakageError(
-                f"{len(desynced)} {label} row(s) desynced past cutoff {cutoff_ts.date()}: "
-                f"their own date is pre-cutoff but the authoritative game date is on/after "
-                f"it (latest authoritative date {pd.Timestamp(latest).date()})."
-            )
-    assert_no_leakage(train, cutoff_ts, date_col=date_col)
-    if "game_id" in train.columns and round_ids:
-        leaked = {int(gid) for gid in train["game_id"].unique()} & round_ids
-        if leaked:
-            raise LeakageError(
-                f"{len(leaked)} round game(s) leaked into the as-of {label} inputs "
-                f"before cutoff {cutoff_ts.date()} (e.g. game_id {sorted(leaked)[:3]})."
-            )
-
-
-def _authoritative_date_map(
-    source: pd.DataFrame | Mapping[int, Any], *, date_col: str = "game_date"
-) -> dict[int, pd.Timestamp]:
-    """Build a ``game_id -> authoritative game date`` map from a frame or mapping."""
-    if isinstance(source, pd.DataFrame):
-        pairs = source[["game_id", date_col]].drop_duplicates(subset=["game_id"])
-        return {
-            int(gid): pd.Timestamp(dt)
-            for gid, dt in zip(pairs["game_id"], pd.to_datetime(pairs[date_col]), strict=True)
-        }
-    return {int(gid): pd.Timestamp(dt) for gid, dt in source.items()}
 
 
 # ── Result records ──────────────────────────────────────────────────────────
@@ -965,54 +817,6 @@ def _draft_events(rounds: list[int]) -> list[tuple[int, list[int]]]:
         by_event.setdefault(event, []).append(rnd)
     events = [(min(grouped), sorted(grouped)) for grouped in by_event.values()]
     return sorted(events)
-
-
-def _score_league_roster(
-    picks: pd.DataFrame,
-    skater_actual: dict[tuple[int, int, int], int],
-    team_actual: dict[tuple[int, int, int], int],
-    *,
-    season_id: int,
-    scored_rounds: Sequence[int],
-) -> float:
-    """Actual active-roster points of one league manager's real picks for a draft event.
-
-    Scores F/D via :data:`skater_actual` and the goalie slot via :data:`team_actual`,
-    summed across every round in ``scored_rounds`` (both the conference final and the
-    Cup Final for the combined ``R3_4`` draft), and de-duplicating by asset so a manager
-    is scored the same way the oracle rosters are (SPEC section 8).
-
-    Honors the league's retroactive IR swap (SPEC section 1): a starter flagged
-    ``points_excluded`` contributes nothing, while an ``IR_F``/``IR_D`` player flagged
-    ``ir_activated`` is scored as an active skater in the excluded starter's place. An
-    IR slot that was never activated stays on the bench and scores zero.
-    """
-    total = 0.0
-    seen: set[tuple[str, int]] = set()
-    for rec in picks.to_dict("records"):
-        position = str(rec.get("position", ""))
-        points_excluded = bool(rec.get("points_excluded"))
-        ir_activated = bool(rec.get("ir_activated"))
-        is_ir_slot = position in ("IR_F", "IR_D")
-        if is_ir_slot and not ir_activated:
-            continue
-        if points_excluded:
-            continue
-        pid = rec.get("player_id")
-        tid = rec.get("team_id")
-        if position == "G" and not pd.isna(tid):
-            key = ("team", int(tid))
-            if key in seen:
-                continue
-            seen.add(key)
-            total += sum(team_actual.get((season_id, rnd, int(tid)), 0) for rnd in scored_rounds)
-        elif not pd.isna(pid):
-            key = ("player", int(pid))
-            if key in seen:
-                continue
-            seen.add(key)
-            total += sum(skater_actual.get((season_id, rnd, int(pid)), 0) for rnd in scored_rounds)
-    return total
 
 
 def _league_comparisons(

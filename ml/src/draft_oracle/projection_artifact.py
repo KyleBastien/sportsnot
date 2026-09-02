@@ -56,6 +56,23 @@ import numpy as np
 import pandas as pd
 
 from draft_oracle import __version__
+from draft_oracle._projection_combined import (
+    _COMBINED_CHEATSHEET_NOTE,
+    _COMBINED_DRAFT_ROUND,
+    _COMBINED_SCORED_ROUNDS,
+    _apply_combined_valuation,
+)
+from draft_oracle._projection_io import (
+    DEFAULT_ARTIFACTS_ROOT,
+    DEFAULT_NORMALIZED_DIR,
+    SNAPSHOTS_SUBDIR,
+    _load_injuries,
+    _load_league_picks,
+    _load_tables,
+    _require_complete_snapshot,
+    _snapshot_id_for,
+)
+from draft_oracle._projection_slot_report import _build_slot_report
 from draft_oracle.features.skater import FEATURE_SET_VERSION, build_skater_features
 from draft_oracle.models.game_win import (
     GAME_WIN_MODEL_VERSION,
@@ -78,10 +95,8 @@ from draft_oracle.models.returns import (
 )
 from draft_oracle.models.series_sim import (
     SERIES_SIM_VERSION,
-    _matchup_key,
     _predict_series,
     reconstruct_series_matchups,
-    simulate_series,
 )
 from draft_oracle.models.shutout import (
     SHUTOUT_MODEL_VERSION,
@@ -100,17 +115,9 @@ from draft_oracle.optimize.ir_value import (
     build_stash_valuations,
     render_ir_section,
 )
-from draft_oracle.optimize.opponents import (
-    FittedLeagueOpponents,
-    OpponentFitConfig,
-    fit_opponent_models,
-)
-from draft_oracle.optimize.recommend import build_pool_from_frames
-from draft_oracle.optimize.simulator import roster_capacity
 from draft_oracle.optimize.slot_strategies import (
     SlotStrategyConfig,
     SlotStrategyReport,
-    build_slot_strategies,
     write_slot_strategies,
 )
 from draft_oracle.optimize.vor import (
@@ -122,11 +129,19 @@ from draft_oracle.optimize.vor import (
 from draft_oracle.provenance import add_git_provenance
 
 __all__ = [
+    "DEFAULT_ARTIFACTS_ROOT",
+    "DEFAULT_NORMALIZED_DIR",
     "LIVE_PROJECTION_VERSION",
     "SKATER_COLUMNS",
+    "SNAPSHOTS_SUBDIR",
     "TEAM_COLUMNS",
+    "_COMBINED_CHEATSHEET_NOTE",
     "ProjectArtifactConfig",
     "ProjectArtifactResult",
+    "_load_league_picks",
+    "_load_tables",
+    "_require_complete_snapshot",
+    "_snapshot_id_for",
     "build_projection_artifact",
     "build_projection_artifact_from_normalized",
     "write_projection_artifact",
@@ -235,154 +250,10 @@ def _team_meta(team_games: pd.DataFrame) -> dict[int, str]:
     return {int(rec["team_id"]): str(rec["team_abbrev"]) for rec in pairs.to_dict("records")}
 
 
-_COMBINED_DRAFT_ROUND = 3
-_COMBINED_SCORED_ROUNDS = (3, 4)
-_EMPTY_LENGTH_PROBS: dict[int, float] = {4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0}
-_COMBINED_CHEATSHEET_NOTE = (
-    "Combined R3+R4 draft: projections span the conference final and the "
-    "conditional Cup Final (weighted by each team's advance probability). In "
-    "teams.csv/parquet, e_goalie_points is combined R3+R4; e_wins, e_games, and "
-    "e_shutout_wins remain R3-only."
-)
-
-
-def _predict_hypothetical_series(
-    win_model: Any,
-    shutout_model: Any,
-    win_x: dict[str, float],
-    sho_x: dict[str, float],
-    win_y: dict[str, float],
-    sho_y: dict[str, float],
-) -> tuple[float, dict[int, float]]:
-    """Goalie points + length distribution for team X in a hypothetical X-vs-Y series.
-
-    Uses each team's leakage-free pre-round snapshot; home ice goes to the higher
-    regular-season points-per-game team (the NHL Cup-Final seeding rule). Returns the
-    outcome oriented to X (its expected goalie-slot points and the series-length
-    distribution, which is symmetric between the teams).
-    """
-    x_home = float(win_x.get("points_per_game", 0.0)) >= float(win_y.get("points_per_game", 0.0))
-    if x_home:
-        top_win, bottom_win, top_sho, bottom_sho = win_x, win_y, sho_x, sho_y
-    else:
-        top_win, bottom_win, top_sho, bottom_sho = win_y, win_x, sho_y, sho_x
-    p_top_home = win_model.predict_matchup(top_win, bottom_win, is_playoff=True)
-    p_top_away = 1.0 - win_model.predict_matchup(bottom_win, top_win, is_playoff=True)
-    shutout_top = shutout_model.predict_matchup(top_sho, bottom_sho)
-    shutout_bottom = shutout_model.predict_matchup(bottom_sho, top_sho)
-    outcome = simulate_series(
-        p_top_home,
-        p_top_away,
-        shutout_prob_a=shutout_top,
-        shutout_prob_b=shutout_bottom,
-    )
-    if x_home:
-        return outcome.e_goalie_points_a, dict(outcome.length_probs)
-    return outcome.e_goalie_points_b, dict(outcome.length_probs)
-
-
-def _apply_combined_valuation(
-    team_rows: list[dict[str, Any]],
-    round_series: pd.DataFrame,
-    matchups: dict[tuple[int, int, int], Any],
-    win_model: Any,
-    shutout_model: Any,
-    season: int,
-    warnings: list[str],
-) -> tuple[dict[str, tuple[float, dict[int, float]]], list[dict[str, Any]]] | None:
-    """Fold conditional next-round (Cup Final) value into a combined R3+R4 draft.
-
-    The league's third draft is the combined ``R3_4`` event: a roster scores across
-    both the conference final and the Cup Final, so an asset's value must add its
-    expected next-round production, weighted by the probability its team advances and
-    marginalized over every possible finals opponent (each weighted by *that* team's
-    conference-final win probability). This is leakage-free: hypothetical finals are
-    simulated from the same pre-round snapshots, never from the actual finals result.
-
-    Mutates each team row's ``e_goalie_points`` to the combined value and returns a
-    ``{team_abbrev: (p_advance, next_round_length_probs)}`` map plus a per-team
-    diagnostic, or ``None`` when the bracket is not the two-series final four.
-    """
-    groups: list[list[dict[str, Any]]] = []
-    for row in round_series.to_dict("records"):
-        top_id_raw = row["top_seed_team_id"]
-        bottom_id_raw = row["bottom_seed_team_id"]
-        if pd.isna(top_id_raw) or pd.isna(bottom_id_raw):
-            return None
-        top_id = int(top_id_raw)
-        bottom_id = int(bottom_id_raw)
-        matchup = matchups.get(_matchup_key(season, top_id, bottom_id))
-        if (
-            matchup is None
-            or top_id not in matchup.win_snapshots
-            or bottom_id not in matchup.win_snapshots
-        ):
-            return None
-        group: list[dict[str, Any]] = []
-        for team_id, abbrev in (
-            (top_id, str(row["top_seed_abbrev"])),
-            (bottom_id, str(row["bottom_seed_abbrev"])),
-        ):
-            group.append(
-                {
-                    "team_id": team_id,
-                    "abbrev": abbrev,
-                    "win_snapshot": matchup.win_snapshots[team_id],
-                    "sho_snapshot": matchup.shutout_snapshots[team_id],
-                }
-            )
-        groups.append(group)
-
-    if len(groups) != 2:
-        warnings.append(
-            "combined R3+R4 valuation skipped: expected exactly two conference-final series"
-        )
-        return None
-
-    row_by_abbrev = {str(r["team_abbrev"]): r for r in team_rows}
-    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] = {}
-    diagnostics: list[dict[str, Any]] = []
-
-    for team_group, opponent_group in ((groups[0], groups[1]), (groups[1], groups[0])):
-        for team in team_group:
-            abbrev = team["abbrev"]
-            team_row = row_by_abbrev.get(abbrev)
-            if team_row is None:
-                continue
-            p_advance = float(team_row["p_series_win"])
-            e_goalie_r3 = float(team_row["e_goalie_points"])
-            e_goalie_r4 = 0.0
-            length_r4: dict[int, float] = dict(_EMPTY_LENGTH_PROBS)
-            for opponent in opponent_group:
-                opp_row = row_by_abbrev.get(opponent["abbrev"])
-                if opp_row is None:
-                    continue
-                weight = float(opp_row["p_series_win"])
-                goalie_points, length_probs = _predict_hypothetical_series(
-                    win_model,
-                    shutout_model,
-                    team["win_snapshot"],
-                    team["sho_snapshot"],
-                    opponent["win_snapshot"],
-                    opponent["sho_snapshot"],
-                )
-                e_goalie_r4 += weight * goalie_points
-                for length, prob in length_probs.items():
-                    length_r4[length] = length_r4.get(length, 0.0) + weight * prob
-            combined = e_goalie_r3 + p_advance * e_goalie_r4
-            team_row["e_goalie_points"] = combined
-            combined_by_abbrev[abbrev] = (p_advance, length_r4)
-            diagnostics.append(
-                {
-                    "team_abbrev": abbrev,
-                    "p_advance": round(p_advance, 6),
-                    "e_goalie_points_r3": round(e_goalie_r3, 6),
-                    "e_goalie_points_r4": round(e_goalie_r4, 6),
-                    "e_goalie_points_combined": round(combined, 6),
-                }
-            )
-
-    return combined_by_abbrev, diagnostics
+def _matchup_key(year: int, team_a: int, team_b: int) -> tuple[int, int, int]:
+    """Order-independent key matching the series reconstruction lookup."""
+    lo, hi = sorted((int(team_a), int(team_b)))
+    return (int(year), lo, hi)
 
 
 def _build_team_rows(
@@ -816,59 +687,6 @@ def build_projection_artifact(
     )
 
 
-def _build_slot_report(
-    skaters: pd.DataFrame,
-    teams: pd.DataFrame,
-    league_picks: pd.DataFrame | None,
-    warnings: list[str],
-    config: ProjectArtifactConfig,
-) -> SlotStrategyReport | None:
-    """Build the per-slot strategy report (US-023), or ``None`` when disabled/empty.
-
-    Opponents are fitted from ``league_picks`` (the entity-matched draft history) when
-    available, else the greedy fallback. A tiny pool that cannot fill every roster is
-    skipped with a warning rather than crashing (SPEC section 7).
-    """
-    if not config.slot_strategies:
-        return None
-    if skaters.empty and teams.empty:
-        warnings.append("slot strategies skipped: no eligible assets in the pool")
-        return None
-    pool = build_pool_from_frames(skaters, teams, ir=config.ir)
-    capacity = roster_capacity(config.ir)
-    per_position = {
-        "F": sum(1 for a in pool if a.position == "F"),
-        "D": sum(1 for a in pool if a.position == "D"),
-        "G": sum(1 for a in pool if a.position == "G"),
-    }
-    need = {
-        "F": capacity.forwards * config.managers,
-        "D": capacity.defense * config.managers,
-        "G": capacity.goalies * config.managers,
-    }
-    if any(per_position[pos] < need[pos] for pos in ("F", "D", "G")):
-        warnings.append(
-            "slot strategies skipped: pool too small to fill every roster "
-            f"(have F{per_position['F']}/D{per_position['D']}/G{per_position['G']}, "
-            f"need F{need['F']}/D{need['D']}/G{need['G']})"
-        )
-        return None
-    fitted: FittedLeagueOpponents | None = None
-    if league_picks is not None and not league_picks.empty:
-        try:
-            fitted = fit_opponent_models(league_picks, OpponentFitConfig())
-        except (ValueError, KeyError) as exc:  # pragma: no cover - defensive
-            warnings.append(f"slot strategies: fitted opponents unavailable ({exc}); using greedy")
-            fitted = None
-    return build_slot_strategies(
-        pool,
-        managers=config.managers,
-        allow_ir=config.ir,
-        opponents=fitted,
-        config=config.resolved_slot_config,
-    )
-
-
 def _finalize_skaters(rows: list[dict[str, Any]]) -> pd.DataFrame:
     """Deterministically ordered skater table with the fixed column layout."""
     if not rows:
@@ -916,96 +734,6 @@ def write_projection_artifact(result: ProjectArtifactResult, out_dir: Path) -> P
         json.dumps(result.manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return out_dir
-
-
-DEFAULT_NORMALIZED_DIR = Path("data/normalized")
-DEFAULT_ARTIFACTS_ROOT = Path("artifacts")
-SNAPSHOTS_SUBDIR = "snapshots"
-SNAPSHOT_MANIFEST_NAME = "_manifest.json"
-
-# Optional tables a pinned run consumes; a complete snapshot records each as
-# "frozen" or "absent" so absence is the frozen truth, not a silent live read.
-_OPTIONAL_SNAPSHOT_TABLES = ("league_draft_picks", "odds", "injuries")
-
-
-def _require_complete_snapshot(source_dir: Path) -> dict[str, object]:
-    """Fail loudly when a pinned snapshot is not a complete, self-contained input.
-
-    A snapshot written before complete-snapshot support (M-10) freezes only the
-    core tables, so a pinned run would silently fall back to live odds/injuries and
-    drop the fitted-opponent league comparison. Rather than degrade silently, a pin
-    against such a snapshot raises, naming the fix. Returns the parsed manifest.
-    """
-    manifest_path = source_dir / SNAPSHOT_MANIFEST_NAME
-    if not manifest_path.exists():
-        raise FileNotFoundError(
-            f"pinned snapshot at {source_dir} has no {SNAPSHOT_MANIFEST_NAME}; "
-            "recreate it with `oracle snapshot` so every consumed input is frozen"
-        )
-    loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if not (isinstance(loaded, dict) and loaded.get("complete") is True):
-        raise RuntimeError(
-            f"pinned snapshot {source_dir.name} predates complete-snapshot support "
-            "(no 'complete' marker); recreate it with `oracle snapshot` so "
-            "league_draft_picks/odds/injuries are frozen instead of read live (M-10)"
-        )
-    optional = loaded.get("optional_tables")
-    if isinstance(optional, dict):
-        for name in _OPTIONAL_SNAPSHOT_TABLES:
-            if optional.get(name) == "frozen" and not (source_dir / f"{name}.parquet").exists():
-                raise FileNotFoundError(
-                    f"pinned snapshot {source_dir.name} declares '{name}' frozen but "
-                    f"{name}.parquet is missing from the snapshot"
-                )
-    return loaded
-
-
-def _load_tables(source_dir: Path) -> dict[str, pd.DataFrame]:
-    """Read the four normalized tables the projection needs from ``source_dir``."""
-    return {
-        name: pd.read_parquet(source_dir / f"{name}.parquet")
-        for name in ("skater_games", "players", "team_games", "series")
-    }
-
-
-def _load_injuries(source_dir: Path) -> pd.DataFrame | None:
-    """Load the current-status injuries table from ``source_dir``, else ``None``.
-
-    A pinned run passes the frozen snapshot directory so mutable live injuries are
-    never read (M-10); the live path passes the normalized directory.
-    """
-    path = source_dir / "injuries.parquet"
-    if not path.exists():
-        return None
-    return pd.read_parquet(path)
-
-
-def _load_league_picks(source_dir: Path) -> pd.DataFrame | None:
-    """Load the entity-matched league draft history from ``source_dir``, else ``None``.
-
-    Feeds the fitted opponent model for the per-slot strategy report (US-023); a
-    pinned run reads the frozen copy so the league comparison is reproducible and
-    never silently drops to greedy (M-10). Absent -> greedy fallback.
-    """
-    path = source_dir / "league_draft_picks.parquet"
-    if not path.exists():
-        return None
-    return pd.read_parquet(path)
-
-
-def _snapshot_id_for(source_dir: Path, snapshot: str | None) -> str:
-    """Resolve the recorded snapshot id: the pinned id, or the source signature."""
-    if snapshot:
-        return snapshot
-    manifest_path = source_dir / "_manifest.json"
-    if manifest_path.exists():
-        loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if isinstance(loaded, dict):
-            sources = loaded.get("sources")
-            if isinstance(sources, dict):
-                total = sum(int(v) for v in sources.values())
-                return f"live-{len(sources)}src-{total}b"
-    return "live"
 
 
 def build_projection_artifact_from_normalized(

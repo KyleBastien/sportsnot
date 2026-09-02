@@ -45,6 +45,7 @@ from typing import Any
 import pandas as pd
 import yaml
 
+from draft_oracle.ingest import _entity_match_build as _entity_match_build_module
 from draft_oracle.ingest.normalize import DEFAULT_NORMALIZED_DIR
 from draft_oracle.ingest.odds import NHL_TEAMS, resolve_team_id
 
@@ -230,37 +231,61 @@ def _validate_override_match_counts(
     league_picks: pd.DataFrame, overrides: NameOverrides
 ) -> None:
     """Fail when a guarded override matches an unexpected league-pick count."""
+    player_actual, team_actual = _override_match_counts(league_picks, overrides)
+    _validate_expected_counts(
+        player_actual,
+        overrides.player_expected_matches,
+        "name override",
+        "league-pick match(es)",
+    )
+    _validate_expected_counts(
+        team_actual,
+        overrides.team_expected_matches,
+        "team override",
+        "G-slot league-pick match(es)",
+    )
+
+
+def _override_match_counts(
+    league_picks: pd.DataFrame, overrides: NameOverrides
+) -> tuple[dict[str, int], dict[str, int]]:
     player_actual = dict.fromkeys(overrides.player_expected_matches, 0)
     team_actual = dict.fromkeys(overrides.team_expected_matches, 0)
     for row in league_picks.itertuples(index=False):
         if str(row.position) in _SKATER_POSITIONS:
-            key = normalize_name(_effective_skater_name(row))
-            if key in player_actual:
-                player_actual[key] += 1
+            _increment_if_present(player_actual, normalize_name(_effective_skater_name(row)))
         elif str(row.position) == "G":
-            raw_name = str(row.player_or_team_name)
-            raw_team_name = getattr(row, "team_name", None)
-            team_name = (
-                str(raw_team_name)
-                if raw_team_name is not None and pd.notna(raw_team_name)
-                else None
-            )
-            team_key = _team_override_key(team_name, raw_name, overrides)
-            if team_key in team_actual:
-                team_actual[team_key] += 1
-    for key, expected in overrides.player_expected_matches.items():
-        observed = player_actual[key]
+            _increment_if_present(team_actual, _row_team_override_key(row, overrides))
+    return player_actual, team_actual
+
+
+def _increment_if_present(counts: dict[str, int], key: str | None) -> None:
+    if key in counts:
+        counts[str(key)] += 1
+
+
+def _row_team_override_key(row: Any, overrides: NameOverrides) -> str | None:
+    raw_name = str(row.player_or_team_name)
+    raw_team_name = getattr(row, "team_name", None)
+    team_name = (
+        str(raw_team_name)
+        if raw_team_name is not None and pd.notna(raw_team_name)
+        else None
+    )
+    return _team_override_key(team_name, raw_name, overrides)
+
+
+def _validate_expected_counts(
+    actual: Mapping[str, int],
+    expected_counts: Mapping[str, int],
+    label: str,
+    count_label: str,
+) -> None:
+    for key, expected in expected_counts.items():
+        observed = actual[key]
         if observed != expected:
             raise ValueError(
-                f"name override {key!r} expected {expected} league-pick match(es), "
-                f"found {observed}"
-            )
-    for key, expected in overrides.team_expected_matches.items():
-        observed = team_actual[key]
-        if observed != expected:
-            raise ValueError(
-                f"team override {key!r} expected {expected} G-slot league-pick "
-                f"match(es), found {observed}"
+                f"{label} {key!r} expected {expected} {count_label}, found {observed}"
             )
 
 
@@ -675,131 +700,12 @@ def build_league_draft_picks(
     overrides_dir: Path = DEFAULT_OVERRIDES_DIR,
     out_dir: Path = DEFAULT_NORMALIZED_DIR,
 ) -> LeagueEntityMatchResult:
-    """Match ``league_picks`` to NHL ids and write ``league_draft_picks.parquet``.
-
-    Reads ``league_picks.parquet`` / ``players.parquet`` / ``teams.parquet`` /
-    ``skater_games.parquet`` from ``normalized_dir`` and the override files from
-    ``overrides_dir``. Fails loudly if a required input is missing.
-    """
-    picks_path = normalized_dir / "league_picks.parquet"
-    players_path = normalized_dir / "players.parquet"
-    teams_path = normalized_dir / "teams.parquet"
-    skater_games_path = normalized_dir / "skater_games.parquet"
-    for required in (picks_path, players_path, teams_path, skater_games_path):
-        if not required.exists():
-            raise FileNotFoundError(
-                f"required normalized table missing: {required} "
-                "(run `oracle league-drafts` and `oracle normalize` first)"
-            )
-
-    league_picks = pd.read_parquet(picks_path)
-    players = pd.read_parquet(players_path)
-    teams = pd.read_parquet(teams_path)
-    skater_games = pd.read_parquet(skater_games_path)
-
-    index = build_player_index(players)
-    manager_aliases = load_manager_aliases(overrides_dir / "manager_aliases.yaml")
-    overrides = load_name_overrides(overrides_dir / "name_overrides.yaml")
-    _validate_override_match_counts(league_picks, overrides)
-    archive_points = _archive_round_points(skater_games)
-
-    team_names: dict[int, str] = {
-        _as_int(r.team_id): str(r.team_full_name) for r in teams.itertuples(index=False)
-    }
-    # Prefer the clean ASCII franchise names (teams.parquet carries a mojibake
-    # "Montr?al Canadiens" from the source archive).
-    for team in NHL_TEAMS:
-        team_names[team.team_id] = team.full_name
-
-    records: list[dict[str, Any]] = []
-    for row in league_picks.itertuples(index=False):
-        position = str(row.position)
-        raw_name = str(row.player_or_team_name)
-        skater_name = _effective_skater_name(row)
-        team_name = (
-            str(row.team_name)
-            if getattr(row, "team_name", None) is not None and pd.notna(row.team_name)
-            else None
-        )
-
-        player_id: int | None = None
-        team_id: int | None = None
-        if position == "G":
-            match = match_team(team_name, raw_name, team_names, overrides)
-            team_id = match.entity_id
-        else:
-            match = match_skater(skater_name, position, index, overrides)
-            player_id = match.entity_id
-            # Best-effort associated team for skater slots (never affects review).
-            team_id = resolve_team(team_name, None, overrides)
-
-        record: dict[str, Any] = {
-            "season": _as_int(row.season),
-            "source": row.source,
-            "league_name": row.league_name,
-            "draft_event": row.draft_event,
-            "manager": resolve_manager(str(row.manager), manager_aliases),
-            "snake_slot": _to_int(row.snake_slot),
-            "pick_number": _to_int(row.pick_number),
-            "position": position,
-            "slot_label": row.slot_label,
-            "player_or_team_name": raw_name,
-            "matched_name": match.matched_name,
-            "player_id": player_id,
-            "team_id": team_id,
-            "points_for_round": _to_int(row.points_for_round),
-            "points_when_drafted": _to_int(row.points_when_drafted),
-            "current_total_points": _to_int(row.current_total_points),
-            "status": row.status,
-            "points_excluded": bool(row.points_excluded),
-            "ir_activated": bool(row.ir_activated),
-            "swap_partner": row.swap_partner,
-            "note": row.note,
-            "is_scored": bool(row.is_scored),
-            "match_method": match.method,
-            "match_confidence": float(match.confidence),
-            "needs_review": bool(match.needs_review),
-        }
-        if _point_columns_contradict(record, archive_points):
-            record["needs_review"] = True
-        records.append(record)
-
-    frame = _picks_frame(records)
-    point_mismatches = sum(_point_columns_contradict(record, archive_points) for record in records)
-    duplicate_ownerships, duplicate_ownership_rows = _mark_duplicate_ownership(frame)
-
-    frame_records = frame.to_dict("records")
-    matched_values = [
-        _is_matched(str(r["position"]), r["player_id"], r["team_id"]) for r in frame_records
-    ]
-    matched_series = pd.Series(matched_values, index=frame.index)
-    seasons: list[SeasonMatchReport] = []
-    for season in sorted({int(r["season"]) for r in records}):
-        idx = [i for i, r in enumerate(records) if int(r["season"]) == season]
-        total = len(idx)
-        matched = sum(1 for i in idx if matched_values[i])
-        review = sum(1 for i in idx if bool(frame.iloc[i]["needs_review"]))
-        seasons.append(SeasonMatchReport(season, total, matched, review))
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    frame.to_parquet(out_dir / "league_draft_picks.parquet", index=False)
-
-    review_path: Path | None = None
-    review_frame = frame[frame["needs_review"] | ~matched_series]
-    if not review_frame.empty:
-        review_path = out_dir / "league_draft_picks_review.csv"
-        review_frame.to_csv(review_path, index=False)
-
-    return LeagueEntityMatchResult(
+    """Match ``league_picks`` to NHL ids and write ``league_draft_picks.parquet``."""
+    return _entity_match_build_module.build_league_draft_picks(
+        normalized_dir=normalized_dir,
+        overrides_dir=overrides_dir,
         out_dir=out_dir,
-        picks=frame,
-        seasons=seasons,
-        review_path=review_path,
-        duplicate_ownerships=duplicate_ownerships,
-        duplicate_ownership_rows=duplicate_ownership_rows,
-        point_mismatches=point_mismatches,
     )
-
 
 def _as_int(value: Any) -> int:
     return int(value)
