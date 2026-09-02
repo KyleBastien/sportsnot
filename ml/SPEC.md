@@ -84,6 +84,7 @@ ml/
     features/                ← versioned matrices (gitignored)
     overrides/               ← injuries.yaml, name_overrides.yaml, manager_aliases.yaml
   artifacts/                 ← generated; gitignored except approved outputs below
+    EVIDENCE_PASS.json       ← shared source commit for all committed evidence
     2026-r1/..2026-r4/       ← committed 2026 projection reproducibility fixtures
     backtests/*/             ← committed report.md and manifest.json only
     models/*/                ← committed report.md and manifest.json only
@@ -95,6 +96,11 @@ explicit owner-approved exception to the generated-artifact rule. They preserve 
 fixtures for the structural checks in `tests/test_committed_projection_artifacts.py`.
 Regenerate them only from a clean committed HEAD; every `run_manifest.json` must name
 that source commit and record `git_dirty: false`.
+
+All committed model, backtest, and projection evidence manifests must name the one
+source commit pinned in `artifacts/EVIDENCE_PASS.json` and record `git_dirty: false`.
+The pin deliberately avoids comparing artifact provenance to the current checkout:
+squash merges and shallow clones need not retain the generating commit object.
 
 ## 5. External data sources (decided — do not re-evaluate)
 

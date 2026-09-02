@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
@@ -13,6 +12,7 @@ import pytest
 
 ML_ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS_ROOT = ML_ROOT / "artifacts"
+EVIDENCE_PASS_FILE = ARTIFACTS_ROOT / "EVIDENCE_PASS.json"
 MODEL_ARTIFACTS = (
     "game-win",
     "opponent",
@@ -52,21 +52,33 @@ PROJECTION_MANIFESTS = tuple(
     ARTIFACTS_ROOT / name / "run_manifest.json" for name in PROJECTION_ARTIFACTS
 )
 ALL_EVIDENCE_MANIFESTS = MODEL_MANIFESTS + BACKTEST_MANIFESTS + PROJECTION_MANIFESTS
+GIT_SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 
-def _require_git_checkout() -> None:
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--is-inside-work-tree"],
-            cwd=ML_ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except FileNotFoundError:
-        pytest.skip("git executable not available; cannot verify artifact ancestry")
-    if result.returncode != 0 or result.stdout.strip() != "true":
-        pytest.skip("not inside a git checkout; cannot verify artifact ancestry")
+def _evidence_pass_git_sha() -> str:
+    evidence_pass = _manifest_file(EVIDENCE_PASS_FILE)
+    git_sha = str(evidence_pass["git_sha"])
+    assert GIT_SHA_PATTERN.fullmatch(git_sha), (
+        f"{EVIDENCE_PASS_FILE.relative_to(ML_ROOT)} carries malformed git_sha {git_sha!r}"
+    )
+    return git_sha
+
+
+def _assert_manifest_matches_evidence_pass(
+    manifest_path: Path, expected_git_sha: str
+) -> None:
+    manifest = _manifest_file(manifest_path)
+    git_sha = str(manifest["git_sha"])
+    assert GIT_SHA_PATTERN.fullmatch(git_sha), (
+        f"{manifest_path.name} carries malformed git_sha {git_sha!r}"
+    )
+    assert git_sha == expected_git_sha, (
+        f"{manifest_path.name} git_sha {git_sha} does not match committed evidence "
+        f"pass {expected_git_sha}"
+    )
+    assert manifest["git_dirty"] is False, (
+        f"{manifest_path.name} must carry git_dirty=false"
+    )
 
 
 def _values_for_key(value: object, key: str) -> list[object]:
@@ -84,22 +96,21 @@ def _values_for_key(value: object, key: str) -> list[object]:
 
 
 @pytest.mark.parametrize("manifest_path", ALL_EVIDENCE_MANIFESTS)
-def test_committed_evidence_git_sha_is_ancestor_of_head(manifest_path: Path) -> None:
-    manifest = _manifest_file(manifest_path)
-    git_sha = str(manifest["git_sha"])
-    assert re.fullmatch(r"[0-9a-f]{40}", git_sha)
-    _require_git_checkout()
-    result = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", git_sha, "HEAD"],
-        cwd=ML_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
+def test_committed_evidence_matches_pinned_pass(manifest_path: Path) -> None:
+    _assert_manifest_matches_evidence_pass(manifest_path, _evidence_pass_git_sha())
+
+
+def test_evidence_pass_guard_rejects_stale_manifest(tmp_path: Path) -> None:
+    stale_manifest = _manifest_file(MODEL_MANIFESTS[0])
+    expected_git_sha = _evidence_pass_git_sha()
+    stale_manifest["git_sha"] = (
+        "0" * 40 if expected_git_sha != "0" * 40 else "1" * 40
     )
-    assert result.returncode == 0, (
-        f"{manifest_path.relative_to(ML_ROOT)} git_sha {git_sha} is not an ancestor "
-        f"of HEAD: {result.stderr.strip()}"
-    )
+    stale_path = tmp_path / "manifest.json"
+    stale_path.write_text(json.dumps(stale_manifest), encoding="utf-8")
+
+    with pytest.raises(AssertionError, match="does not match committed evidence pass"):
+        _assert_manifest_matches_evidence_pass(stale_path, expected_git_sha)
 
 
 @pytest.mark.parametrize(

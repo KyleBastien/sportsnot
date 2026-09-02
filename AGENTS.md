@@ -235,8 +235,9 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   change the repository inspected by `git_state()`.
 - `test_committed_model_evidence.py` guards committed model/backtest/projection
   provenance, seeds, coverage, and league-comparison structure. Every manifest SHA
-  must be an ancestor of HEAD; models plus backtests share one evidence-pass SHA,
-  while all four 2026 projection fixtures may share a separate SHA. Regenerate each
+  must equal the single SHA pinned in `ml/artifacts/EVIDENCE_PASS.json`, with
+  `git_dirty=false`; never compare provenance to current HEAD ancestry because squash
+  merges and shallow clones may omit the generating commit. Regenerate every committed
   report/manifest pair together at a fixed seed. The 2026 `r500` backtest can run for
   roughly seven CPU hours and writes its artifact only when the run completes; quiet
   output is normal while the process remains active.

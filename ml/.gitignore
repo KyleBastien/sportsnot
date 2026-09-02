@@ -16,6 +16,8 @@ data/normalized/
 
 # Model artifacts, except committed backtest reports and manifests
 artifacts/*
+# One clean regeneration pass pins every committed evidence manifest to one SHA.
+!artifacts/EVIDENCE_PASS.json
 # Owner-approved 2026 projection evidence and structural regression fixtures.
 !artifacts/2026-r1/
 !artifacts/2026-r1/**

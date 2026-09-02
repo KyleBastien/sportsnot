@@ -9,10 +9,10 @@ Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior 
 - When parser diagnostics live in pandas `DataFrame.attrs`, aggregate them before
   concatenation and copy them into the command result object; pandas operations do not
   provide durable user-facing accounting by themselves.
-- Committed evidence provenance is grouped by regeneration pass: every manifest SHA
-  must be an ancestor of HEAD, models plus backtests share one SHA, and the four 2026
-  projection fixtures may share a separate SHA. Skip ancestry checks only when Git or
-  a checkout is unavailable.
+- Committed evidence provenance uses one regeneration pass: every model, backtest, and
+  projection manifest SHA must equal `ml/artifacts/EVIDENCE_PASS.json` and carry
+  `git_dirty=false`. Never compare provenance to current HEAD ancestry; squash merges
+  and shallow clones may not retain the generating commit object.
 - Duplicate draft ownership uses the asset identity consumed by the slot: `player_id`
   for skaters and `team_id` for goalie/team slots, scoped by league, season, and draft
   event. Goalie rows deliberately skip skater goals-plus-assists point cross-checks.
@@ -761,4 +761,35 @@ Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior 
   (`_tables_present` checks `teams` too), so a from-normalized test fixture that only
   writes the 4 projection tables must also drop a `teams.parquet` before snapshotting.
 
+---
+
+## 2026-09-02T07:10:44Z - US-401
+- Replaced current-HEAD ancestry checks with one committed evidence-pass pin at
+  `ml/artifacts/EVIDENCE_PASS.json`. Every model, backtest, and 2026 projection
+  manifest must match that SHA and carry `git_dirty=false`.
+- Added a stale-manifest regression that supplies a different well-formed SHA and
+  proves the guard rejects it. Removed Git subprocess use, so shallow clones never
+  depend on missing commit objects.
+- Verified simulated squash evidence suite: 29 passed. Verified depth-1 clone full
+  suite: 732 passed, 5 expected missing-normalized-data skips, 0 failures. Mutating
+  game-win provenance in that clone failed named test
+  `test_committed_evidence_matches_pinned_pass` (1 failed, 13 passed).
+- Quality gates passed: ruff, mypy, 737 ML tests, Nx lint/typecheck, all monorepo unit
+  tests, web build, and 96 Playwright tests. Initial Nx E2E attempt hit documented
+  Windows server startup race (12 connection-refused failures, 84 passes); controlled
+  rerun after HTTP 200 readiness passed 96/96.
+- Normal commit hook reached CodeScene and failed only because neither `CODESCENE_PAT`
+  nor `CODESCENE_ACCESS_TOKEN` was available. All other required checks passed
+  independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `AGENTS.md`, `ml/.gitignore`, `ml/SPEC.md`,
+  `ml/artifacts/EVIDENCE_PASS.json`,
+  `ml/tests/test_committed_model_evidence.py`, `scripts/ralph/prd.json`, and
+  `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - Evidence provenance must compare manifests to one committed pass pin, never to
+    checkout ancestry; squash merges and depth-1 clones may omit generating objects.
+  - Regeneration story must rewrite `EVIDENCE_PASS.json` together with every committed
+    evidence manifest so stale partial regeneration remains detectable.
+  - On Windows, wait for `http://localhost:4200` to return HTTP 200 before launching
+    Playwright directly; Nx dependency ordering can race static-server readiness.
 ---
