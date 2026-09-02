@@ -8,7 +8,7 @@
 Sorted by value over replacement (VOR). The G rows are whole-team goalie
 slots and carry no per-game quantiles.
 
-> Combined R3+R4 draft: projections span the conference final and the conditional Cup Final (weighted by each team's advance probability).
+> Combined R3+R4 draft: projections span the conference final and the conditional Cup Final (weighted by each team's advance probability). In teams.csv/parquet, e_goalie_points is combined R3+R4; e_wins, e_games, and e_shutout_wins remain R3-only.
 
 | Rank | Pos | Player | Team | Proj | p10 | p50 | p90 | Repl | VOR | Status |
 | ---: | :-- | :----- | :--- | ---: | --: | --: | --: | ---: | --: | :----- |

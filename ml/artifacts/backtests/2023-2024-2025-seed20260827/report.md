@@ -1,7 +1,7 @@
 # Backtest report — run `2023-2024-2025-seed20260827`
 
 - Package version: 0.1.0
-- Generated: 2026-09-01T07:44:29.919383+00:00
+- Generated: 2026-09-02T08:31:07.209526+00:00
 - Seasons: 2023, 2024, 2025
 - Rounds replayed: 9
 - League size: 4 managers; IR slots: False

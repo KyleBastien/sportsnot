@@ -6,7 +6,7 @@
     2024,
     2025
   ],
-  "generated_at": "2026-09-01T07:44:29.919383+00:00",
+  "generated_at": "2026-09-02T08:31:07.209526+00:00",
   "config": {
     "seed": 20260827,
     "managers": 4,
@@ -277,6 +277,6 @@
     }
   ],
   "leakage_ok": true,
-  "git_sha": "6f56cf8d69647135ce0a4b0e58c272b994b34008",
+  "git_sha": "e8656219b87297262c39461456fc527f70e350b7",
   "git_dirty": false
 }

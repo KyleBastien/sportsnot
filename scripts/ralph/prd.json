@@ -119,8 +119,8 @@
     "All Playwright tests pass (even if it's outside of your changes)"
    ],
    "priority": 6,
-   "passes": false,
-   "notes": ""
+   "passes": true,
+   "notes": "Regenerated all four 2026 projection fixtures, all eight model artifacts, both backtests, and EVIDENCE_PASS from clean SHA e865621 at fixed seed. Metrics match 05980f1; full local and depth-1-clone suites pass."
   }
  ]
 }

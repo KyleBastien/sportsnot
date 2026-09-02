@@ -919,3 +919,41 @@ Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior 
   - US-406 must regenerate every committed evidence artifact together so new manifest
     fields and report disclosures share one clean source SHA.
 ---
+
+## 2026-09-02T09:29:28-07:00 - US-406
+- Regenerated all four `2026-r1..r4` projection fixtures, all eight model
+  evidence pairs, and both committed backtests from clean detached SHA
+  `e8656219b87297262c39461456fc527f70e350b7` at pinned seed `20260827`.
+  Updated `ml/artifacts/EVIDENCE_PASS.json` to the same SHA. All 14 manifests
+  carry that SHA and `git_dirty=false`; projection manifests now record exact
+  CLI flags plus Windows 11 / Python 3.12.12 / numpy 2.5.2 platform metadata.
+- Honesty comparison against `05980f1` found zero substantive JSON metric or
+  config changes in every regenerated artifact. Report differences are limited
+  to timestamps and US-405 disclosures: opponent membership exclusion, exact
+  30-series sample size, and the R3 combined-goalie column contract. Projection
+  parquet files reproduced byte-identically. Windows-generated CSV/Markdown
+  files differ in CRLF bytes only where content is otherwise unchanged.
+- Historical `one_step` mean remained `58.44` on the generating platform, not
+  the observed Linux/Windows variant `58.31`; seeds and configs were not tuned.
+  The 2026 `r500` run completed in about 7h50m with 3 rounds and
+  `leakage_ok=true`.
+- Quality gates passed: Ruff, strict mypy (73 files), 758/758 ML tests, Nx
+  affected lint/typecheck, web production build, all nine Nx unit-test targets
+  (380 web tests), and 96/96 Playwright tests. A one-commit depth-1 clone in the
+  Windows temp directory passed 751 tests with 7 expected missing-normalized-
+  data skips and 0 failures.
+- Normal commit hook reached CodeScene and failed only because neither
+  `CODESCENE_PAT` nor `CODESCENE_ACCESS_TOKEN` was available. All other required
+  checks passed independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `ml/artifacts/EVIDENCE_PASS.json`, projection run manifests
+  plus the R3 cheatsheet, all eight model manifests plus opponent/series reports,
+  both committed backtest report/manifest pairs, `scripts/ralph/prd.json`, and
+  `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - One-pass clean-worktree regeneration can be verified before import by
+    recursively comparing JSON while excluding provenance, timestamp, and
+    intentional disclosure fields; require zero remaining differences.
+  - Long `r500` runs remain single-core and write evidence only at completion;
+    steady CPU plus a heartbeat monitor distinguishes expected silence from a
+    hung process.
+---

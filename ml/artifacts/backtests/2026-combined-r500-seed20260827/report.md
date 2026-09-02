@@ -1,7 +1,7 @@
 # Backtest report — run `2026-combined-r500-seed20260827`
 
 - Package version: 0.1.0
-- Generated: 2026-09-01T11:22:22.608409+00:00
+- Generated: 2026-09-02T16:22:09.507592+00:00
 - Seasons: 2026
 - Rounds replayed: 3
 - League size: 4 managers; IR slots: False

@@ -46,7 +46,7 @@ Brier score for P(higher seed wins the series), lower is better:
 | 4 | 1.13 | 1 |
 
 ## Honesty note (SPEC section 7)
-Metrics are reported exactly as measured. With ~40 playoff series held out the
+Metrics are reported exactly as measured. With 30 playoff series held out the
 sample is small, so the series-winner Brier is noisy and may not beat the
 higher-seed baseline every split; the number is printed as-is. Series prices
 are unavailable, so per-game probabilities come from the stat-only win model.

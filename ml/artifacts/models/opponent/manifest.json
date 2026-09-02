@@ -190,6 +190,14 @@
       }
     ],
     "seasons_beating_fallback": 2,
+    "membership_exclusions": [
+      {
+        "season": 2025,
+        "draft_event": "R1",
+        "league_name": "The Gemmell Cup",
+        "reason": "no snake order in sheet"
+      }
+    ],
     "per_pick": {
       "picks": 240,
       "k": 3,
@@ -199,6 +207,6 @@
       "greedy_topk": 0.2042
     }
   },
-  "git_sha": "6f56cf8d69647135ce0a4b0e58c272b994b34008",
+  "git_sha": "e8656219b87297262c39461456fc527f70e350b7",
   "git_dirty": false
 }

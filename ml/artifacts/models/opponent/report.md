@@ -28,6 +28,10 @@ Roster-membership accuracy (leave-one-season-out): the fraction of each manager'
 
 Seasons where fitted beats the fallback: 2/3.
 
+### Events excluded from membership evaluation
+
+- 2025 R1 (The Gemmell Cup): no snake order in sheet.
+
 ### Per-pick accuracy (true-order app export)
 
 - picks scored: 240
