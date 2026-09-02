@@ -41,7 +41,6 @@ never altered to force a pass.
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -53,6 +52,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from draft_oracle.models._games import pivot_decided_games
 from draft_oracle.models.game_win import (
     REGULAR_SEASON_GAME_TYPE,
     TemporalSplit,
@@ -262,48 +262,28 @@ def shutout_feature_row(
 
 
 def _pivot_games(team_games: pd.DataFrame) -> pd.DataFrame:
-    """One row per decided game (home + away), sorted chronologically.
-
-    Carries each side's goals and shots-against so the running state can be updated
-    and the winner/loser framing resolved. The archive's ``win`` column determines
-    the winner because shootouts retain tied goal totals. Rows without exactly one
-    archive winner are excluded with a warning.
-    """
-    tg = team_games.copy()
-    tg["game_date"] = pd.to_datetime(tg["game_date"])
-    home = tg.loc[tg["home_road"] == "H"]
-    away = tg.loc[tg["home_road"] == "R"]
-    merged = home.merge(away, on="game_id", suffixes=("_home", "_away"))
-    home_won = merged["win_home"].fillna(False).astype(bool)
-    away_won = merged["win_away"].fillna(False).astype(bool)
-    decided = home_won.ne(away_won)
-    undecided_count = int((~decided).sum())
-    if undecided_count:
-        warnings.warn(
-            f"_pivot_games excluded {undecided_count} games without exactly one archive winner",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-    merged = merged.loc[decided].copy()
-    home_won = home_won.loc[decided]
-
-    games = pd.DataFrame(
-        {
-            "game_id": merged["game_id"],
-            "season_id": merged["season_id_home"].astype(int),
-            "season_end_year": (merged["season_id_home"] % 10000).astype(int),
-            "game_type_id": merged["game_type_id_home"].astype(int),
-            "game_date": merged["game_date_home"],
-            "home_abbrev": merged["team_abbrev_home"],
-            "away_abbrev": merged["team_abbrev_away"],
-            "home_goals": merged["goals_for_home"].astype(int),
-            "away_goals": merged["goals_for_away"].astype(int),
-            "home_shots_against": merged["shots_against_home"].fillna(0).astype(int),
-            "away_shots_against": merged["shots_against_away"].fillna(0).astype(int),
-            "home_win": home_won.astype(int),
+    """Adapt shared decided-game rows to shutout's column contract."""
+    games = pivot_decided_games(team_games).rename(
+        columns={
+            "home_team_abbrev": "home_abbrev",
+            "away_team_abbrev": "away_abbrev",
         }
     )
-    return games.sort_values(["game_date", "game_id"], kind="stable").reset_index(drop=True)
+    columns = [
+        "game_id",
+        "season_id",
+        "season_end_year",
+        "game_type_id",
+        "game_date",
+        "home_abbrev",
+        "away_abbrev",
+        "home_goals",
+        "away_goals",
+        "home_shots_against",
+        "away_shots_against",
+        "home_win",
+    ]
+    return games.loc[:, columns]
 
 
 def build_shutout_dataset(

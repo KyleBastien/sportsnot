@@ -43,10 +43,11 @@ Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior 
 - Combined-event regression tests must assert concrete cross-round numbers, not only
   `scored_rounds` metadata. Guard roster actuals, conditional goalie valuation, and
   league comparisons independently so one working leg cannot mask another regression.
-- Every team-game pivot derives winners from normalized `team_games.win`, not goal
-  comparison. This includes game-win training, series-sim replay, and shutout
-  training. Shootouts can have equal `goals_for`; pivots retain rows with exactly
-  one archive winner and warn before excluding malformed/undecided rows.
+- All team-game consumers call `models._games.pivot_decided_games`; do not recreate
+  local home/away pivots in game-win training, series-sim replay, or shutout training.
+  The helper derives winners from normalized `team_games.win`, not goal comparison.
+  Shootouts can have equal `goals_for`; retain rows with exactly one archive winner
+  and warn before excluding malformed/undecided rows.
 - League draft consumers must call `dedupe_duplicate_events` before aggregation and
   use shared `event_keys` grouping; real events are keyed by
   `(season, league_name, draft_event)`, never season/event alone. Dedupe preserves
@@ -842,4 +843,36 @@ Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior 
     candidate names can falsely certify an override matcher never consumes.
   - Team override guards apply only to G slots; skater team resolution remains
     best-effort metadata and must not inflate guarded team counts.
+---
+
+## 2026-09-02T07:48:24Z - US-404
+- Consolidated game-win, series-sim, and shutout home/away pairing into
+  `models._games.pivot_decided_games`; thin caller adapters preserve each existing
+  column contract.
+- Added shared-helper construction guards plus real-parquet evaluation pins for 2026:
+  membership events 6, picks 240, fitted 0.2875, greedy 0.2917; per-pick picks 240
+  and fitted top-1 0.1125.
+- Compared all three downstream frames against a detached pre-change worktree: each
+  remained exactly equal at 14,508 rows. No committed artifacts regenerated; US-406
+  owns the final one-pass evidence rebuild.
+- Re-applied both league-blind mutants in the temp worktree. Membership mutation
+  failed `test_real_membership_evaluation_keeps_league_events_isolated` (events 3 vs
+  6); per-pick mutation failed
+  `test_real_per_pick_evaluation_keeps_league_events_isolated` (picks 143 vs 240).
+- Quality gates passed: ruff, mypy, 749 ML tests, Nx affected lint/typecheck, 380
+  monorepo unit tests, web build, and 96 Playwright tests.
+- Normal commit hook reached CodeScene and failed only because neither `CODESCENE_PAT`
+  nor `CODESCENE_ACCESS_TOKEN` was available. All other required checks passed
+  independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `AGENTS.md`, `ml/src/draft_oracle/models/_games.py`,
+  `ml/src/draft_oracle/models/game_win.py`,
+  `ml/src/draft_oracle/models/series_sim.py`,
+  `ml/src/draft_oracle/models/shutout.py`, `ml/tests/test_decided_games.py`,
+  `ml/tests/test_opponents.py`, `scripts/ralph/prd.json`, and
+  `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - Keep archive pairing and decided-game filtering centralized; caller-specific
+    naming and column subsets belong in thin adapters.
+  - Pin evaluation counts as well as accuracies. League-blind grouping can discard
+    teacher-forced picks even when an aggregate accuracy still looks plausible.
 ---

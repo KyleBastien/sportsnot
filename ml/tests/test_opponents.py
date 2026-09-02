@@ -547,6 +547,34 @@ def test_fitted_counts_match_real_league_truth() -> None:
     assert max(counts.values()) == 120
 
 
+def test_real_membership_evaluation_keeps_league_events_isolated() -> None:
+    """Mutation guard: membership evaluation must group through league-aware keys."""
+    if not _REAL_LEAGUE_PICKS.exists():
+        pytest.skip("committed league_draft_picks parquet not present")
+    picks = pd.read_parquet(_REAL_LEAGUE_PICKS)
+
+    score = opponents_module._membership_for_season(picks, 2026, OpponentFitConfig())
+
+    assert score is not None
+    assert score.events == 6
+    assert score.picks == 240
+    assert score.fitted_accuracy == pytest.approx(69 / 240)
+    assert score.greedy_accuracy == pytest.approx(70 / 240)
+
+
+def test_real_per_pick_evaluation_keeps_league_events_isolated() -> None:
+    """Mutation guard: true-order evaluation must group through league-aware keys."""
+    if not _REAL_LEAGUE_PICKS.exists():
+        pytest.skip("committed league_draft_picks parquet not present")
+    picks = pd.read_parquet(_REAL_LEAGUE_PICKS)
+
+    score = opponents_module._per_pick_accuracy(picks, OpponentFitConfig())
+
+    assert score is not None
+    assert score.picks == 240
+    assert score.fitted_top1 == pytest.approx(27 / 240)
+
+
 # ── Committed artifact load path (US-113) ─────────────────────────────────
 
 

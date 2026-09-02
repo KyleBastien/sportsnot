@@ -33,7 +33,6 @@ pass.
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -51,6 +50,7 @@ from draft_oracle.features.elo import (
     regress_to_mean,
     update_rating,
 )
+from draft_oracle.models._games import pivot_decided_games
 from draft_oracle.provenance import add_git_provenance
 
 __all__ = [
@@ -223,50 +223,24 @@ def matchup_feature_row(
 
 
 def _pivot_games(team_games: pd.DataFrame) -> pd.DataFrame:
-    """One row per game (home + away), sorted chronologically.
-
-    The home/away split uses the archive's ``home_road`` flag and the winner
-    comes from its ``win`` column. Shootouts retain tied goal totals because the
-    deciding shootout goal is not counted in ``goals_for``. Rows without exactly
-    one archive winner are excluded with a warning.
-    """
-    tg = team_games.copy()
-    tg["game_date"] = pd.to_datetime(tg["game_date"])
-    home = tg.loc[tg["home_road"] == "H"]
-    away = tg.loc[tg["home_road"] == "R"]
-    merged = home.merge(away, on="game_id", suffixes=("_home", "_away"))
-    home_won = merged["win_home"].fillna(False).astype(bool)
-    away_won = merged["win_away"].fillna(False).astype(bool)
-    decided = home_won.ne(away_won)
-    undecided_count = int((~decided).sum())
-    if undecided_count:
-        warnings.warn(
-            f"_pivot_games excluded {undecided_count} games without exactly one archive winner",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-    merged = merged.loc[decided].copy()
-    home_won = home_won.loc[decided]
-
-    games = pd.DataFrame(
-        {
-            "game_id": merged["game_id"],
-            "season_id": merged["season_id_home"],
-            "season_end_year": (merged["season_id_home"] % 10000).astype(int),
-            "game_type_id": merged["game_type_id_home"],
-            "game_date": merged["game_date_home"],
-            "home_team_id": merged["team_id_home"].astype(int),
-            "away_team_id": merged["team_id_away"].astype(int),
-            "home_team_abbrev": merged["team_abbrev_home"],
-            "away_team_abbrev": merged["team_abbrev_away"],
-            "home_goals": merged["goals_for_home"].astype(int),
-            "away_goals": merged["goals_for_away"].astype(int),
-            "home_points": merged["points_home"].astype(int),
-            "away_points": merged["points_away"].astype(int),
-            "home_win": home_won.astype(int),
-        }
-    )
-    return games.sort_values(["game_date", "game_id"], kind="stable").reset_index(drop=True)
+    """Adapt the shared decided-game rows to game-win's column contract."""
+    columns = [
+        "game_id",
+        "season_id",
+        "season_end_year",
+        "game_type_id",
+        "game_date",
+        "home_team_id",
+        "away_team_id",
+        "home_team_abbrev",
+        "away_team_abbrev",
+        "home_goals",
+        "away_goals",
+        "home_points",
+        "away_points",
+        "home_win",
+    ]
+    return pivot_decided_games(team_games).loc[:, columns]
 
 
 def _attach_market(games: pd.DataFrame, odds: pd.DataFrame | None) -> pd.DataFrame:
