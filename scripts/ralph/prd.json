@@ -1,19 +1,18 @@
 {
  "project": "SportsNot",
  "branchName": "ralph/ml-draft-optimizer",
- "description": "Draft Oracle round-4 (intended FINAL) fix round: resolve the adversarially-verified findings in ml/CODE_REVIEW_R3.md (2 major R3-M1..M2, 11 minor R3-m1..m11; every finding independently reproduced). Read ml/CODE_REVIEW_R3.md and ml/SPEC.md before any story. Round-3 verdict for context: all 23 round-2 statuses fixed or partial and the committed evidence is honest end-to-end; what remains is finishing the shootout fix's scope (US-301), hardening draft-night input handling (US-302), guard/test hygiene (US-303), doc and override polish (US-304), and ONE final regeneration of the 2026-r* fixtures plus whatever evidence US-301 moves (US-305, must run LAST). Story order matters: US-305 depends on US-301 landing first or the fixtures would need yet another pass. Prior-round prd/progress archived under scripts/ralph/archive/2026-09-01-ml-draft-optimizer-fixround2/.",
+ "description": "Draft Oracle round-5 (CLOSING) fix round: resolve the adversarially-verified minors in ml/CODE_REVIEW_R4.md (0 critical, 0 major, 9 minor R4-m1..m9, 1 uncertain). Read ml/CODE_REVIEW_R4.md and ml/SPEC.md before any story. Round-4 verdict for context: the tool is correct, deterministic, and honest end-to-end; every prior finding is verified fixed. This round is hygiene plus one PROCESS blocker: the provenance-ancestry test added in US-303 is incompatible with the repo's squash-merge workflow and will fail on main after merge (US-401). Story order: US-401..US-405 are independent code/test/doc fixes; US-406 regenerates ALL committed evidence in ONE pass at a clean HEAD and must run LAST (the shared-sha guard means any report-writer change in US-405 requires regenerating everything together). Prior-round prd/progress archived under scripts/ralph/archive/2026-09-02-ml-draft-optimizer-fixround3/.",
  "userStories": [
   {
-   "id": "US-301",
-   "title": "Finish the shootout fix: series_sim and shutout pivots derive winners from the win column (R3-M1)",
-   "description": "As the tool owner, I want the two remaining copies of the condemned tied-goal pivot fixed so the game-win model is served the same feature universe it is trained on. (CODE_REVIEW_R3 R3-M1) Evidence: US-203 fixed only game_win.py; series_sim.py:330 (_pivot_all_games) and shutout.py:291 (_pivot_games) still filter games.loc[home_goals != away_goals], and series_sim derives home_won by goal comparison at line 491 — so reconstruct_series_matchups (the production pre-series snapshot path feeding projection artifacts and both backtests) excludes all 1,024 shootout games (7.1% of 14,508 decided games) from Elo/win_pct/points state while the retrained model includes them. Measured serve-vs-train skew at the 2026 R1 freeze: VGK Elo +35.8, PIT +19.4, EDM +17.1, win_pct up to 5.1pp. shutout.py additionally drops 16 genuine 0-0 shootout wins from its training universe.",
+   "id": "US-401",
+   "title": "Make the provenance guard survive squash-merge and shallow clones (R4-m1)",
+   "description": "As the tool owner, I want the ml test suite to stay green on main after this branch is squash-merged. (CODE_REVIEW_R4 R4-m1) Evidence: main has 0 merge commits (PRs land as single-parent squash commits), so the recorded generating sha 6f56cf8 can never be an ancestor of main HEAD — test_committed_evidence_git_sha_is_ancestor_of_head (tests/test_committed_model_evidence.py) fails 14 parametrized cases permanently after merge (reproduced by simulating the squash with git commit-tree). A 'git clone --depth 1' also hard-fails: 'git merge-base --is-ancestor' exits 128 ('Not a valid commit name') and _require_git_checkout only skips when git is missing or cwd is not a work tree, so exit 128 is asserted as non-ancestry.",
    "acceptanceCriteria": [
-    "Read ml/SPEC.md AND the R3-M1 finding in ml/CODE_REVIEW_R3.md in full before starting",
-    "series_sim._pivot_all_games and shutout._pivot_games derive the winner from the archive 'win' column (same pattern as game_win.py post-US-203); series_sim.py:491's home_won comes from the win column too; genuinely undecided rows still excluded loudly",
-    "Real-archive count tests for BOTH modules: pivot row count equals unique decided games (14,508 total across the 11 archives; shutout's pre-fix 13,484 is the regression number); a real SO game asserts the correct winner in each module",
-    "The 16 genuine 0-0 shootout wins enter build_shutout_dataset as shutout wins for the SO winner (NHL stats rules) — asserted on at least one real example",
-    "Train/serve consistency check: for one real season, the pre-series snapshot Elo from reconstruct_series_matchups matches the training-path Elo trajectory for the same team/date (the R3-M1 divergence measurement goes to ~0) — asserted with a tolerance, and series_sim's 'exact same update rules' docstring is true again",
-    "HONESTY GATE: series-sim/shutout/game-win metrics will move; report the honest numbers in progress.txt — never tune seeds/splits/baselines to preserve old values. Committed evidence regeneration is deferred to US-305",
+    "Read ml/SPEC.md AND the R4-m1 finding in ml/CODE_REVIEW_R4.md in full before starting",
+    "The provenance guard no longer requires the manifest sha to be an ancestor of the CURRENT HEAD; replace with a check that survives squash-merge — e.g. every evidence manifest's git_sha equals the sha recorded in a single committed evidence-pass file (ml/artifacts/EVIDENCE_PASS.json or equivalent) that US-406 rewrites, AND all manifests share that one sha (keep test_evidence_pass_uses_one_shared_git_sha), AND git_dirty is false — the R2-M2/R3-M2 staleness class stays detectable because a regenerated-elsewhere artifact would carry a sha that differs from the pass file",
+    "Where git is consulted at all, exit code 128 / missing object results in pytest.skip with a clear reason, never an assertion failure; verified in a 'git clone --depth 1' of the branch under /tmp (full suite: 0 failures)",
+    "Verified in a simulated squash checkout under /tmp (git commit-tree HEAD^{tree} -p $(git merge-base origin/main HEAD)): the evidence tests pass, not fail",
+    "A test proves the guard still catches staleness: in a /tmp copy, stamp one manifest with a different well-formed sha and confirm a named test fails",
     "All Typecheck passes (even if it's outside of your changes)",
     "Lint passes (even if it's outside of your changes)",
     "Unit tests have been added",
@@ -21,19 +20,18 @@
     "All Playwright tests pass (even if it's outside of your changes)"
    ],
    "priority": 1,
-   "passes": true,
-   "notes": "Both remaining pivots now use archive win flags; 14,508-game, real-SO, 0-0 shutout, and train/serve Elo regressions pass. Evidence regeneration deferred to US-305."
+   "passes": false,
+   "notes": ""
   },
   {
-   "id": "US-302",
-   "title": "Draft-night input safety: session clobber, duplicate managers, strict --eliminated, honest recommend label (R3-m9, R3-m10, R3-m11, R3-m8)",
-   "description": "As the tool owner, I want the CLI to protect me from my own draft-night typos, because round 3 demonstrated live: (R3-m9) launching 'oracle draft' autosaves BEFORE the input loop (cli/draft.py:664) so a quit-only session silently wipes an existing ./draft-session.json to 0 picks — and I draft in TWO 2026 leagues on the same nights, making the collision the default; (R3-m10) '--managers ben,ben,kyle,levi' passes validation, giving 'oracle recommend' a misleading deep ValueError and 'oracle draft' a silently merged two-seat roster; (R3-m11) '--eliminated MON' (Montreal is MTL) silently drops the unmatched token, leaving the team draftable; (R3-m8) standalone 'oracle recommend' still prints plain 'fitted opponents' when seatN/case-typo names zero the affinity signal — the interactive path already has the honest three-state label.",
+   "id": "US-402",
+   "title": "Close the two remaining session-clobber paths (R4-m2)",
+   "description": "As the tool owner drafting in two leagues on the same night, I want NO code path to silently overwrite a session log. (CODE_REVIEW_R4 R4-m2) US-302's refusal lives only in the new-session branch of cli/draft.py (~line 810). Two sibling paths still clobber, both reproduced live: (a) 'oracle draft --resume A.json --session B.json' with an existing, different B.json — the --resume branch (~line 799) sets session_path = session or resume and _run_loop's pre-loop _autosave() writes A's contents over B (verified: 2-pick log -> 0 picks, no message); (b) the in-loop 'resume <path>' command replaces the session object and immediately autosaves it to the ORIGINAL launch session_path, destroying the launch log (verified: league1.json ended up holding league2's picks and slot).",
    "acceptanceCriteria": [
-    "Read ml/SPEC.md AND the R3-m8..m11 findings in ml/CODE_REVIEW_R3.md in full before starting",
-    "Session clobber: starting a session never silently overwrites an existing session file — refuse with a clear message (offer --resume or a different --session path) or uniquify the default filename; the round-3 quit-only reproduction (2-pick log -> 0 picks) is the regression test",
-    "Duplicate manager ids are rejected at parse time with a clear message in BOTH 'oracle draft' and 'oracle recommend' (and DraftState.new validates uniqueness as defense in depth); tested",
-    "--eliminated raises a clear error naming any token that matches no team in the pool (valid case-insensitive abbrevs keep working); tested with the MON/XYZ cases",
-    "'oracle recommend' (cli/project.py:641) reuses the interactive path's three-state opponent label (plain fitted / mixed / league-average-no-affinity) or emits an equivalent warning; the default seat1..seat4 invocation must not print plain 'fitted opponents'; tested — also cover the case-typo real-name case ('Ben' vs 'ben')",
+    "Read ml/SPEC.md AND the R4-m2 finding in ml/CODE_REVIEW_R4.md in full before starting",
+    "'--resume A --session B' refuses with a clear message when B exists and is not the same file as A (resuming A in place, i.e. B omitted or B == A, keeps working); the round-4 reproduction (existing 2-pick B) is the regression test and B must be byte-identical afterwards",
+    "The in-loop 'resume <path>' command never writes the resumed session over the launch log: either the autosave target switches to the resumed path (announced to the user) or the command refuses when the launch log holds picks that differ; the round-4 reproduction (league1.json 2 picks, resume league2.json, quit) is the regression test and league1.json must be unchanged",
+    "README's draft-assistant section documents the resume semantics chosen",
     "All Typecheck passes (even if it's outside of your changes)",
     "Lint passes (even if it's outside of your changes)",
     "Unit tests have been added",
@@ -41,19 +39,18 @@
     "All Playwright tests pass (even if it's outside of your changes)"
    ],
    "priority": 2,
-   "passes": true,
-   "notes": "Draft/recommend now reject duplicate manager ids; DraftState validates uniqueness; eliminated tokens fail loudly; new sessions refuse existing logs; standalone recommend shares the honest fitted-opponent coverage label."
+   "passes": false,
+   "notes": ""
   },
   {
-   "id": "US-303",
-   "title": "Guard hygiene: fresh-clone skips, provenance ancestry, call-site isolation guard, goalie ownership (R3-m2, R3-m4, R3-m5, R3-m1)",
-   "description": "As the tool owner, I want the guards themselves airtight: (R3-m2) test_real_2026_league_comparisons_never_pool_leagues (tests/test_backtest.py:858) and test_real_2024_levi_r3_4_roster_scores_corrected_64_points (:906) read gitignored data/normalized/*.parquet with no existence check — on a fresh clone the suite is 2 failed / 690 passed, and README's 'Run tests' documents no generation prerequisite; (R3-m4) the provenance test accepts any 40-hex git_sha, so a stale artifact from any old commit passes (today's split tree — models at da5e568, fixtures at 8000f5b — is the demonstration); (R3-m5) hardcoding the grouping inside _build_choices (opponents.py:385) re-merges the 2026 cross-league pools and changes fitted coefficients yet passes all 695 tests, because the isolation tests call _event_keys themselves (same wiring at _membership_for_season:899 and _per_pick_accuracy:954); (R3-m1) _mark_duplicate_ownership excludes goalie/team slots, so two managers owning the same team's goalie slot would pass silently.",
+   "id": "US-403",
+   "title": "Override count-guard consistency: corrected_name-aware counting and team-side enforcement (R4-m5, R4-m4)",
+   "description": "As the tool owner, I want the expected_matches guard to count exactly what the override consumes. (CODE_REVIEW_R4 R4-m5, R4-m4) Evidence: _validate_player_override_match_counts (ingest/entity_match.py ~210-228) counts skater rows by normalize_name(raw player_or_team_name), but build_league_draft_picks (~679-683) applies overrides via match_skater(corrected_name or raw) — verified: setting corrected_name='Connor McDavid' on the 2024 R3_4 row silently bypasses the Draisaitl override while the guard still passes (corrected_name is in real use: row 104 Makar -> Evan Bouchard). Separately, load_name_overrides (~196) parses expected_matches for the teams: section and binds it to _team_expected_matches, then drops it — NameOverrides has no team field, so a team override declaring a count would appear guarded and never be.",
    "acceptanceCriteria": [
-    "Read ml/SPEC.md AND the R3-m1/m2/m4/m5 findings in ml/CODE_REVIEW_R3.md in full before starting",
-    "The two real-data regression tests use the same pytest.skip pattern as their siblings (test_opponents.py:498, test_entity_match.py:519) when data/normalized files are absent; verified: the full suite passes (with skips) in a clean worktree with no generated data; README's test section documents the three-command generation prerequisite (normalize, league-drafts + match-drafts, odds) for running the real-data tests",
-    "test_committed_model_evidence asserts each manifest git_sha is an ancestor of HEAD (subprocess git merge-base --is-ancestor, skipping gracefully outside a git checkout) AND that all manifests regenerated by one evidence pass share one sha (the 2026-r* fixtures may carry their own single shared sha; encode the expected relationship, not just format)",
-    "The league-isolation guard goes through the production call path: either a coefficient-level assertion on the real-parquet fit or a test that patches/inspects _build_choices grouping — verified by re-applying the round-3 surviving mutant (hardcode ['season','draft_event','base_position'] inside _build_choices) and confirming a named test now fails",
-    "_mark_duplicate_ownership (or a sibling check) also flags two managers owning the same team_id in goalie/team slots within one (league_name, season, draft_event); the point-split cross-check's G-row skip is documented; tested with a synthetic goalie duplicate",
+    "Read ml/SPEC.md AND the R4-m4/R4-m5 findings in ml/CODE_REVIEW_R4.md in full before starting",
+    "The count-guard keys on the exact name the override lookup consumes (corrected_name when present, else raw) — the round-4 bypass (corrected_name='Connor McDavid' on the 2024 McDavid row) now trips the guard with 'found 0'; the committed corpus still validates (McDavid expected 1 found 1) and levi's row still resolves to 8477934",
+    "teams: overrides either enforce expected_matches against G-slot rows (grouped like the player guard) or the loader rejects the key on team entries with a clear error — never parsed-and-dropped; NameOverrides carries the team counts if enforced; tested both ways (declared count matches; mismatch raises)",
+    "The name_overrides.yaml header documents the qualifier's semantics for both sections",
     "All Typecheck passes (even if it's outside of your changes)",
     "Lint passes (even if it's outside of your changes)",
     "Unit tests have been added",
@@ -61,20 +58,18 @@
     "All Playwright tests pass (even if it's outside of your changes)"
    ],
    "priority": 3,
-   "passes": true,
-   "notes": "Fresh-clone real-data tests now skip cleanly; evidence SHAs must be HEAD ancestors and shared per regeneration pass; _build_choices has a call-site league-isolation mutation guard; goalie/team duplicate ownership is review-flagged."
+   "passes": false,
+   "notes": ""
   },
   {
-   "id": "US-304",
-   "title": "Overrides, gitignore, and doc polish (R3-m3, R3-m6, R3-m7, SPEC/README info nits)",
-   "description": "As the tool owner, I want the last paper cuts closed: (R3-m3) the Draisaitl override is a GLOBAL bare-name key — any future row whose raw name is exactly 'McDavid' in any season/league resolves to Draisaitl at confidence 1.0 (safe today: exactly one such row in the corpus, but app-era rows carry no point columns for the cross-check to catch a future mistake); (R3-m6) .gitignore still re-includes an explicitly placed draft-session.json inside artifacts/2026-r*/ and the new ./draft-session.json default is not ignored; (R3-m7) two README sentences went stale mid-round: 'both maps ship empty' (US-202's override now ships) and the autosave default '<artifact>/draft-session.json' (US-208 moved it to cwd); plus info nits: SPEC section 2 'IR slots disabled for 2026' is false for Press Play-offs (11-pick rosters with IR_F/IR_D), README's interactive examples point at nonexistent artifacts/2025-r1, the live EspnGameOddsClient docstring overclaims completion-matching semantics, and unattributed_uncovered_rows is a write-only attr never surfaced in OddsResult or the CLI guard line.",
+   "id": "US-404",
+   "title": "Evaluation-path isolation guards and one shared game pivot (R4-m3, R4-m9)",
+   "description": "As the tool owner, I want the league-isolation and decided-game rules enforced by construction, not by three copies and one test. (CODE_REVIEW_R4 R4-m3, R4-m9) Evidence: hardcoding ['season','draft_event'] at _membership_for_season (optimize/opponents.py ~899) or _per_pick_accuracy (~954) passes the full suite while moving the committed opponent evidence (2026 membership events 6->3, accuracy 0.2875->0.1845; per-pick picks 240->143) — only _build_choices got a call-site guard in US-303. And R3-M1 happened because one of three near-identical pivots was fixed: game_win._pivot_games (~225), series_sim._pivot_all_games (~305), shutout._pivot_games (~264) now each carry an identical 12-line home_won/away_won/decided/warn block (cosmetically divergent column names, fillna differences) and all three produce 14,508 rows with identical home_win per game_id — consolidation is behavior-preserving.",
    "acceptanceCriteria": [
-    "Read ml/SPEC.md AND the R3-m3/m6/m7 findings (plus the info observations) in ml/CODE_REVIEW_R3.md in full before starting",
-    "The name-override mechanism supports scoping (e.g. optional season/league_name/draft_event/manager qualifiers on an override entry) OR the loader enforces a documented expected-match-count guard (the Draisaitl entry declares it matches exactly 1 row; match-drafts fails loudly if the count differs); the committed override uses it; tested both ways (matches its row; a synthetic second bare-'McDavid' row trips the guard)",
-    "ml/.gitignore: draft-session.json inside artifacts/2026-r*/ is ignored (a line after the re-includes) and the cwd-default draft-session.json is ignored repo-wide under ml/; verified with git check-ignore",
-    "README: the entity-matching section reflects the shipped override (no 'ship empty' claim), the draft-assistant section documents the cwd autosave default and the clobber-guard behavior from US-302, and the interactive examples reference a directory that exists (artifacts/2026-r1); EspnGameOddsClient's docstring states its spread-derived favorite limitation honestly",
-    "SPEC section 2 corrects the 2026 IR fact (Gemmell Cup: IR disabled; Press Play-offs: IR enabled, 11 picks)",
-    "unattributed_uncovered_rows is aggregated into OddsResult and the `oracle odds` guard summary line (visible accounting, not a write-only attr)",
+    "Read ml/SPEC.md AND the R4-m3/R4-m9 findings in ml/CODE_REVIEW_R4.md in full before starting",
+    "Tests guard the real evaluation path: re-applying either round-4 mutant (league-blind keys inside _membership_for_season or _per_pick_accuracy) fails a named test — verify in a /tmp copy and record the failing test names in progress.txt; the committed opponent evaluation numbers (events 6, picks 240, fitted 0.2875 / greedy 0.2917, top1 0.1125) are pinned on the real parquet",
+    "A single shared decided-game pivot helper (e.g. models/_games.py or features/) replaces the three copies; game_win, series_sim and shutout call it; column-name differences are reconciled at the call sites, not by keeping variants",
+    "Behavior-preservation proof: on the real archive the helper returns 14,508 rows and the three callers' downstream frames are identical to pre-refactor output (compare in a /tmp copy of the pre-change tree); all existing tests pass unchanged; a test asserts the three callers share the helper (e.g. identity check or a grep-style guard against reintroducing a local pivot)",
     "All Typecheck passes (even if it's outside of your changes)",
     "Lint passes (even if it's outside of your changes)",
     "Unit tests have been added",
@@ -82,20 +77,21 @@
     "All Playwright tests pass (even if it's outside of your changes)"
    ],
    "priority": 4,
-   "passes": true,
-   "notes": "Name overrides now support expected-match guards; draft autosaves are ignored; docs reflect current fixtures, IR, and session safety; odds unattributed rows are surfaced through OddsResult and CLI."
+   "passes": false,
+   "notes": ""
   },
   {
-   "id": "US-305",
-   "title": "Regenerate the 2026-r1..r4 fixtures and US-301-moved evidence at a clean HEAD — must run LAST (R3-M2)",
-   "description": "As the tool owner, I want the committed 2026 projection fixtures to reproduce from the code beside them, because round 3 proved they are stale: all four run_manifest.json still carry git_sha 8000f5b (round-2 HEAD) while every generating input changed since (US-202 override, US-203 game-win fix, US-205 team_id recovery — and now US-301's series_sim/shutout fix). Rebuilding 2026-r1 at round-3 HEAD already moved p_series_win by up to 0.0135, e_goalie_points by up to 0.099, and REORDERED the cheatsheet draft board (committed rank 4 = G COL; rebuilt rank 4 = D Bouchard). The two committed 2026 evidence sets (fixtures at 8000f5b vs backtest at da5e568) currently disagree with each other. (CODE_REVIEW_R3 R3-M2) This story runs only after US-301..US-304 all pass — regenerating before US-301 would force a fifth pass.",
+   "id": "US-405",
+   "title": "Reporting and doc polish: live ESPN favorite flag, series-sim sample size, r3 goalie fold contract, manifest disclosures (R4-m6, R4-m7, R4-m8, info items)",
+   "description": "As the tool owner, I want the last reporting inconsistencies gone. (CODE_REVIEW_R4 R4-m6, R4-m7, R4-m8 + info) Evidence: (R4-m6) espn_summary_to_rows (ingest/odds.py ~1800) selects the moneyline via the per-side favorite flag, then discards the side and sets favorite_side from the spread, defaulting to 'away' covered=True when the spread is missing/blank — the offline completion parser already returns unattributed in that case; (R4-m7) series_sim.py ~770 hard-codes 'With ~40 playoff series held out' while the same report and manifest say series_scored: 30; (R4-m8) _apply_combined_valuation (projection_artifact.py ~362) folds R4 into e_goalie_points only, so on artifacts/2026-r3/teams.csv the SPEC identity e_goalie_points == 2E[wins]+2E[shutouts] fails by up to 4.73 (COL) while holding to 1e-15 on r1/r2/r4, and README's teams column list never mentions the fold; info items: run manifests don't record generating CLI flags (r4 was built with --no-slot-strategies), fixtures reproduce to float-ULP not byte-identically across platforms (the one_step row 58.44 vs 58.31 Windows-vs-Linux divergence is the uncertain finding), the opponent membership evaluation silently drops 2025 R1 (no snake order in the sheet), and SPEC section 5 / PROVENANCE still describe the Kaggle/ESPN 2022-23..2025-26 favorite prices as usable although the pipeline correctly carries them covered=False.",
    "acceptanceCriteria": [
-    "Read ml/SPEC.md AND the R3-M2 finding in ml/CODE_REVIEW_R3.md in full before starting; confirm US-301..US-304 all have passes:true first — if any does not, stop and pick that story instead",
-    "Regenerate from a clean committed HEAD (Codebase Patterns: run inside a clean worktree with the process CWD in it, write artifacts to an external directory, then commit): all four 2026-r1..r4 projection fixtures (including the combined R3_4 event), PLUS every model/backtest artifact whose numbers US-301 moved (at minimum series-sim, shutout, game-win reports; rerun both backtests and recommit if their numbers moved)",
-    "Every regenerated manifest carries git_sha of the real generating commit with git_dirty=false and pinned seeds; after this story ALL committed evidence (fixtures + models + backtests) shares consistent provenance satisfying the strengthened US-303 ancestry/shared-sha test",
-    "The full structural test suite passes on the regenerated fixtures (quantile ordering, alive-team sets, r4 = exactly Carolina and Vegas, goalie identity through the scoring rule, csv==parquet, cheatsheet/slot consistency), and the fixtures reproduce at the named commit (spot-verify one round end-to-end)",
-    "HONESTY GATE: the draft board WILL reorder (that is the fixtures becoming true, not a regression) and series-sim/shutout/game-win metrics will move — record every movement plainly in the reports and progress.txt; never reroll seeds, change configs, or keep a stale artifact because its numbers look better",
-    "After regeneration, git status is clean and the full suite passes at the final HEAD",
+    "Read ml/SPEC.md AND the R4-m6/R4-m7/R4-m8 findings and the info observations in ml/CODE_REVIEW_R4.md in full before starting",
+    "espn_summary_to_rows derives favorite_side from the per-side favorite flag it already reads; when neither flag nor a usable spread exists the row is unattributed/uncovered (mirroring parse_espn_completion); tested with the missing/None/blank spread and flag-vs-spread-disagreement payloads",
+    "The series-sim honesty note derives its sample size from counts.series_scored (no hard-coded '~40'); tested via the report renderer",
+    "The r3 combined fold is part of the column contract: either emit companion columns (e_wins_combined, e_shutout_wins_combined) so the goalie identity is recomputable from the table, or document in README's teams column list and the artifact cheatsheet header exactly which columns are R3-only vs combined; a test asserts the identity on r1/r2/r4 and the documented fold relation on r3",
+    "Run manifests record the generating CLI flags (e.g. slot_strategies on/off, rollouts) and a platform note (os/python/numpy versions) so a rebuild can be compared like-for-like; the reproducibility statement in README/SPEC says 'to float-ULP across platforms, byte-identical on the generating platform'",
+    "The opponent report discloses which events are excluded from membership evaluation and why (2025 R1: no snake order in the sheet); SPEC section 5 and odds-archive/PROVENANCE.md state that the Kaggle/ESPN favorite prices for 2022-23 onward are carried covered=False by the pipeline",
+    "Any report/manifest writer change here does NOT regenerate committed artifacts in this story — US-406 regenerates everything in one pass so the shared-sha guard holds",
     "All Typecheck passes (even if it's outside of your changes)",
     "Lint passes (even if it's outside of your changes)",
     "Unit tests have been added",
@@ -103,8 +99,28 @@
     "All Playwright tests pass (even if it's outside of your changes)"
    ],
    "priority": 5,
-   "passes": true,
-   "notes": "Regenerated all four 2026 projection fixtures, all eight model artifacts, and both backtests from clean SHA 6f56cf8 at fixed seed; honest metrics and draft-board movement are committed, and all structural and project quality suites pass."
+   "passes": false,
+   "notes": ""
+  },
+  {
+   "id": "US-406",
+   "title": "Final evidence pass: regenerate ALL committed artifacts in one pass at a clean HEAD — must run LAST",
+   "description": "As the tool owner, I want every committed artifact (2026-r1..r4 fixtures, all model reports/manifests, both backtests) regenerated together from one clean commit so the shared-sha guard and the US-401 evidence-pass record are satisfied by construction, and so the US-404 pivot consolidation and US-405 writer changes are reflected in the committed evidence. This story runs only after US-401..US-405 all pass. Expected outcome: numbers essentially unchanged from 05980f1 (the pivot refactor is behavior-preserving; writer changes add disclosures) — any material metric movement is a red flag to investigate, not to explain away.",
+   "acceptanceCriteria": [
+    "Read ml/SPEC.md AND ml/CODE_REVIEW_R4.md's Recommendation section before starting; confirm US-401..US-405 all have passes:true — if any does not, stop and pick that story instead",
+    "Regenerate from a clean committed HEAD (Codebase Patterns: run inside a clean worktree with the process CWD in it, write artifacts externally, then commit) — all four 2026-r* fixtures, all 8 model artifacts, both backtests — in ONE pass; write the US-401 evidence-pass record with that sha",
+    "Every manifest carries the same git_sha (a real commit) with git_dirty=false, the US-405 CLI-flag and platform fields, and pinned seeds; the strengthened evidence tests pass; the structural fixture suite passes; csv==parquet holds",
+    "HONESTY GATE: compare every regenerated report against its 05980f1 version — differences must be limited to disclosures added by US-405 and float-ULP noise; if any metric moved materially, do NOT commit — investigate and report in progress.txt. If the one_step 2023-2025 baseline row lands at 58.31 on the generating platform, record the platform in the manifest and note the cross-platform float-ULP caveat; never adjust seeds or config to chase the old value",
+    "After regeneration the full suite passes at the final HEAD in the normal checkout AND in a 'git clone --depth 1' of the branch under /tmp (0 failures), and git status is clean",
+    "All Typecheck passes (even if it's outside of your changes)",
+    "Lint passes (even if it's outside of your changes)",
+    "Unit tests have been added",
+    "All Unit tests pass (even if it's outside of your changes)",
+    "All Playwright tests pass (even if it's outside of your changes)"
+   ],
+   "priority": 6,
+   "passes": false,
+   "notes": ""
   }
  ]
 }
