@@ -12,6 +12,7 @@ import gzip
 import json
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pandas as pd
@@ -1411,7 +1412,7 @@ def test_odds_api_events_missing_market_flagged() -> None:
 # ── Live: ESPN summary (MockTransport + payload conversion) ──────────────
 
 
-def _espn_summary_payload(favorite_home: bool) -> dict[str, object]:
+def _espn_summary_payload(favorite_home: bool) -> dict[str, Any]:
     spread = -1.5 if favorite_home else 1.5
     return {
         "header": {
@@ -1450,6 +1451,48 @@ def test_espn_summary_to_rows_missing_pickcenter_flagged() -> None:
     df = espn_summary_to_rows(payload)
     assert len(df) == 1
     assert not bool(df.iloc[0]["covered"])
+
+
+@pytest.mark.parametrize("spread", [None, ""])
+def test_espn_summary_to_rows_missing_spread_and_flags_is_unattributed(
+    spread: object,
+) -> None:
+    payload = _espn_summary_payload(favorite_home=True)
+    pickcenter = payload["pickcenter"][0]
+    pickcenter["spread"] = spread
+    pickcenter["homeTeamOdds"]["favorite"] = False
+    pickcenter["awayTeamOdds"]["favorite"] = False
+    pickcenter["moneyLine"] = -160
+
+    row = espn_summary_to_rows(payload).iloc[0]
+
+    assert row["favorite_side"] is None
+    assert not bool(row["covered"])
+
+
+def test_espn_summary_to_rows_omitted_spread_and_flags_is_unattributed() -> None:
+    payload = _espn_summary_payload(favorite_home=True)
+    pickcenter = payload["pickcenter"][0]
+    del pickcenter["spread"]
+    pickcenter["homeTeamOdds"]["favorite"] = False
+    pickcenter["awayTeamOdds"]["favorite"] = False
+    pickcenter["moneyLine"] = -160
+
+    row = espn_summary_to_rows(payload).iloc[0]
+
+    assert row["favorite_side"] is None
+    assert not bool(row["covered"])
+
+
+def test_espn_summary_to_rows_favorite_flag_overrides_spread() -> None:
+    payload = _espn_summary_payload(favorite_home=True)
+    pickcenter = payload["pickcenter"][0]
+    pickcenter["spread"] = 1.5
+
+    row = espn_summary_to_rows(payload).iloc[0]
+
+    assert row["favorite_side"] == "home"
+    assert bool(row["covered"])
 
 
 def test_espn_game_odds_client_uses_transport(tmp_path: Path) -> None:

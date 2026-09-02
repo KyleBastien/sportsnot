@@ -551,4 +551,7 @@ def test_evaluate_series_sim_manifest_and_report() -> None:
     assert manifest["seed"] == 1
     assert manifest["test_years"] == [2020, 2021]
     assert "series_model" in manifest["brier"]
-    assert any("series simulator" in line.lower() for line in result.report_lines())
+    report = result.report_lines()
+    assert any("series simulator" in line.lower() for line in report)
+    assert any("With 2 playoff series held out" in line for line in report)
+    assert not any("~40" in line for line in report)

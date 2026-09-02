@@ -59,6 +59,9 @@ in the sheets was a one-time favor). The simulator and optimizer must never assu
 - Config/overrides: YAML via **pyyaml**.
 - Seeds: every stochastic component takes an explicit seed; artifact manifests record
   them. `oracle` entry points must be deterministic given (snapshot, seed).
+- Rebuilds reproduce to float-ULP across platforms and byte-identically on the
+  generating platform; run manifests record OS, Python, numpy, and generating flags
+  for like-for-like comparison.
 
 ## 4. Directory contract
 
@@ -128,8 +131,10 @@ playoff windows in 2020/2021, team-name variants, ending-year season labels, pre
 rows). Two committed sources: SBR workbooks (2016-17 – 2021-22 complete with both-side
 Open/Close moneylines — preferred where present; 2022-23 partial) and the Kaggle/ESPN
 file (2004 – Dec 2025 with favorite-side moneyline only, playoffs included through
-2024-25). The 2025-26 completion (Dec 2025 - June 2026, incl. the full 2026 playoffs, 100%
-odds fill, DraftKings via ESPN's pickcenter) is committed under
+2024-25). Its repeated game-level spread does not provide trustworthy side attribution,
+so the pipeline carries its 2022-23 onward favorite prices `covered=False`; raw price
+presence is not usable modeled coverage. The 2025-26 completion (Dec 2025 - June 2026,
+incl. the full 2026 playoffs, 100% odds fill, DraftKings via ESPN's pickcenter) is committed under
 `odds-archive/espn-2025-26-completion/` — so committed archives now cover every game
 2004 through June 2026 with no gaps. ESPN's public summary endpoint
 (`site.api.espn.com/.../summary?event=<id>`, `pickcenter` block; note: browser-like

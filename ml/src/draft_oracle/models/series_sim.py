@@ -748,7 +748,8 @@ class SeriesSimResult:
         lines += [
             "",
             "## Honesty note (SPEC section 7)",
-            "Metrics are reported exactly as measured. With ~40 playoff series held out the",
+            f"Metrics are reported exactly as measured. With {self.n_series_scored} playoff "
+            "series held out the",
             "sample is small, so the series-winner Brier is noisy and may not beat the",
             "higher-seed baseline every split; the number is printed as-is. Series prices",
             "are unavailable, so per-game probabilities come from the stat-only win model.",

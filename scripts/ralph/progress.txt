@@ -3,6 +3,13 @@ Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior 
 ---
 
 ## Codebase Patterns
+- Projection run manifests record resolved generating flags plus OS/Python/numpy
+  versions. Rebuilds target float-ULP equality across platforms and byte identity on
+  the generating platform. Combined R3+R4 team tables keep `e_wins`, `e_games`, and
+  `e_shutout_wins` R3-only while `e_goalie_points` carries the documented fold.
+- Evaluation reports must disclose excluded events and reasons. In opponent membership
+  replay, missing snake order is an explicit manifest/report exclusion, never a silent
+  drop.
 - Guard globally keyed overrides with structured ids plus `expected_matches`.
   `match-drafts` counts skaters by the effective lookup name (`corrected_name` when
   present, else raw) and team overrides by the first matching G-slot team/raw
@@ -875,4 +882,40 @@ Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior 
     naming and column subsets belong in thin adapters.
   - Pin evaluation counts as well as accuracies. League-blind grouping can discard
     teacher-forced picks even when an aggregate accuracy still looks plausible.
+---
+
+## 2026-09-02T08:11:15Z - US-405
+- Fixed live ESPN favorite attribution: authoritative per-side flags now beat spread;
+  missing/None/blank attribution yields an uncovered row instead of default-away.
+- Made series-sim honesty text use `counts.series_scored`. Documented and tested the
+  goalie-column contract: single rounds recompute as `2*e_wins + 2*e_shutout_wins`;
+  combined R3+R4 folds only `e_goalie_points` while companion columns stay R3-only.
+- Added projection-manifest generating flags and OS/Python/numpy metadata. Updated
+  reproducibility language to float-ULP across platforms and byte identity on the
+  generating platform.
+- Added explicit opponent membership exclusions to report/manifest output; real data
+  confirms `2025 R1 (The Gemmell Cup): no snake order in sheet` as the sole exclusion.
+- Corrected SPEC and odds provenance: raw Kaggle/ESPN favorite prices from 2022-23
+  onward remain `covered=False`; raw price presence is not modeled coverage.
+- No committed reports/manifests/projection fixtures regenerated; US-406 owns the final
+  clean-HEAD one-pass evidence rebuild.
+- Quality gates passed: ruff, mypy, 758 ML tests, Nx affected lint/typecheck, 380
+  monorepo unit tests, web build, and 96 Playwright tests.
+- Normal commit hook reached CodeScene and failed only because neither `CODESCENE_PAT`
+  nor `CODESCENE_ACCESS_TOKEN` was available. All other required checks passed
+  independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `AGENTS.md`, `ml/README.md`, `ml/SPEC.md`,
+  `ml/data/raw/odds-archive/PROVENANCE.md`,
+  `ml/src/draft_oracle/cli/project.py`, `ml/src/draft_oracle/ingest/odds.py`,
+  `ml/src/draft_oracle/models/series_sim.py`,
+  `ml/src/draft_oracle/optimize/opponents.py`,
+  `ml/src/draft_oracle/projection_artifact.py`, five ML test files,
+  `scripts/ralph/prd.json`, and `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - Distinguish raw odds-file fill from pipeline `covered` state; unattributed prices
+    stay audit-only even when numerically populated.
+  - Report writers should derive narrative counts from the same result fields used by
+    manifests; duplicated prose constants drift.
+  - US-406 must regenerate every committed evidence artifact together so new manifest
+    fields and report disclosures share one clean source SHA.
 ---

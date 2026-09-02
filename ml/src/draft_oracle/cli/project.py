@@ -521,6 +521,7 @@ def project(
             seed=seed,
             managers=managers,
             ir=ir,
+            no_refresh=no_refresh,
             slot_strategies=slot_strategies,
             slot_strategy_config=SlotStrategyConfig(seed=seed, rollouts=slot_rollouts),
         ),

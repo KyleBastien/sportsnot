@@ -368,8 +368,9 @@ one row). Odds columns are **game-level, repeated identically on both rows**:
 - `favorite_moneyline` — the favorite's American-odds price (single side only; the
   underdog price is NOT present, so exact de-vigging is impossible — treat as a
   monotone win-probability proxy or apply a documented standard-overround assumption)
-- `spread` — puck line for the row's team; the favorite's row carries the negative
-  spread, which identifies which team the moneyline belongs to
+- `spread` — game-level puck line repeated identically on both team rows. It does not
+  identify which row owns the favorite moneyline, so the production parser refuses
+  to infer a side from it.
 - `over_under` — game total
 - `season` — the season's ENDING year (season 2025 = 2024-25); September rows are
   preseason, so filter by joining to the real NHL schedule
@@ -386,19 +387,25 @@ one row). Odds columns are **game-level, repeated identically on both rows**:
 - **Season 2025-26 ends 2025-12-11** — the 2026 playoffs are NOT in this file
 - The favorite moneyline is identical on both rows of all 29,417 two-row games
 
-### Updated coverage picture
+### Updated raw-price picture and pipeline disposition
 
-| Seasons | Game moneylines | Source |
-|---|---|---|
-| 2004 – 2015-16 | favorite price only | Kaggle/ESPN file |
-| 2016-17 – 2021-22 | both-side Open/Close (preferred) + favorite price (cross-check) | SBR workbooks + Kaggle/ESPN file |
-| 2022-23 | SBR through Nov 2022 only; favorite price for the full season incl. playoffs | both |
-| 2023-24 – 2024-25 | favorite price only, playoffs included | Kaggle/ESPN file |
-| 2025-26 regular season (to Dec 11) | favorite price only | Kaggle/ESPN file |
-| **2025-26 playoffs and beyond** | **fetchable live: ESPN summary API** (`site.api.espn.com/.../summary?event=<id>`, `pickcenter` block) — same host already pinned for injuries; US-005 ingests these directly | ESPN API |
+Raw price presence is not modeled coverage. The production pipeline carries the
+Kaggle/ESPN favorite-only rows from 2022-23 onward `covered=False` because the repeated
+spread does not provide trustworthy side attribution. They remain committed for audit;
+they do not become model features. This differs from §9's ESPN completion, whose raw
+summaries retain authoritative per-side `favorite` flags.
 
-The overlap seasons (2016-17 – 2021-22) double as a cross-validation set between the
-two sources.
+| Seasons | Raw game moneylines | Pipeline disposition | Source |
+|---|---|---|---|
+| 2004 – 2015-16 | favorite price only | audit-only favorite rows | Kaggle/ESPN file |
+| 2016-17 – 2021-22 | both-side Open/Close (preferred) + favorite price | SBR covered; Kaggle audit-only | SBR workbooks + Kaggle/ESPN file |
+| 2022-23 | SBR through Nov 2022; favorite price for full season incl. playoffs | SBR window covered; Kaggle `covered=False` | both |
+| 2023-24 – 2024-25 | favorite price only, playoffs included | `covered=False` | Kaggle/ESPN file |
+| 2025-26 regular season (to Dec 11) | favorite price only | `covered=False` | Kaggle/ESPN file |
+| **2025-26 playoffs and beyond** | **fetchable live: ESPN summary API** (`site.api.espn.com/.../summary?event=<id>`, `pickcenter` block) | covered only with authoritative flag or usable home-relative spread | ESPN API |
+
+The overlap seasons remain useful for source auditing, but unattributed Kaggle prices
+are not admitted as modeled coverage.
 
 ---
 
@@ -577,7 +584,7 @@ A round-1 playoff pair and the Cup clincher:
 Note `Utah Mammoth` — a team name that exists in no other file here, and one more
 reason the team-name mapping in §3.4 needs to be per-source.
 
-### Coverage picture after this addition
+### Raw-price picture after this addition
 
 | Seasons | Game moneylines | Source |
 |---|---|---|
@@ -588,10 +595,11 @@ reason the team-name mapping in §3.4 needs to be per-source.
 | 2025-26 to 2025-12-11 | favorite price only | Kaggle/ESPN file |
 | **2025-26 from 2025-12-12, incl. all 82 playoff games** | **favorite price, 100% filled, side identifiable via `spread` sign** | **this section** |
 
-**All ten of the originally requested seasons (2016-17 … 2025-26) now have game
-moneyline coverage, playoffs included.** The one remaining hole is the front half of
-2022-23 for *both-side* Open/Close prices, which only SBR carried and which SBR never
-published.
+**All ten of the originally requested seasons (2016-17 … 2025-26) now have raw game
+moneyline files, playoffs included.** This is not equivalent to modeled coverage:
+Kaggle/ESPN favorite prices from 2022-23 onward remain `covered=False`; §9's completion
+is attributable through raw per-side flags. The remaining hole is the front half of
+2022-23 for *both-side* Open/Close prices, which only SBR carried and never published.
 
 ---
 

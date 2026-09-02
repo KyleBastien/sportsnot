@@ -27,6 +27,7 @@ from draft_oracle.ingest.normalize import create_snapshot
 from draft_oracle.models.series_sim import HOME_ICE_PATTERN
 from draft_oracle.models.skater_production import SkaterProductionConfig
 from draft_oracle.projection_artifact import (
+    _COMBINED_CHEATSHEET_NOTE,
     LIVE_PROJECTION_VERSION,
     SKATER_COLUMNS,
     TEAM_COLUMNS,
@@ -381,6 +382,32 @@ def test_build_projection_artifact_shapes_and_columns() -> None:
     assert len(result.teams) == 2
     assert set(result.teams["team_abbrev"]) == {"AAA", "DDD"}
     assert result.manifest["counts"]["eligible_series"] == 1
+    assert result.manifest["cli_flags"] == {
+        "managers": 4,
+        "ir": False,
+        "seed": 20260827,
+        "no_refresh": None,
+        "slot_strategies": True,
+        "slot_rollouts": 60,
+        "combine_final_rounds": True,
+        "n_sims": 300,
+        "horizon": 7,
+    }
+    assert set(result.manifest["platform"]) == {
+        "os",
+        "os_release",
+        "machine",
+        "python",
+        "numpy",
+    }
+    assert all(result.manifest["platform"].values())
+
+
+def test_combined_cheatsheet_note_documents_team_column_contract() -> None:
+    assert "e_goalie_points is combined R3+R4" in _COMBINED_CHEATSHEET_NOTE
+    assert "e_wins, e_games, and e_shutout_wins remain R3-only" in (
+        _COMBINED_CHEATSHEET_NOTE
+    )
 
 
 def test_round_one_has_no_combined_event() -> None:
@@ -813,8 +840,19 @@ def test_cli_project_runs_offline(tmp_path: Path) -> None:
             "--artifacts-root",
             str(tmp_path / "artifacts"),
             "--no-refresh",
+            "--no-slot-strategies",
+            "--slot-rollouts",
+            "17",
         ],
     )
     assert result.exit_code == 0, result.output
     assert "Projection artifact ->" in result.output
     assert (tmp_path / "artifacts" / "2022-r1" / "skaters.parquet").exists()
+    manifest = json.loads(
+        (tmp_path / "artifacts" / "2022-r1" / "run_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["cli_flags"]["no_refresh"] is True
+    assert manifest["cli_flags"]["slot_strategies"] is False
+    assert manifest["cli_flags"]["slot_rollouts"] == 17

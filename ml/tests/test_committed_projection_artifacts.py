@@ -123,7 +123,7 @@ def test_committed_2026_projection_artifact_structure(round_number: int) -> None
 
 
 def test_committed_2026_r3_combined_event_decomposition() -> None:
-    _, _, _, manifest = _artifact(3)
+    _, _, teams, manifest = _artifact(3)
     combined = manifest["combined_event"]
 
     assert combined["draft_event"] == "R3_4"
@@ -137,6 +137,31 @@ def test_committed_2026_r3_combined_event_decomposition() -> None:
         assert team["e_goalie_points_combined"] == pytest.approx(
             expected, abs=MANIFEST_COMBINED_ATOL
         )
+        table_row = teams.loc[teams["team_abbrev"].eq(team["team_abbrev"])].iloc[0]
+        assert table_row["e_goalie_points"] == pytest.approx(
+            team["e_goalie_points_combined"], abs=MANIFEST_COMBINED_ATOL
+        )
+        r3_goalie_points = 2.0 * (
+            float(table_row["e_wins"]) + float(table_row["e_shutout_wins"])
+        )
+        assert r3_goalie_points == pytest.approx(
+            team["e_goalie_points_r3"], abs=MANIFEST_COMBINED_ATOL
+        )
+
+
+@pytest.mark.parametrize("round_number", [1, 2, 4])
+def test_committed_single_round_goalie_columns_recompute_points(
+    round_number: int,
+) -> None:
+    _, _, teams, _ = _artifact(round_number)
+    recomputed = 2.0 * (teams["e_wins"] + teams["e_shutout_wins"])
+
+    np.testing.assert_allclose(
+        teams["e_goalie_points"],
+        recomputed,
+        rtol=CSV_FLOAT_RTOL,
+        atol=CSV_FLOAT_ATOL,
+    )
 
 
 def test_committed_2026_r1_board_reflects_regenerated_model_inputs() -> None:

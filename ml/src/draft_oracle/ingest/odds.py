@@ -1725,8 +1725,10 @@ def espn_summary_to_rows(summary: Mapping[str, Any]) -> pd.DataFrame:
     """Convert one ESPN ``summary`` payload into a favorite-only odds row.
 
     Reads ``header.competitions[0]`` for the teams/date and ``pickcenter[0]``
-    for the favorite moneyline and home-relative spread (``spread < 0`` ⇒ home
-    favorite - PROVENANCE §9). Missing/blank prices are flagged, not imputed.
+    for the favorite moneyline and authoritative per-side favorite flag. A usable
+    home-relative spread (``spread < 0`` ⇒ home favorite - PROVENANCE §9) is only
+    the fallback when neither side is flagged. Missing/blank prices or attribution
+    are flagged, not imputed.
     """
     competitions = _dig(summary, "header", "competitions")
     if not isinstance(competitions, list) or not competitions:
@@ -1753,13 +1755,17 @@ def espn_summary_to_rows(summary: Mapping[str, Any]) -> pd.DataFrame:
 
     pickcenter = summary.get("pickcenter") if isinstance(summary, Mapping) else None
     fav_ml: float | None = None
+    favorite_side: str | None = None
     home_relative_spread: float | None = None
     if isinstance(pickcenter, list) and pickcenter:
         first = pickcenter[0]
         if isinstance(first, dict):
             fav_ml = _pickcenter_favorite_ml(first)
+            favorite_side = _pickcenter_favorite_side(first)
             home_relative_spread = _american(first.get("spread"))
-    if fav_ml is None:
+            if favorite_side is None and home_relative_spread not in (None, 0.0):
+                favorite_side = "home" if home_relative_spread < 0 else "away"
+    if fav_ml is None or favorite_side is None:
         return _finalize(
             [
                 _uncovered_row(
@@ -1774,9 +1780,6 @@ def espn_summary_to_rows(summary: Mapping[str, Any]) -> pd.DataFrame:
                 )
             ]
         )
-    favorite_side = (
-        "home" if (home_relative_spread is not None and home_relative_spread < 0) else "away"
-    )
     return _finalize(
         [
             _favorite_only_row(

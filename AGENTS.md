@@ -246,6 +246,11 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   tolerance in `test_committed_projection_artifacts.py`.
 - Combined-event manifest components are independently serialized to six decimal
   places. Formula decomposition assertions need `3e-6` absolute tolerance.
+- Projection run manifests persist resolved generating flags plus OS/Python/numpy
+  versions. Rebuilds target float-ULP equality across platforms and byte identity on
+  the generating platform. In combined R3+R4 team tables, only `e_goalie_points` is
+  combined; `e_wins`, `e_games`, and `e_shutout_wins` remain R3-only and the manifest
+  carries the recomputable fold.
 - Keep imports in `draft_oracle.cli.project` lightweight. Import training and HTTP
   modules inside command bodies so draft-time commands start without LightGBM,
   scikit-learn, or httpx. Keep `draft_oracle.optimize` package re-exports lazy and
@@ -281,6 +286,8 @@ gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
   `event_keys`. App rows remain authoritative, but missing app skater `team_id` values
   inherit an unambiguous sheet match on `(league event, manager, player_id)` before
   sheet rows are dropped; existing app ids and goalie/team rows stay untouched.
+- Opponent evaluation manifests/reports list every membership event excluded from
+  replay and its reason; missing snake order must never disappear silently.
 - Recommend vectorized kernels must match object policies on exact ties
   (`rank_value` descending, then asset key ascending) and keep fitted `need_weight`
   per manager. Fitted CLI output must disclose league-average/no-affinity fallback

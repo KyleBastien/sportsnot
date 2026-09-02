@@ -358,6 +358,29 @@ def test_membership_report_and_manifest_shapes() -> None:
     assert any("Held-out validation" in line for line in lines)
 
 
+def test_membership_report_discloses_event_without_snake_order() -> None:
+    picks = _affinity_league((2024, 2025, 2026))
+    picks["league_name"] = "The Gemmell Cup"
+    picks["source"] = "sheet"
+    missing_order = picks["season"].eq(2025) & picks["draft_event"].eq("R1")
+    picks.loc[missing_order, "snake_slot"] = pd.NA
+
+    result = evaluate_opponents(picks, OpponentFitConfig(min_manager_picks=4))
+
+    assert [exclusion.manifest() for exclusion in result.membership_exclusions] == [
+        {
+            "season": 2025,
+            "draft_event": "R1",
+            "league_name": "The Gemmell Cup",
+            "reason": "no snake order in sheet",
+        }
+    ]
+    assert any(
+        "2025 R1 (The Gemmell Cup): no snake order in sheet" in line
+        for line in result.report_lines()
+    )
+
+
 # ── Duplicate-event dedupe + league isolation (US-106) ─────────────────────
 
 _REAL_LEAGUE_PICKS = Path("data/normalized/league_draft_picks.parquet")

@@ -83,6 +83,7 @@ __all__ = [
     "Coefficients",
     "FittedLeagueOpponents",
     "FittedOpponentModel",
+    "MembershipExclusion",
     "MembershipScore",
     "OpponentEvalResult",
     "OpponentFitConfig",
@@ -877,6 +878,50 @@ class PerPickScore:
     k: int
 
 
+@dataclass(frozen=True)
+class MembershipExclusion:
+    """One draft event omitted from roster-membership validation, with reason."""
+
+    season: int
+    draft_event: str
+    league_name: str | None
+    reason: str
+
+    def manifest(self) -> dict[str, Any]:
+        return {
+            "season": self.season,
+            "draft_event": self.draft_event,
+            "league_name": self.league_name,
+            "reason": self.reason,
+        }
+
+    def report_line(self) -> str:
+        league = f" ({self.league_name})" if self.league_name else ""
+        return f"- {self.season} {self.draft_event}{league}: {self.reason}."
+
+
+def _membership_exclusions(prepared: pd.DataFrame) -> list[MembershipExclusion]:
+    """List events whose incomplete seat order prevents membership replay."""
+    exclusions: list[MembershipExclusion] = []
+    for _, pool in prepared.groupby(_event_keys(prepared), sort=True):
+        if _event_order(pool) is not None:
+            continue
+        first = pool.iloc[0]
+        league_raw = first.get("league_name")
+        league_name = str(league_raw) if pd.notna(league_raw) else None
+        sources = {str(source) for source in pool.get("source", pd.Series(dtype=str)).dropna()}
+        reason = "no snake order in sheet" if sources == {"sheet"} else "no snake order in source"
+        exclusions.append(
+            MembershipExclusion(
+                season=int(first["season"]),
+                draft_event=str(first["draft_event"]),
+                league_name=league_name,
+                reason=reason,
+            )
+        )
+    return exclusions
+
+
 def _membership_for_season(
     picks: pd.DataFrame,
     season: int,
@@ -1028,6 +1073,7 @@ class OpponentEvalResult:
 
     membership: list[MembershipScore]
     per_pick: PerPickScore | None
+    membership_exclusions: list[MembershipExclusion]
 
     @property
     def seasons_beating_fallback(self) -> int:
@@ -1047,6 +1093,9 @@ class OpponentEvalResult:
                 for score in self.membership
             ],
             "seasons_beating_fallback": self.seasons_beating_fallback,
+            "membership_exclusions": [
+                exclusion.manifest() for exclusion in self.membership_exclusions
+            ],
         }
         if self.per_pick is not None:
             data["per_pick"] = {
@@ -1081,6 +1130,15 @@ class OpponentEvalResult:
             f"Seasons where fitted beats the fallback: "
             f"{self.seasons_beating_fallback}/{len(self.membership)}."
         )
+        if self.membership_exclusions:
+            lines.extend(
+                [
+                    "",
+                    "### Events excluded from membership evaluation",
+                    "",
+                    *[exclusion.report_line() for exclusion in self.membership_exclusions],
+                ]
+            )
         if self.per_pick is not None:
             pp = self.per_pick
             lines.extend(
@@ -1102,6 +1160,7 @@ def evaluate_opponents(
     """Run leave-one-season-out membership + true-order per-pick validation."""
     cfg = config or OpponentFitConfig()
     prepared = _prepare_picks(picks)
+    exclusions = _membership_exclusions(prepared)
     seasons = sorted(int(s) for s in prepared["season"].unique())
     membership: list[MembershipScore] = []
     for season in seasons:
@@ -1109,7 +1168,11 @@ def evaluate_opponents(
         if score is not None:
             membership.append(score)
     per_pick = _per_pick_accuracy(picks, cfg)
-    return OpponentEvalResult(membership=membership, per_pick=per_pick)
+    return OpponentEvalResult(
+        membership=membership,
+        per_pick=per_pick,
+        membership_exclusions=exclusions,
+    )
 
 
 # ── Artifact driver ────────────────────────────────────────────────────────

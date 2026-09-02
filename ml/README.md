@@ -642,18 +642,26 @@ uv run oracle project --season 2026 --round 1 --managers 12 --no-slot-strategies
   availability_multiplier, injured, low_confidence`.
 - `teams.{parquet,csv}` — `team_id, team_abbrev, opponent_abbrev, is_top_seed,
   playoff_round, p_series_win, e_wins, e_games, e_goalie_points (goalie slot),
-  e_shutout_wins` (goalie slot = a whole team's goaltending, SPEC §1).
+  e_shutout_wins` (goalie slot = a whole team's goaltending, SPEC §1). In normal
+  single-round artifacts, `e_goalie_points = 2*e_wins + 2*e_shutout_wins`. In the
+  combined R3+R4 artifact only, `e_goalie_points` spans both rounds; `e_wins`,
+  `e_games`, and `e_shutout_wins` remain R3-only. `run_manifest.json` records the
+  R3, conditional R4, advance-weight, and combined goalie-point decomposition.
 - `cheatsheet.md` — the VOR draft board (US-018): every skater and team priced by
   value over replacement, sorted descending. See below.
 - `slot_strategies.md` — the per-slot draft plan (US-023): one plan per snake slot
   `1..N`. See below.
 - `run_manifest.json` — snapshot id, every sub-model version, feature version, git
-  SHA, seeds, the VOR scarcity summary, the per-slot summary, and a UTC timestamp.
+  SHA, seeds, generating CLI flags (including slot-strategy enablement and rollouts),
+  OS/Python/numpy versions, the VOR scarcity summary, the per-slot summary, and a UTC
+  timestamp.
 
 The wall-clock timestamp and git SHA live **only** in `run_manifest.json`; the
-Parquet payload is byte-identical across reruns on the same snapshot (fixed seeds +
-deterministic ordering). `--no-refresh` skips the idempotent ingest step (offline);
-`--snapshot <id>` pins a frozen snapshot under `data/normalized/snapshots/`.
+same snapshot reproduces to float-ULP across platforms and byte-identically on the
+generating platform (fixed seeds + deterministic ordering). Manifest platform fields
+make like-for-like rebuild comparisons explicit. `--no-refresh` skips the idempotent
+ingest step (offline); `--snapshot <id>` pins a frozen snapshot under
+`data/normalized/snapshots/`.
 
 ## VOR, positional scarcity & cheat sheet (`optimize/vor.py`)
 

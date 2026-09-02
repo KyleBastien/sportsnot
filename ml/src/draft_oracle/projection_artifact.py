@@ -13,8 +13,8 @@ artifact is a directory ``artifacts/<season>-r<round>/`` containing:
   ``e_goalie_points``, ``e_wins``, ``e_games``, ``p_series_win``, and the expected
   shutout wins.
 * ``run_manifest.json`` -- the data snapshot id, every sub-model version, the
-  feature-set version, the git SHA, the seeds, the VOR scarcity summary, and a UTC
-  timestamp.
+  feature-set version, git SHA, seeds, generating CLI flags, OS/Python/numpy
+  versions, the VOR scarcity summary, and a UTC timestamp.
 * ``cheatsheet.md`` -- the value-over-replacement (VOR) draft board (US-018): every
   skater and team priced against its position's replacement level and sorted by VOR.
 
@@ -37,19 +37,22 @@ Composition (no new estimator is learned here):
    **projection** (US-016) for its team's length distribution.
 
 Determinism (SPEC section 3): every stochastic step is seeded and the Monte-Carlo
-seed for a skater is derived from ``(seed, season, round, player)``, so re-running on
-the same snapshot reproduces byte-identical Parquet outputs. The wall-clock timestamp
-and git SHA live only in ``run_manifest.json`` -- never in the Parquet payload.
+seed for a skater is derived from ``(seed, season, round, player)``. The same snapshot
+reproduces outputs to float-ULP across platforms and byte-identically on the generating
+platform. The wall-clock timestamp and git SHA live only in ``run_manifest.json`` --
+never in the Parquet payload.
 """
 
 from __future__ import annotations
 
 import json
+import platform
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from draft_oracle import __version__
@@ -178,6 +181,7 @@ class ProjectArtifactConfig:
     ir: bool = False
     slot_strategies: bool = True
     combine_final_rounds: bool = True
+    no_refresh: bool | None = None
     slot_strategy_config: SlotStrategyConfig | None = field(default=None)
     production_config: SkaterProductionConfig | None = field(default=None)
 
@@ -234,6 +238,12 @@ def _team_meta(team_games: pd.DataFrame) -> dict[int, str]:
 _COMBINED_DRAFT_ROUND = 3
 _COMBINED_SCORED_ROUNDS = (3, 4)
 _EMPTY_LENGTH_PROBS: dict[int, float] = {4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0}
+_COMBINED_CHEATSHEET_NOTE = (
+    "Combined R3+R4 draft: projections span the conference final and the "
+    "conditional Cup Final (weighted by each team's advance probability). In "
+    "teams.csv/parquet, e_goalie_points is combined R3+R4; e_wins, e_games, and "
+    "e_shutout_wins remain R3-only."
+)
 
 
 def _predict_hypothetical_series(
@@ -721,10 +731,7 @@ def build_projection_artifact(
     teams = _finalize_teams(team_rows)
     cheatsheet = build_cheatsheet(skaters, teams, config=config.vor_config)
     if combined_diagnostics is not None:
-        cheatsheet.note = (
-            "Combined R3+R4 draft: projections span the conference final and the "
-            "conditional Cup Final (weighted by each team's advance probability)."
-        )
+        cheatsheet.note = _COMBINED_CHEATSHEET_NOTE
     ir_valuations = _apply_ir_stash(
         skaters, cheatsheet, injuries, length_by_abbrev, train_sk, train_tg, config
     )
@@ -749,6 +756,24 @@ def build_projection_artifact(
             },
             "git_sha": git_sha,
             "seeds": {"base": config.seed, "n_sims": config.n_sims, "horizon": config.horizon},
+            "cli_flags": {
+                "managers": config.managers,
+                "ir": config.ir,
+                "seed": config.seed,
+                "no_refresh": config.no_refresh,
+                "slot_strategies": config.slot_strategies,
+                "slot_rollouts": config.resolved_slot_config.rollouts,
+                "combine_final_rounds": config.combine_final_rounds,
+                "n_sims": config.n_sims,
+                "horizon": config.horizon,
+            },
+            "platform": {
+                "os": platform.system(),
+                "os_release": platform.release(),
+                "machine": platform.machine(),
+                "python": platform.python_version(),
+                "numpy": np.__version__,
+            },
             "generated_at": generated_at or datetime.now(UTC).isoformat(),
             "scarcity": cheatsheet.summary(),
             "counts": {
