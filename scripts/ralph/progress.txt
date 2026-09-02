@@ -3,9 +3,10 @@ Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior 
 ---
 
 ## Codebase Patterns
-- Guard globally keyed player-name overrides with a structured `player_id` plus
-  `expected_matches`; `match-drafts` validates the raw-name corpus count before
-  matching. Legacy scalar ids remain supported for unguarded overrides.
+- Guard globally keyed overrides with structured ids plus `expected_matches`.
+  `match-drafts` counts skaters by the effective lookup name (`corrected_name` when
+  present, else raw) and team overrides by the first matching G-slot team/raw
+  candidate. Legacy scalar ids remain supported for unguarded overrides.
 - When parser diagnostics live in pandas `DataFrame.attrs`, aggregate them before
   concatenation and copy them into the command result object; pandas operations do not
   provide durable user-facing accounting by themselves.
@@ -817,4 +818,28 @@ Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior 
     `DraftSession` and destination path before any autosave.
   - Compare existing resume targets by file identity when possible, with normalized
     path fallback, so alternate spellings of same file remain valid.
+---
+
+## 2026-09-02T07:31:04Z - US-403
+- Made override count guards consume the same keys as matching: skater guards now use
+  `corrected_name` when present, and team guards follow first-match team/raw candidate
+  precedence for G slots.
+- Preserved team `expected_matches` in `NameOverrides` and fail closed on matching or
+  missing G-slot corpus counts. Documented both qualifier contracts in override YAML.
+- Added regressions for the R4 corrected-name bypass, team-count load, matching team
+  count, and mismatch rejection. Real 2024 corpus regression still resolves levi's
+  bare `McDavid` row to Draisaitl `8477934`.
+- Quality gates passed: ruff, mypy, 744 ML tests, Nx affected lint/typecheck, all
+  monorepo unit tests, web build, and 96 Playwright tests.
+- Normal commit hook reached CodeScene and failed only because neither `CODESCENE_PAT`
+  nor `CODESCENE_ACCESS_TOKEN` was available. All other required checks passed
+  independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `AGENTS.md`, `ml/data/overrides/name_overrides.yaml`,
+  `ml/src/draft_oracle/ingest/entity_match.py`, `ml/tests/test_entity_match.py`,
+  `scripts/ralph/prd.json`, and `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - Validation must share lookup precedence with matcher; counting a broader set of
+    candidate names can falsely certify an override matcher never consumes.
+  - Team override guards apply only to G slots; skater team resolution remains
+    best-effort metadata and must not inflate guarded team counts.
 ---

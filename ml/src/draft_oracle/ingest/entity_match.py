@@ -153,6 +153,7 @@ class NameOverrides:
     players: dict[str, int] = field(default_factory=dict)
     teams: dict[str, int] = field(default_factory=dict)
     player_expected_matches: dict[str, int] = field(default_factory=dict)
+    team_expected_matches: dict[str, int] = field(default_factory=dict)
 
 
 def _load_override_section(
@@ -193,35 +194,73 @@ def load_name_overrides(
     players, player_expected_matches = _load_override_section(
         raw.get("players") or {}, id_key="player_id"
     )
-    teams, _team_expected_matches = _load_override_section(
+    teams, team_expected_matches = _load_override_section(
         raw.get("teams") or {}, id_key="team_id"
     )
     return NameOverrides(
         players=players,
         teams=teams,
         player_expected_matches=player_expected_matches,
+        team_expected_matches=team_expected_matches,
     )
 
 
-def _validate_player_override_match_counts(
+def _effective_skater_name(row: Any) -> str:
+    corrected = getattr(row, "corrected_name", None)
+    if corrected is not None and pd.notna(corrected) and str(corrected).strip():
+        return str(corrected)
+    return str(row.player_or_team_name)
+
+
+def _team_candidates(team_name: str | None, raw_name: str | None) -> list[str]:
+    return [c for c in (team_name, raw_name) if c is not None and str(c).strip()]
+
+
+def _team_override_key(
+    team_name: str | None, raw_name: str | None, overrides: NameOverrides
+) -> str | None:
+    for candidate in _team_candidates(team_name, raw_name):
+        key = normalize_name(candidate)
+        if key in overrides.teams:
+            return key
+    return None
+
+
+def _validate_override_match_counts(
     league_picks: pd.DataFrame, overrides: NameOverrides
 ) -> None:
-    """Fail when a guarded raw-name override matches an unexpected row count."""
-    if not overrides.player_expected_matches:
-        return
-    actual = dict.fromkeys(overrides.player_expected_matches, 0)
+    """Fail when a guarded override matches an unexpected league-pick count."""
+    player_actual = dict.fromkeys(overrides.player_expected_matches, 0)
+    team_actual = dict.fromkeys(overrides.team_expected_matches, 0)
     for row in league_picks.itertuples(index=False):
-        if str(row.position) not in _SKATER_POSITIONS:
-            continue
-        key = normalize_name(str(row.player_or_team_name))
-        if key in actual:
-            actual[key] += 1
+        if str(row.position) in _SKATER_POSITIONS:
+            key = normalize_name(_effective_skater_name(row))
+            if key in player_actual:
+                player_actual[key] += 1
+        elif str(row.position) == "G":
+            raw_name = str(row.player_or_team_name)
+            raw_team_name = getattr(row, "team_name", None)
+            team_name = (
+                str(raw_team_name)
+                if raw_team_name is not None and pd.notna(raw_team_name)
+                else None
+            )
+            team_key = _team_override_key(team_name, raw_name, overrides)
+            if team_key in team_actual:
+                team_actual[team_key] += 1
     for key, expected in overrides.player_expected_matches.items():
-        observed = actual[key]
+        observed = player_actual[key]
         if observed != expected:
             raise ValueError(
                 f"name override {key!r} expected {expected} league-pick match(es), "
                 f"found {observed}"
+            )
+    for key, expected in overrides.team_expected_matches.items():
+        observed = team_actual[key]
+        if observed != expected:
+            raise ValueError(
+                f"team override {key!r} expected {expected} G-slot league-pick "
+                f"match(es), found {observed}"
             )
 
 
@@ -265,12 +304,11 @@ def resolve_team(
     Resolution order: manual override, then ``odds.resolve_team_id`` (city / full
     name / abbrev), then a nickname fallback on the final word.
     """
-    candidates = [c for c in (team_name, raw_name) if c is not None and str(c).strip()]
+    candidates = _team_candidates(team_name, raw_name)
     if overrides is not None:
-        for candidate in candidates:
-            hit = overrides.teams.get(normalize_name(candidate))
-            if hit is not None:
-                return hit
+        override_key = _team_override_key(team_name, raw_name, overrides)
+        if override_key is not None:
+            return overrides.teams[override_key]
     for candidate in candidates:
         tid = resolve_team_id(candidate)
         if tid is not None:
@@ -662,7 +700,7 @@ def build_league_draft_picks(
     index = build_player_index(players)
     manager_aliases = load_manager_aliases(overrides_dir / "manager_aliases.yaml")
     overrides = load_name_overrides(overrides_dir / "name_overrides.yaml")
-    _validate_player_override_match_counts(league_picks, overrides)
+    _validate_override_match_counts(league_picks, overrides)
     archive_points = _archive_round_points(skater_games)
 
     team_names: dict[int, str] = {
@@ -677,12 +715,7 @@ def build_league_draft_picks(
     for row in league_picks.itertuples(index=False):
         position = str(row.position)
         raw_name = str(row.player_or_team_name)
-        corrected = getattr(row, "corrected_name", None)
-        skater_name = (
-            str(corrected)
-            if corrected is not None and pd.notna(corrected) and str(corrected).strip()
-            else raw_name
-        )
+        skater_name = _effective_skater_name(row)
         team_name = (
             str(row.team_name)
             if getattr(row, "team_name", None) is not None and pd.notna(row.team_name)

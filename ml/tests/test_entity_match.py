@@ -140,6 +140,23 @@ def test_load_name_overrides_reads_expected_match_guard(tmp_path: Path) -> None:
     assert ov.player_expected_matches == {"mcdavid": 1}
 
 
+def test_load_name_overrides_reads_team_expected_match_guard(tmp_path: Path) -> None:
+    path = tmp_path / "ov.yaml"
+    path.write_text(
+        "players: {}\n"
+        "teams:\n"
+        "  'Mystery Club':\n"
+        "    team_id: 13\n"
+        "    expected_matches: 2\n",
+        encoding="utf-8",
+    )
+
+    ov = load_name_overrides(path)
+
+    assert ov.teams["mysteryclub"] == 13
+    assert ov.team_expected_matches == {"mysteryclub": 2}
+
+
 def test_load_name_overrides_missing_file_is_empty(tmp_path: Path) -> None:
     ov = load_name_overrides(tmp_path / "absent.yaml")
     assert ov == NameOverrides()
@@ -507,6 +524,102 @@ def test_name_override_expected_match_guard_rejects_second_raw_name(
     )
 
     with pytest.raises(ValueError, match=r"expected 1 league-pick match.*found 2"):
+        build_league_draft_picks(
+            normalized_dir=normalized,
+            overrides_dir=tmp_path,
+            out_dir=tmp_path / "out",
+        )
+
+
+def test_name_override_guard_counts_corrected_name_used_by_matcher(
+    tmp_path: Path,
+) -> None:
+    normalized = tmp_path / "normalized"
+    _write_normalized(normalized)
+    pd.DataFrame(
+        [
+            _league_pick(
+                season=2024,
+                draft_event="R3_4",
+                player_or_team_name="McDavid",
+                corrected_name="Connor McDavid",
+            )
+        ]
+    ).to_parquet(normalized / "league_picks.parquet", index=False)
+    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
+    (tmp_path / "name_overrides.yaml").write_text(
+        "players:\n"
+        "  McDavid:\n"
+        "    player_id: 8477934\n"
+        "    expected_matches: 1\n"
+        "teams: {}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"expected 1 league-pick match.*found 0"):
+        build_league_draft_picks(
+            normalized_dir=normalized,
+            overrides_dir=tmp_path,
+            out_dir=tmp_path / "out",
+        )
+
+
+def test_team_override_guard_accepts_matching_g_slot_count(tmp_path: Path) -> None:
+    normalized = tmp_path / "normalized"
+    _write_normalized(normalized)
+    pd.DataFrame(
+        [
+            _league_pick(
+                position="G",
+                slot_label="Goalie 1",
+                player_or_team_name="Mystery Goalie",
+                team_name="Mystery Club",
+            )
+        ]
+    ).to_parquet(normalized / "league_picks.parquet", index=False)
+    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
+    (tmp_path / "name_overrides.yaml").write_text(
+        "players: {}\n"
+        "teams:\n"
+        "  'Mystery Club':\n"
+        "    team_id: 13\n"
+        "    expected_matches: 1\n",
+        encoding="utf-8",
+    )
+
+    result = build_league_draft_picks(
+        normalized_dir=normalized,
+        overrides_dir=tmp_path,
+        out_dir=tmp_path / "out",
+    )
+
+    assert int(result.picks.iloc[0]["team_id"]) == 13
+
+
+def test_team_override_guard_rejects_wrong_g_slot_count(tmp_path: Path) -> None:
+    normalized = tmp_path / "normalized"
+    _write_normalized(normalized)
+    pd.DataFrame(
+        [
+            _league_pick(
+                position="G",
+                slot_label="Goalie 1",
+                player_or_team_name="Mystery Goalie",
+                team_name="Mystery Club",
+            )
+        ]
+    ).to_parquet(normalized / "league_picks.parquet", index=False)
+    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
+    (tmp_path / "name_overrides.yaml").write_text(
+        "players: {}\n"
+        "teams:\n"
+        "  'Mystery Club':\n"
+        "    team_id: 13\n"
+        "    expected_matches: 2\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"expected 2 G-slot.*found 1"):
         build_league_draft_picks(
             normalized_dir=normalized,
             overrides_dir=tmp_path,
