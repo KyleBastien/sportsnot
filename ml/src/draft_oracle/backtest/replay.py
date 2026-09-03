@@ -57,7 +57,7 @@ from draft_oracle.backtest._replay_opponents import (
     _fit_opponents_for_season,
     _managers_and_opponents,
 )
-from draft_oracle.backtest._replay_playout import _play_oracle_draft
+from draft_oracle.backtest._replay_playout import _OracleDraftRequest, _play_oracle_draft
 from draft_oracle.backtest._replay_scoring import (
     ScoreContext,
     _score_active_roster,
@@ -246,12 +246,14 @@ def _simulate_slot_results(
             for draft_index in range(config.n_drafts):
                 draft_seed = config.seed + draft_index
                 final = _play_oracle_draft(
-                    base_state,
-                    oracle,
-                    strategy,
-                    opponent_model,
-                    config,
-                    draft_seed,
+                    _OracleDraftRequest(
+                        base_state,
+                        oracle,
+                        strategy,
+                        opponent_model,
+                        config,
+                        draft_seed,
+                    )
                 )
                 opponent_points = {
                     manager: _score_active_roster(final, manager, score_context)

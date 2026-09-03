@@ -19,6 +19,16 @@ class _OraclePickRequest:
     config: BacktestConfig
 
 
+@dataclass(frozen=True)
+class _OracleDraftRequest:
+    base_state: DraftState
+    oracle: str
+    strategy: Strategy
+    opponent_model: OpponentModel | dict[str, OpponentModel]
+    config: BacktestConfig
+    seed: int
+
+
 def _oracle_pick(request: _OraclePickRequest, rng: random.Random) -> DraftAsset:
     """The asset the oracle drafts under ``strategy`` at the current slot."""
     if request.strategy == "random_legal":
@@ -35,30 +45,29 @@ def _oracle_pick(request: _OraclePickRequest, rng: random.Random) -> DraftAsset:
     return choose_pick(request.state, request.oracle, request.opponent_model, config=cfg)
 
 
-def _play_oracle_draft(
-    base_state: DraftState,
-    oracle: str,
-    strategy: Strategy,
-    opponent_model: OpponentModel | dict[str, OpponentModel],
-    config: BacktestConfig,
-    seed: int,
-) -> DraftState:
+def _play_oracle_draft(request: _OracleDraftRequest) -> DraftState:
     """Play a full draft with ``oracle`` seated under ``strategy`` vs. opponents.
 
     Opponents draw from one seeded ``rng`` so the whole playout is determined by
     ``(base_state, seed)``; the oracle's own policy is deterministic given the state.
     """
-    state = base_state.copy()
-    rng = random.Random(seed)
+    state = request.base_state.copy()
+    rng = random.Random(request.seed)
     while not state.is_complete:
         current = state.current_manager
-        if current == oracle:
+        if current == request.oracle:
             asset = _oracle_pick(
-                _OraclePickRequest(strategy, state, oracle, opponent_model, config),
+                _OraclePickRequest(
+                    request.strategy,
+                    state,
+                    request.oracle,
+                    request.opponent_model,
+                    request.config,
+                ),
                 rng,
             )
         else:
-            model = _resolve_model(opponent_model, current)
+            model = _resolve_model(request.opponent_model, current)
             asset = model.pick(state, current, rng)
         state.apply_pick(asset)
     return state

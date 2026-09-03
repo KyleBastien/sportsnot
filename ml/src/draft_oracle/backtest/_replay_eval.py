@@ -124,10 +124,8 @@ def _series_ids(row: Mapping[Hashable, Any]) -> tuple[int, int, int] | None:
     top_raw = row.get("top_seed_team_id")
     bottom_raw = row.get("bottom_seed_team_id")
     winner_raw = row.get("winning_team_id")
-    missing_top = pd.isna(top_raw)
-    missing_bottom = pd.isna(bottom_raw)
-    missing_winner = pd.isna(winner_raw)
-    if missing_top or missing_bottom or missing_winner:
+    missing_ids = [pd.isna(value) for value in (top_raw, bottom_raw, winner_raw)]
+    if any(missing_ids):
         return None
     assert top_raw is not None and bottom_raw is not None and winner_raw is not None
     return int(top_raw), int(bottom_raw), int(winner_raw)

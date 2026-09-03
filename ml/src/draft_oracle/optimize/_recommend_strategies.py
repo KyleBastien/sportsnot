@@ -179,6 +179,21 @@ class _CompareCtx:
     managers: int
 
 
+@dataclass(frozen=True)
+class CompareStrategiesRequest:
+    pool: Sequence[DraftAsset]
+    managers_list: Sequence[str]
+    owner: str
+    opponent_model: OpponentModel | Mapping[str, OpponentModel]
+    allow_ir: bool = False
+    config: RecommendConfig | None = None
+    n_drafts: int = 200
+    decision_prefix: int | None = None
+    seed: int = 20260827
+    opponent_kind: str = 'greedy'
+    scenario: str = 'balanced fitted opponents'
+
+
 def _decision_pick(ctx: _CompareCtx, state: DraftState, strategy: _Strategy) -> DraftAsset:
     """The single pick ``strategy`` makes for the owner at the current slot."""
     if strategy == "greedy_vor":
@@ -351,20 +366,7 @@ class StrategyComparison:
         }
 
 
-def compare_strategies(
-    pool: Sequence[DraftAsset],
-    managers_list: Sequence[str],
-    owner: str,
-    opponent_model: OpponentModel | Mapping[str, OpponentModel],
-    *,
-    allow_ir: bool = False,
-    config: RecommendConfig | None = None,
-    n_drafts: int = 200,
-    decision_prefix: int | None = None,
-    seed: int = 20260827,
-    opponent_kind: str = "greedy",
-    scenario: str = "balanced fitted opponents",
-) -> StrategyComparison:
+def compare_strategies(request: CompareStrategiesRequest) -> StrategyComparison:
     """Compare multi-step vs. greedy-VOR vs. one-step over ``n_drafts`` seeded drafts.
 
     Single-decision, same-slot framing (acceptance: "from the same slot"): each draft
@@ -375,29 +377,36 @@ def compare_strategies(
     one decision. Honest by construction: one fixed config, every draft counted, no
     per-seed or per-slot cherry-picking (acceptance / SPEC section 7).
     """
-    if n_drafts < 1:
-        raise ValueError(f"n_drafts must be >= 1, got {n_drafts}")
-    cfg = config or RecommendConfig(compute_survival=False)
-    managers = len(managers_list)
-    base = DraftState.new(managers_list, pool, allow_ir=allow_ir)
+    if request.n_drafts < 1:
+        raise ValueError(f"n_drafts must be >= 1, got {request.n_drafts}")
+    cfg = request.config or RecommendConfig(compute_survival=False)
+    managers = len(request.managers_list)
+    base = DraftState.new(request.managers_list, request.pool, allow_ir=request.allow_ir)
     replacement = replacement_levels(base, managers)
-    prefix = decision_prefix if decision_prefix is not None else base.capacity.total // 3
-    ctx = _CompareCtx(owner, opponent_model, replacement, cfg, managers)
-    totals, counted = _accumulate_scores(ctx, _CompareRun(base, prefix, n_drafts, seed))
+    prefix = (
+        request.decision_prefix
+        if request.decision_prefix is not None
+        else base.capacity.total // 3
+    )
+    ctx = _CompareCtx(request.owner, request.opponent_model, replacement, cfg, managers)
+    totals, counted = _accumulate_scores(
+        ctx,
+        _CompareRun(base, prefix, request.n_drafts, request.seed),
+    )
     if counted == 0:
         raise ValueError("no draft reached the decision slot; lower decision_prefix")
     means = {k: v / counted for k, v in totals.items()}
     return StrategyComparison(
         n_drafts=counted,
-        owner=owner,
+        owner=request.owner,
         managers=managers,
-        allow_ir=allow_ir,
+        allow_ir=request.allow_ir,
         rollouts=cfg.rollouts,
         max_candidates=cfg.max_candidates,
-        opponent_kind=opponent_kind,
+        opponent_kind=request.opponent_kind,
         means=means,
-        seed=seed,
-        scenario=scenario,
+        seed=request.seed,
+        scenario=request.scenario,
     )
 
 
@@ -493,29 +502,33 @@ def evaluate_recommendation_strategies_from_normalized(
     cfg = _recommend_compare_config(rollouts=rollouts, max_candidates=max_candidates, seed=seed)
 
     fitted_comparison = compare_strategies(
-        pool,
-        managers_list,
-        owner,
-        fitted.as_mapping(managers_list),
-        allow_ir=allow_ir,
-        config=cfg,
-        n_drafts=n_drafts,
-        seed=seed,
-        opponent_kind="fitted-league",
-        scenario="balanced fitted opponents",
+        CompareStrategiesRequest(
+            pool,
+            managers_list,
+            owner,
+            fitted.as_mapping(managers_list),
+            allow_ir=allow_ir,
+            config=cfg,
+            n_drafts=n_drafts,
+            seed=seed,
+            opponent_kind='fitted-league',
+            scenario='balanced fitted opponents',
+        )
     )
     run_opponent = _PositionRunOpponent(favored="F", bonus=run_bonus)
     run_comparison = compare_strategies(
-        pool,
-        managers_list,
-        owner,
-        run_opponent,
-        allow_ir=allow_ir,
-        config=cfg,
-        n_drafts=n_drafts,
-        seed=seed,
-        opponent_kind="positional-run",
-        scenario="positional-run opponents (forward run)",
+        CompareStrategiesRequest(
+            pool,
+            managers_list,
+            owner,
+            run_opponent,
+            allow_ir=allow_ir,
+            config=cfg,
+            n_drafts=n_drafts,
+            seed=seed,
+            opponent_kind='positional-run',
+            scenario='positional-run opponents (forward run)',
+        )
     )
 
     _write_comparison_artifact(artifact_dir, fitted_comparison, run_comparison)

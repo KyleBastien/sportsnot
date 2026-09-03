@@ -17,6 +17,7 @@ from typing import Literal
 import pandas as pd
 import pytest
 
+from draft_oracle.optimize._recommend_strategies import CompareStrategiesRequest
 from draft_oracle.optimize.opponents import Coefficients, FittedOpponentModel
 from draft_oracle.optimize.recommend import (
     Recommendation,
@@ -572,12 +573,14 @@ def test_compare_strategies_returns_three_means() -> None:
     managers = [f"m{i}" for i in range(4)]
     model = GreedyOpponentModel(temperature=0.5)
     result = compare_strategies(
-        pool,
-        managers,
-        "m0",
-        model,
-        config=RecommendConfig(rollouts=12, max_candidates=5, compute_survival=False),
-        n_drafts=5,
+        CompareStrategiesRequest(
+            pool,
+            managers,
+            "m0",
+            model,
+            config=RecommendConfig(rollouts=12, max_candidates=5, compute_survival=False),
+            n_drafts=5,
+        )
     )
     assert isinstance(result, StrategyComparison)
     assert set(result.means) == {"greedy_vor", "one_step", "multi_step"}
@@ -591,14 +594,16 @@ def test_multi_step_beats_greedy_on_positional_run() -> None:
     managers = [f"m{i}" for i in range(4)]
     run_model = _PositionRunOpponent(favored="F", bonus=12.0)
     result = compare_strategies(
-        pool,
-        managers,
-        "m0",
-        run_model,
-        config=RecommendConfig(rollouts=24, max_candidates=6, compute_survival=False),
-        n_drafts=60,
-        opponent_kind="positional-run",
-        scenario="positional-run",
+        CompareStrategiesRequest(
+            pool,
+            managers,
+            "m0",
+            run_model,
+            config=RecommendConfig(rollouts=24, max_candidates=6, compute_survival=False),
+            n_drafts=60,
+            opponent_kind="positional-run",
+            scenario="positional-run",
+        )
     )
     assert result.means["multi_step"] >= result.means["greedy_vor"] - 0.05
 
