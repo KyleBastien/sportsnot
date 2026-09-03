@@ -49,6 +49,7 @@ from sklearn.preprocessing import StandardScaler
 
 from draft_oracle.features.skater import (
     SkaterFeatureConfig,
+    SkaterFeatureRequest,
     build_skater_features,
 )
 from draft_oracle.models._skater_rounds import (
@@ -236,10 +237,12 @@ def build_production_dataset(
                 skater_games,
                 players,
                 team_games,
-                season_id=season_id,
-                as_of_date=start,
-                playoff_round=rnd,
-                config=feature_config,
+                SkaterFeatureRequest(
+                    season_id=season_id,
+                    as_of_date=start,
+                    playoff_round=rnd,
+                    config=feature_config,
+                ),
             )
             if feats.empty:
                 continue

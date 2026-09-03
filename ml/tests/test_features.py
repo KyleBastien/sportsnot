@@ -19,6 +19,7 @@ from draft_oracle.features import (
     FEATURE_SET_VERSION,
     LeakageError,
     SkaterFeatureConfig,
+    SkaterFeatureRequest,
     age_years,
     as_of,
     assert_no_leakage,
@@ -270,10 +271,16 @@ def test_build_ignores_games_on_or_after_cutoff() -> None:
         ignore_index=True,
     )
     clean = build_skater_features(
-        base, _players(), _team_games(), season_id=SEASON, as_of_date=ROUND1_START
+        base,
+        _players(),
+        _team_games(),
+        SkaterFeatureRequest(season_id=SEASON, as_of_date=ROUND1_START),
     )
     with_leak = build_skater_features(
-        leaked, _players(), _team_games(), season_id=SEASON, as_of_date=ROUND1_START
+        leaked,
+        _players(),
+        _team_games(),
+        SkaterFeatureRequest(season_id=SEASON, as_of_date=ROUND1_START),
     )
     alice_clean = clean.loc[clean["player_id"] == 100, "goals_per_game"].iloc[0]
     alice_leak = with_leak.loc[with_leak["player_id"] == 100, "goals_per_game"].iloc[0]
@@ -288,9 +295,11 @@ def test_build_skater_features_values() -> None:
         _skater_games(),
         _players(),
         _team_games(),
-        season_id=SEASON,
-        as_of_date=ROUND1_START,
-        playoff_round=1,
+        SkaterFeatureRequest(
+            season_id=SEASON,
+            as_of_date=ROUND1_START,
+            playoff_round=1,
+        ),
     )
     assert list(matrix.columns) == list(FEATURE_COLUMNS)
     # Goalie dropped; only F/D remain.
@@ -321,9 +330,7 @@ def test_min_games_filter_drops_thin_samples() -> None:
         _skater_games(),
         _players(),
         _team_games(),
-        season_id=SEASON,
-        as_of_date=ROUND1_START,
-        config=cfg,
+        SkaterFeatureRequest(season_id=SEASON, as_of_date=ROUND1_START, config=cfg),
     )
     # Bob has only 2 reg games; dropped. Alice has 3; kept.
     assert set(matrix["player_id"]) == {100}
@@ -386,8 +393,7 @@ def test_empty_when_no_games_before_cutoff() -> None:
         _skater_games(),
         _players(),
         _team_games(),
-        season_id=SEASON,
-        as_of_date="2023-12-01",
+        SkaterFeatureRequest(season_id=SEASON, as_of_date="2023-12-01"),
     )
     assert matrix.empty
     assert list(matrix.columns) == list(FEATURE_COLUMNS)
@@ -398,9 +404,11 @@ def test_write_feature_matrix_roundtrip(tmp_path: Path) -> None:
         _skater_games(),
         _players(),
         _team_games(),
-        season_id=SEASON,
-        as_of_date=ROUND1_START,
-        playoff_round=1,
+        SkaterFeatureRequest(
+            season_id=SEASON,
+            as_of_date=ROUND1_START,
+            playoff_round=1,
+        ),
     )
     path = write_feature_matrix(matrix, features_dir=tmp_path)
     assert path == tmp_path / FEATURE_SET_VERSION / "skater_features.parquet"
@@ -415,8 +423,7 @@ def test_no_nan_in_output_features() -> None:
         _skater_games(),
         _players(),
         _team_games(),
-        season_id=SEASON,
-        as_of_date=ROUND1_START,
+        SkaterFeatureRequest(season_id=SEASON, as_of_date=ROUND1_START),
     )
     numeric = matrix.select_dtypes(include="number")
     assert not numeric.map(lambda v: isinstance(v, float) and math.isnan(v)).to_numpy().any()

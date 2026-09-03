@@ -72,6 +72,13 @@ VERDICT_STASH = "stash"
 VERDICT_AVOID = "avoid"
 
 
+@dataclass(frozen=True)
+class _StashSimulationInput:
+    pts_per_game: float
+    length_probs: Mapping[int, float]
+    availability_curve: Sequence[float] | None
+
+
 def retroactive_swap_points(ir_points: float, active_points: float) -> float:
     """Points an IR slot pair yields after an *optimal* retroactive activation.
 
@@ -106,9 +113,7 @@ def round_points_with_return(
 
 def simulate_stash_samples(
     rng: np.random.Generator,
-    pts_per_game: float,
-    length_probs: Mapping[int, float],
-    availability_curve: Sequence[float] | None,
+    stash_input: _StashSimulationInput,
     *,
     n_sims: int,
     horizon: int,
@@ -122,11 +127,21 @@ def simulate_stash_samples(
     caller).
     """
     avail = _availability_per_game(
-        list(availability_curve) if availability_curve is not None else None,
+        (
+            list(stash_input.availability_curve)
+            if stash_input.availability_curve is not None
+            else None
+        ),
         1.0,
         horizon,
     )
-    return simulate_round_points(rng, pts_per_game, dict(length_probs), avail, n_sims=n_sims)
+    return simulate_round_points(
+        rng,
+        stash_input.pts_per_game,
+        dict(stash_input.length_probs),
+        avail,
+        n_sims=n_sims,
+    )
 
 
 def value_stash(
@@ -150,7 +165,10 @@ def value_stash(
     """
     rng = np.random.default_rng(seed)
     samples = simulate_stash_samples(
-        rng, pts_per_game, length_probs, availability_curve, n_sims=n_sims, horizon=horizon
+        rng,
+        _StashSimulationInput(pts_per_game, length_probs, availability_curve),
+        n_sims=n_sims,
+        horizon=horizon,
     )
     baseline = float(active_baseline)
     swapped = np.maximum(samples, baseline)

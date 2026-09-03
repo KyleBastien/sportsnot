@@ -23,6 +23,7 @@ from draft_oracle.optimize._recommend_core import (
     _owner_roster_value,
     _prune_candidates,
     _rollout_owner_value,
+    _RolloutInput,
     asset_value,
     replacement_levels,
 )
@@ -487,11 +488,10 @@ def _expected_value(
     rollout count still ranks picks correctly.
     """
     total = 0.0
+    query = _RolloutInput(state, owner, asset, opponent_model, replacement, cfg.depth)
     for rollout in range(cfg.rollouts):
         rng = random.Random(cfg.seed * _ROLLOUT_SALT + rollout)
-        total += _rollout_owner_value(
-            state, owner, asset, opponent_model, replacement, cfg.depth, rng
-        )
+        total += _rollout_owner_value(query, rng)
     return total / cfg.rollouts
 
 

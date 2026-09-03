@@ -10,12 +10,15 @@ fixtures are tiny and deterministic -- no committed data, no network (SPEC secti
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import pytest
 
 from draft_oracle.optimize.ir_value import (
     StashInput,
+    _StashSimulationInput,
     build_stash_valuations,
     healthy_alternative_value,
     render_ir_section,
@@ -129,7 +132,12 @@ def test_value_stash_is_deterministic_given_seed() -> None:
 
 def test_simulate_stash_samples_shape_and_nonnegative() -> None:
     rng = np.random.default_rng(0)
-    samples = simulate_stash_samples(rng, 1.0, _LENGTH_7, [1.0] * 7, n_sims=500, horizon=7)
+    samples = simulate_stash_samples(
+        rng,
+        _StashSimulationInput(1.0, _LENGTH_7, [1.0] * 7),
+        n_sims=500,
+        horizon=7,
+    )
     assert samples.shape == (500,)
     assert float(samples.min()) >= 0.0
 
@@ -169,28 +177,35 @@ def test_healthy_alternative_value_is_small_and_nonnegative() -> None:
 
 
 def _input(
-    player_id: int,
-    position: str,
-    pts_per_game: float,
-    curve: list[float],
-    name: str = "P",
+    case: _StashCase,
 ) -> StashInput:
     return StashInput(
-        player_id=player_id,
-        player_name=name,
-        position=position,
+        player_id=case.player_id,
+        player_name=case.name,
+        position=case.position,
         team_abbrev="AAA",
         status="out",
-        pts_per_game=pts_per_game,
+        pts_per_game=case.pts_per_game,
         length_probs=_LENGTH_7,
-        availability_curve=curve,
-        expected_games_available=float(sum(curve)),
+        availability_curve=case.curve,
+        expected_games_available=float(sum(case.curve)),
     )
 
 
+@dataclass(frozen=True)
+class _StashCase:
+    player_id: int
+    position: str
+    pts_per_game: float
+    curve: list[float]
+    name: str = "P"
+
+
 def test_build_valuations_verdicts_and_ordering() -> None:
-    star = _input(1, "F", 1.6, [1.0] * 7, name="Star")  # healthy-ish, high scorer
-    scrub = _input(2, "F", 0.1, [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0], name="Scrub")
+    star = _input(_StashCase(1, "F", 1.6, [1.0] * 7, name="Star"))
+    scrub = _input(
+        _StashCase(2, "F", 0.1, [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0], name="Scrub")
+    )
     replacement = {"F": 1.2, "D": 0.8}
     vals = build_stash_valuations([scrub, star], replacement, seed=11, n_sims=6000)
 
@@ -204,7 +219,7 @@ def test_build_valuations_verdicts_and_ordering() -> None:
 
 
 def test_defense_swaps_defense_baseline() -> None:
-    d = _input(9, "D", 1.0, [1.0] * 7)
+    d = _input(_StashCase(9, "D", 1.0, [1.0] * 7))
     vals = build_stash_valuations([d], {"F": 5.0, "D": 0.5}, seed=1, n_sims=1000)
     assert vals[0].active_baseline == pytest.approx(0.5)
 
@@ -217,7 +232,7 @@ def test_render_ir_section_empty_is_blank() -> None:
 
 
 def test_render_ir_section_is_ascii_with_verdict() -> None:
-    star = _input(1, "F", 1.6, [1.0] * 7, name="Star")
+    star = _input(_StashCase(1, "F", 1.6, [1.0] * 7, name="Star"))
     vals = build_stash_valuations([star], {"F": 1.0, "D": 1.0}, seed=1, n_sims=1000)
     lines = render_ir_section(vals)
     text = "\n".join(lines)
@@ -231,11 +246,11 @@ def test_render_ir_section_is_ascii_with_verdict() -> None:
 # ── Optimizer pool repricing ─────────────────────────────────────────────
 
 
-def _asset(player_id: int, position: str, projection: float) -> DraftAsset:
+def _asset(player_id: int, position: Literal["F", "D", "G"], projection: float) -> DraftAsset:
     return DraftAsset(
         key=f"P{player_id}",
         name=f"P{player_id}",
-        position=position,  # type: ignore[arg-type]
+        position=position,
         rank_value=projection,
         player_id=player_id,
         team_abbrev="AAA",
@@ -262,7 +277,7 @@ def test_reprice_pool_preserves_length_and_identity() -> None:
 
 def test_no_return_stash_is_worthless_to_the_optimizer() -> None:
     # A stash that never plays has zero stash value -> the optimizer prices it at ~0.
-    hurt = _input(1, "F", 3.0, [0.0] * 7)
+    hurt = _input(_StashCase(1, "F", 3.0, [0.0] * 7))
     vals = build_stash_valuations([hurt], {"F": 4.0, "D": 4.0}, seed=1, n_sims=1000)
     assert math.isclose(vals[0].stash_value, 0.0, abs_tol=1e-9)
     repriced = reprice_pool_for_ir([_asset(1, "F", 12.0)], {1: vals[0].stash_value})

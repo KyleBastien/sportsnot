@@ -128,6 +128,16 @@ class _Candidate:
     replacement: float
 
 
+@dataclass(frozen=True)
+class _RolloutInput:
+    state: DraftState
+    owner: str
+    candidate: DraftAsset
+    opponent_model: OpponentModel | Mapping[str, OpponentModel]
+    replacement: Mapping[str, float]
+    depth: int | None
+
+
 def _prune_candidates(
     state: DraftState,
     owner: str,
@@ -166,15 +176,7 @@ def _fill_owner_greedily(sim: DraftState, owner: str, replacement: Mapping[str, 
         sim.place(owner, pick)
 
 
-def _rollout_owner_value(
-    state: DraftState,
-    owner: str,
-    candidate: DraftAsset,
-    opponent_model: OpponentModel | Mapping[str, OpponentModel],
-    replacement: Mapping[str, float],
-    depth: int | None,
-    rng: random.Random,
-) -> float:
+def _rollout_owner_value(query: _RolloutInput, rng: random.Random) -> float:
     """One playout's final owner-roster value after taking ``candidate`` now.
 
     The owner takes ``candidate`` immediately, then the draft plays forward: opponents
@@ -183,29 +185,29 @@ def _rollout_owner_value(
     cannot change the owner's score). Once the owner has made ``depth`` picks the tail
     is filled greedily from the current pool without simulating more opponents.
     """
-    sim = state.copy()
-    sim.apply_pick(candidate)
+    sim = query.state.copy()
+    sim.apply_pick(query.candidate)
     owner_picks = 1
     total = sim.capacity.total
-    roster = sim.rosters[owner]
+    roster = sim.rosters[query.owner]
 
     def owner_full() -> bool:
         return roster.count("F") + roster.count("D") + roster.count("G") >= total
 
     while not owner_full() and not sim.is_complete:
         manager = sim.current_manager
-        if manager == owner:
-            if depth is not None and owner_picks >= depth:
-                _fill_owner_greedily(sim, owner, replacement)
+        if manager == query.owner:
+            if query.depth is not None and owner_picks >= query.depth:
+                _fill_owner_greedily(sim, query.owner, query.replacement)
                 break
-            pick = greedy_vor_pick(sim, owner, replacement)
+            pick = greedy_vor_pick(sim, query.owner, query.replacement)
             sim.apply_pick(pick)
             owner_picks += 1
         else:
-            model = _resolve_model(opponent_model, manager)
+            model = _resolve_model(query.opponent_model, manager)
             asset = model.pick(sim, manager, rng)
             sim.apply_pick(asset)
-    return _owner_roster_value(sim, owner)
+    return _owner_roster_value(sim, query.owner)
 
 
 def _resolve_model(

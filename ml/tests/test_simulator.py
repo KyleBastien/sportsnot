@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import random
 import time
+from dataclasses import dataclass
+from typing import Literal
 
 import pytest
 
@@ -27,15 +29,21 @@ from draft_oracle.optimize.simulator import (
 )
 
 
-def _skater(key: str, position: str, rank: float, *, team_id: int, player_id: int) -> DraftAsset:
+@dataclass(frozen=True)
+class _AssetIds:
+    team_id: int
+    player_id: int
+
+
+def _skater(key: str, position: Literal["F", "D", "G"], rank: float, ids: _AssetIds) -> DraftAsset:
     return DraftAsset(
         key=key,
         name=key,
-        position=position,  # type: ignore[arg-type]
+        position=position,
         rank_value=rank,
-        player_id=player_id,
-        team_id=team_id,
-        team_abbrev=f"T{team_id}",
+        player_id=ids.player_id,
+        team_id=ids.team_id,
+        team_abbrev=f"T{ids.team_id}",
     )
 
 
@@ -56,10 +64,10 @@ def _exact_pool(managers: int, allow_ir: bool) -> list[DraftAsset]:
     pool: list[DraftAsset] = []
     rank = 1000.0
     for i in range(cap.forwards * managers):
-        pool.append(_skater(f"F{i}", "F", rank, team_id=1 + (i % 8), player_id=1000 + i))
+        pool.append(_skater(f"F{i}", "F", rank, _AssetIds(1 + (i % 8), 1000 + i)))
         rank -= 1.0
     for i in range(cap.defense * managers):
-        pool.append(_skater(f"D{i}", "D", rank, team_id=1 + (i % 8), player_id=2000 + i))
+        pool.append(_skater(f"D{i}", "D", rank, _AssetIds(1 + (i % 8), 2000 + i)))
         rank -= 1.0
     for i in range(cap.goalies * managers):
         pool.append(_team_asset(100 + i, rank))
@@ -132,8 +140,8 @@ def test_no_duplicate_picks() -> None:
 
 def test_eliminated_team_removed_from_pool() -> None:
     pool = [
-        _skater("F1", "F", 100.0, team_id=7, player_id=1),
-        _skater("F2", "F", 90.0, team_id=3, player_id=2),
+        _skater("F1", "F", 100.0, _AssetIds(7, 1)),
+        _skater("F2", "F", 90.0, _AssetIds(3, 2)),
         _team_asset(7, 80.0),
     ]
     state = DraftState.new(["a"], pool, allow_ir=False, eliminated_team_ids=frozenset({7}))
@@ -154,7 +162,7 @@ def test_unresolved_team_skater_dropped_once_teams_eliminated() -> None:
     )
     pool = [
         unresolved,
-        _skater("F2", "F", 90.0, team_id=3, player_id=2),
+        _skater("F2", "F", 90.0, _AssetIds(3, 2)),
         _team_asset(3, 80.0),
     ]
     # No eliminations yet: the unresolved skater is still draftable (round-1 behavior).
@@ -181,9 +189,9 @@ def test_place_rejects_over_limit() -> None:
 
 def test_greedy_picks_highest_rank_at_zero_temperature() -> None:
     pool = [
-        _skater("F1", "F", 50.0, team_id=1, player_id=1),
-        _skater("F2", "F", 99.0, team_id=2, player_id=2),
-        _skater("F3", "F", 10.0, team_id=3, player_id=3),
+        _skater("F1", "F", 50.0, _AssetIds(1, 1)),
+        _skater("F2", "F", 99.0, _AssetIds(2, 2)),
+        _skater("F3", "F", 10.0, _AssetIds(3, 3)),
     ]
     state = DraftState.new(["a"], pool + _fill_rest(pool), allow_ir=False)
     model = GreedyOpponentModel(temperature=0.0, need_weight=0.0)
@@ -196,9 +204,9 @@ def _fill_rest(pool: list[DraftAsset]) -> list[DraftAsset]:
     """Pad a pool so a single manager can complete a 9-pick roster."""
     extra: list[DraftAsset] = []
     for i in range(5):
-        extra.append(_skater(f"PF{i}", "F", 1.0 + i, team_id=1, player_id=5000 + i))
+        extra.append(_skater(f"PF{i}", "F", 1.0 + i, _AssetIds(1, 5000 + i)))
     for i in range(3):
-        extra.append(_skater(f"PD{i}", "D", 1.0 + i, team_id=1, player_id=6000 + i))
+        extra.append(_skater(f"PD{i}", "D", 1.0 + i, _AssetIds(1, 6000 + i)))
     extra.append(_team_asset(200, 1.0))
     return extra
 

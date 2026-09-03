@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import random
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
@@ -61,30 +62,36 @@ _PICK_COLUMNS = [
 ]
 
 
-def _pick(
-    season: int,
-    event: str,
-    manager: str,
-    slot: int,
-    position: str,
-    player_id: int | None,
-    team_id: int | None,
-    *,
-    points: float | None = None,
-    pick_number: int | None = None,
-) -> dict[str, object]:
+@dataclass(frozen=True)
+class _PickCase:
+    season: int
+    event: str
+    manager: str
+    slot: int
+    position: str
+    player_id: int | None
+    team_id: int | None
+    points: float | None = None
+    pick_number: int | None = None
+
+
+def _pick(case: _PickCase) -> dict[str, object]:
     return {
-        "season": season,
-        "draft_event": event,
-        "manager": manager,
-        "snake_slot": slot,
-        "pick_number": pick_number,
-        "position": position,
-        "player_id": player_id,
-        "team_id": team_id,
-        "points_when_drafted": points,
-        "matched_name": f"P{player_id}" if player_id is not None else f"T{team_id}",
-        "player_or_team_name": f"P{player_id}" if player_id is not None else f"T{team_id}",
+        "season": case.season,
+        "draft_event": case.event,
+        "manager": case.manager,
+        "snake_slot": case.slot,
+        "pick_number": case.pick_number,
+        "position": case.position,
+        "player_id": case.player_id,
+        "team_id": case.team_id,
+        "points_when_drafted": case.points,
+        "matched_name": (
+            f"P{case.player_id}" if case.player_id is not None else f"T{case.team_id}"
+        ),
+        "player_or_team_name": (
+            f"P{case.player_id}" if case.player_id is not None else f"T{case.team_id}"
+        ),
     }
 
 
@@ -98,9 +105,9 @@ def _manager_event_picks(
     """One manager's picks for one event: 3 F + 1 D, all from their own team."""
     picks: list[dict[str, object]] = []
     for _ in range(3):
-        picks.append(_pick(season, event, manager, slot, "F", pid, team, points=float(pid % 7)))
+        picks.append(_pick(_PickCase(season, event, manager, slot, "F", pid, team, float(pid % 7))))
         pid += 1
-    picks.append(_pick(season, event, manager, slot, "D", pid, team, points=float(pid % 5)))
+    picks.append(_pick(_PickCase(season, event, manager, slot, "D", pid, team, float(pid % 5))))
     pid += 1
     return picks, pid
 
@@ -149,10 +156,10 @@ def test_base_position_collapses_ir_and_drops_unknown() -> None:
 def test_build_team_affinity_is_a_fraction() -> None:
     frame = _frame(
         [
-            _pick(2024, "R1", "kyle", 1, "F", 10, 5),
-            _pick(2024, "R1", "kyle", 1, "F", 11, 5),
-            _pick(2024, "R1", "kyle", 1, "D", 12, 7),
-            _pick(2024, "R1", "ben", 2, "F", 20, 9),
+            _pick(_PickCase(2024, "R1", "kyle", 1, "F", 10, 5)),
+            _pick(_PickCase(2024, "R1", "kyle", 1, "F", 11, 5)),
+            _pick(_PickCase(2024, "R1", "kyle", 1, "D", 12, 7)),
+            _pick(_PickCase(2024, "R1", "ben", 2, "F", 20, 9)),
         ]
     )
     affinity = build_team_affinity(frame)
@@ -335,17 +342,7 @@ def test_per_pick_validation_runs_when_true_order_present() -> None:
     for slot, (manager, team) in enumerate([("home", 1), ("away", 2)], start=1):
         for _ in range(3):
             rows.append(
-                _pick(
-                    2026,
-                    "R1",
-                    manager,
-                    slot,
-                    "F",
-                    9000 + pick_no,
-                    team,
-                    points=1.0,
-                    pick_number=pick_no,
-                )
+                _pick(_PickCase(2026, "R1", manager, slot, "F", 9000 + pick_no, team, 1.0, pick_no))
             )
             pick_no += 1
     picks = _frame(rows)

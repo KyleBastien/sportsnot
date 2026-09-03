@@ -39,6 +39,7 @@ __all__ = [
     "FEATURE_COLUMNS",
     "FEATURE_SET_VERSION",
     "SkaterFeatureConfig",
+    "SkaterFeatureRequest",
     "age_years",
     "build_round_feature_matrix",
     "build_skater_features",
@@ -93,6 +94,14 @@ class SkaterFeatureConfig:
 
     last_n_games: int = 25
     min_games: int = 1
+
+
+@dataclass(frozen=True)
+class SkaterFeatureRequest:
+    season_id: int
+    as_of_date: str | pd.Timestamp
+    playoff_round: int | None = None
+    config: SkaterFeatureConfig | None = None
 
 
 # ── Scalar feature primitives (each unit-tested) ─────────────────────────
@@ -366,23 +375,19 @@ def build_skater_features(
     skater_games: pd.DataFrame,
     players: pd.DataFrame,
     team_games: pd.DataFrame,
-    *,
-    season_id: int,
-    as_of_date: str | pd.Timestamp,
-    playoff_round: int | None = None,
-    config: SkaterFeatureConfig | None = None,
+    request: SkaterFeatureRequest,
 ) -> pd.DataFrame:
     """Build the as-of skater feature matrix for one round start.
 
-    Filters every input to ``season_id`` and to games strictly before
-    ``as_of_date`` (via :func:`as_of`), asserts the no-leakage invariant, then
+    Filters every input to ``request.season_id`` and to games strictly before
+    ``request.as_of_date`` (via :func:`as_of`), asserts the no-leakage invariant, then
     joins the per-feature builders into one row per pooled skater (position
-    ``F``/``D``) with at least ``config.min_games`` regular-season games.
+    ``F``/``D``) with at least ``request.config.min_games`` regular-season games.
     """
-    config = config or SkaterFeatureConfig()
-    cutoff = to_cutoff(as_of_date)
+    config = request.config or SkaterFeatureConfig()
+    cutoff = to_cutoff(request.as_of_date)
 
-    before = _season_as_of_skaters(skater_games, season_id, cutoff)
+    before = _season_as_of_skaters(skater_games, request.season_id, cutoff)
     reg = before.loc[before["game_type_id"] == REGULAR_SEASON_GAME_TYPE]
     reg_agg = _regular_aggregates(reg)
     reg_agg = reg_agg.loc[reg_agg["games_played"] >= config.min_games]
@@ -398,7 +403,7 @@ def build_skater_features(
         return _empty_feature_frame()
 
     last_n = _last_n_rates(before, config.last_n_games)
-    team_offense = _team_offense_for_cutoff(team_games, season_id, cutoff)
+    team_offense = _team_offense_for_cutoff(team_games, request.season_id, cutoff)
     linemates = _linemate_frame(reg_agg)
 
     out = (
@@ -407,7 +412,10 @@ def build_skater_features(
         .merge(team_offense, on="team_abbrev", how="left")
     )
     return _final_feature_frame(
-        out, season_id=season_id, playoff_round=playoff_round, cutoff=cutoff
+        out,
+        season_id=request.season_id,
+        playoff_round=request.playoff_round,
+        cutoff=cutoff,
     )
 
 
@@ -431,10 +439,12 @@ def build_round_feature_matrix(
             skater_games,
             players,
             team_games,
-            season_id=season_id,
-            as_of_date=start,
-            playoff_round=rnd,
-            config=config,
+            SkaterFeatureRequest(
+                season_id=season_id,
+                as_of_date=start,
+                playoff_round=rnd,
+                config=config,
+            ),
         )
         for rnd, start in sorted(round_start_dates.items())
     ]

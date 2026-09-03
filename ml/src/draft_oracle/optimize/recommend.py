@@ -312,7 +312,6 @@ def recommend_pick(
     opponent_model: OpponentModel | Mapping[str, OpponentModel],
     *,
     config: RecommendConfig | None = None,
-    managers: int | None = None,
 ) -> Recommendation:
     """Recommend the owner's best pick by multi-step Monte-Carlo rollout.
 
@@ -325,8 +324,7 @@ def recommend_pick(
     """
     cfg = config or RecommendConfig()
     _require_on_clock(state, owner)
-    n_managers = managers if managers is not None else len(state.rosters)
-    replacement = replacement_levels(state, n_managers)
+    replacement = replacement_levels(state, len(state.rosters))
     candidates = _prune_candidates(state, owner, replacement, cfg.max_candidates)
     if not candidates:
         raise ValueError(f"owner {owner!r} has no legal pick")

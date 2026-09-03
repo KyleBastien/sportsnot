@@ -190,7 +190,6 @@ def recommend(
         setup.owner,
         setup.opponent_model,
         config=config,
-        managers=len(manager_ids),
     )
     label = opponent_label(opponents_kind, setup.fitted, manager_ids)
     typer.echo(f"Recommendation for {setup.owner} (pick #{setup.state.pick_index + 1}, {label}):")

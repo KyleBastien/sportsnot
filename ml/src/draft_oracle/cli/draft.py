@@ -480,9 +480,7 @@ class DraftSession:
             seed=self.seed,
             top_n=5,
         )
-        recommendation = recommend_pick(
-            self.state, current, model, config=config, managers=self.manager_count
-        )
+        recommendation = recommend_pick(self.state, current, model, config=config)
         return ActionResult(
             True, f"recommendation ({self.opponent_label()})", recommendation.report_lines()
         )

@@ -351,7 +351,7 @@ def _plan_slot(
             state.apply_pick(model.pick(state, manager, line_rng))
             continue
 
-        rec = recommend_pick(state, owner, opponents, config=rec_config, managers=managers)
+        rec = recommend_pick(state, owner, opponents, config=rec_config)
         recommended_eval = rec.best
         alternatives = [
             PickOption.from_evaluation(ev) for ev in rec.top()[1 : config.top_alternatives + 1]

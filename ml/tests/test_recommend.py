@@ -186,18 +186,22 @@ def test_recommend_rejects_complete_draft() -> None:
 # ── Forced picks & goalie timing ────────────────────────────────────────────
 
 
+def _fill_owner_skater_slots(state: DraftState, owner: str) -> None:
+    """Fill the owner's F/D slots directly so only the goalie slot remains."""
+    for asset in list(state.available.values()):
+        roster = state.rosters[owner]
+        needs_forward = asset.position == "F" and roster.count("F") < state.capacity.forwards
+        needs_defense = asset.position == "D" and roster.count("D") < state.capacity.defense
+        if needs_forward or needs_defense:
+            state.place(owner, asset)
+
+
 def test_forced_pick_when_only_goalie_slot_left() -> None:
     # A manager with all skater slots full can only be recommended a team (G) asset.
     managers = [f"m{i}" for i in range(2)]
     state = DraftState.new(managers, _pool(2, False), allow_ir=False)
     owner = "m0"
-    # Fill m0's forwards and defense directly.
-    for asset in list(state.available.values()):
-        roster = state.rosters[owner]
-        if (asset.position == "F" and roster.count("F") < state.capacity.forwards) or (
-            asset.position == "D" and roster.count("D") < state.capacity.defense
-        ):
-            state.place(owner, asset)
+    _fill_owner_skater_slots(state, owner)
     # Rewind the pick pointer to owner and confirm only G is legal.
     while state.current_manager != owner:
         state.pick_index += 1

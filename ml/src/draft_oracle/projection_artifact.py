@@ -74,7 +74,11 @@ from draft_oracle._projection_io import (
     _snapshot_id_for,
 )
 from draft_oracle._projection_slot_report import SlotReportInput, _build_slot_report
-from draft_oracle.features.skater import FEATURE_SET_VERSION, build_skater_features
+from draft_oracle.features.skater import (
+    FEATURE_SET_VERSION,
+    SkaterFeatureRequest,
+    build_skater_features,
+)
 from draft_oracle.models.game_win import (
     GAME_WIN_MODEL_VERSION,
     GameWinConfig,
@@ -641,9 +645,11 @@ def build_projection_artifact(
         skater_games,
         players,
         team_games,
-        season_id=season_id,
-        as_of_date=cutoff,
-        playoff_round=int(playoff_round),
+        SkaterFeatureRequest(
+            season_id=season_id,
+            as_of_date=cutoff,
+            playoff_round=int(playoff_round),
+        ),
     )
     eligible_feats = feats.loc[feats["team_abbrev"].isin(length_by_abbrev)]
     skater_rows: list[dict[str, Any]] = []
