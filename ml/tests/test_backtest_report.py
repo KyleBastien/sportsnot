@@ -8,6 +8,7 @@ on a synthetic archive with odds + league picks to prove the report wires end-to
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
@@ -37,27 +38,29 @@ from tests.test_backtest import SERIES_PAIRS, TEAMS, _config, _tables
 # ── Hand-built fixtures ─────────────────────────────────────────────────────
 
 
-def _round(
-    *,
-    season: int = 2022,
-    playoff_round: int = 1,
-    skaters: list[tuple[int, float, float]],
-    teams: list[tuple[int, float, float]],
-    series: list[SeriesEval],
-    slots: list[SlotResult],
-) -> RoundResult:
+@dataclass(frozen=True)
+class _RoundInput:
+    skaters: list[tuple[int, float, float]]
+    teams: list[tuple[int, float, float]]
+    series: list[SeriesEval]
+    slots: list[SlotResult]
+    season: int = 2022
+    playoff_round: int = 1
+
+
+def _round(spec: _RoundInput) -> RoundResult:
     return RoundResult(
-        season=season,
-        season_id=season * 10001,
-        playoff_round=playoff_round,
-        as_of_cutoff=f"{season}-04-15",
+        season=spec.season,
+        season_id=spec.season * 10001,
+        playoff_round=spec.playoff_round,
+        as_of_cutoff=f"{spec.season}-04-15",
         opponents_kind="greedy",
         eligible_team_abbrevs=["AAA", "BBB"],
         leakage_ok=True,
-        slot_results=slots,
+        slot_results=spec.slots,
         warnings=[],
-        projection_eval=ProjectionEval(skaters=skaters, teams=teams),
-        series_evals=series,
+        projection_eval=ProjectionEval(skaters=spec.skaters, teams=spec.teams),
+        series_evals=spec.series,
     )
 
 
@@ -102,10 +105,12 @@ def test_fmt_and_pct_handle_nan() -> None:
 
 def test_projection_accuracy_pools_pairs() -> None:
     rnd = _round(
-        skaters=[(1, 10.0, 8.0), (2, 4.0, 6.0), (3, 1.0, 0.0)],
-        teams=[(101, 3.0, 4.0), (102, 1.0, 0.0)],
-        series=[],
-        slots=[],
+        _RoundInput(
+            skaters=[(1, 10.0, 8.0), (2, 4.0, 6.0), (3, 1.0, 0.0)],
+            teams=[(101, 3.0, 4.0), (102, 1.0, 0.0)],
+            series=[],
+            slots=[],
+        )
     )
     acc = _projection_accuracy("ALL", [rnd])
     assert acc.skater_n == 3
@@ -124,7 +129,7 @@ def test_series_calibration_two_tracks() -> None:
         SeriesEval(1, 2, "AAA", "BBB", top_won=1, p_top_stat=0.8, p_top_market=0.7),
         SeriesEval(3, 4, "CCC", "DDD", top_won=0, p_top_stat=0.4, p_top_market=None),
     ]
-    rnd = _round(skaters=[], teams=[], series=series, slots=[])
+    rnd = _round(_RoundInput(skaters=[], teams=[], series=series, slots=[]))
     cal = _series_calibration("ALL", [rnd])
     # Stat track scores both series; market track only the one with odds.
     assert cal.stat_n == 2
@@ -140,15 +145,17 @@ def test_series_calibration_two_tracks() -> None:
 
 def test_strategy_summaries_and_win_rate() -> None:
     rnd = _round(
-        skaters=[],
-        teams=[],
-        series=[],
-        slots=[
-            _slot("oracle", 1, 20.0, [10.0, 15.0]),  # win
-            _slot("oracle", 2, 5.0, [10.0, 15.0]),  # loss
-            _slot("greedy_vor", 1, 8.0, [10.0, 15.0]),  # loss
-            _slot("random_legal", 1, 30.0, [10.0, 15.0]),  # win
-        ],
+        _RoundInput(
+            skaters=[],
+            teams=[],
+            series=[],
+            slots=[
+                _slot("oracle", 1, 20.0, [10.0, 15.0]),  # win
+                _slot("oracle", 2, 5.0, [10.0, 15.0]),  # loss
+                _slot("greedy_vor", 1, 8.0, [10.0, 15.0]),  # loss
+                _slot("random_legal", 1, 30.0, [10.0, 15.0]),  # win
+            ],
+        )
     )
     result = _result([rnd])
     summaries = {s.strategy: s for s in _strategy_summaries(result)}
@@ -162,10 +169,14 @@ def test_strategy_summaries_and_win_rate() -> None:
 
 def test_report_has_all_sections_and_league_comparison(tmp_path: Path) -> None:
     rnd = _round(
-        skaters=[(1, 10.0, 8.0), (2, 4.0, 6.0)],
-        teams=[(101, 3.0, 4.0)],
-        series=[SeriesEval(1, 2, "AAA", "BBB", top_won=1, p_top_stat=0.8, p_top_market=0.7)],
-        slots=[_slot("oracle", 1, 20.0, [10.0])],
+        _RoundInput(
+            skaters=[(1, 10.0, 8.0), (2, 4.0, 6.0)],
+            teams=[(101, 3.0, 4.0)],
+            series=[
+                SeriesEval(1, 2, "AAA", "BBB", top_won=1, p_top_stat=0.8, p_top_market=0.7)
+            ],
+            slots=[_slot("oracle", 1, 20.0, [10.0])],
+        )
     )
     league = [
         LeagueComparison(
@@ -202,7 +213,7 @@ def test_report_has_all_sections_and_league_comparison(tmp_path: Path) -> None:
 
 
 def test_league_section_notes_absence_when_no_overlap() -> None:
-    rnd = _round(skaters=[], teams=[], series=[], slots=[])
+    rnd = _round(_RoundInput(skaters=[], teams=[], series=[], slots=[]))
     result = _result([rnd])
     text = build_backtest_report(result).markdown()
     assert "No backtested season overlapped" in text

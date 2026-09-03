@@ -35,10 +35,13 @@ class BacktestConfig:
     run_id: str = ""
 
     def __post_init__(self) -> None:
-        if self.managers < 2:
-            raise ValueError(f"managers must be >= 2, got {self.managers}")
-        if self.n_drafts < 1:
-            raise ValueError(f"n_drafts must be >= 1, got {self.n_drafts}")
+        checks: tuple[tuple[int, str, int], ...] = (
+            (self.managers, "managers", 2),
+            (self.n_drafts, "n_drafts", 1),
+        )
+        for value, name, minimum in checks:
+            if value < minimum:
+                raise ValueError(f"{name} must be >= {minimum}, got {value}")
         if not self.strategies:
             raise ValueError("strategies must be non-empty")
         for strategy in self.strategies:

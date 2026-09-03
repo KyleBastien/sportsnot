@@ -101,8 +101,10 @@ def _build_series_evals(
         top_raw = row.get("top_seed_team_id")
         bottom_raw = row.get("bottom_seed_team_id")
         winner_raw = row.get("winning_team_id")
-        if pd.isna(top_raw) or pd.isna(bottom_raw) or pd.isna(winner_raw):
+        missing_ids = any(pd.isna(value) for value in (top_raw, bottom_raw, winner_raw))
+        if missing_ids:
             continue
+        assert top_raw is not None and bottom_raw is not None and winner_raw is not None
         top_id = int(top_raw)
         bottom_id = int(bottom_raw)
         if top_id not in stat_by_team:

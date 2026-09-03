@@ -26,6 +26,15 @@ class RoundLeakageCheck:
     authoritative_dates: pd.DataFrame | Mapping[int, Any] | None = None
 
 
+@dataclass(frozen=True)
+class _AuthoritativeDateCheck:
+    train: pd.DataFrame
+    authoritative_dates: pd.DataFrame | Mapping[int, Any] | None
+    cutoff_ts: pd.Timestamp
+    date_col: str
+    label: str
+
+
 def round_game_ids(
     team_games: pd.DataFrame, series: pd.DataFrame, *, season_id: int, playoff_round: int
 ) -> set[int]:
@@ -48,34 +57,29 @@ def assert_round_inputs_leakfree(check: RoundLeakageCheck) -> None:
     frame[check.date_col] = pd.to_datetime(frame[check.date_col])
     train = frame.loc[frame[check.date_col] < cutoff_ts]
     _assert_authoritative_dates_leakfree(
-        train,
-        check.authoritative_dates,
-        cutoff_ts,
-        date_col=check.date_col,
-        label=check.label,
+        _AuthoritativeDateCheck(
+            train,
+            check.authoritative_dates,
+            cutoff_ts,
+            check.date_col,
+            check.label,
+        )
     )
     assert_no_leakage(train, cutoff_ts, date_col=check.date_col)
     _assert_round_ids_absent(train, check.round_ids, cutoff_ts, label=check.label)
 
 
-def _assert_authoritative_dates_leakfree(
-    train: pd.DataFrame,
-    authoritative_dates: pd.DataFrame | Mapping[int, Any] | None,
-    cutoff_ts: pd.Timestamp,
-    *,
-    date_col: str,
-    label: str,
-) -> None:
-    if authoritative_dates is None or "game_id" not in train.columns:
+def _assert_authoritative_dates_leakfree(check: _AuthoritativeDateCheck) -> None:
+    if check.authoritative_dates is None or "game_id" not in check.train.columns:
         return
-    auth = _authoritative_date_map(authoritative_dates, date_col=date_col)
-    true_dates = train["game_id"].map(auth)
-    desynced = train.loc[true_dates.notna() & (true_dates >= cutoff_ts)]
+    auth = _authoritative_date_map(check.authoritative_dates, date_col=check.date_col)
+    true_dates = check.train["game_id"].map(auth)
+    desynced = check.train.loc[true_dates.notna() & (true_dates >= check.cutoff_ts)]
     if desynced.empty:
         return
     latest = true_dates.loc[desynced.index].max()
     raise LeakageError(
-        f"{len(desynced)} {label} row(s) desynced past cutoff {cutoff_ts.date()}: "
+        f"{len(desynced)} {check.label} row(s) desynced past cutoff {check.cutoff_ts.date()}: "
         f"their own date is pre-cutoff but the authoritative game date is on/after "
         f"it (latest authoritative date {pd.Timestamp(latest).date()})."
     )
