@@ -3,12 +3,22 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
 
 from draft_oracle.backtest._replay_types import ProjectionEval, SeriesEval
 from draft_oracle.models.series_sim import simulate_series
+
+
+@dataclass(frozen=True)
+class _ProjectionEvalRequest:
+    result: Any
+    skater_actual: dict[tuple[int, int, int], int]
+    team_actual: dict[tuple[int, int, int], int]
+    season_id: int
+    scored_rounds: Sequence[int]
 
 
 def _round_series(series: pd.DataFrame, season: int, playoff_round: int) -> pd.DataFrame:
@@ -61,26 +71,29 @@ def _market_series_prob(
     return simulate_series(p_top_game_one, p_top_game_one).p_a_win_series
 
 
-def _build_projection_eval(
-    result: Any,
-    skater_actual: dict[tuple[int, int, int], int],
-    team_actual: dict[tuple[int, int, int], int],
-    *,
-    season_id: int,
-    scored_rounds: Sequence[int],
-) -> ProjectionEval:
+def _build_projection_eval(request: _ProjectionEvalRequest) -> ProjectionEval:
     """Pair every as-of projection with its realized outcome across the scored rounds."""
     skaters: list[tuple[int, float, float]] = []
-    for rec in result.skaters.to_dict("records"):
+    for rec in request.result.skaters.to_dict("records"):
         pid = int(rec["player_id"])
         projected = float(rec["expected_points"])
-        actual = float(sum(skater_actual.get((season_id, rnd, pid), 0) for rnd in scored_rounds))
+        actual = float(
+            sum(
+                request.skater_actual.get((request.season_id, rnd, pid), 0)
+                for rnd in request.scored_rounds
+            )
+        )
         skaters.append((pid, projected, actual))
     teams: list[tuple[int, float, float]] = []
-    for rec in result.teams.to_dict("records"):
+    for rec in request.result.teams.to_dict("records"):
         tid = int(rec["team_id"])
         projected = float(rec["e_goalie_points"])
-        actual = float(sum(team_actual.get((season_id, rnd, tid), 0) for rnd in scored_rounds))
+        actual = float(
+            sum(
+                request.team_actual.get((request.season_id, rnd, tid), 0)
+                for rnd in request.scored_rounds
+            )
+        )
         teams.append((tid, projected, actual))
     return ProjectionEval(skaters=skaters, teams=teams)
 

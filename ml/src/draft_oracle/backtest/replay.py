@@ -39,6 +39,7 @@ from draft_oracle.backtest._replay_eval import (
     _build_projection_eval,
     _build_series_evals,
     _market_series_prob,
+    _ProjectionEvalRequest,
     _round_series,
 )
 from draft_oracle.backtest._replay_events import (
@@ -187,11 +188,7 @@ def _prepare_round_setup(
     season_id = _season_id_for(tables["series"], season)
     round_series = _round_series(tables["series"], season, playoff_round)
     projection_eval = _build_projection_eval(
-        artifact,
-        skater_actual,
-        team_actual,
-        season_id=season_id,
-        scored_rounds=scored,
+        _ProjectionEvalRequest(artifact, skater_actual, team_actual, season_id, scored)
     )
     series_evals = _build_series_evals(artifact, round_series, odds, season=season)
     return _ReplayRoundSetup(
