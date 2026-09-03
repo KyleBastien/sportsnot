@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
@@ -88,52 +89,75 @@ def test_real_archive_team_games_normalize_smoke() -> None:
 # ── Fixtures ─────────────────────────────────────────────────────────────
 
 
+@dataclass(frozen=True)
+class _SkaterFixture:
+    game_id: int
+    player_id: int
+    name: str
+    pos: str
+    team: str
+    opp: str
+    goals: int
+    assists: int
+
+
+@dataclass(frozen=True)
+class _TeamFixture:
+    game_id: int
+    team_id: int
+    full_name: str
+    opp_abbrev: str
+    win: int
+    goals_against: int
+    goals_for: int
+
+
+@dataclass(frozen=True)
+class _BioFixture:
+    season_id: int
+    player_id: int
+    name: str
+    pos: str
+    team: str
+
+
 def _raw_skaters() -> pd.DataFrame:
     return pd.DataFrame(
         [
             # centre, wing, defenceman → F, F, D
-            _skater_row(2025020001, 100, "Centre Guy", "C", "NYR", "BOS", 1, 1),
-            _skater_row(2025020001, 101, "Wing Guy", "L", "NYR", "BOS", 0, 2),
-            _skater_row(2025020001, 200, "D Guy", "D", "BOS", "NYR", 0, 0),
+            _skater_row(_SkaterFixture(2025020001, 100, "Centre Guy", "C", "NYR", "BOS", 1, 1)),
+            _skater_row(_SkaterFixture(2025020001, 101, "Wing Guy", "L", "NYR", "BOS", 0, 2)),
+            _skater_row(_SkaterFixture(2025020001, 200, "D Guy", "D", "BOS", "NYR", 0, 0)),
             # a goalie row that must be dropped
-            _skater_row(2025020001, 300, "Goalie Guy", "G", "BOS", "NYR", 0, 0),
+            _skater_row(_SkaterFixture(2025020001, 300, "Goalie Guy", "G", "BOS", "NYR", 0, 0)),
         ]
     )
 
 
-def _skater_row(
-    game_id: int,
-    player_id: int,
-    name: str,
-    pos: str,
-    team: str,
-    opp: str,
-    goals: int,
-    assists: int,
-) -> dict[str, object]:
+def _skater_row(row: _SkaterFixture) -> dict[str, object]:
     return {
         "seasonId": 20252026,
         "gameTypeId": 3,
-        "gameId": game_id,
+        "gameId": row.game_id,
         "gameDate": "2026-04-20",
-        "playerId": player_id,
-        "skaterFullName": name,
-        "positionCode": pos,
+        "playerId": row.player_id,
+        "skaterFullName": row.name,
+        "positionCode": row.pos,
         "shootsCatches": "L",
-        "teamAbbrev": team,
-        "opponentTeamAbbrev": opp,
+        "teamAbbrev": row.team,
+        "opponentTeamAbbrev": row.opp,
         "homeRoad": "H",
-        "goals": goals,
-        "assists": assists,
-        "points": goals + assists,
+        "goals": row.goals,
+        "assists": row.assists,
+        "points": row.goals + row.assists,
         "shots": 3,
         "timeOnIcePerGame": 1200.0,
         "ppGoals": 0,
         "ppPoints": 0,
         "shGoals": 0,
         "shPoints": 0,
-        "evGoals": goals,
-        "evPoints": goals + assists,
+        "evGoals": row.goals,
+        "evPoints": row.goals + row.assists,
         "plusMinus": 1,
         "penaltyMinutes": 0,
         "gameWinningGoals": 0,
@@ -146,64 +170,56 @@ def _skater_row(
 def _raw_teams() -> pd.DataFrame:
     return pd.DataFrame(
         [
-            _team_row(2025020001, 3, "New York Rangers", "BOS", 1, 0, 0),
-            _team_row(2025020001, 6, "Boston Bruins", "NYR", 0, 0, 3),
+            _team_row(_TeamFixture(2025020001, 3, "New York Rangers", "BOS", 1, 0, 0)),
+            _team_row(_TeamFixture(2025020001, 6, "Boston Bruins", "NYR", 0, 0, 3)),
         ]
     )
 
 
-def _team_row(
-    game_id: int,
-    team_id: int,
-    full_name: str,
-    opp_abbrev: str,
-    win: int,
-    goals_against: int,
-    goals_for: int,
-) -> dict[str, object]:
+def _team_row(row: _TeamFixture) -> dict[str, object]:
     return {
         "seasonId": 20252026,
         "gameTypeId": 3,
-        "gameId": game_id,
+        "gameId": row.game_id,
         "gameDate": "2026-04-20",
-        "teamId": team_id,
-        "teamFullName": full_name,
-        "opponentTeamAbbrev": opp_abbrev,
+        "teamId": row.team_id,
+        "teamFullName": row.full_name,
+        "opponentTeamAbbrev": row.opp_abbrev,
         "homeRoad": "H",
-        "goalsFor": goals_for,
-        "goalsAgainst": goals_against,
-        "wins": win,
-        "losses": 1 - win,
+        "goalsFor": row.goals_for,
+        "goalsAgainst": row.goals_against,
+        "wins": row.win,
+        "losses": 1 - row.win,
         "otLosses": 0,
         "ties": None,
-        "regulationAndOtWins": win,
-        "winsInRegulation": win,
+        "regulationAndOtWins": row.win,
+        "winsInRegulation": row.win,
         "winsInShootout": 0,
-        "points": 2 * win,
-        "pointPct": float(win),
-        "teamShutouts": 1 if (win == 1 and goals_against == 0) else 0,
+        "points": 2 * row.win,
+        "pointPct": float(row.win),
+        "teamShutouts": 1 if (row.win == 1 and row.goals_against == 0) else 0,
     }
 
 
 def _raw_bios() -> pd.DataFrame:
     return pd.DataFrame(
         [
-            _bios_row(20242025, 100, "Centre Guy", "C", "NYR"),
-            _bios_row(20252026, 100, "Centre Guy", "C", "NYR"),  # newer wins
-            _bios_row(20252026, 200, "D Guy", "D", "BOS"),
-            _bios_row(20252026, 300, "Goalie Guy", "G", "BOS"),  # dropped
+            _bios_row(_BioFixture(20242025, 100, "Centre Guy", "C", "NYR")),
+            _bios_row(_BioFixture(20252026, 100, "Centre Guy", "C", "NYR")),  # newer wins
+            _bios_row(_BioFixture(20252026, 200, "D Guy", "D", "BOS")),
+            _bios_row(_BioFixture(20252026, 300, "Goalie Guy", "G", "BOS")),  # dropped
         ]
     )
 
 
-def _bios_row(season_id: int, player_id: int, name: str, pos: str, team: str) -> dict[str, object]:
+def _bios_row(row: _BioFixture) -> dict[str, object]:
     return {
-        "seasonId": season_id,
-        "playerId": player_id,
-        "skaterFullName": name,
-        "lastName": name.split()[-1],
+        "seasonId": row.season_id,
+        "playerId": row.player_id,
+        "skaterFullName": row.name,
+        "lastName": row.name.split()[-1],
         "birthDate": "1999-01-01",
-        "positionCode": pos,
+        "positionCode": row.pos,
         "shootsCatches": "L",
         "height": 72,
         "weight": 190,
@@ -215,7 +231,7 @@ def _bios_row(season_id: int, player_id: int, name: str, pos: str, team: str) ->
         "draftRound": 1,
         "draftOverall": 5,
         "firstSeasonForGameType": 20182019,
-        "currentTeamAbbrev": team,
+        "currentTeamAbbrev": row.team,
     }
 
 

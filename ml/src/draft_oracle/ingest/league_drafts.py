@@ -186,6 +186,39 @@ _INT_COLUMNS: tuple[str, ...] = (
 _BOOL_COLUMNS: tuple[str, ...] = ("points_excluded", "ir_activated", "is_scored")
 
 
+@dataclass(frozen=True)
+class _BlockParseContext:
+    manager: str
+    season: int
+    event: str
+    scored: bool
+    order: dict[str, int] | None
+
+
+@dataclass(frozen=True)
+class _SheetPickInput:
+    row: list[str]
+    label: str
+    position: str
+    player: str
+    team: str
+    block: _BlockParseContext
+
+
+@dataclass(frozen=True)
+class _SheetPointFields:
+    status: str | None
+    note: str | None
+    points_when_drafted: int | None
+    current_total_points: int | None
+
+
+@dataclass(frozen=True)
+class _ParsedBlockRow:
+    is_total: bool
+    pick: dict[str, object] | None = None
+
+
 # ── Low-level helpers ────────────────────────────────────────────────────
 
 
@@ -229,6 +262,7 @@ def detect_draft_order(rows: list[list[str]]) -> dict[str, int] | None:
 
     return _league_drafts_order_module.detect_draft_order(rows)
 
+
 # ── Sheet-block splitting ────────────────────────────────────────────────
 
 
@@ -241,14 +275,22 @@ def _split_blocks(rows: list[list[str]]) -> list[tuple[str, list[list[str]]]]:
     blocks: list[tuple[str, list[list[str]]]] = []
     current: list[list[str]] | None = None
     for row in rows[1:]:  # row 0 is the header
-        label = _cell(row, 0).strip()
-        if label and _is_manager_token(label):
-            current = []
-            blocks.append((canonical_manager(label), current))
-            current.append(row)
-        elif current is not None:
-            current.append(row)
+        current = _append_block_row(row, blocks, current)
     return blocks
+
+
+def _append_block_row(
+    row: list[str],
+    blocks: list[tuple[str, list[list[str]]]],
+    current: list[list[str]] | None,
+) -> list[list[str]] | None:
+    label = _cell(row, 0).strip()
+    if label and _is_manager_token(label):
+        current = []
+        blocks.append((canonical_manager(label), current))
+    if current is not None:
+        current.append(row)
+    return current
 
 
 # ── Sheet tab parsing ────────────────────────────────────────────────────
@@ -273,7 +315,14 @@ def parse_sheet_tab(rows: list[list[str]], season: int, event: str) -> list[dict
 
     picks: list[dict[str, object]] = []
     for manager, block_rows in blocks:
-        block_picks = _parse_block(block_rows, manager, season, event, scored, order)
+        context = _BlockParseContext(
+            manager=manager,
+            season=season,
+            event=event,
+            scored=scored,
+            order=order,
+        )
+        block_picks = _parse_block(block_rows, context)
         _pair_ir_swaps(block_picks)
         picks.extend(block_picks)
     return picks
@@ -281,80 +330,42 @@ def parse_sheet_tab(rows: list[list[str]], season: int, event: str) -> list[dict
 
 def _parse_block(
     block_rows: list[list[str]],
-    manager: str,
-    season: int,
-    event: str,
-    scored: bool,
-    order: dict[str, int] | None,
+    context: _BlockParseContext,
 ) -> list[dict[str, object]]:
-    saw_total = False
-    picks: list[dict[str, object]] = []
-    for row in block_rows:
-        label = _cell(row, 1).strip()
-        if label in _TOTAL_LABELS:
-            saw_total = True
-            continue
-        position = slot_position(label)
-        if position is None:
-            raise ValueError(f"{season} {event} {manager}: unknown slot label {label!r}")
-
-        player = _cell(row, 2).strip()
-        team = _cell(row, 3).strip()
-        # Empty roster slots (e.g. 2026's retired IR rows) and the stray ``,`` at
-        # sheet1__round-1.csv C24 are not picks (SCHEMA §3.1, OPEN_QUESTIONS A8).
-        if player in ("", ","):
-            continue
-
-        pick = _build_pick(
-            row, label, position, player, team, manager, season, event, scored, order
+    parsed = [_parse_block_row(row, context) for row in block_rows]
+    if not any(item.is_total for item in parsed):
+        raise ValueError(
+            f"{context.season} {context.event} {context.manager}: block has no Total row"
         )
-        picks.append(pick)
-
-    if not saw_total:
-        raise ValueError(f"{season} {event} {manager}: block has no Total row")
-    return picks
+    return [item.pick for item in parsed if item.pick is not None]
 
 
-def _build_pick(
-    row: list[str],
-    label: str,
-    position: str,
-    player: str,
-    team: str,
-    manager: str,
-    season: int,
-    event: str,
-    scored: bool,
-    order: dict[str, int] | None,
-) -> dict[str, object]:
-    status: str | None = None
-    note: str | None = None
-    points_when_drafted: int | None = None
-    current_total_points: int | None = None
+def _parse_block_row(row: list[str], context: _BlockParseContext) -> _ParsedBlockRow:
+    label = _cell(row, 1).strip()
+    if label in _TOTAL_LABELS:
+        return _ParsedBlockRow(is_total=True)
+    position = slot_position(label)
+    if position is None:
+        raise ValueError(
+            f"{context.season} {context.event} {context.manager}: unknown slot label {label!r}"
+        )
+    player = _cell(row, 2).strip()
+    if player in ("", ","):
+        return _ParsedBlockRow(is_total=False)
+    team = _cell(row, 3).strip()
+    pick_input = _SheetPickInput(row, label, position, player, team, context)
+    return _ParsedBlockRow(is_total=False, pick=_build_pick(pick_input))
+
+
+def _build_pick(pick_input: _SheetPickInput) -> dict[str, object]:
+    row = pick_input.row
+    block = pick_input.block
     points_for_round = _num(_cell(row, 4))
+    fields = _sheet_point_fields(row, block.event)
+    points_excluded = fields.status in ("Dropped", "Not playing")
+    ir_activated = fields.status == "Activated"
 
-    if event == "R1":
-        # Column F (index 5) is overloaded: a status flag, or the Hyman drafted-points
-        # mini-column (numeric). Disambiguate by content (SCHEMA §5, OPEN_QUESTIONS A8).
-        col_f = _cell(row, 5).strip()
-        if col_f in _STATUS_FLAGS:
-            status = col_f
-        elif col_f != "":
-            points_when_drafted = _num(col_f)
-            current_total_points = _num(_cell(row, 6))
-    else:
-        points_when_drafted = _num(_cell(row, 5))
-        current_total_points = _num(_cell(row, 6))
-        col_h = _cell(row, 7).strip()
-        if col_h in _STATUS_FLAGS:
-            status = col_h
-        elif col_h != "":
-            note = col_h  # e.g. the Trouba "+3" annotation
-
-    points_excluded = status in ("Dropped", "Not playing")
-    ir_activated = status == "Activated"
-
-    key = (season, event, manager, label)
+    key = (block.season, block.event, block.manager, pick_input.label)
     swap = _UNFLAGGED_SWAPS.get(key)
     if swap == "excluded":
         points_excluded = True
@@ -362,28 +373,52 @@ def _build_pick(
         ir_activated = True
 
     return {
-        "season": season,
+        "season": block.season,
         "source": "sheet",
         "league_name": SHEET_LEAGUE_NAME,
-        "draft_event": event,
-        "manager": manager,
-        "snake_slot": order.get(manager) if order else None,
+        "draft_event": block.event,
+        "manager": block.manager,
+        "snake_slot": block.order.get(block.manager) if block.order else None,
         "pick_number": None,
-        "position": position,
-        "slot_label": label,
-        "player_or_team_name": player,
+        "position": pick_input.position,
+        "slot_label": pick_input.label,
+        "player_or_team_name": pick_input.player,
         "corrected_name": _NAME_OVERRIDES.get(key),
-        "team_name": team,
+        "team_name": pick_input.team,
         "points_for_round": points_for_round,
-        "points_when_drafted": points_when_drafted,
-        "current_total_points": current_total_points,
-        "status": status,
+        "points_when_drafted": fields.points_when_drafted,
+        "current_total_points": fields.current_total_points,
+        "status": fields.status,
         "points_excluded": points_excluded,
         "ir_activated": ir_activated,
         "swap_partner": None,
-        "note": note,
-        "is_scored": scored,
+        "note": fields.note,
+        "is_scored": block.scored,
     }
+
+
+def _sheet_point_fields(row: list[str], event: str) -> _SheetPointFields:
+    if event == "R1":
+        return _round_one_point_fields(row)
+    return _later_round_point_fields(row)
+
+
+def _round_one_point_fields(row: list[str]) -> _SheetPointFields:
+    # Column F (index 5) is overloaded: a status flag, or the Hyman drafted-points
+    # mini-column (numeric). Disambiguate by content (SCHEMA §5, OPEN_QUESTIONS A8).
+    col_f = _cell(row, 5).strip()
+    if col_f in _STATUS_FLAGS:
+        return _SheetPointFields(col_f, None, None, None)
+    if col_f == "":
+        return _SheetPointFields(None, None, None, None)
+    return _SheetPointFields(None, None, _num(col_f), _num(_cell(row, 6)))
+
+
+def _later_round_point_fields(row: list[str]) -> _SheetPointFields:
+    col_h = _cell(row, 7).strip()
+    status = col_h if col_h in _STATUS_FLAGS else None
+    note = col_h if col_h and status is None else None
+    return _SheetPointFields(status, note, _num(_cell(row, 5)), _num(_cell(row, 6)))
 
 
 def _pair_ir_swaps(block_picks: list[dict[str, object]]) -> None:
@@ -394,18 +429,42 @@ def _pair_ir_swaps(block_picks: list[dict[str, object]]) -> None:
     best-effort: an excluded starter with no matching IR row (e.g. 2026's IR-less tabs)
     is left unpaired.
     """
-    ir_by_position = {
-        "F": [p for p in block_picks if p["position"] == "IR_F" and p["ir_activated"]],
-        "D": [p for p in block_picks if p["position"] == "IR_D" and p["ir_activated"]],
-    }
+    ir_by_position = _activated_ir_by_position(block_picks)
     for pick in block_picks:
-        if not pick["points_excluded"] or pick["position"] not in ("F", "D"):
-            continue
-        candidates = ir_by_position.get(str(pick["position"]), [])
-        partner = next((ir for ir in candidates if ir.get("swap_partner") is None), None)
-        if partner is not None:
-            pick["swap_partner"] = partner["player_or_team_name"]
-            partner["swap_partner"] = pick["player_or_team_name"]
+        _pair_one_ir_swap(pick, ir_by_position)
+
+
+def _pair_one_ir_swap(
+    pick: dict[str, object],
+    ir_by_position: dict[str, list[dict[str, object]]],
+) -> None:
+    if not _needs_ir_partner(pick):
+        return
+    candidates = ir_by_position.get(str(pick["position"]), [])
+    partner = next((ir for ir in candidates if ir.get("swap_partner") is None), None)
+    if partner is None:
+        return
+    pick["swap_partner"] = partner["player_or_team_name"]
+    partner["swap_partner"] = pick["player_or_team_name"]
+
+
+def _activated_ir_by_position(
+    block_picks: list[dict[str, object]],
+) -> dict[str, list[dict[str, object]]]:
+    return {
+        "F": [p for p in block_picks if _is_activated_ir(p, "IR_F")],
+        "D": [p for p in block_picks if _is_activated_ir(p, "IR_D")],
+    }
+
+
+def _is_activated_ir(pick: dict[str, object], position: str) -> bool:
+    return pick["position"] == position and bool(pick["ir_activated"])
+
+
+def _needs_ir_partner(pick: dict[str, object]) -> bool:
+    if not pick["points_excluded"]:
+        return False
+    return pick["position"] in ("F", "D")
 
 
 # ── Wins-tab parsing ─────────────────────────────────────────────────────
@@ -419,30 +478,43 @@ def parse_wins_tab(rows: list[list[str]]) -> dict[int, str]:
     """
     champions: dict[int, str] = {}
     for row in rows:
-        year_text = _cell(row, 0).strip()
-        if not year_text.isdigit():
-            continue  # skip the header / blank rows
-        champion = _cell(row, 1).strip()
-        if champion:
-            champions[int(year_text)] = canonical_manager(champion)
+        parsed = _champion_from_row(row)
+        if parsed is not None:
+            year, champion = parsed
+            champions[year] = champion
     return champions
+
+
+def _champion_from_row(row: list[str]) -> tuple[int, str] | None:
+    year_text = _cell(row, 0).strip()
+    if not year_text.isdigit():
+        return None
+    champion = _cell(row, 1).strip()
+    if not champion:
+        return None
+    return int(year_text), canonical_manager(champion)
 
 
 def build_champions(league_dir: Path = DEFAULT_LEAGUE_DRAFTS_DIR) -> pd.DataFrame:
     """Merge the three Wins tabs into one champions table, plus owner-confirmed 2026."""
     merged: dict[int, str] = {}
-    for name in WINS_TABS:
-        path = league_dir / name
-        if not path.exists():
-            continue
-        for year, champion in parse_wins_tab(read_csv_rows(path)).items():
-            merged.setdefault(year, champion)
+    for year, champion in _champions_from_tabs(league_dir).items():
+        merged.setdefault(year, champion)
     merged.update(_OWNER_CHAMPIONS)
 
     records = [{"year": year, "champion": merged[year]} for year in sorted(merged)]
     frame = pd.DataFrame(records, columns=["year", "champion"])
     frame["year"] = frame["year"].astype("Int64")
     return frame
+
+
+def _champions_from_tabs(league_dir: Path) -> dict[int, str]:
+    merged: dict[int, str] = {}
+    for name in WINS_TABS:
+        path = league_dir / name
+        if path.exists():
+            merged.update(parse_wins_tab(read_csv_rows(path)))
+    return merged
 
 
 # ── App-export parsing ───────────────────────────────────────────────────
@@ -477,48 +549,49 @@ def parse_app_picks(
     order: dict[tuple[str, int], dict[str, int]],
 ) -> list[dict[str, object]]:
     """Parse the app draft-picks export, preserving the true ``pick_number``."""
-    picks: list[dict[str, object]] = []
-    for row in rows:
-        league = row["league_name"]
-        rnd = int(row["playoff_round"])
-        if rnd not in _APP_ROUND_TO_EVENT:
-            raise ValueError(f"app export: unexpected playoff_round {rnd}")
-        position = row["position"].strip()
-        if position not in _APP_POSITIONS:
-            raise ValueError(f"app export: unexpected position {position!r}")
+    return [_parse_app_pick(row, order) for row in rows]
 
-        player_name = row.get("player_name", "").strip()
-        nhl_team = row.get("nhl_team_name", "").strip()
-        name = player_name if player_name and player_name != "null" else nhl_team
-        team = "" if nhl_team == "null" else nhl_team
-        manager = canonical_manager(row["manager"])
 
-        picks.append(
-            {
-                "season": 2026,
-                "source": "app",
-                "league_name": league,
-                "draft_event": _APP_ROUND_TO_EVENT[rnd],
-                "manager": manager,
-                "snake_slot": order.get((league, rnd), {}).get(manager),
-                "pick_number": int(row["pick_number"]),
-                "position": position,
-                "slot_label": position,
-                "player_or_team_name": name,
-                "corrected_name": None,
-                "team_name": team,
-                "points_for_round": None,
-                "points_when_drafted": None,
-                "current_total_points": None,
-                "status": None,
-                "points_excluded": False,
-                "ir_activated": False,
-                "swap_partner": None,
-                "note": None,
-                "is_scored": True,
-            }
-        )
-    return picks
+def _parse_app_pick(
+    row: dict[str, str], order: dict[tuple[str, int], dict[str, int]]
+) -> dict[str, object]:
+    league = row["league_name"]
+    rnd = int(row["playoff_round"])
+    if rnd not in _APP_ROUND_TO_EVENT:
+        raise ValueError(f"app export: unexpected playoff_round {rnd}")
+    position = row["position"].strip()
+    if position not in _APP_POSITIONS:
+        raise ValueError(f"app export: unexpected position {position!r}")
+
+    player_name = row.get("player_name", "").strip()
+    nhl_team = row.get("nhl_team_name", "").strip()
+    name = player_name if player_name and player_name != "null" else nhl_team
+    team = "" if nhl_team == "null" else nhl_team
+    manager = canonical_manager(row["manager"])
+
+    return {
+        "season": 2026,
+        "source": "app",
+        "league_name": league,
+        "draft_event": _APP_ROUND_TO_EVENT[rnd],
+        "manager": manager,
+        "snake_slot": order.get((league, rnd), {}).get(manager),
+        "pick_number": int(row["pick_number"]),
+        "position": position,
+        "slot_label": position,
+        "player_or_team_name": name,
+        "corrected_name": None,
+        "team_name": team,
+        "points_for_round": None,
+        "points_when_drafted": None,
+        "current_total_points": None,
+        "status": None,
+        "points_excluded": False,
+        "ir_activated": False,
+        "swap_partner": None,
+        "note": None,
+        "is_scored": True,
+    }
 
 
 # ── Result types ─────────────────────────────────────────────────────────
@@ -567,6 +640,12 @@ class LeagueDraftsResult:
         return lines
 
 
+@dataclass(frozen=True)
+class _AppExportResult:
+    present: bool
+    records: list[dict[str, object]]
+
+
 # ── Top-level ingestion ──────────────────────────────────────────────────
 
 
@@ -591,40 +670,9 @@ def build_league_drafts(
     if not league_dir.exists():
         raise FileNotFoundError(f"league-drafts directory not found: {league_dir}")
 
-    all_records: list[dict[str, object]] = []
-    tabs: list[TabReport] = []
-    for name, season, event in SHEET_TABS:
-        path = league_dir / name
-        if not path.exists():
-            raise FileNotFoundError(f"expected committed snapshot missing: {path}")
-        records = parse_sheet_tab(read_csv_rows(path), season, event)
-        tabs.append(
-            TabReport(
-                file=name,
-                season=season,
-                draft_event=event,
-                picks=len(records),
-                status_flags=sum(1 for r in records if r["status"] is not None),
-                points_excluded=sum(1 for r in records if r["points_excluded"]),
-                ir_activated=sum(1 for r in records if r["ir_activated"]),
-                scored=season != 2026,
-            )
-        )
-        all_records.extend(records)
-
-    app_picks_path = league_dir / "app-export-2026__draft-picks.csv"
-    app_order_path = league_dir / "app-export-2026__draft-order.csv"
-    app_present = app_picks_path.exists()
-    app_pick_count = 0
-    if app_present:
-        order = (
-            parse_app_draft_order(_read_dict_rows(app_order_path))
-            if app_order_path.exists()
-            else {}
-        )
-        app_records = parse_app_picks(_read_dict_rows(app_picks_path), order)
-        app_pick_count = len(app_records)
-        all_records.extend(app_records)
+    all_records, tabs = _parse_sheet_tabs(league_dir)
+    app_export = _parse_app_export(league_dir)
+    all_records.extend(app_export.records)
 
     picks = _pick_frame(all_records)
     champions = build_champions(league_dir)
@@ -638,6 +686,50 @@ def build_league_drafts(
         picks=picks,
         champions=champions,
         tabs=tabs,
-        app_present=app_present,
-        app_picks=app_pick_count,
+        app_present=app_export.present,
+        app_picks=len(app_export.records),
     )
+
+
+def _parse_sheet_tabs(league_dir: Path) -> tuple[list[dict[str, object]], list[TabReport]]:
+    all_records: list[dict[str, object]] = []
+    tabs: list[TabReport] = []
+    for name, season, event in SHEET_TABS:
+        records = _parse_sheet_file(league_dir, name, season, event)
+        tabs.append(_tab_report(name, season, event, records))
+        all_records.extend(records)
+    return all_records, tabs
+
+
+def _parse_sheet_file(
+    league_dir: Path, name: str, season: int, event: str
+) -> list[dict[str, object]]:
+    path = league_dir / name
+    if not path.exists():
+        raise FileNotFoundError(f"expected committed snapshot missing: {path}")
+    return parse_sheet_tab(read_csv_rows(path), season, event)
+
+
+def _tab_report(name: str, season: int, event: str, records: list[dict[str, object]]) -> TabReport:
+    return TabReport(
+        file=name,
+        season=season,
+        draft_event=event,
+        picks=len(records),
+        status_flags=sum(1 for r in records if r["status"] is not None),
+        points_excluded=sum(1 for r in records if r["points_excluded"]),
+        ir_activated=sum(1 for r in records if r["ir_activated"]),
+        scored=season != 2026,
+    )
+
+
+def _parse_app_export(league_dir: Path) -> _AppExportResult:
+    app_picks_path = league_dir / "app-export-2026__draft-picks.csv"
+    if not app_picks_path.exists():
+        return _AppExportResult(False, [])
+    app_order_path = league_dir / "app-export-2026__draft-order.csv"
+    order = (
+        parse_app_draft_order(_read_dict_rows(app_order_path)) if app_order_path.exists() else {}
+    )
+    records = parse_app_picks(_read_dict_rows(app_picks_path), order)
+    return _AppExportResult(True, records)

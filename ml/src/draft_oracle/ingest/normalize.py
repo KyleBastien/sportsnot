@@ -441,17 +441,22 @@ def _source_signature(archive_dir: Path, labels: Iterable[str]) -> dict[str, int
     """Map of relevant source filename → byte size (change detection)."""
     signature: dict[str, int] = {}
     for label in labels:
-        candidates = [
-            f"skater-games-{label}.csv.gz",
-            f"team-games-{label}.csv.gz",
-            f"skater-bios-{label}.csv.gz",
-            f"bracket-{bracket_year_from_label(label)}.json",
-        ]
-        for name in candidates:
-            path = archive_dir / name
-            if path.exists():
-                signature[name] = path.stat().st_size
+        signature.update(_label_source_signature(archive_dir, label))
     return signature
+
+
+def _label_source_signature(archive_dir: Path, label: str) -> dict[str, int]:
+    candidates = [
+        f"skater-games-{label}.csv.gz",
+        f"team-games-{label}.csv.gz",
+        f"skater-bios-{label}.csv.gz",
+        f"bracket-{bracket_year_from_label(label)}.json",
+    ]
+    return {
+        name: (archive_dir / name).stat().st_size
+        for name in candidates
+        if (archive_dir / name).exists()
+    }
 
 
 def _read_manifest(out_dir: Path) -> dict[str, object] | None:
@@ -537,9 +542,7 @@ def normalize_archive(
     return NormalizeResult(out_dir=out_dir, seasons=labels, row_counts=row_counts)
 
 
-def _resolve_archive_labels(
-    archive_dir: Path, seasons: Iterable[str] | None
-) -> list[str]:
+def _resolve_archive_labels(archive_dir: Path, seasons: Iterable[str] | None) -> list[str]:
     labels = list(seasons) if seasons is not None else discover_season_labels(archive_dir)
     if labels:
         return labels
@@ -552,16 +555,18 @@ def _cached_normalize_result(
     if force:
         return None
     manifest = _read_manifest(out_dir)
-    if manifest is None or manifest.get("sources") != signature or not _tables_present(out_dir):
+    if manifest is None:
+        return None
+    if manifest.get("sources") != signature:
+        return None
+    if not _tables_present(out_dir):
         return None
     counts = manifest.get("row_counts")
     cached_counts = counts if isinstance(counts, dict) else {}
     return NormalizeResult(out_dir=out_dir, seasons=labels, row_counts=cached_counts, skipped=True)
 
 
-def _write_normalized_tables(
-    tables: Mapping[str, pd.DataFrame], out_dir: Path
-) -> dict[str, int]:
+def _write_normalized_tables(tables: Mapping[str, pd.DataFrame], out_dir: Path) -> dict[str, int]:
     row_counts: dict[str, int] = {}
     for name in TABLE_NAMES:
         frame = tables[name]

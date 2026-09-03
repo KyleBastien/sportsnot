@@ -35,7 +35,7 @@ return-time calibration lives in US-015, not here.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -52,7 +52,6 @@ from draft_oracle.ingest.entity_match import (
     last_name_key,
     normalize_name,
 )
-from draft_oracle.ingest.normalize import DEFAULT_NORMALIZED_DIR
 from draft_oracle.ingest.odds import resolve_team_id
 
 # ── Endpoints (the only place ESPN injury URLs are allowed) ──────────────
@@ -81,6 +80,19 @@ NORMALIZED_STATUSES: tuple[str, ...] = (
 SOURCE_ESPN = "espn"
 SOURCE_OVERRIDE = "override"
 SOURCE_LAST_KNOWN = "last_known"
+
+_TYPE_STATUS_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("INJURED_RESERVE", "LTIR"), STATUS_IR),
+    (("DAY_TO_DAY", "QUESTIONABLE", "GTD"), STATUS_DAY_TO_DAY),
+    (("OUT", "SUSPEN"), STATUS_OUT),
+    (("ACTIVE", "HEALTHY"), STATUS_HEALTHY),
+)
+_TEXT_STATUS_RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], str], ...] = (
+    (("injured reserve", "long term"), ("ir", "ltir"), STATUS_IR),
+    (("day to day", "questionable", "gtd"), (), STATUS_DAY_TO_DAY),
+    (("out", "suspension", "suspended"), (), STATUS_OUT),
+    (("active", "healthy", "probable"), (), STATUS_HEALTHY),
+)
 
 _INJURY_COLUMNS: tuple[str, ...] = (
     "player_id",
@@ -180,14 +192,11 @@ def normalize_status(status_raw: str | None, type_name: str | None = None) -> st
 def _normalize_type_status(type_key: str) -> str | None:
     if not type_key:
         return None
-    if "INJURED_RESERVE" in type_key or type_key.endswith("_IR") or "LTIR" in type_key:
+    if type_key.endswith("_IR"):
         return STATUS_IR
-    if "DAY_TO_DAY" in type_key or "QUESTIONABLE" in type_key or "GTD" in type_key:
-        return STATUS_DAY_TO_DAY
-    if "OUT" in type_key or "SUSPEN" in type_key:
-        return STATUS_OUT
-    if "ACTIVE" in type_key or "HEALTHY" in type_key:
-        return STATUS_HEALTHY
+    for markers, status in _TYPE_STATUS_RULES:
+        if _contains_status_marker(type_key, markers):
+            return status
     return None
 
 
@@ -198,15 +207,16 @@ def _collapse_status_text(status_raw: str | None) -> str:
 
 
 def _normalize_text_status(collapsed: str) -> str | None:
-    if "injured reserve" in collapsed or collapsed in {"ir", "ltir"} or "long term" in collapsed:
-        return STATUS_IR
-    if "day to day" in collapsed or "questionable" in collapsed or "gtd" in collapsed:
-        return STATUS_DAY_TO_DAY
-    if "out" in collapsed or "suspension" in collapsed or "suspended" in collapsed:
-        return STATUS_OUT
-    if "active" in collapsed or "healthy" in collapsed or "probable" in collapsed:
-        return STATUS_HEALTHY
+    for contains_markers, exact_markers, status in _TEXT_STATUS_RULES:
+        contains = _contains_status_marker(collapsed, contains_markers)
+        exact = collapsed in exact_markers
+        if contains or exact:
+            return status
     return None
+
+
+def _contains_status_marker(value: str, markers: tuple[str, ...]) -> bool:
+    return any(marker in value for marker in markers)
 
 
 # ── Feed → normalized rows ───────────────────────────────────────────────
@@ -251,8 +261,15 @@ class PlayerIdResolution:
 
 @dataclass(frozen=True)
 class _PlayerResolutionContext:
+    index: PlayerIndex
     fantasy_pos: str
     team_key: str | None
+    team_by_id: Mapping[int, Any]
+
+
+@dataclass(frozen=True)
+class _PlayerResolverContext:
+    index: PlayerIndex
     team_by_id: Mapping[int, Any]
 
 
@@ -260,8 +277,8 @@ def resolve_espn_player_id(
     name: str | None,
     team_abbrev: str | None,
     position: str | None,
-    index: PlayerIndex,
-    team_by_id: Mapping[int, Any],
+    resolver: _PlayerResolverContext | PlayerIndex,
+    *legacy_team_by_id: Mapping[int, Any],
 ) -> PlayerIdResolution:
     """Resolve one ESPN injury entry to an NHL ``player_id`` via name + team.
 
@@ -276,25 +293,37 @@ def resolve_espn_player_id(
     fantasy_pos = _fantasy_position(position)
     if fantasy_pos is None:
         return PlayerIdResolution(None, "goalie")
+    resolver = _coerce_player_resolver(resolver, legacy_team_by_id)
     norm = normalize_name(name)
     context = _PlayerResolutionContext(
+        index=resolver.index,
         fantasy_pos=fantasy_pos,
         team_key=_team_abbrev_key(team_abbrev),
-        team_by_id=team_by_id,
+        team_by_id=resolver.team_by_id,
     )
 
-    exact = index.by_norm.get(norm, [])
+    exact = context.index.by_norm.get(norm, [])
     if exact:
         resolved = _disambiguate_player_id(exact, "exact", context)
         return resolved if resolved is not None else PlayerIdResolution(None, "unresolved")
 
     last = last_name_key(name)
-    last_hits = index.by_last.get(last, []) if last else []
+    last_hits = context.index.by_last.get(last, []) if last else []
     if last_hits:
         resolved = _disambiguate_player_id(last_hits, "lastname", context)
         if resolved is not None:
             return resolved
     return PlayerIdResolution(None, "unresolved")
+
+
+def _coerce_player_resolver(
+    resolver: _PlayerResolverContext | PlayerIndex,
+    legacy_team_by_id: tuple[Mapping[int, Any], ...],
+) -> _PlayerResolverContext:
+    if isinstance(resolver, _PlayerResolverContext):
+        return resolver
+    team_by_id = legacy_team_by_id[0] if legacy_team_by_id else {}
+    return _PlayerResolverContext(index=resolver, team_by_id=team_by_id)
 
 
 def _disambiguate_player_id(
@@ -312,9 +341,7 @@ def _disambiguate_player_id(
     return None
 
 
-def _team_matches(
-    candidates: list[Any], context: _PlayerResolutionContext
-) -> list[Any]:
+def _team_matches(candidates: list[Any], context: _PlayerResolutionContext) -> list[Any]:
     if context.team_key is None:
         return []
     return [
@@ -335,18 +362,17 @@ def resolve_player_ids(
     of ESPN ids that could not be resolved (surfaced, never guessed). When no
     ``players`` dimension is supplied the ESPN ids are retained unchanged.
     """
-    if rows.empty or players is None or players.empty:
+    if rows.empty:
+        return rows, []
+    if players is None:
+        return rows, []
+    if players.empty:
         return rows, []
     skaters = players[players["position"].isin(("F", "D"))]
     index = build_player_index(skaters)
-    has_team = "current_team_abbrev" in players.columns
-    team_by_id: dict[int, Any] = (
-        {
-            int(rec["player_id"]): rec["current_team_abbrev"]
-            for rec in players.to_dict("records")
-        }
-        if has_team
-        else {}
+    resolver = _PlayerResolverContext(
+        index=index,
+        team_by_id=_current_team_by_player_id(players),
     )
     df = rows.copy()
     resolved_ids: list[int] = []
@@ -356,17 +382,25 @@ def resolve_player_ids(
             _as_str(rec["player_name"]),
             _as_str(rec["team_abbrev"]),
             _as_str(rec["position"]),
-            index,
-            team_by_id,
+            resolver,
         )
-        if result.player_id is not None:
-            resolved_ids.append(int(result.player_id))
-        else:
-            resolved_ids.append(int(rec["espn_id"]))
-            if result.method == "unresolved":
-                unresolved.append(int(rec["espn_id"]))
+        resolved_ids.append(_resolved_player_id(rec, result))
+        if result.player_id is None and result.method == "unresolved":
+            unresolved.append(int(rec["espn_id"]))
     df["player_id"] = resolved_ids
     return df, unresolved
+
+
+def _current_team_by_player_id(players: pd.DataFrame) -> dict[int, Any]:
+    if "current_team_abbrev" not in players.columns:
+        return {}
+    return {int(rec["player_id"]): rec["current_team_abbrev"] for rec in players.to_dict("records")}
+
+
+def _resolved_player_id(rec: Mapping[Hashable, Any], result: PlayerIdResolution) -> int:
+    if result.player_id is not None:
+        return int(result.player_id)
+    return int(rec["espn_id"])
 
 
 def injuries_response_to_rows(
@@ -384,36 +418,7 @@ def injuries_response_to_rows(
     injured flag and IR-stash valuation join against real player ids (M-11).
     Entries without an athlete id are skipped — every row must key on a player.
     """
-    rows: list[dict[str, Any]] = []
-    for group in response.injuries:
-        team_id = resolve_team_id(group.display_name) if group.display_name else None
-        team_abbrev = group.abbreviation
-        for entry in group.injuries:
-            athlete = entry.athlete
-            if athlete is None or athlete.id is None:
-                continue
-            player_name = athlete.full_name or athlete.display_name
-            position = athlete.position.abbreviation if athlete.position else None
-            type_name = entry.type.name if entry.type else None
-            return_date = entry.details.return_date if entry.details else None
-            detail = entry.details.type if entry.details else None
-            espn_id = int(athlete.id)
-            rows.append(
-                {
-                    "player_id": espn_id,
-                    "espn_id": espn_id,
-                    "player_name": player_name,
-                    "position": position,
-                    "team_id": team_id,
-                    "team_abbrev": team_abbrev,
-                    "status": normalize_status(entry.status, type_name),
-                    "status_raw": entry.status,
-                    "return_date": return_date,
-                    "detail": detail,
-                    "as_of_date": entry.date or as_of,
-                    "source": SOURCE_ESPN,
-                }
-            )
+    rows = [row for group in response.injuries for row in _team_injury_rows(group, as_of)]
     df = pd.DataFrame.from_records(rows, columns=list(_INJURY_COLUMNS))
     if df.empty:
         return df
@@ -421,6 +426,48 @@ def injuries_response_to_rows(
     df = df.drop_duplicates(subset=["player_id"], keep="last").reset_index(drop=True)
     df.attrs["unresolved_espn_ids"] = unresolved
     return df
+
+
+def _team_injury_rows(group: EspnTeamInjuries, as_of: str | None) -> list[dict[str, Any]]:
+    team_id = resolve_team_id(group.display_name) if group.display_name else None
+    return [
+        row
+        for entry in group.injuries
+        if (row := _injury_entry_row(entry, team_id, group.abbreviation, as_of)) is not None
+    ]
+
+
+def _injury_entry_row(
+    entry: EspnInjuryEntry,
+    team_id: int | None,
+    team_abbrev: str | None,
+    as_of: str | None,
+) -> dict[str, Any] | None:
+    athlete = entry.athlete
+    if athlete is None:
+        return None
+    if athlete.id is None:
+        return None
+    player_name = athlete.full_name or athlete.display_name
+    position = athlete.position.abbreviation if athlete.position else None
+    type_name = entry.type.name if entry.type else None
+    return_date = entry.details.return_date if entry.details else None
+    detail = entry.details.type if entry.details else None
+    espn_id = int(athlete.id)
+    return {
+        "player_id": espn_id,
+        "espn_id": espn_id,
+        "player_name": player_name,
+        "position": position,
+        "team_id": team_id,
+        "team_abbrev": team_abbrev,
+        "status": normalize_status(entry.status, type_name),
+        "status_raw": entry.status,
+        "return_date": return_date,
+        "detail": detail,
+        "as_of_date": entry.date or as_of,
+        "source": SOURCE_ESPN,
+    }
 
 
 # ── Manual overrides (final authority) ───────────────────────────────────
@@ -459,26 +506,30 @@ def load_injury_overrides(
     entries = raw.get("overrides") or []
     overrides: list[InjuryOverride] = []
     for item in entries:
-        if not isinstance(item, Mapping):
-            continue
-        player_id = item.get("player_id")
-        espn_id = item.get("espn_id")
-        status = item.get("status")
-        return_game = item.get("return_game")
-        overrides.append(
-            InjuryOverride(
-                player=_as_str(item.get("player")),
-                player_id=int(player_id) if player_id is not None else None,
-                espn_id=int(espn_id) if espn_id is not None else None,
-                status=normalize_status(str(status)) if status is not None else None,
-                return_date=_as_str(item.get("return_date")),
-                detail=_as_str(item.get("detail")),
-                team=_as_str(item.get("team")),
-                remove=bool(item.get("remove", False)),
-                return_game=int(return_game) if return_game is not None else None,
-            )
-        )
+        override = _injury_override_from_item(item)
+        if override is not None:
+            overrides.append(override)
     return overrides
+
+
+def _injury_override_from_item(item: object) -> InjuryOverride | None:
+    if not isinstance(item, Mapping):
+        return None
+    player_id = item.get("player_id")
+    espn_id = item.get("espn_id")
+    status = item.get("status")
+    return_game = item.get("return_game")
+    return InjuryOverride(
+        player=_as_str(item.get("player")),
+        player_id=int(player_id) if player_id is not None else None,
+        espn_id=int(espn_id) if espn_id is not None else None,
+        status=normalize_status(str(status)) if status is not None else None,
+        return_date=_as_str(item.get("return_date")),
+        detail=_as_str(item.get("detail")),
+        team=_as_str(item.get("team")),
+        remove=bool(item.get("remove", False)),
+        return_game=int(return_game) if return_game is not None else None,
+    )
 
 
 def _as_str(value: Any) -> str | None:
@@ -501,19 +552,27 @@ def apply_overrides(source: pd.DataFrame, overrides: Iterable[InjuryOverride]) -
     name_keys = df["player_name"].map(normalize_name) if not df.empty else pd.Series(dtype=str)
 
     for override in overrides:
-        mask = _match_mask(df, override, name_keys)
-        matched = bool(mask.any())
-        if override.remove:
-            if matched:
-                df = df.loc[~mask].reset_index(drop=True)
-                name_keys = df["player_name"].map(normalize_name)
-            continue
-        if matched:
-            _rewrite_matched(df, mask, override)
-        else:
-            df = _append_override_row(df, override)
-            name_keys = df["player_name"].map(normalize_name)
+        df, name_keys = _apply_one_override(df, name_keys, override)
     return _reorder(df)
+
+
+def _apply_one_override(
+    df: pd.DataFrame, name_keys: pd.Series, override: InjuryOverride
+) -> tuple[pd.DataFrame, pd.Series]:
+    mask = _match_mask(df, override, name_keys)
+    matched = bool(mask.any())
+    if override.remove:
+        return _remove_override_match(df, mask) if matched else (df, name_keys)
+    if matched:
+        _rewrite_matched(df, mask, override)
+        return df, name_keys
+    df = _append_override_row(df, override)
+    return df, df["player_name"].map(normalize_name)
+
+
+def _remove_override_match(df: pd.DataFrame, mask: pd.Series) -> tuple[pd.DataFrame, pd.Series]:
+    df = df.loc[~mask].reset_index(drop=True)
+    return df, df["player_name"].map(normalize_name)
 
 
 def _match_mask(df: pd.DataFrame, override: InjuryOverride, name_keys: pd.Series) -> pd.Series:
@@ -572,24 +631,22 @@ def _reorder(df: pd.DataFrame) -> pd.DataFrame:
 # ── ESPN injuries client + table builder ─────────────────────────────────
 
 EspnInjuriesClient = _injuries_build_module.EspnInjuriesClient
+EspnInjuriesClientConfig = _injuries_build_module.EspnInjuriesClientConfig
+InjuryBuildOptions = _injuries_build_module.InjuryBuildOptions
 InjuriesResult = _injuries_build_module.InjuriesResult
 _load_players = _injuries_build_module._load_players
 _load_last_known = _injuries_build_module._load_last_known
 
 
 def build_injuries_table(
+    options: InjuryBuildOptions | None = None,
     *,
     client: EspnInjuriesClient | None = None,
-    overrides_path: Path = DEFAULT_INJURIES_OVERRIDES,
-    out_dir: Path = DEFAULT_NORMALIZED_DIR,
-    players: pd.DataFrame | None = None,
-    fetch: bool = True,
+    **legacy: object,
 ) -> InjuriesResult:
     """Ingest injuries into ``injuries.parquet``; overrides are final authority."""
     return _injuries_build_module.build_injuries_table(
+        options=options,
         client=client,
-        overrides_path=overrides_path,
-        out_dir=out_dir,
-        players=players,
-        fetch=fetch,
+        **legacy,
     )

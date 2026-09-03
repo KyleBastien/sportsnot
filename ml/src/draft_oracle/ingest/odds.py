@@ -451,31 +451,36 @@ def _empty_odds_frame() -> pd.DataFrame:
     return pd.DataFrame(columns=list(_ODDS_COLUMNS))
 
 
+@dataclass(frozen=True)
+class OddsRowGame:
+    source: str
+    season_end_year: int
+    game_date: date
+    away_id: int
+    home_id: int
+    away_name: str
+    home_name: str
+    neutral: bool
+
+
 def _two_sided_row(
+    game: OddsRowGame,
     *,
-    source: str,
-    season_end_year: int,
-    game_date: date,
-    away_id: int,
-    home_id: int,
-    away_name: str,
-    home_name: str,
     away_ml: float,
     home_ml: float,
-    neutral: bool,
 ) -> dict[str, Any]:
     devig = devig_proportional(home_ml, away_ml)
     favorite_side = "home" if home_ml < away_ml else "away"
     return {
-        "source": source,
-        "season_end_year": season_end_year,
-        "game_date": game_date.isoformat(),
-        "neutral_site": neutral,
-        "is_playoff": is_playoff_game(season_end_year, game_date),
-        "away_team_id": away_id,
-        "home_team_id": home_id,
-        "away_team_name": away_name,
-        "home_team_name": home_name,
+        "source": game.source,
+        "season_end_year": game.season_end_year,
+        "game_date": game.game_date.isoformat(),
+        "neutral_site": game.neutral,
+        "is_playoff": is_playoff_game(game.season_end_year, game.game_date),
+        "away_team_id": game.away_id,
+        "home_team_id": game.home_id,
+        "away_team_name": game.away_name,
+        "home_team_name": game.home_name,
         "away_ml": away_ml,
         "home_ml": home_ml,
         "favorite_side": favorite_side,
@@ -485,22 +490,15 @@ def _two_sided_row(
         "home_implied": devig.home_prob,
         "devig_method": devig.method,
         "overround": devig.overround,
-        "game_key": _game_key(season_end_year, game_date, away_id, home_id),
+        "game_key": _game_key(game.season_end_year, game.game_date, game.away_id, game.home_id),
     }
 
 
 def _favorite_only_row(
+    game: OddsRowGame,
     *,
-    source: str,
-    season_end_year: int,
-    game_date: date,
-    away_id: int,
-    home_id: int,
-    away_name: str,
-    home_name: str,
     favorite_ml: float,
     favorite_side: str,
-    neutral: bool,
     overround: float = STANDARD_OVERROUND,
 ) -> dict[str, Any]:
     devig = devig_favorite_only(favorite_ml, overround=overround)
@@ -513,15 +511,15 @@ def _favorite_only_row(
         away_ml = favorite_ml
         home_ml = None
     return {
-        "source": source,
-        "season_end_year": season_end_year,
-        "game_date": game_date.isoformat(),
-        "neutral_site": neutral,
-        "is_playoff": is_playoff_game(season_end_year, game_date),
-        "away_team_id": away_id,
-        "home_team_id": home_id,
-        "away_team_name": away_name,
-        "home_team_name": home_name,
+        "source": game.source,
+        "season_end_year": game.season_end_year,
+        "game_date": game.game_date.isoformat(),
+        "neutral_site": game.neutral,
+        "is_playoff": is_playoff_game(game.season_end_year, game.game_date),
+        "away_team_id": game.away_id,
+        "home_team_id": game.home_id,
+        "away_team_name": game.away_name,
+        "home_team_name": game.home_name,
         "away_ml": away_ml,
         "home_ml": home_ml,
         "favorite_side": favorite_side,
@@ -531,7 +529,7 @@ def _favorite_only_row(
         "home_implied": home_prob,
         "devig_method": devig.method,
         "overround": devig.overround,
-        "game_key": _game_key(season_end_year, game_date, away_id, home_id),
+        "game_key": _game_key(game.season_end_year, game.game_date, game.away_id, game.home_id),
     }
 
 
@@ -559,14 +557,14 @@ _placeholder_prices_by_season = _odds_sources_module._placeholder_prices_by_seas
 _reconstruct_date = _odds_sources_module._reconstruct_date
 _sbr_season_end_year = _odds_sources_module._sbr_season_end_year
 _uncovered_row = _odds_sources_module._uncovered_row
+
+
 def build_source_odds(archive_dir: Path = DEFAULT_ODDS_ARCHIVE_DIR) -> pd.DataFrame:
     """Parse every committed archive source into one de-vigged long table."""
     return cast("pd.DataFrame", _odds_sources_module.build_source_odds(archive_dir))
 
 
-def parse_espn_completion(
-    path: Path, *, summary_dir: Path | None = None
-) -> pd.DataFrame:
+def parse_espn_completion(path: Path, *, summary_dir: Path | None = None) -> pd.DataFrame:
     """Parse the ESPN 2025-26 completion ``games.csv`` favorite-only odds file."""
     return cast(
         "pd.DataFrame",
@@ -616,6 +614,7 @@ _median = _odds_live_module._median
 _pickcenter_favorite_ml = _odds_live_module._pickcenter_favorite_ml
 espn_summary_to_rows = _odds_live_module.espn_summary_to_rows
 odds_api_events_to_rows = _odds_live_module.odds_api_events_to_rows
+
 
 @dataclass
 class OddsResult:
@@ -673,7 +672,5 @@ def build_odds_table(
         xval_flagged_rows=int(consolidated.attrs.get("xval_flagged_rows", 0)),
         unmatched_uncovered_rows=int(consolidated.attrs.get("unmatched_uncovered_rows", 0)),
         orientation_unmatched_rows=int(consolidated.attrs.get("orientation_unmatched_rows", 0)),
-        unattributed_uncovered_rows=int(
-            source_odds.attrs.get("unattributed_uncovered_rows", 0)
-        ),
+        unattributed_uncovered_rows=int(source_odds.attrs.get("unattributed_uncovered_rows", 0)),
     )

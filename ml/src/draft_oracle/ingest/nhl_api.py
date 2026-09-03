@@ -20,9 +20,10 @@ import hashlib
 import json
 import time
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -260,6 +261,36 @@ def _sorted_params(params: Params | None) -> dict[str, ParamValue]:
 # ── Client ───────────────────────────────────────────────────────────────
 
 
+@dataclass(frozen=True)
+class NHLApiClientConfig:
+    web_base: str = WEB_BASE
+    stats_base: str = STATS_BASE
+    delay: float = DEFAULT_DELAY
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS
+    retry_backoff: float = DEFAULT_RETRY_BACKOFF
+    timeout: float = DEFAULT_TIMEOUT
+
+
+def _nhl_client_config(
+    config: NHLApiClientConfig | None, legacy: Mapping[str, object]
+) -> NHLApiClientConfig:
+    allowed = {"web_base", "stats_base", "delay", "max_attempts", "retry_backoff", "timeout"}
+    unexpected = set(legacy) - allowed
+    if unexpected:
+        raise TypeError(f"unexpected NHLApiClient option(s): {sorted(unexpected)}")
+    base_config = config or NHLApiClientConfig()
+    return NHLApiClientConfig(
+        web_base=str(legacy.get("web_base", base_config.web_base)),
+        stats_base=str(legacy.get("stats_base", base_config.stats_base)),
+        delay=float(cast("float | int", legacy.get("delay", base_config.delay))),
+        max_attempts=int(cast("float | int", legacy.get("max_attempts", base_config.max_attempts))),
+        retry_backoff=float(
+            cast("float | int", legacy.get("retry_backoff", base_config.retry_backoff))
+        ),
+        timeout=float(cast("float | int", legacy.get("timeout", base_config.timeout))),
+    )
+
+
 class NHLApiClient:
     """Polite, cached, typed NHL API client.
 
@@ -286,26 +317,23 @@ class NHLApiClient:
         self,
         cache_dir: Path | str = DEFAULT_CACHE_DIR,
         *,
-        web_base: str = WEB_BASE,
-        stats_base: str = STATS_BASE,
-        delay: float = DEFAULT_DELAY,
-        max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-        retry_backoff: float = DEFAULT_RETRY_BACKOFF,
-        timeout: float = DEFAULT_TIMEOUT,
+        config: NHLApiClientConfig | None = None,
         client: httpx.Client | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        **legacy: object,
     ) -> None:
-        if max_attempts < 1:
+        config = _nhl_client_config(config, legacy)
+        if config.max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
-        self.web_base = web_base.rstrip("/")
-        self.stats_base = stats_base.rstrip("/")
-        self.delay = delay
-        self.max_attempts = max_attempts
-        self.retry_backoff = retry_backoff
+        self.web_base = config.web_base.rstrip("/")
+        self.stats_base = config.stats_base.rstrip("/")
+        self.delay = config.delay
+        self.max_attempts = config.max_attempts
+        self.retry_backoff = config.retry_backoff
         self._cache = ResponseCache(Path(cache_dir))
         self._sleep = sleep
         self._owns_client = client is None
-        self._client = client if client is not None else httpx.Client(timeout=timeout)
+        self._client = client if client is not None else httpx.Client(timeout=config.timeout)
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -338,20 +366,31 @@ class NHLApiClient:
     def _request_with_retry(self, url: str, params: Params | None) -> RawJson:
         last_error: Exception | None = None
         for attempt in range(self.max_attempts):
-            if self.delay > 0:
-                self._sleep(self.delay)
-            try:
-                response = self._client.get(url, params=dict(params or {}))
-                response.raise_for_status()
-                parsed: RawJson = response.json()
+            parsed, last_error = self._request_attempt(url, params, attempt, last_error)
+            if parsed is not None:
                 return parsed
-            except (httpx.HTTPError, json.JSONDecodeError, ValueError) as error:
-                last_error = error
-                if attempt + 1 < self.max_attempts:
-                    self._sleep(self.retry_backoff * (2**attempt))
         raise NHLApiError(
             f"NHL request failed after {self.max_attempts} attempts: {url} {dict(params or {})}"
         ) from last_error
+
+    def _request_attempt(
+        self,
+        url: str,
+        params: Params | None,
+        attempt: int,
+        last_error: Exception | None,
+    ) -> tuple[RawJson | None, Exception | None]:
+        if self.delay > 0:
+            self._sleep(self.delay)
+        try:
+            response = self._client.get(url, params=dict(params or {}))
+            response.raise_for_status()
+            parsed: RawJson = response.json()
+            return parsed, last_error
+        except (httpx.HTTPError, json.JSONDecodeError, ValueError) as error:
+            if attempt + 1 < self.max_attempts:
+                self._sleep(self.retry_backoff * (2**attempt))
+            return None, error
 
     # -- typed adapters (the only NHL endpoint knowledge in the codebase) --
 

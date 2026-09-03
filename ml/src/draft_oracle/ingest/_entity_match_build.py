@@ -12,7 +12,12 @@ import pandas as pd
 from draft_oracle.ingest.odds import NHL_TEAMS
 
 if TYPE_CHECKING:
-    from draft_oracle.ingest.entity_match import LeagueEntityMatchResult
+    from draft_oracle.ingest.entity_match import (
+        LeagueEntityMatchResult,
+        Match,
+        NameOverrides,
+        PlayerIndex,
+    )
 
 
 @dataclass(frozen=True)
@@ -25,11 +30,20 @@ class _InputPaths:
 
 @dataclass(frozen=True)
 class _MatchContext:
-    index: Any
+    index: PlayerIndex
     manager_aliases: Mapping[str, str]
-    overrides: Any
+    overrides: NameOverrides
     archive_points: Mapping[tuple[int, int, int], int]
     team_names: Mapping[int, str]
+
+
+@dataclass(frozen=True)
+class _ResolvedPick:
+    position: str
+    raw_name: str
+    match: Match
+    player_id: int | None
+    team_id: int | None
 
 
 def build_league_draft_picks(
@@ -151,7 +165,8 @@ def _match_pick_record(row: Any, context: _MatchContext) -> dict[str, Any]:
         player_id = match.entity_id
         team_id = resolve_team(team_name, None, context.overrides)
 
-    record = _base_record(row, position, raw_name, match, player_id, team_id, context)
+    resolved = _ResolvedPick(position, raw_name, match, player_id, team_id)
+    record = _base_record(row, resolved, context)
     if _point_columns_contradict(record, dict(context.archive_points)):
         record["needs_review"] = True
     return record
@@ -166,11 +181,7 @@ def _row_team_name(row: Any) -> str | None:
 
 def _base_record(
     row: Any,
-    position: str,
-    raw_name: str,
-    match: Any,
-    player_id: int | None,
-    team_id: int | None,
+    resolved: _ResolvedPick,
     context: _MatchContext,
 ) -> dict[str, Any]:
     from draft_oracle.ingest.entity_match import _as_int, _to_int, resolve_manager
@@ -183,12 +194,12 @@ def _base_record(
         "manager": resolve_manager(str(row.manager), dict(context.manager_aliases)),
         "snake_slot": _to_int(row.snake_slot),
         "pick_number": _to_int(row.pick_number),
-        "position": position,
+        "position": resolved.position,
         "slot_label": row.slot_label,
-        "player_or_team_name": raw_name,
-        "matched_name": match.matched_name,
-        "player_id": player_id,
-        "team_id": team_id,
+        "player_or_team_name": resolved.raw_name,
+        "matched_name": resolved.match.matched_name,
+        "player_id": resolved.player_id,
+        "team_id": resolved.team_id,
         "points_for_round": _to_int(row.points_for_round),
         "points_when_drafted": _to_int(row.points_when_drafted),
         "current_total_points": _to_int(row.current_total_points),
@@ -198,9 +209,9 @@ def _base_record(
         "swap_partner": row.swap_partner,
         "note": row.note,
         "is_scored": bool(row.is_scored),
-        "match_method": match.method,
-        "match_confidence": float(match.confidence),
-        "needs_review": bool(match.needs_review),
+        "match_method": resolved.match.method,
+        "match_confidence": float(resolved.match.confidence),
+        "needs_review": bool(resolved.match.needs_review),
     }
 
 

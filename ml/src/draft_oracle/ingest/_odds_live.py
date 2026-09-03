@@ -5,8 +5,9 @@ from __future__ import annotations
 import os
 import time
 from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 import pandas as pd
@@ -19,6 +20,9 @@ from draft_oracle.ingest.nhl_api import (
     ResponseCache,
 )
 
+if TYPE_CHECKING:
+    from draft_oracle.ingest.odds import OddsRowGame
+
 # ── Live odds: The Odds API (future games only) ──────────────────────────
 
 DEFAULT_ODDS_CACHE_DIR = Path("data/raw/odds-api")
@@ -28,7 +32,89 @@ SOURCE_ESPN_SUMMARY = "espn_summary"
 
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 ODDS_API_SPORT = "icehockey_nhl"
+ESPN_SUMMARY_BASE = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl"
 DEFAULT_ODDS_API_DELAY = 1.0
+
+
+@dataclass(frozen=True)
+class _FavoritePrice:
+    moneyline: float | None
+    side: str | None
+
+
+@dataclass(frozen=True)
+class OddsApiClientConfig:
+    api_key: str | None = None
+    base: str = ODDS_API_BASE
+    sport: str = ODDS_API_SPORT
+    delay: float = DEFAULT_ODDS_API_DELAY
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS
+    retry_backoff: float = 1.0
+    timeout: float = DEFAULT_TIMEOUT
+
+
+@dataclass(frozen=True)
+class EspnGameOddsClientConfig:
+    base: str = ESPN_SUMMARY_BASE
+    delay: float = 1.0
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS
+    retry_backoff: float = 1.0
+    timeout: float = DEFAULT_TIMEOUT
+
+
+def _odds_api_config(
+    config: OddsApiClientConfig | None, legacy: Mapping[str, object]
+) -> OddsApiClientConfig:
+    _reject_unexpected_options(
+        "OddsApiClient",
+        legacy,
+        {"api_key", "base", "sport", "delay", "max_attempts", "retry_backoff", "timeout"},
+    )
+    base_config = config or OddsApiClientConfig()
+    api_key = legacy.get("api_key", base_config.api_key)
+    return OddsApiClientConfig(
+        api_key=str(api_key) if api_key is not None else None,
+        base=str(legacy.get("base", base_config.base)),
+        sport=str(legacy.get("sport", base_config.sport)),
+        delay=_float_option(legacy, "delay", base_config.delay),
+        max_attempts=_int_option(legacy, "max_attempts", base_config.max_attempts),
+        retry_backoff=_float_option(legacy, "retry_backoff", base_config.retry_backoff),
+        timeout=_float_option(legacy, "timeout", base_config.timeout),
+    )
+
+
+def _espn_game_config(
+    config: EspnGameOddsClientConfig | None, legacy: Mapping[str, object]
+) -> EspnGameOddsClientConfig:
+    _reject_unexpected_options(
+        "EspnGameOddsClient",
+        legacy,
+        {"base", "delay", "max_attempts", "retry_backoff", "timeout"},
+    )
+    base_config = config or EspnGameOddsClientConfig()
+    return EspnGameOddsClientConfig(
+        base=str(legacy.get("base", base_config.base)),
+        delay=_float_option(legacy, "delay", base_config.delay),
+        max_attempts=_int_option(legacy, "max_attempts", base_config.max_attempts),
+        retry_backoff=_float_option(legacy, "retry_backoff", base_config.retry_backoff),
+        timeout=_float_option(legacy, "timeout", base_config.timeout),
+    )
+
+
+def _reject_unexpected_options(
+    owner: str, legacy: Mapping[str, object], allowed: set[str]
+) -> None:
+    unexpected = set(legacy) - allowed
+    if unexpected:
+        raise TypeError(f"unexpected {owner} option(s): {sorted(unexpected)}")
+
+
+def _float_option(options: Mapping[str, object], name: str, default: float) -> float:
+    return float(cast("float | int", options.get(name, default)))
+
+
+def _int_option(options: Mapping[str, object], name: str, default: int) -> int:
+    return int(cast("float | int", options.get(name, default)))
 
 
 class OddsApiOutcome(BaseModel):
@@ -88,28 +174,26 @@ class OddsApiClient:
         self,
         cache_dir: Path | str = DEFAULT_ODDS_CACHE_DIR,
         *,
-        api_key: str | None = None,
-        base: str = ODDS_API_BASE,
-        sport: str = ODDS_API_SPORT,
-        delay: float = DEFAULT_ODDS_API_DELAY,
-        max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-        retry_backoff: float = 1.0,
-        timeout: float = DEFAULT_TIMEOUT,
+        config: OddsApiClientConfig | None = None,
         client: httpx.Client | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        **legacy: object,
     ) -> None:
-        if max_attempts < 1:
+        config = _odds_api_config(config, legacy)
+        if config.max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
-        self.api_key = api_key if api_key is not None else os.environ.get("ODDS_API_KEY", "")
-        self.base = base.rstrip("/")
-        self.sport = sport
-        self.delay = delay
-        self.max_attempts = max_attempts
-        self.retry_backoff = retry_backoff
+        self.api_key = (
+            config.api_key if config.api_key is not None else os.environ.get("ODDS_API_KEY", "")
+        )
+        self.base = config.base.rstrip("/")
+        self.sport = config.sport
+        self.delay = config.delay
+        self.max_attempts = config.max_attempts
+        self.retry_backoff = config.retry_backoff
         self._cache = ResponseCache(Path(cache_dir))
         self._sleep = sleep
         self._owns_client = client is None
-        self._client = client if client is not None else httpx.Client(timeout=timeout)
+        self._client = client if client is not None else httpx.Client(timeout=config.timeout)
         self.requests_remaining: int | None = None
         self.requests_used: int | None = None
 
@@ -134,22 +218,32 @@ class OddsApiClient:
             return cached.get("data")
         last_error: Exception | None = None
         for attempt in range(self.max_attempts):
-            if self.delay > 0:
-                self._sleep(self.delay)
-            try:
-                response = self._client.get(f"{self.base}{path}", params=dict(query))
-                response.raise_for_status()
-                self._capture_quota(response.headers)
-                parsed = response.json()
+            parsed, last_error = self._get_attempt(path, query, attempt, last_error)
+            if parsed is not None:
                 self._cache.put(cache_key, {"data": parsed})
                 return parsed
-            except (httpx.HTTPError, ValueError) as error:
-                last_error = error
-                if attempt + 1 < self.max_attempts:
-                    self._sleep(self.retry_backoff * (2**attempt))
         raise NHLApiError(
             f"Odds API request failed after {self.max_attempts} attempts: {path}"
         ) from last_error
+
+    def _get_attempt(
+        self,
+        path: str,
+        query: Mapping[str, str],
+        attempt: int,
+        last_error: Exception | None,
+    ) -> tuple[object | None, Exception | None]:
+        if self.delay > 0:
+            self._sleep(self.delay)
+        try:
+            response = self._client.get(f"{self.base}{path}", params=dict(query))
+            response.raise_for_status()
+            self._capture_quota(response.headers)
+            return response.json(), last_error
+        except (httpx.HTTPError, ValueError) as error:
+            if attempt + 1 < self.max_attempts:
+                self._sleep(self.retry_backoff * (2**attempt))
+            return None, error
 
     def _capture_quota(self, headers: httpx.Headers) -> None:
         remaining = headers.get("x-requests-remaining")
@@ -193,70 +287,98 @@ def odds_api_events_to_rows(events: Iterable[OddsApiEvent]) -> pd.DataFrame:
     per PROVENANCE/AC). Events whose teams do not resolve, or that lack a
     two-sided price, are flagged uncovered rather than imputed.
     """
-    from draft_oracle.ingest.odds import (
-        _finalize,
-        _parse_utc_date,
-        _two_sided_row,
-        _uncovered_row,
-        resolve_team_id,
-    )
+    from draft_oracle.ingest.odds import _finalize
 
     rows: list[dict[str, Any]] = []
     for event in events:
-        if event.home_team is None or event.away_team is None:
-            continue
-        home_id = resolve_team_id(event.home_team)
-        away_id = resolve_team_id(event.away_team)
-        game_date = _parse_utc_date(event.commence_time)
-        if home_id is None or away_id is None or game_date is None:
-            continue
-        season_end_year = game_date.year + 1 if game_date.month >= 8 else game_date.year
-        home_prices: list[float] = []
-        away_prices: list[float] = []
-        for book in event.bookmakers:
-            for market in book.markets:
-                if market.key != "h2h":
-                    continue
-                for outcome in market.outcomes:
-                    oid = resolve_team_id(outcome.name)
-                    if oid == home_id:
-                        home_prices.append(outcome.price)
-                    elif oid == away_id:
-                        away_prices.append(outcome.price)
-        if not home_prices or not away_prices:
-            rows.append(
-                _uncovered_row(
-                    source=SOURCE_ODDS_API,
-                    season_end_year=season_end_year,
-                    game_date=game_date,
-                    away_id=away_id,
-                    home_id=home_id,
-                    away_name=event.away_team,
-                    home_name=event.home_team,
-                    neutral=False,
-                )
-            )
-            continue
-        rows.append(
-            _two_sided_row(
-                source=SOURCE_ODDS_API,
-                season_end_year=season_end_year,
-                game_date=game_date,
-                away_id=away_id,
-                home_id=home_id,
-                away_name=event.away_team,
-                home_name=event.home_team,
-                away_ml=_median(away_prices),
-                home_ml=_median(home_prices),
-                neutral=False,
-            )
-        )
+        row = _odds_api_event_row(event)
+        if row is not None:
+            rows.append(row)
     return _finalize(rows)
 
 
-# ── Live odds: ESPN summary (favorite-only, future games) ────────────────
+def _odds_api_event_row(event: OddsApiEvent) -> dict[str, Any] | None:
+    from draft_oracle.ingest.odds import _two_sided_row, _uncovered_row
 
-ESPN_SUMMARY_BASE = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl"
+    game = _odds_api_game(event)
+    if game is None:
+        return None
+    home_prices, away_prices = _odds_api_h2h_prices(event, game.home_id, game.away_id)
+    if not home_prices:
+        return cast("dict[str, Any]", _uncovered_row(game))
+    if not away_prices:
+        return cast("dict[str, Any]", _uncovered_row(game))
+    return _two_sided_row(
+        game,
+        away_ml=_median(away_prices),
+        home_ml=_median(home_prices),
+    )
+
+
+def _odds_api_game(event: OddsApiEvent) -> OddsRowGame | None:
+    from draft_oracle.ingest.odds import OddsRowGame, _parse_utc_date, resolve_team_id
+
+    if event.home_team is None:
+        return None
+    if event.away_team is None:
+        return None
+    home_id = resolve_team_id(event.home_team)
+    away_id = resolve_team_id(event.away_team)
+    game_date = _parse_utc_date(event.commence_time)
+    if home_id is None:
+        return None
+    if away_id is None:
+        return None
+    if game_date is None:
+        return None
+    season_end_year = game_date.year + 1 if game_date.month >= 8 else game_date.year
+    return OddsRowGame(
+        source=SOURCE_ODDS_API,
+        season_end_year=season_end_year,
+        game_date=game_date,
+        away_id=away_id,
+        home_id=home_id,
+        away_name=event.away_team,
+        home_name=event.home_team,
+        neutral=False,
+    )
+
+
+def _odds_api_h2h_prices(
+    event: OddsApiEvent, home_id: int, away_id: int
+) -> tuple[list[float], list[float]]:
+    from draft_oracle.ingest.odds import resolve_team_id
+
+    home_prices: list[float] = []
+    away_prices: list[float] = []
+    prices_by_id = {home_id: home_prices, away_id: away_prices}
+    outcomes = [
+        outcome
+        for book in event.bookmakers
+        for market in book.markets
+        if market.key == "h2h"
+        for outcome in market.outcomes
+    ]
+    for outcome in outcomes:
+        bucket = _price_bucket(prices_by_id, resolve_team_id(outcome.name))
+        _append_price(bucket, outcome.price)
+    return home_prices, away_prices
+
+
+def _price_bucket(
+    prices_by_id: dict[int, list[float]], outcome_id: int | None
+) -> list[float] | None:
+    if outcome_id is None:
+        return None
+    return prices_by_id.get(outcome_id)
+
+
+def _append_price(bucket: list[float] | None, price: float) -> None:
+    if bucket is not None:
+        bucket.append(price)
+
+
+# ── Live odds: ESPN summary (favorite-only, future games) ────────────────
 
 
 class EspnGameOddsClient:
@@ -274,24 +396,22 @@ class EspnGameOddsClient:
         self,
         cache_dir: Path | str = DEFAULT_ESPN_CACHE_DIR,
         *,
-        base: str = ESPN_SUMMARY_BASE,
-        delay: float = 1.0,
-        max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-        retry_backoff: float = 1.0,
-        timeout: float = DEFAULT_TIMEOUT,
+        config: EspnGameOddsClientConfig | None = None,
         client: httpx.Client | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        **legacy: object,
     ) -> None:
-        if max_attempts < 1:
+        config = _espn_game_config(config, legacy)
+        if config.max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
-        self.base = base.rstrip("/")
-        self.delay = delay
-        self.max_attempts = max_attempts
-        self.retry_backoff = retry_backoff
+        self.base = config.base.rstrip("/")
+        self.delay = config.delay
+        self.max_attempts = config.max_attempts
+        self.retry_backoff = config.retry_backoff
         self._cache = ResponseCache(Path(cache_dir))
         self._sleep = sleep
         self._owns_client = client is None
-        self._client = client if client is not None else httpx.Client(timeout=timeout)
+        self._client = client if client is not None else httpx.Client(timeout=config.timeout)
 
     def close(self) -> None:
         if self._owns_client:
@@ -313,21 +433,32 @@ class EspnGameOddsClient:
             return cached
         last_error: Exception | None = None
         for attempt in range(self.max_attempts):
-            if self.delay > 0:
-                self._sleep(self.delay)
-            try:
-                response = self._client.get(f"{self.base}{path}", params=dict(params))
-                response.raise_for_status()
-                parsed: dict[str, Any] = response.json()
+            parsed, last_error = self._summary_attempt(path, params, attempt, last_error)
+            if parsed is not None:
                 self._cache.put(cache_key, parsed)
                 return parsed
-            except (httpx.HTTPError, ValueError) as error:
-                last_error = error
-                if attempt + 1 < self.max_attempts:
-                    self._sleep(self.retry_backoff * (2**attempt))
         raise NHLApiError(
             f"ESPN summary request failed after {self.max_attempts} attempts: event={event_id}"
         ) from last_error
+
+    def _summary_attempt(
+        self,
+        path: str,
+        params: Mapping[str, str],
+        attempt: int,
+        last_error: Exception | None,
+    ) -> tuple[dict[str, Any] | None, Exception | None]:
+        if self.delay > 0:
+            self._sleep(self.delay)
+        try:
+            response = self._client.get(f"{self.base}{path}", params=dict(params))
+            response.raise_for_status()
+            parsed: dict[str, Any] = response.json()
+            return parsed, last_error
+        except (httpx.HTTPError, ValueError) as error:
+            if attempt + 1 < self.max_attempts:
+                self._sleep(self.retry_backoff * (2**attempt))
+            return None, error
 
     def game_odds(self, event_id: int | str) -> pd.DataFrame:
         """One favorite-only, de-vigged odds row for a future game (or flagged)."""
@@ -344,82 +475,107 @@ def espn_summary_to_rows(summary: Mapping[str, Any]) -> pd.DataFrame:
     are flagged, not imputed.
     """
     from draft_oracle.ingest.odds import (
-        _american,
         _empty_odds_frame,
         _favorite_only_row,
         _finalize,
-        _parse_utc_date,
-        _pickcenter_favorite_side,
         _uncovered_row,
-        resolve_team_id,
     )
 
-    competitions = _dig(summary, "header", "competitions")
-    if not isinstance(competitions, list) or not competitions:
+    game = _espn_summary_game(summary)
+    if game is None:
         return _empty_odds_frame()
-    competition = competitions[0]
-    competitors = competition.get("competitors", []) if isinstance(competition, dict) else []
-    home_name: str | None = None
-    away_name: str | None = None
-    for competitor in competitors:
-        team = competitor.get("team", {}) if isinstance(competitor, dict) else {}
-        name = team.get("displayName") if isinstance(team, dict) else None
-        if competitor.get("homeAway") == "home":
-            home_name = name
-        elif competitor.get("homeAway") == "away":
-            away_name = name
-    game_date = _parse_utc_date(competition.get("date")) if isinstance(competition, dict) else None
-    if home_name is None or away_name is None or game_date is None:
-        return _empty_odds_frame()
-    home_id = resolve_team_id(home_name)
-    away_id = resolve_team_id(away_name)
-    if home_id is None or away_id is None:
-        return _empty_odds_frame()
-    season_end_year = game_date.year if game_date.month < 8 else game_date.year + 1
-
-    pickcenter = summary.get("pickcenter") if isinstance(summary, Mapping) else None
-    fav_ml: float | None = None
-    favorite_side: str | None = None
-    home_relative_spread: float | None = None
-    if isinstance(pickcenter, list) and pickcenter:
-        first = pickcenter[0]
-        if isinstance(first, dict):
-            fav_ml = _pickcenter_favorite_ml(first)
-            favorite_side = _pickcenter_favorite_side(first)
-            home_relative_spread = _american(first.get("spread"))
-            if favorite_side is None and home_relative_spread not in (None, 0.0):
-                favorite_side = "home" if home_relative_spread < 0 else "away"
-    if fav_ml is None or favorite_side is None:
-        return _finalize(
-            [
-                _uncovered_row(
-                    source=SOURCE_ESPN_SUMMARY,
-                    season_end_year=season_end_year,
-                    game_date=game_date,
-                    away_id=away_id,
-                    home_id=home_id,
-                    away_name=away_name,
-                    home_name=home_name,
-                    neutral=False,
-                )
-            ]
-        )
+    favorite = _espn_pickcenter_favorite(summary.get("pickcenter"))
+    if favorite.moneyline is None or favorite.side is None:
+        return _finalize([_uncovered_row(game)])
     return _finalize(
         [
             _favorite_only_row(
-                source=SOURCE_ESPN_SUMMARY,
-                season_end_year=season_end_year,
-                game_date=game_date,
-                away_id=away_id,
-                home_id=home_id,
-                away_name=away_name,
-                home_name=home_name,
-                favorite_ml=fav_ml,
-                favorite_side=favorite_side,
-                neutral=False,
+                game,
+                favorite_ml=favorite.moneyline,
+                favorite_side=favorite.side,
             )
         ]
     )
+
+
+def _espn_summary_game(summary: Mapping[str, Any]) -> OddsRowGame | None:
+    from draft_oracle.ingest.odds import OddsRowGame, _parse_utc_date, resolve_team_id
+
+    competition = _first_espn_competition(summary)
+    if competition is None:
+        return None
+    home_name, away_name = _espn_competitor_names(competition)
+    game_date = _parse_utc_date(competition.get("date"))
+    if home_name is None:
+        return None
+    if away_name is None:
+        return None
+    if game_date is None:
+        return None
+    home_id = resolve_team_id(home_name)
+    away_id = resolve_team_id(away_name)
+    if home_id is None or away_id is None:
+        return None
+    season_end_year = game_date.year if game_date.month < 8 else game_date.year + 1
+    return OddsRowGame(
+        source=SOURCE_ESPN_SUMMARY,
+        season_end_year=season_end_year,
+        game_date=game_date,
+        away_id=away_id,
+        home_id=home_id,
+        away_name=away_name,
+        home_name=home_name,
+        neutral=False,
+    )
+
+
+def _first_espn_competition(summary: Mapping[str, Any]) -> dict[str, Any] | None:
+    competitions = _dig(summary, "header", "competitions")
+    if not isinstance(competitions, list):
+        return None
+    if not competitions:
+        return None
+    first = competitions[0]
+    return first if isinstance(first, dict) else None
+
+
+def _espn_competitor_names(competition: Mapping[str, Any]) -> tuple[str | None, str | None]:
+    competitors = competition.get("competitors", [])
+    if not isinstance(competitors, list):
+        return None, None
+    names = {
+        side: name
+        for side, name in (_espn_competitor_side_name(item) for item in competitors)
+        if side is not None
+    }
+    return names.get("home"), names.get("away")
+
+
+def _espn_competitor_side_name(competitor: object) -> tuple[str | None, str | None]:
+    if not isinstance(competitor, Mapping):
+        return None, None
+    team = competitor.get("team", {})
+    name = team.get("displayName") if isinstance(team, Mapping) else None
+    side = competitor.get("homeAway")
+    return str(side) if side is not None else None, str(name) if name is not None else None
+
+
+def _espn_pickcenter_favorite(pickcenter: object) -> _FavoritePrice:
+    from draft_oracle.ingest.odds import _american, _pickcenter_favorite_side
+
+    if not isinstance(pickcenter, list):
+        return _FavoritePrice(None, None)
+    if not pickcenter:
+        return _FavoritePrice(None, None)
+    first = pickcenter[0]
+    if not isinstance(first, Mapping):
+        return _FavoritePrice(None, None)
+    favorite_ml = _pickcenter_favorite_ml(first)
+    favorite_side = _pickcenter_favorite_side(first)
+    home_relative_spread = _american(first.get("spread"))
+    if favorite_side is None and home_relative_spread not in (None, 0.0):
+        favorite_side = "home" if home_relative_spread < 0 else "away"
+    return _FavoritePrice(favorite_ml, favorite_side)
 
 
 def _pickcenter_favorite_ml(pickcenter: Mapping[str, Any]) -> float | None:
@@ -427,14 +583,21 @@ def _pickcenter_favorite_ml(pickcenter: Mapping[str, Any]) -> float | None:
     from draft_oracle.ingest.odds import _american
 
     for side_key in ("homeTeamOdds", "awayTeamOdds"):
-        side = pickcenter.get(side_key)
-        if isinstance(side, dict) and side.get("favorite"):
-            ml = side.get("moneyLine")
-            coerced = _american(ml)
-            if coerced is not None:
-                return coerced
+        coerced = _favorite_side_moneyline(pickcenter.get(side_key))
+        if coerced is not None:
+            return coerced
     # Fall back to a top-level moneyLine if the per-side flags are absent.
     return _american(pickcenter.get("moneyLine"))
+
+
+def _favorite_side_moneyline(side: object) -> float | None:
+    from draft_oracle.ingest.odds import _american
+
+    if not isinstance(side, Mapping):
+        return None
+    if not side.get("favorite"):
+        return None
+    return _american(side.get("moneyLine"))
 
 
 def _dig(obj: Any, *keys: str) -> Any:

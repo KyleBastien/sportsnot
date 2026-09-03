@@ -164,21 +164,24 @@ def _load_override_section(
     expected_matches: dict[str, int] = {}
     for raw_name, value in raw_section.items():
         name = normalize_name(raw_name)
-        if isinstance(value, Mapping):
-            if id_key not in value:
-                raise ValueError(f"name override {raw_name!r} is missing {id_key!r}")
-            ids[name] = int(value[id_key])
-            expected = value.get("expected_matches")
-            if expected is not None:
-                count = int(expected)
-                if count < 1:
-                    raise ValueError(
-                        f"name override {raw_name!r} expected_matches must be >= 1"
-                    )
-                expected_matches[name] = count
-        else:
-            ids[name] = int(value)
+        ids[name], expected = _override_id_and_expected(raw_name, value, id_key)
+        if expected is not None:
+            expected_matches[name] = expected
     return ids, expected_matches
+
+
+def _override_id_and_expected(raw_name: str, value: Any, id_key: str) -> tuple[int, int | None]:
+    if not isinstance(value, Mapping):
+        return int(value), None
+    if id_key not in value:
+        raise ValueError(f"name override {raw_name!r} is missing {id_key!r}")
+    expected = value.get("expected_matches")
+    if expected is None:
+        return int(value[id_key]), None
+    count = int(expected)
+    if count < 1:
+        raise ValueError(f"name override {raw_name!r} expected_matches must be >= 1")
+    return int(value[id_key]), count
 
 
 def load_name_overrides(
@@ -195,9 +198,7 @@ def load_name_overrides(
     players, player_expected_matches = _load_override_section(
         raw.get("players") or {}, id_key="player_id"
     )
-    teams, team_expected_matches = _load_override_section(
-        raw.get("teams") or {}, id_key="team_id"
-    )
+    teams, team_expected_matches = _load_override_section(raw.get("teams") or {}, id_key="team_id")
     return NameOverrides(
         players=players,
         teams=teams,
@@ -208,8 +209,10 @@ def load_name_overrides(
 
 def _effective_skater_name(row: Any) -> str:
     corrected = getattr(row, "corrected_name", None)
-    if corrected is not None and pd.notna(corrected) and str(corrected).strip():
-        return str(corrected)
+    if corrected is not None:
+        text = str(corrected).strip()
+        if pd.notna(corrected) and text:
+            return str(corrected)
     return str(row.player_or_team_name)
 
 
@@ -227,9 +230,7 @@ def _team_override_key(
     return None
 
 
-def _validate_override_match_counts(
-    league_picks: pd.DataFrame, overrides: NameOverrides
-) -> None:
+def _validate_override_match_counts(league_picks: pd.DataFrame, overrides: NameOverrides) -> None:
     """Fail when a guarded override matches an unexpected league-pick count."""
     player_actual, team_actual = _override_match_counts(league_picks, overrides)
     _validate_expected_counts(
@@ -252,11 +253,21 @@ def _override_match_counts(
     player_actual = dict.fromkeys(overrides.player_expected_matches, 0)
     team_actual = dict.fromkeys(overrides.team_expected_matches, 0)
     for row in league_picks.itertuples(index=False):
-        if str(row.position) in _SKATER_POSITIONS:
-            _increment_if_present(player_actual, normalize_name(_effective_skater_name(row)))
-        elif str(row.position) == "G":
-            _increment_if_present(team_actual, _row_team_override_key(row, overrides))
+        _count_override_match(row, overrides, player_actual, team_actual)
     return player_actual, team_actual
+
+
+def _count_override_match(
+    row: Any,
+    overrides: NameOverrides,
+    player_actual: dict[str, int],
+    team_actual: dict[str, int],
+) -> None:
+    position = str(row.position)
+    if position in _SKATER_POSITIONS:
+        _increment_if_present(player_actual, normalize_name(_effective_skater_name(row)))
+    elif position == "G":
+        _increment_if_present(team_actual, _row_team_override_key(row, overrides))
 
 
 def _increment_if_present(counts: dict[str, int], key: str | None) -> None:
@@ -268,9 +279,7 @@ def _row_team_override_key(row: Any, overrides: NameOverrides) -> str | None:
     raw_name = str(row.player_or_team_name)
     raw_team_name = getattr(row, "team_name", None)
     team_name = (
-        str(raw_team_name)
-        if raw_team_name is not None and pd.notna(raw_team_name)
-        else None
+        str(raw_team_name) if raw_team_name is not None and pd.notna(raw_team_name) else None
     )
     return _team_override_key(team_name, raw_name, overrides)
 
@@ -284,9 +293,7 @@ def _validate_expected_counts(
     for key, expected in expected_counts.items():
         observed = actual[key]
         if observed != expected:
-            raise ValueError(
-                f"{label} {key!r} expected {expected} {count_label}, found {observed}"
-            )
+            raise ValueError(f"{label} {key!r} expected {expected} {count_label}, found {observed}")
 
 
 # ── Team-id resolution (extends odds.resolve_team_id with nicknames) ──────
@@ -334,17 +341,32 @@ def resolve_team(
         override_key = _team_override_key(team_name, raw_name, overrides)
         if override_key is not None:
             return overrides.teams[override_key]
+    return _resolve_team_candidate(candidates) or _resolve_team_nickname(candidates)
+
+
+def _resolve_team_candidate(candidates: list[str]) -> int | None:
     for candidate in candidates:
-        tid = resolve_team_id(candidate)
-        if tid is not None:
-            return tid
+        team_id = resolve_team_id(candidate)
+        if team_id is not None:
+            return team_id
+    return None
+
+
+def _resolve_team_nickname(candidates: list[str]) -> int | None:
     for candidate in candidates:
-        # Scan tokens (surname-first) so "Panthers Goalie" resolves on "panthers"
-        # and two-word nicknames ("Maple Leafs") resolve on the distinctive word.
-        for token in reversed(name_tokens(candidate)):
-            nick = _NICKNAME_INDEX.get(token)
-            if nick is not None:
-                return nick
+        team_id = _resolve_nickname_tokens(candidate)
+        if team_id is not None:
+            return team_id
+    return None
+
+
+def _resolve_nickname_tokens(candidate: str) -> int | None:
+    # Scan tokens (surname-first) so "Panthers Goalie" resolves on "panthers"
+    # and two-word nicknames ("Maple Leafs") resolve on the distinctive word.
+    for token in reversed(name_tokens(candidate)):
+        nick = _NICKNAME_INDEX.get(token)
+        if nick is not None:
+            return nick
     return None
 
 
@@ -427,46 +449,69 @@ def match_skater(
     fuzzy → unique last-name fallback → low-confidence fuzzy (review) → unresolved.
     """
     norm = normalize_name(name)
-    if overrides is not None:
-        override_id = overrides.players.get(norm)
-        if override_id is not None:
-            return Match(
-                override_id,
-                index.id_to_name.get(override_id),
-                "override",
-                1.0,
-                False,
-            )
+    override_match = _override_skater_match(norm, index, overrides)
+    if override_match is not None:
+        return override_match
 
-    exact = index.by_norm.get(norm, [])
-    if exact:
-        same_pos = [c for c in exact if c.position == position]
-        chosen = same_pos or exact
-        # Ambiguous only if multiple survive position disambiguation.
-        ambiguous = len(chosen) > 1
-        cand = chosen[0]
-        return Match(cand.player_id, cand.name, "exact", 1.0, ambiguous)
+    exact_match = _exact_skater_match(norm, position, index)
+    if exact_match is not None:
+        return exact_match
 
     pool = _position_pool(index, position)
+    best, best_ratio = _best_fuzzy_candidate(norm, pool)
+    if best is not None and best_ratio >= HIGH_CONFIDENCE:
+        return Match(best.player_id, best.name, "fuzzy", round(best_ratio, 3), False)
+
+    last_match = _last_name_match(name, pool)
+    if last_match is not None:
+        return last_match
+
+    if best is not None and best_ratio >= REVIEW_THRESHOLD:
+        return Match(best.player_id, best.name, "fuzzy-low", round(best_ratio, 3), True)
+
+    return Match(None, None, "unmatched", round(best_ratio, 3), True)
+
+
+def _override_skater_match(
+    norm: str, index: PlayerIndex, overrides: NameOverrides | None
+) -> Match | None:
+    if overrides is None:
+        return None
+    override_id = overrides.players.get(norm)
+    if override_id is None:
+        return None
+    return Match(override_id, index.id_to_name.get(override_id), "override", 1.0, False)
+
+
+def _exact_skater_match(norm: str, position: str, index: PlayerIndex) -> Match | None:
+    exact = index.by_norm.get(norm, [])
+    if not exact:
+        return None
+    same_pos = [c for c in exact if c.position == position]
+    chosen = same_pos or exact
+    cand = chosen[0]
+    return Match(cand.player_id, cand.name, "exact", 1.0, len(chosen) > 1)
+
+
+def _best_fuzzy_candidate(
+    norm: str, pool: list[PlayerCandidate]
+) -> tuple[PlayerCandidate | None, float]:
     best = max(
         pool,
         key=lambda c: SequenceMatcher(None, norm, c.norm).ratio(),
         default=None,
     )
     best_ratio = SequenceMatcher(None, norm, best.norm).ratio() if best is not None else 0.0
-    if best is not None and best_ratio >= HIGH_CONFIDENCE:
-        return Match(best.player_id, best.name, "fuzzy", round(best_ratio, 3), False)
+    return best, best_ratio
 
+
+def _last_name_match(name: str, pool: list[PlayerCandidate]) -> Match | None:
     last = last_name_key(name)
     last_hits = [c for c in pool if c.last == last] if last else []
-    if len(last_hits) == 1:
-        cand = last_hits[0]
-        return Match(cand.player_id, cand.name, "lastname", LASTNAME_CONFIDENCE, False)
-
-    if best is not None and best_ratio >= REVIEW_THRESHOLD:
-        return Match(best.player_id, best.name, "fuzzy-low", round(best_ratio, 3), True)
-
-    return Match(None, None, "unmatched", round(best_ratio, 3), True)
+    if len(last_hits) != 1:
+        return None
+    cand = last_hits[0]
+    return Match(cand.player_id, cand.name, "lastname", LASTNAME_CONFIDENCE, False)
 
 
 def match_team(
@@ -607,7 +652,11 @@ def _is_matched(position: str, player_id: int | None, team_id: int | None) -> bo
 def _playoff_round(game_id: Any) -> int | None:
     """Return the best-of-seven round encoded in an NHL playoff ``game_id``."""
     text = str(game_id).strip()
-    if len(text) != 10 or not text.isdigit() or text[7] not in "1234":
+    if len(text) != 10:
+        return None
+    if not text.isdigit():
+        return None
+    if text[7] not in "1234":
         return None
     return int(text[7])
 
@@ -643,13 +692,7 @@ def _point_columns_contradict(
     team wins and shutouts, while this archive cross-check uses skater goals and
     assists keyed by ``player_id``.
     """
-    if (
-        record["source"] != "sheet"
-        or record["position"] == "G"
-        or record["player_id"] is None
-        or not record["is_scored"]
-        or record["draft_event"] not in _DRAFT_EVENT_ROUNDS
-    ):
+    if not _can_crosscheck_points(record):
         return False
     columns = (
         record["points_for_round"],
@@ -675,6 +718,18 @@ def _point_columns_contradict(
     )
 
 
+def _can_crosscheck_points(record: dict[str, Any]) -> bool:
+    if record["source"] != "sheet":
+        return False
+    if record["position"] == "G":
+        return False
+    if record["player_id"] is None:
+        return False
+    if not record["is_scored"]:
+        return False
+    return record["draft_event"] in _DRAFT_EVENT_ROUNDS
+
+
 def _mark_duplicate_ownership(frame: pd.DataFrame) -> tuple[int, int]:
     """Flag assets owned by multiple managers within one league draft event."""
     conflicting_keys: list[tuple[Any, ...]] = []
@@ -684,15 +739,25 @@ def _mark_duplicate_ownership(frame: pd.DataFrame) -> tuple[int, int]:
         ("team_id", frame.loc[frame["team_id"].notna() & (frame["position"] == "G")]),
     )
     for asset_column, assets in asset_frames:
-        group_columns = ["league_name", "season", "draft_event", asset_column]
-        for key, group in assets.groupby(group_columns, dropna=False, sort=False):
-            if group["manager"].nunique() <= 1:
-                continue
-            conflicting_keys.append(key if isinstance(key, tuple) else (key,))
-            conflicting_rows.update(int(index) for index in group.index)
+        keys, rows = _conflicting_asset_ownerships(assets, asset_column)
+        conflicting_keys.extend(keys)
+        conflicting_rows.update(rows)
     if conflicting_rows:
         frame.loc[list(conflicting_rows), "needs_review"] = True
     return len(conflicting_keys), len(conflicting_rows)
+
+
+def _conflicting_asset_ownerships(
+    assets: pd.DataFrame, asset_column: str
+) -> tuple[list[tuple[Any, ...]], set[int]]:
+    group_columns = ["league_name", "season", "draft_event", asset_column]
+    conflicting_keys: list[tuple[Any, ...]] = []
+    conflicting_rows: set[int] = set()
+    for key, group in assets.groupby(group_columns, dropna=False, sort=False):
+        if group["manager"].nunique() > 1:
+            conflicting_keys.append(key if isinstance(key, tuple) else (key,))
+            conflicting_rows.update(int(index) for index in group.index)
+    return conflicting_keys, conflicting_rows
 
 
 def build_league_draft_picks(
@@ -706,6 +771,7 @@ def build_league_draft_picks(
         overrides_dir=overrides_dir,
         out_dir=out_dir,
     )
+
 
 def _as_int(value: Any) -> int:
     return int(value)

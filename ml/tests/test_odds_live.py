@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -122,14 +123,7 @@ def test_odds_api_client_fetches_and_captures_quota(tmp_path: Path) -> None:
             headers={"x-requests-remaining": "480", "x-requests-used": "20"},
         )
 
-    client = OddsApiClient(
-        cache_dir=tmp_path / "cache",
-        api_key="secret",
-        delay=0.0,
-        retry_backoff=0.0,
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
-        sleep=_noop_sleep,
-    )
+    client = _odds_api_test_client(tmp_path, handler, api_key="secret")
     events = client.nhl_odds()
     assert len(events) == 1
     assert client.requests_remaining == 480
@@ -141,16 +135,28 @@ def test_odds_api_client_fetches_and_captures_quota(tmp_path: Path) -> None:
 
 
 def test_odds_api_client_requires_key(tmp_path: Path) -> None:
-    client = OddsApiClient(
-        cache_dir=tmp_path / "cache",
-        api_key="",
-        delay=0.0,
-        client=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=[]))),
-        sleep=_noop_sleep,
+    client = _odds_api_test_client(
+        tmp_path, lambda _request: httpx.Response(200, json=[]), api_key=""
     )
     with pytest.raises(NHLApiError):
         client.nhl_odds()
     client.close()
+
+
+def _odds_api_test_client(
+    tmp_path: Path,
+    handler: Callable[[httpx.Request], httpx.Response],
+    *,
+    api_key: str,
+) -> OddsApiClient:
+    return OddsApiClient(
+        cache_dir=tmp_path / "cache",
+        api_key=api_key,
+        delay=0.0,
+        retry_backoff=0.0,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        sleep=_noop_sleep,
+    )
 
 
 def test_odds_api_events_to_rows_devigs() -> None:
@@ -224,9 +230,7 @@ def test_espn_summary_to_rows_missing_spread_and_flags_is_unattributed(
     payload = _espn_summary_payload(favorite_home=True)
     pickcenter = payload["pickcenter"][0]
     pickcenter["spread"] = spread
-    pickcenter["homeTeamOdds"]["favorite"] = False
-    pickcenter["awayTeamOdds"]["favorite"] = False
-    pickcenter["moneyLine"] = -160
+    _clear_pickcenter_favorite_flags(pickcenter)
 
     row = espn_summary_to_rows(payload).iloc[0]
 
@@ -238,9 +242,7 @@ def test_espn_summary_to_rows_omitted_spread_and_flags_is_unattributed() -> None
     payload = _espn_summary_payload(favorite_home=True)
     pickcenter = payload["pickcenter"][0]
     del pickcenter["spread"]
-    pickcenter["homeTeamOdds"]["favorite"] = False
-    pickcenter["awayTeamOdds"]["favorite"] = False
-    pickcenter["moneyLine"] = -160
+    _clear_pickcenter_favorite_flags(pickcenter)
 
     row = espn_summary_to_rows(payload).iloc[0]
 
@@ -264,14 +266,26 @@ def test_espn_game_odds_client_uses_transport(tmp_path: Path) -> None:
         assert request.url.path.endswith("/summary")
         return httpx.Response(200, json=_espn_summary_payload(favorite_home=False))
 
-    client = EspnGameOddsClient(
+    client = _espn_game_test_client(tmp_path, handler)
+    df = client.game_odds(401874176)
+    assert len(df) == 1
+    assert df.iloc[0]["favorite_side"] == "away"
+    client.close()
+
+
+def _clear_pickcenter_favorite_flags(pickcenter: dict[str, Any]) -> None:
+    pickcenter["homeTeamOdds"]["favorite"] = False
+    pickcenter["awayTeamOdds"]["favorite"] = False
+    pickcenter["moneyLine"] = -160
+
+
+def _espn_game_test_client(
+    tmp_path: Path, handler: Callable[[httpx.Request], httpx.Response]
+) -> EspnGameOddsClient:
+    return EspnGameOddsClient(
         cache_dir=tmp_path / "cache",
         delay=0.0,
         retry_backoff=0.0,
         client=httpx.Client(transport=httpx.MockTransport(handler)),
         sleep=_noop_sleep,
     )
-    df = client.game_odds(401874176)
-    assert len(df) == 1
-    assert df.iloc[0]["favorite_side"] == "away"
-    client.close()

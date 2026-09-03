@@ -6,6 +6,7 @@ flag counts per tab are derived from ``SCHEMA.md`` §8 and ``OPEN_QUESTIONS.md``
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
@@ -28,6 +29,17 @@ from draft_oracle.ingest.league_drafts import (
 )
 
 LEAGUE_DIR = DEFAULT_LEAGUE_DRAFTS_DIR
+
+
+@dataclass(frozen=True)
+class _TabExpectation:
+    file: str
+    season: int
+    event: str
+    picks: int
+    flags: int
+    excluded: int
+    activated: int
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────
@@ -74,36 +86,25 @@ def test_slot_position_mapping() -> None:
 
 # (file, season, event, expected picks, status flags, excluded, activated)
 _TAB_EXPECTATIONS = [
-    ("sheet3__round-1.csv", 2024, "R1", 36, 0, 0, 0),
-    ("sheet3__round-2.csv", 2024, "R2", 36, 0, 0, 0),
-    ("sheet3__round-3-round-4.csv", 2024, "R3_4", 36, 0, 0, 0),
-    ("sheet2__round-1.csv", 2025, "R1", 44, 2, 1, 1),
-    ("sheet2__round-2.csv", 2025, "R2", 44, 4, 2, 2),
-    ("sheet2__round-3-4.csv", 2025, "R3_4", 44, 0, 2, 2),
-    ("sheet1__round-1.csv", 2026, "R1", 36, 0, 0, 0),
-    ("sheet1__round-2.csv", 2026, "R2", 36, 2, 2, 0),
+    _TabExpectation("sheet3__round-1.csv", 2024, "R1", 36, 0, 0, 0),
+    _TabExpectation("sheet3__round-2.csv", 2024, "R2", 36, 0, 0, 0),
+    _TabExpectation("sheet3__round-3-round-4.csv", 2024, "R3_4", 36, 0, 0, 0),
+    _TabExpectation("sheet2__round-1.csv", 2025, "R1", 44, 2, 1, 1),
+    _TabExpectation("sheet2__round-2.csv", 2025, "R2", 44, 4, 2, 2),
+    _TabExpectation("sheet2__round-3-4.csv", 2025, "R3_4", 44, 0, 2, 2),
+    _TabExpectation("sheet1__round-1.csv", 2026, "R1", 36, 0, 0, 0),
+    _TabExpectation("sheet1__round-2.csv", 2026, "R2", 36, 2, 2, 0),
 ]
 
 
-@pytest.mark.parametrize(
-    ("file", "season", "event", "n_picks", "n_flags", "n_excluded", "n_activated"),
-    _TAB_EXPECTATIONS,
-)
-def test_tab_counts(
-    file: str,
-    season: int,
-    event: str,
-    n_picks: int,
-    n_flags: int,
-    n_excluded: int,
-    n_activated: int,
-) -> None:
-    rows = read_csv_rows(LEAGUE_DIR / file)
-    records = parse_sheet_tab(rows, season, event)
-    assert len(records) == n_picks
-    assert sum(1 for r in records if r["status"] is not None) == n_flags
-    assert sum(1 for r in records if r["points_excluded"]) == n_excluded
-    assert sum(1 for r in records if r["ir_activated"]) == n_activated
+@pytest.mark.parametrize("expected", _TAB_EXPECTATIONS)
+def test_tab_counts(expected: _TabExpectation) -> None:
+    rows = read_csv_rows(LEAGUE_DIR / expected.file)
+    records = parse_sheet_tab(rows, expected.season, expected.event)
+    assert len(records) == expected.picks
+    assert sum(1 for r in records if r["status"] is not None) == expected.flags
+    assert sum(1 for r in records if r["points_excluded"]) == expected.excluded
+    assert sum(1 for r in records if r["ir_activated"]) == expected.activated
     # Every block is a legal 9-starter composition (5F + 3D + 1G), IR excluded.
     non_ir = [r for r in records if not str(r["position"]).startswith("IR")]
     assert len(non_ir) == 36  # 4 managers x 9 starters

@@ -124,13 +124,20 @@ def _write_league_picks(normalized_dir: Path) -> None:
     pd.DataFrame(rows).to_parquet(normalized_dir / "league_picks.parquet", index=False)
 
 
-def test_build_league_draft_picks_end_to_end(tmp_path: Path) -> None:
+def _prepare_match_inputs(
+    tmp_path: Path, overrides_text: str = "players: {}\nteams: {}\n"
+) -> tuple[Path, Path]:
     normalized = tmp_path / "normalized"
     out = tmp_path / "out"
     _write_normalized(normalized)
-    _write_league_picks(normalized)
     _write_manager_aliases(tmp_path / "manager_aliases.yaml")
-    (tmp_path / "name_overrides.yaml").write_text("players: {}\nteams: {}\n", encoding="utf-8")
+    (tmp_path / "name_overrides.yaml").write_text(overrides_text, encoding="utf-8")
+    return normalized, out
+
+
+def test_build_league_draft_picks_end_to_end(tmp_path: Path) -> None:
+    normalized, out = _prepare_match_inputs(tmp_path)
+    _write_league_picks(normalized)
 
     result = build_league_draft_picks(
         normalized_dir=normalized, overrides_dir=tmp_path, out_dir=out
@@ -157,9 +164,7 @@ def test_build_league_draft_picks_end_to_end(tmp_path: Path) -> None:
 
 
 def test_build_league_draft_picks_review_report(tmp_path: Path) -> None:
-    normalized = tmp_path / "normalized"
-    out = tmp_path / "out"
-    _write_normalized(normalized)
+    normalized, out = _prepare_match_inputs(tmp_path)
     rows = [
         _league_pick(),
         _league_pick(
@@ -169,8 +174,6 @@ def test_build_league_draft_picks_review_report(tmp_path: Path) -> None:
         ),  # unmatched -> review
     ]
     pd.DataFrame(rows).to_parquet(normalized / "league_picks.parquet", index=False)
-    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
-    (tmp_path / "name_overrides.yaml").write_text("players: {}\nteams: {}\n", encoding="utf-8")
 
     result = build_league_draft_picks(
         normalized_dir=normalized, overrides_dir=tmp_path, out_dir=out
@@ -184,20 +187,16 @@ def test_build_league_draft_picks_review_report(tmp_path: Path) -> None:
 
 
 def test_build_league_draft_picks_override_closes_gap(tmp_path: Path) -> None:
-    normalized = tmp_path / "normalized"
-    out = tmp_path / "out"
-    _write_normalized(normalized)
-    pd.DataFrame([_league_pick(player_or_team_name="Mystery Man")]).to_parquet(
-        normalized / "league_picks.parquet", index=False
-    )
-    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
-    (tmp_path / "name_overrides.yaml").write_text(
+    normalized, out = _prepare_match_inputs(
+        tmp_path,
         "players:\n"
         "  'Mystery Man':\n"
         "    player_id: 8478402\n"
         "    expected_matches: 1\n"
         "teams: {}\n",
-        encoding="utf-8",
+    )
+    pd.DataFrame([_league_pick(player_or_team_name="Mystery Man")]).to_parquet(
+        normalized / "league_picks.parquet", index=False
     )
 
     result = build_league_draft_picks(
@@ -211,8 +210,14 @@ def test_build_league_draft_picks_override_closes_gap(tmp_path: Path) -> None:
 def test_name_override_expected_match_guard_rejects_second_raw_name(
     tmp_path: Path,
 ) -> None:
-    normalized = tmp_path / "normalized"
-    _write_normalized(normalized)
+    normalized, out = _prepare_match_inputs(
+        tmp_path,
+        "players:\n"
+        "  McDavid:\n"
+        "    player_id: 8477934\n"
+        "    expected_matches: 1\n"
+        "teams: {}\n",
+    )
     pd.DataFrame(
         [
             _league_pick(manager="ben", player_or_team_name="McDavid"),
@@ -223,29 +228,26 @@ def test_name_override_expected_match_guard_rejects_second_raw_name(
             ),
         ]
     ).to_parquet(normalized / "league_picks.parquet", index=False)
-    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
-    (tmp_path / "name_overrides.yaml").write_text(
-        "players:\n"
-        "  McDavid:\n"
-        "    player_id: 8477934\n"
-        "    expected_matches: 1\n"
-        "teams: {}\n",
-        encoding="utf-8",
-    )
 
     with pytest.raises(ValueError, match=r"expected 1 league-pick match.*found 2"):
         build_league_draft_picks(
             normalized_dir=normalized,
             overrides_dir=tmp_path,
-            out_dir=tmp_path / "out",
+            out_dir=out,
         )
 
 
 def test_name_override_guard_counts_corrected_name_used_by_matcher(
     tmp_path: Path,
 ) -> None:
-    normalized = tmp_path / "normalized"
-    _write_normalized(normalized)
+    normalized, out = _prepare_match_inputs(
+        tmp_path,
+        "players:\n"
+        "  McDavid:\n"
+        "    player_id: 8477934\n"
+        "    expected_matches: 1\n"
+        "teams: {}\n",
+    )
     pd.DataFrame(
         [
             _league_pick(
@@ -256,27 +258,24 @@ def test_name_override_guard_counts_corrected_name_used_by_matcher(
             )
         ]
     ).to_parquet(normalized / "league_picks.parquet", index=False)
-    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
-    (tmp_path / "name_overrides.yaml").write_text(
-        "players:\n"
-        "  McDavid:\n"
-        "    player_id: 8477934\n"
-        "    expected_matches: 1\n"
-        "teams: {}\n",
-        encoding="utf-8",
-    )
 
     with pytest.raises(ValueError, match=r"expected 1 league-pick match.*found 0"):
         build_league_draft_picks(
             normalized_dir=normalized,
             overrides_dir=tmp_path,
-            out_dir=tmp_path / "out",
+            out_dir=out,
         )
 
 
 def test_team_override_guard_accepts_matching_g_slot_count(tmp_path: Path) -> None:
-    normalized = tmp_path / "normalized"
-    _write_normalized(normalized)
+    normalized, out = _prepare_match_inputs(
+        tmp_path,
+        "players: {}\n"
+        "teams:\n"
+        "  'Mystery Club':\n"
+        "    team_id: 13\n"
+        "    expected_matches: 1\n",
+    )
     pd.DataFrame(
         [
             _league_pick(
@@ -287,28 +286,25 @@ def test_team_override_guard_accepts_matching_g_slot_count(tmp_path: Path) -> No
             )
         ]
     ).to_parquet(normalized / "league_picks.parquet", index=False)
-    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
-    (tmp_path / "name_overrides.yaml").write_text(
-        "players: {}\n"
-        "teams:\n"
-        "  'Mystery Club':\n"
-        "    team_id: 13\n"
-        "    expected_matches: 1\n",
-        encoding="utf-8",
-    )
 
     result = build_league_draft_picks(
         normalized_dir=normalized,
         overrides_dir=tmp_path,
-        out_dir=tmp_path / "out",
+        out_dir=out,
     )
 
     assert int(result.picks.iloc[0]["team_id"]) == 13
 
 
 def test_team_override_guard_rejects_wrong_g_slot_count(tmp_path: Path) -> None:
-    normalized = tmp_path / "normalized"
-    _write_normalized(normalized)
+    normalized, out = _prepare_match_inputs(
+        tmp_path,
+        "players: {}\n"
+        "teams:\n"
+        "  'Mystery Club':\n"
+        "    team_id: 13\n"
+        "    expected_matches: 2\n",
+    )
     pd.DataFrame(
         [
             _league_pick(
@@ -319,28 +315,18 @@ def test_team_override_guard_rejects_wrong_g_slot_count(tmp_path: Path) -> None:
             )
         ]
     ).to_parquet(normalized / "league_picks.parquet", index=False)
-    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
-    (tmp_path / "name_overrides.yaml").write_text(
-        "players: {}\n"
-        "teams:\n"
-        "  'Mystery Club':\n"
-        "    team_id: 13\n"
-        "    expected_matches: 2\n",
-        encoding="utf-8",
-    )
 
     with pytest.raises(ValueError, match=r"expected 2 G-slot.*found 1"):
         build_league_draft_picks(
             normalized_dir=normalized,
             overrides_dir=tmp_path,
-            out_dir=tmp_path / "out",
+            out_dir=out,
         )
 
 
 def test_point_split_crosscheck_flags_wrong_2024_mcdavid_match(tmp_path: Path) -> None:
     """Row 99's 24/7/31 split contradicts Connor McDavid in all three fields."""
-    normalized = tmp_path / "normalized"
-    _write_normalized(normalized)
+    normalized, out = _prepare_match_inputs(tmp_path)
     _write_playoff_points(normalized, 8478402, {1: 12, 2: 9, 3: 10, 4: 11})
     pd.DataFrame(
         [
@@ -355,11 +341,9 @@ def test_point_split_crosscheck_flags_wrong_2024_mcdavid_match(tmp_path: Path) -
             )
         ]
     ).to_parquet(normalized / "league_picks.parquet", index=False)
-    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
-    (tmp_path / "name_overrides.yaml").write_text("players: {}\nteams: {}\n", encoding="utf-8")
 
     result = build_league_draft_picks(
-        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=tmp_path / "out"
+        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=out
     )
 
     assert POINT_CROSSCHECK_TOLERANCE == 0
@@ -369,19 +353,16 @@ def test_point_split_crosscheck_flags_wrong_2024_mcdavid_match(tmp_path: Path) -
 
 
 def test_duplicate_player_ownership_flags_every_manager_copy(tmp_path: Path) -> None:
-    normalized = tmp_path / "normalized"
-    _write_normalized(normalized)
+    normalized, out = _prepare_match_inputs(tmp_path)
     pd.DataFrame(
         [
             _league_pick(manager="ben"),
             _league_pick(manager="levi", slot_label="Forward 2"),
         ]
     ).to_parquet(normalized / "league_picks.parquet", index=False)
-    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
-    (tmp_path / "name_overrides.yaml").write_text("players: {}\nteams: {}\n", encoding="utf-8")
 
     result = build_league_draft_picks(
-        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=tmp_path / "out"
+        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=out
     )
 
     assert result.duplicate_ownerships == 1
@@ -391,8 +372,7 @@ def test_duplicate_player_ownership_flags_every_manager_copy(tmp_path: Path) -> 
 
 
 def test_duplicate_goalie_team_ownership_flags_every_manager_copy(tmp_path: Path) -> None:
-    normalized = tmp_path / "normalized"
-    _write_normalized(normalized)
+    normalized, out = _prepare_match_inputs(tmp_path)
     pd.DataFrame(
         [
             _league_pick(
@@ -411,11 +391,9 @@ def test_duplicate_goalie_team_ownership_flags_every_manager_copy(tmp_path: Path
             ),
         ]
     ).to_parquet(normalized / "league_picks.parquet", index=False)
-    _write_manager_aliases(tmp_path / "manager_aliases.yaml")
-    (tmp_path / "name_overrides.yaml").write_text("players: {}\nteams: {}\n", encoding="utf-8")
 
     result = build_league_draft_picks(
-        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=tmp_path / "out"
+        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=out
     )
 
     assert set(result.picks["team_id"].astype(int)) == {13}
