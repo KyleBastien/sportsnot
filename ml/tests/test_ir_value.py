@@ -18,6 +18,7 @@ import pytest
 
 from draft_oracle.optimize.ir_value import (
     StashInput,
+    _HealthyAlternativeRequest,
     _StashSimulationInput,
     _StashValueRequest,
     build_stash_valuations,
@@ -154,7 +155,11 @@ def test_earlier_return_is_worth_at_least_as_much() -> None:
 def test_healthy_alternative_value_is_small_and_nonnegative() -> None:
     # A replacement-level healthy body only adds upside variance over the same-level
     # starter, so its marginal IR value is small but never negative.
-    value = healthy_alternative_value(3.0, _LENGTH_7, seed=5, n_sims=4000)
+    value = healthy_alternative_value(
+        _HealthyAlternativeRequest(3.0, _LENGTH_7),
+        seed=5,
+        n_sims=4000,
+    )
     assert value >= 0.0
     assert value < 3.0
 

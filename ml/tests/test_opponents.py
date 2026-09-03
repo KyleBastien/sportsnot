@@ -436,24 +436,32 @@ def test_membership_report_discloses_event_without_snake_order() -> None:
 _REAL_LEAGUE_PICKS = Path("data/normalized/league_draft_picks.parquet")
 
 
-def _dup_row(
-    league: str, source: str, manager: str, slot: int, player_id: int, team_id: int
-) -> dict[str, object]:
+@dataclass(frozen=True)
+class _DupRowCase:
+    league: str
+    source: str
+    manager: str
+    slot: int
+    player_id: int
+    team_id: int
+
+
+def _dup_row(case: _DupRowCase) -> dict[str, object]:
     return {
         "season": 2026,
-        "league_name": league,
+        "league_name": case.league,
         "draft_event": "R1",
-        "source": source,
-        "manager": manager,
-        "snake_slot": slot,
+        "source": case.source,
+        "manager": case.manager,
+        "snake_slot": case.slot,
         "pick_number": None,
         "position": "F",
-        "player_id": player_id,
-        "team_id": team_id,
+        "player_id": case.player_id,
+        "team_id": case.team_id,
         "points_when_drafted": 1.0,
         "points_excluded": False,
-        "matched_name": f"P{player_id}",
-        "player_or_team_name": f"P{player_id}",
+        "matched_name": f"P{case.player_id}",
+        "player_or_team_name": f"P{case.player_id}",
     }
 
 
@@ -462,9 +470,15 @@ def _dup_frame() -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for source in ("sheet", "app"):
         for slot, manager in enumerate(("ben", "kyle"), start=1):
-            rows.append(_dup_row("The Gemmell Cup", source, manager, slot, 100 + slot, 5))
+            rows.append(
+                _dup_row(
+                    _DupRowCase("The Gemmell Cup", source, manager, slot, 100 + slot, 5)
+                )
+            )
     for slot, manager in enumerate(("tobi", "kyle"), start=1):
-        rows.append(_dup_row("Press Play-offs", "app", manager, slot, 200 + slot, 9))
+        rows.append(
+            _dup_row(_DupRowCase("Press Play-offs", "app", manager, slot, 200 + slot, 9))
+        )
     frame = pd.DataFrame(rows)
     frame.loc[
         (frame["league_name"] == "The Gemmell Cup")
@@ -509,7 +523,7 @@ def test_dedupe_recovers_missing_app_skater_team_from_sheet_copy() -> None:
     frame.loc[sheet_kyle, "team_id"] = 6
     goalie_rows = []
     for source in ("sheet", "app"):
-        goalie = _dup_row("The Gemmell Cup", source, "ben", 1, 999, 30)
+        goalie = _dup_row(_DupRowCase("The Gemmell Cup", source, "ben", 1, 999, 30))
         goalie["position"] = "G"
         goalie["player_id"] = None
         goalie_rows.append(goalie)

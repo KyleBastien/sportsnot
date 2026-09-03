@@ -87,6 +87,12 @@ class _StashValueRequest:
     active_baseline: float
 
 
+@dataclass(frozen=True)
+class _HealthyAlternativeRequest:
+    active_baseline: float
+    length_probs: Mapping[int, float]
+
+
 def retroactive_swap_points(ir_points: float, active_points: float) -> float:
     """Points an IR slot pair yields after an *optimal* retroactive activation.
 
@@ -188,8 +194,7 @@ def value_stash(
 
 
 def healthy_alternative_value(
-    active_baseline: float,
-    length_probs: Mapping[int, float],
+    request: _HealthyAlternativeRequest,
     *,
     seed: int,
     n_sims: int = DEFAULT_STASH_N_SIMS,
@@ -203,10 +208,10 @@ def healthy_alternative_value(
     value ``E[max(Z - active_baseline, 0)]`` is the pure upside a replacement-level body
     adds through the same swap. A stash is only worth it when it clears this bar.
     """
-    e_len = expected_series_length(dict(length_probs))
-    ppg = float(active_baseline) / e_len if e_len > 0 else 0.0
+    e_len = expected_series_length(dict(request.length_probs))
+    ppg = float(request.active_baseline) / e_len if e_len > 0 else 0.0
     _stash_ev, stash_value, _prob = value_stash(
-        _StashValueRequest(ppg, length_probs, None, active_baseline),
+        _StashValueRequest(ppg, request.length_probs, None, request.active_baseline),
         seed=seed,
         n_sims=n_sims,
         horizon=horizon,
@@ -284,8 +289,7 @@ def build_stash_valuations(
             horizon=horizon,
         )
         alt_value = healthy_alternative_value(
-            baseline,
-            item.length_probs,
+            _HealthyAlternativeRequest(baseline, item.length_probs),
             seed=player_seed + 1,
             n_sims=n_sims,
             horizon=horizon,
