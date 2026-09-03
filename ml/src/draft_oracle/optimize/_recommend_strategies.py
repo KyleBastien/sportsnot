@@ -64,6 +64,16 @@ class _PositionRunOpponent(OpponentModel):
         legal = state.legal_assets(manager)
         if not legal:
             raise ValueError(f"manager {manager!r} has no legal asset to draft")
+        scores = self._scores(state, manager, legal)
+        if self.temperature <= 0.0:
+            best = max(range(len(legal)), key=lambda i: (scores[i], legal[i].key))
+            return legal[best]
+        return _softmax_pick(legal, scores, rng, self.temperature)
+
+    def _scores(
+        self, state: DraftState, manager: str, legal: Sequence[DraftAsset]
+    ) -> list[float]:
+        """Score each legal asset by rank + positional need + the favoured-run bonus."""
         roster = state.rosters[manager]
         scores: list[float] = []
         for asset in legal:
@@ -71,18 +81,25 @@ class _PositionRunOpponent(OpponentModel):
             urgency = (limit - roster.count(asset.position)) / limit if limit else 0.0
             bonus = self.bonus if asset.position == self.favored else 0.0
             scores.append(asset.rank_value + self.need_weight * urgency + bonus)
-        if self.temperature <= 0.0:
-            best = max(range(len(legal)), key=lambda i: (scores[i], legal[i].key))
-            return legal[best]
-        highest = max(scores)
-        weights = [math.exp((s - highest) / self.temperature) for s in scores]
-        threshold = rng.random() * sum(weights)
-        cumulative = 0.0
-        for index, weight in enumerate(weights):
-            cumulative += weight
-            if threshold <= cumulative:
-                return legal[index]
-        return legal[-1]
+        return scores
+
+
+def _softmax_pick(
+    legal: Sequence[DraftAsset],
+    scores: Sequence[float],
+    rng: random.Random,
+    temperature: float,
+) -> DraftAsset:
+    """Sample a legal asset from a numerically stable softmax over ``scores``."""
+    highest = max(scores)
+    weights = [math.exp((s - highest) / temperature) for s in scores]
+    threshold = rng.random() * sum(weights)
+    cumulative = 0.0
+    for index, weight in enumerate(weights):
+        cumulative += weight
+        if threshold <= cumulative:
+            return legal[index]
+    return legal[-1]
 
 
 def build_synthetic_pool(
@@ -151,35 +168,32 @@ def build_synthetic_pool(
     return pool
 
 
-def _decision_pick(
-    state: DraftState,
-    owner: str,
-    opponent_model: OpponentModel | Mapping[str, OpponentModel],
-    strategy: _Strategy,
-    replacement: Mapping[str, float],
-    cfg: RecommendConfig,
-    managers: int,
-) -> DraftAsset:
+@dataclass(frozen=True)
+class _CompareCtx:
+    """Fixed inputs shared across every draft/strategy in a comparison run."""
+
+    owner: str
+    opponent_model: OpponentModel | Mapping[str, OpponentModel]
+    replacement: Mapping[str, float]
+    cfg: RecommendConfig
+    managers: int
+
+
+def _decision_pick(ctx: _CompareCtx, state: DraftState, strategy: _Strategy) -> DraftAsset:
     """The single pick ``strategy`` makes for the owner at the current slot."""
     if strategy == "greedy_vor":
-        return greedy_vor_pick(state, owner, replacement)
+        return greedy_vor_pick(state, ctx.owner, ctx.replacement)
     depth = 1 if strategy == "one_step" else None
     return choose_pick(
         state,
-        owner,
-        opponent_model,
-        config=replace(cfg, depth=depth),
-        managers=managers,
+        ctx.owner,
+        ctx.opponent_model,
+        config=replace(ctx.cfg, depth=depth),
+        managers=ctx.managers,
     )
 
 
-def _continue_to_end(
-    state: DraftState,
-    owner: str,
-    opponent_model: OpponentModel | Mapping[str, OpponentModel],
-    replacement: Mapping[str, float],
-    seed: int,
-) -> float:
+def _continue_to_end(ctx: _CompareCtx, state: DraftState, seed: int) -> float:
     """Finish the draft with a fixed greedy-VOR owner tail + opponents; owner value.
 
     The common continuation shared by all three strategies once they diverge at the
@@ -189,21 +203,16 @@ def _continue_to_end(
     rng = random.Random(seed)
     while not state.is_complete:
         current = state.current_manager
-        if current == owner:
-            state.apply_pick(greedy_vor_pick(state, owner, replacement))
+        if current == ctx.owner:
+            state.apply_pick(greedy_vor_pick(state, ctx.owner, ctx.replacement))
         else:
-            model = _resolve_model(opponent_model, current)
+            model = _resolve_model(ctx.opponent_model, current)
             state.apply_pick(model.pick(state, current, rng))
-    return _owner_roster_value(state, owner)
+    return _owner_roster_value(state, ctx.owner)
 
 
 def _play_to_decision(
-    base_state: DraftState,
-    owner: str,
-    opponent_model: OpponentModel | Mapping[str, OpponentModel],
-    replacement: Mapping[str, float],
-    prefix: int,
-    seed: int,
+    ctx: _CompareCtx, base_state: DraftState, prefix: int, seed: int
 ) -> DraftState | None:
     """Advance a fresh draft to the owner's ``prefix``-th pick (greedy tail + opponents).
 
@@ -215,15 +224,28 @@ def _play_to_decision(
     owner_made = 0
     while not state.is_complete:
         current = state.current_manager
-        if current == owner:
+        if current == ctx.owner:
             if owner_made == prefix:
                 return state
-            state.apply_pick(greedy_vor_pick(state, owner, replacement))
+            state.apply_pick(greedy_vor_pick(state, ctx.owner, ctx.replacement))
             owner_made += 1
         else:
-            model = _resolve_model(opponent_model, current)
+            model = _resolve_model(ctx.opponent_model, current)
             state.apply_pick(model.pick(state, current, rng))
     return None
+
+
+_STRATEGIES: tuple[_Strategy, ...] = ("greedy_vor", "one_step", "multi_step")
+
+
+def _score_draft(ctx: _CompareCtx, decision: DraftState, seed: int) -> dict[str, float]:
+    """Each strategy's final owner value from the shared decision state (paired tail)."""
+    scores: dict[str, float] = {}
+    for strategy in _STRATEGIES:
+        state = decision.copy()
+        state.apply_pick(_decision_pick(ctx, state, strategy))
+        scores[strategy] = _continue_to_end(ctx, state, seed)
+    return scores
 
 
 @dataclass
@@ -335,24 +357,17 @@ def compare_strategies(
     base = DraftState.new(managers_list, pool, allow_ir=allow_ir)
     replacement = replacement_levels(base, managers)
     prefix = decision_prefix if decision_prefix is not None else base.capacity.total // 3
+    ctx = _CompareCtx(owner, opponent_model, replacement, cfg, managers)
     totals = {"greedy_vor": 0.0, "one_step": 0.0, "multi_step": 0.0}
-    strategies: tuple[_Strategy, ...] = ("greedy_vor", "one_step", "multi_step")
     counted = 0
     for draft in range(n_drafts):
         draft_seed = seed + draft
-        decision = _play_to_decision(base, owner, opponent_model, replacement, prefix, draft_seed)
+        decision = _play_to_decision(ctx, base, prefix, draft_seed)
         if decision is None:
             continue
         counted += 1
-        for strategy in strategies:
-            state = decision.copy()
-            pick = _decision_pick(
-                state, owner, opponent_model, strategy, replacement, cfg, managers
-            )
-            state.apply_pick(pick)
-            totals[strategy] += _continue_to_end(
-                state, owner, opponent_model, replacement, draft_seed
-            )
+        for strategy, value in _score_draft(ctx, decision, draft_seed).items():
+            totals[strategy] += value
     if counted == 0:
         raise ValueError("no draft reached the decision slot; lower decision_prefix")
     means = {k: v / counted for k, v in totals.items()}

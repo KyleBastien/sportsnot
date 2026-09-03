@@ -39,7 +39,7 @@ public import paths (``draft_oracle.optimize.recommend.X``) stay stable.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Hashable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -55,6 +55,9 @@ from draft_oracle.optimize._recommend_core import (
     asset_value,
     greedy_vor_pick,
     replacement_levels,
+)
+from draft_oracle.optimize._recommend_core import (
+    _Candidate as _Candidate,
 )
 from draft_oracle.optimize._recommend_core import (
     _prune_candidates as _prune_candidates,
@@ -89,6 +92,7 @@ from draft_oracle.optimize.simulator import (
     DraftAsset,
     DraftState,
     OpponentModel,
+    SurvivalQuery,
     survival_probability,
 )
 
@@ -223,6 +227,53 @@ class Recommendation:
         }
 
 
+@dataclass(frozen=True)
+class _RecommendCtx:
+    """The fixed draft context for one recommendation (state, owner, opponents, cfg)."""
+
+    state: DraftState
+    owner: str
+    opponent_model: OpponentModel | Mapping[str, OpponentModel]
+    cfg: RecommendConfig
+
+
+def _build_evaluations(
+    ctx: _RecommendCtx,
+    ranked: list[tuple[_Candidate, float]],
+    second_best: float,
+) -> list[PickEvaluation]:
+    """Explain the surfaced top-N picks (survival estimated only for those shown)."""
+    roster = ctx.state.rosters[ctx.owner]
+    evaluations: list[PickEvaluation] = []
+    for candidate, expected in ranked[: ctx.cfg.top_n]:
+        asset = candidate.asset
+        survival = (
+            survival_probability(
+                SurvivalQuery(ctx.state, asset, ctx.owner, ctx.opponent_model),
+                rollouts=ctx.cfg.survival_rollouts,
+                seed=ctx.cfg.seed,
+            )
+            if ctx.cfg.compute_survival
+            else 0.0
+        )
+        limit = ctx.state.capacity.limit(asset.position)
+        open_slots = limit - roster.count(asset.position)
+        evaluations.append(
+            PickEvaluation(
+                asset=asset,
+                expected_points=expected,
+                immediate_value=asset_value(asset),
+                vor=candidate.vor,
+                replacement=candidate.replacement,
+                survival=survival,
+                open_slots=open_slots,
+                position_limit=limit,
+                delta_vs_next=expected - second_best,
+            )
+        )
+    return evaluations
+
+
 def recommend_pick(
     state: DraftState,
     owner: str,
@@ -253,7 +304,6 @@ def recommend_pick(
     if not candidates:
         raise ValueError(f"owner {owner!r} has no legal pick")
 
-    roster = state.rosters[owner]
     expecteds = _expected_values(
         state, owner, [c.asset for c in candidates], opponent_model, replacement, cfg
     )
@@ -263,38 +313,11 @@ def recommend_pick(
     )
     second_best = ranked[1][1] if len(ranked) > 1 else ranked[0][1]
 
-    evaluations: list[PickEvaluation] = []
     # Survival is a display-only explanation, so estimate it just for the surfaced
     # top-N rather than every rolled-out candidate (keeps the <10s budget).
-    for candidate, expected in ranked[: cfg.top_n]:
-        asset = candidate.asset
-        survival = (
-            survival_probability(
-                state,
-                asset,
-                owner,
-                opponent_model,
-                rollouts=cfg.survival_rollouts,
-                seed=cfg.seed,
-            )
-            if cfg.compute_survival
-            else 0.0
-        )
-        limit = state.capacity.limit(asset.position)
-        open_slots = limit - roster.count(asset.position)
-        evaluations.append(
-            PickEvaluation(
-                asset=asset,
-                expected_points=expected,
-                immediate_value=asset_value(asset),
-                vor=candidate.vor,
-                replacement=candidate.replacement,
-                survival=survival,
-                open_slots=open_slots,
-                position_limit=limit,
-                delta_vs_next=expected - second_best,
-            )
-        )
+    evaluations = _build_evaluations(
+        _RecommendCtx(state, owner, opponent_model, cfg), ranked, second_best
+    )
 
     return Recommendation(
         owner=owner,
@@ -306,6 +329,56 @@ def recommend_pick(
         candidates_considered=len(candidates),
         seed=cfg.seed,
     )
+
+
+def _skater_pool_asset(
+    rec: Mapping[Hashable, Any], abbrev_to_id: Mapping[str, int]
+) -> DraftAsset | None:
+    """Build one F/D pool asset from a skater projection row (``None`` for goalies)."""
+    position = str(rec["position"])
+    if position not in ("F", "D"):
+        return None
+    projection = float(rec["expected_points"])
+    return DraftAsset(
+        key=f"P{int(rec['player_id'])}",
+        name=str(rec["player_name"]),
+        position=position,  # type: ignore[arg-type]
+        rank_value=projection,
+        player_id=int(rec["player_id"]),
+        team_id=abbrev_to_id.get(str(rec["team_abbrev"])),
+        team_abbrev=str(rec["team_abbrev"]),
+        projection=projection,
+    )
+
+
+def _team_pool_asset(rec: Mapping[Hashable, Any]) -> DraftAsset:
+    """Build the whole-team goalie (``G``) pool asset from a team projection row."""
+    projection = float(rec["e_goalie_points"])
+    return DraftAsset(
+        key=f"T{int(rec['team_id'])}",
+        name=str(rec["team_abbrev"]),
+        position="G",
+        rank_value=projection,
+        team_id=int(rec["team_id"]),
+        team_abbrev=str(rec["team_abbrev"]),
+        projection=projection,
+    )
+
+
+def _ir_repriced(pool: list[DraftAsset], skaters: pd.DataFrame) -> list[DraftAsset]:
+    """Reprice injured skaters to their IR-stash value (US-022); pool unchanged if none."""
+    import pandas as pd
+
+    from draft_oracle.optimize.ir_pool import reprice_pool_for_ir
+
+    stash_value_by_player = {
+        int(rec["player_id"]): float(rec["ir_stash_value"])
+        for rec in skaters.to_dict("records")
+        if pd.notna(rec.get("ir_stash_value"))
+    }
+    if not stash_value_by_player:
+        return pool
+    return reprice_pool_for_ir(pool, stash_value_by_player)
 
 
 def build_pool_from_frames(
@@ -323,52 +396,17 @@ def build_pool_from_frames(
     repriced to that stash value, so the optimizer values an ``IR_F`` / ``IR_D`` stash
     for the retroactive-swap points it really adds, not for full-health production.
     """
-    import pandas as pd
-
-    from draft_oracle.optimize.ir_pool import reprice_pool_for_ir
-
     abbrev_to_id = {
         str(rec["team_abbrev"]): int(rec["team_id"]) for rec in teams.to_dict("records")
     }
     pool: list[DraftAsset] = []
     for rec in skaters.to_dict("records"):
-        position = str(rec["position"])
-        if position not in ("F", "D"):
-            continue
-        projection = float(rec["expected_points"])
-        pool.append(
-            DraftAsset(
-                key=f"P{int(rec['player_id'])}",
-                name=str(rec["player_name"]),
-                position=position,  # type: ignore[arg-type]
-                rank_value=projection,
-                player_id=int(rec["player_id"]),
-                team_id=abbrev_to_id.get(str(rec["team_abbrev"])),
-                team_abbrev=str(rec["team_abbrev"]),
-                projection=projection,
-            )
-        )
-    for rec in teams.to_dict("records"):
-        projection = float(rec["e_goalie_points"])
-        pool.append(
-            DraftAsset(
-                key=f"T{int(rec['team_id'])}",
-                name=str(rec["team_abbrev"]),
-                position="G",
-                rank_value=projection,
-                team_id=int(rec["team_id"]),
-                team_abbrev=str(rec["team_abbrev"]),
-                projection=projection,
-            )
-        )
+        asset = _skater_pool_asset(rec, abbrev_to_id)
+        if asset is not None:
+            pool.append(asset)
+    pool.extend(_team_pool_asset(rec) for rec in teams.to_dict("records"))
     if ir and "ir_stash_value" in skaters.columns:
-        stash_value_by_player = {
-            int(rec["player_id"]): float(rec["ir_stash_value"])
-            for rec in skaters.to_dict("records")
-            if pd.notna(rec.get("ir_stash_value"))
-        }
-        if stash_value_by_player:
-            pool = reprice_pool_for_ir(pool, stash_value_by_player)
+        pool = _ir_repriced(pool, skaters)
     return pool
 
 

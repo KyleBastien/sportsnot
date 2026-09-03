@@ -19,6 +19,7 @@ from draft_oracle.optimize.simulator import (
     DraftAsset,
     DraftState,
     GreedyOpponentModel,
+    SurvivalQuery,
     roster_capacity,
     run_draft,
     survival_probability,
@@ -236,7 +237,9 @@ def test_survival_of_drafted_candidate_is_zero() -> None:
     state = DraftState.new(["a", "b"], pool, allow_ir=False)
     taken = state.legal_assets("a")[0]
     state.apply_pick(taken)
-    prob = survival_probability(state, taken, "b", GreedyOpponentModel(), rollouts=16, seed=0)
+    prob = survival_probability(
+        SurvivalQuery(state, taken, "b", GreedyOpponentModel()), rollouts=16, seed=0
+    )
     assert prob == 0.0
 
 
@@ -246,7 +249,9 @@ def test_survival_is_one_when_no_gap() -> None:
     state.apply_pick(state.legal_assets("a")[0])
     # Now b is on the clock; b's own next pick has no intervening opponents.
     candidate = next(a for a in state.available.values() if a.position == "D")
-    prob = survival_probability(state, candidate, "b", GreedyOpponentModel(), rollouts=16, seed=0)
+    prob = survival_probability(
+        SurvivalQuery(state, candidate, "b", GreedyOpponentModel()), rollouts=16, seed=0
+    )
     assert prob == 1.0
 
 
@@ -260,7 +265,9 @@ def test_top_ranked_candidate_rarely_survives() -> None:
         key=lambda a: a.rank_value,
     )
     model = GreedyOpponentModel(temperature=0.5, need_weight=2.0)
-    prob = survival_probability(state, best_forward, "a", model, rollouts=200, seed=7)
+    prob = survival_probability(
+        SurvivalQuery(state, best_forward, "a", model), rollouts=200, seed=7
+    )
     assert prob < 0.2
 
 
@@ -269,8 +276,9 @@ def test_survival_probability_is_seed_deterministic() -> None:
     state = DraftState.new(["a", "b", "c", "d"], pool, allow_ir=False)
     candidate = state.legal_assets("a")[3]
     model = GreedyOpponentModel(temperature=0.7)
-    p1 = survival_probability(state, candidate, "a", model, rollouts=100, seed=42)
-    p2 = survival_probability(state, candidate, "a", model, rollouts=100, seed=42)
+    query = SurvivalQuery(state, candidate, "a", model)
+    p1 = survival_probability(query, rollouts=100, seed=42)
+    p2 = survival_probability(query, rollouts=100, seed=42)
     assert p1 == p2
 
 
@@ -281,7 +289,9 @@ def test_survival_thousand_rollouts_under_five_seconds() -> None:
     candidate = next(a for a in state.available.values() if a.position == "F")
     model = GreedyOpponentModel(temperature=0.5, need_weight=3.0)
     start = time.perf_counter()
-    prob = survival_probability(state, candidate, "m0", model, rollouts=1000, seed=1)
+    prob = survival_probability(
+        SurvivalQuery(state, candidate, "m0", model), rollouts=1000, seed=1
+    )
     elapsed = time.perf_counter() - start
     assert 0.0 <= prob <= 1.0
     assert elapsed < 5.0

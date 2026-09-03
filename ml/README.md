@@ -725,7 +725,7 @@ interface: it drafts greedily by `rank_value` with softmax noise (a configurable
 still-open position gets a `need_weight × urgency` bump where
 `urgency = open_slots / limit`). `run_draft` plays a state to completion through a
 single seeded RNG; `validate_draft` checks every finished roster through the rules
-engine. `survival_probability(state, candidate, manager, model, rollouts, seed)`
+engine. `survival_probability(query, rollouts, seed)` (where `query` bundles the
 Monte-Carlos the opponents' picks between now and a manager's next turn and returns
 `P(candidate survives)` — ≥1000 rollouts run well under 5 s and are deterministic
 given `(state, seed)`.

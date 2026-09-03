@@ -38,6 +38,7 @@ from draft_oracle.optimize.simulator import (
     DraftAsset,
     DraftState,
     GreedyOpponentModel,
+    SurvivalQuery,
     run_draft,
     survival_probability,
     validate_draft,
@@ -279,7 +280,9 @@ def test_fitted_model_works_in_survival_probability() -> None:
         coefficients=Coefficients(rank=3.0, affinity=0.0), affinity={}, temperature=0.5
     )
     # the top-ranked asset rarely survives the opponent pick before 'a' is up again
-    prob = survival_probability(state, assets[0], "a", model, rollouts=200, seed=5)
+    prob = survival_probability(
+        SurvivalQuery(state, assets[0], "a", model), rollouts=200, seed=5
+    )
     assert 0.0 <= prob <= 1.0
 
 

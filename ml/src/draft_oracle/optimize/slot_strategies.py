@@ -470,6 +470,34 @@ class SlotStrategyReport:
         }
 
 
+def _resolve_opponent_setup(
+    opponents: FittedLeagueOpponents | None,
+    manager_ids: Sequence[str],
+    cfg: SlotStrategyConfig,
+) -> tuple[OpponentModel | Mapping[str, OpponentModel], bool, str]:
+    """Pick the opponent policy + honest label for the report (fitted vs greedy)."""
+    if opponents is None:
+        greedy = GreedyOpponentModel(temperature=cfg.temperature, need_weight=cfg.need_weight)
+        return greedy, False, "greedy fallback"
+    opponent_model: OpponentModel | Mapping[str, OpponentModel] = opponents.as_mapping(
+        list(manager_ids)
+    )
+    # The seat ids (``seat1..seatN``) never match the fitted per-manager keys
+    # (ben/judah/kyle/levi) or their affinity tables, so ``as_mapping`` yields the
+    # league-average coefficients with the affinity feature zeroed for every seat.
+    # Label the report by the model actually simulated, not by "fitted supplied".
+    genuinely_fitted = any(
+        (mid in opponents.per_manager) or bool(opponents.affinity.get(mid))
+        for mid in manager_ids
+    )
+    opponent_label = (
+        "fitted per-manager league model"
+        if genuinely_fitted
+        else "league-average fitted coefficients (per-seat, affinity zeroed)"
+    )
+    return opponent_model, genuinely_fitted, opponent_label
+
+
 def build_slot_strategies(
     pool: Sequence[DraftAsset],
     *,
@@ -491,29 +519,9 @@ def build_slot_strategies(
         raise ValueError(f"managers must be >= 2, got {managers}")
     cfg = config or SlotStrategyConfig()
     manager_ids = [f"seat{i + 1}" for i in range(managers)]
-    if opponents is not None:
-        opponent_model: OpponentModel | Mapping[str, OpponentModel] = opponents.as_mapping(
-            manager_ids
-        )
-        # The seat ids (``seat1..seatN``) never match the fitted per-manager keys
-        # (ben/judah/kyle/levi) or their affinity tables, so ``as_mapping`` yields the
-        # league-average coefficients with the affinity feature zeroed for every seat.
-        # Label the report by the model actually simulated, not by "fitted supplied".
-        genuinely_fitted = any(
-            (mid in opponents.per_manager) or bool(opponents.affinity.get(mid))
-            for mid in manager_ids
-        )
-        opponent_label = (
-            "fitted per-manager league model"
-            if genuinely_fitted
-            else "league-average fitted coefficients (per-seat, affinity zeroed)"
-        )
-    else:
-        opponent_model = GreedyOpponentModel(
-            temperature=cfg.temperature, need_weight=cfg.need_weight
-        )
-        genuinely_fitted = False
-        opponent_label = "greedy fallback"
+    opponent_model, genuinely_fitted, opponent_label = _resolve_opponent_setup(
+        opponents, manager_ids, cfg
+    )
 
     rounds = roster_capacity(allow_ir).total
     slots = [

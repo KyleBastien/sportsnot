@@ -286,7 +286,8 @@ def build_cheatsheet(
 
 def _fmt(value: Any) -> str:
     """Format a projection/VOR cell: two decimals, ``-`` for missing quantiles."""
-    if value is None or (isinstance(value, float) and value != value):
+    is_nan = isinstance(value, float) and value != value
+    if value is None or is_nan:
         return "-"
     return f"{float(value):.2f}"
 

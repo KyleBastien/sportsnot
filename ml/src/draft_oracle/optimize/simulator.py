@@ -57,6 +57,7 @@ __all__ = [
     "ManagerRoster",
     "OpponentModel",
     "RosterCapacity",
+    "SurvivalQuery",
     "roster_capacity",
     "run_draft",
     "survival_probability",
@@ -500,53 +501,62 @@ def validate_draft(state: DraftState) -> dict[str, RosterValidation]:
     return results
 
 
+@dataclass(frozen=True)
+class SurvivalQuery:
+    """The draft context for a :func:`survival_probability` rollout.
+
+    Bundles the four inputs that define *whose* pick, on *which* board, against *which*
+    opponents a candidate must survive, so the rollout count/seed stay the only knobs.
+    """
+
+    state: DraftState
+    candidate: DraftAsset
+    manager: str
+    opponent_model: OpponentModel | Mapping[str, OpponentModel]
+
+
 def survival_probability(
-    state: DraftState,
-    candidate: DraftAsset,
-    manager: str,
-    opponent_model: OpponentModel | Mapping[str, OpponentModel],
+    query: SurvivalQuery,
     *,
     rollouts: int = DEFAULT_ROLLOUTS,
     seed: int = 0,
 ) -> float:
     """Monte-Carlo estimate of ``P(candidate survives to manager's next pick)``.
 
-    Rolls the opponents' picks between now and ``manager``'s next turn ``rollouts``
-    times; the candidate *survives* a rollout if no opponent drafts it. Returns the
-    survival fraction. Deterministic given ``(state, seed)``: rollout ``i`` uses an
-    RNG seeded deterministically from ``seed`` and ``i``.
+    Rolls the opponents' picks between now and ``query.manager``'s next turn
+    ``rollouts`` times; the candidate *survives* a rollout if no opponent drafts it.
+    Returns the survival fraction. Deterministic given ``(query.state, seed)``: rollout
+    ``i`` uses an RNG seeded deterministically from ``seed`` and ``i``.
 
     Fast paths: an already-drafted candidate returns ``0.0`` and an empty gap
     (``manager`` picks again immediately, or the draft is over) returns ``1.0``.
     """
     if rollouts <= 0:
         raise ValueError(f"rollouts must be >= 1, got {rollouts}")
-    if candidate.key not in state.available:
+    if query.candidate.key not in query.state.available:
         return 0.0
-    gap = state.picks_until_next(manager)
+    gap = query.state.picks_until_next(query.manager)
     if not gap:
         return 1.0
 
     survived = 0
     for rollout in range(rollouts):
         rng = random.Random(seed * 1_000_003 + rollout)
-        if _candidate_survives(state, gap, candidate, opponent_model, rng):
+        if _candidate_survives(query, gap, rng):
             survived += 1
     return survived / rollouts
 
 
 def _candidate_survives(
-    state: DraftState,
+    query: SurvivalQuery,
     gap: Sequence[str],
-    candidate: DraftAsset,
-    opponent_model: OpponentModel | Mapping[str, OpponentModel],
     rng: random.Random,
 ) -> bool:
-    sim = state.copy()
+    sim = query.state.copy()
     for manager in gap:
-        model = _resolve_model(opponent_model, manager)
+        model = _resolve_model(query.opponent_model, manager)
         asset = model.pick(sim, manager, rng)
-        if asset.key == candidate.key:
+        if asset.key == query.candidate.key:
             return False
         sim.place(manager, asset)
     return True

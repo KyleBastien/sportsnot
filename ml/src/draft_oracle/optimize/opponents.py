@@ -529,18 +529,17 @@ def _legal_rank_z(legal: Sequence[DraftAsset]) -> dict[str, float]:
     return z
 
 
-def _choose(
-    assets: Sequence[DraftAsset],
-    scores: Sequence[float],
-    rng: random.Random,
-    temperature: float,
-) -> int:
-    if temperature <= 0.0:
-        best = 0
-        for index in range(1, len(scores)):
-            if _is_better(assets[index], scores[index], assets[best], scores[best]):
-                best = index
-        return best
+def _argmax_index(assets: Sequence[DraftAsset], scores: Sequence[float]) -> int:
+    """Deterministic best index by score, breaking ties via :func:`_is_better`."""
+    best = 0
+    for index in range(1, len(scores)):
+        if _is_better(assets[index], scores[index], assets[best], scores[best]):
+            best = index
+    return best
+
+
+def _sample_softmax_index(scores: Sequence[float], rng: random.Random, temperature: float) -> int:
+    """Sample an index from a numerically stable softmax over ``scores``."""
     highest = max(scores)
     weights = [math.exp((score - highest) / temperature) for score in scores]
     total = sum(weights)
@@ -551,6 +550,17 @@ def _choose(
         if threshold <= cumulative:
             return index
     return len(weights) - 1
+
+
+def _choose(
+    assets: Sequence[DraftAsset],
+    scores: Sequence[float],
+    rng: random.Random,
+    temperature: float,
+) -> int:
+    if temperature <= 0.0:
+        return _argmax_index(assets, scores)
+    return _sample_softmax_index(scores, rng, temperature)
 
 
 def _is_better(asset: DraftAsset, score: float, best_asset: DraftAsset, best_score: float) -> bool:

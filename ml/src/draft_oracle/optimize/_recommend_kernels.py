@@ -242,6 +242,52 @@ def _owner_step(
     return _OwnerStep(False, choice, owner_total, owner_taken + 1)
 
 
+@dataclass(frozen=True)
+class _Turn:
+    """One manager's per-rollout position counts + legality mask for the current pick."""
+
+    cnt_m: np.ndarray
+    legal: np.ndarray
+
+
+def _greedy_opponent_choice(
+    arr: _RolloutArrays,
+    gmodel: GreedyOpponentModel,
+    turn: _Turn,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Greedy opponent's per-rollout pick: ``rank_value + need`` softmax (or argmax)."""
+    urgency = (arr.limits - turn.cnt_m) / arr.limits
+    # Score opponents by ``rank_value`` (public perception), matching
+    # ``GreedyOpponentModel.pick``; ``val`` (projection) would diverge.
+    scores = arr.rank_val[None, :] + (gmodel.need_weight * urgency)[:, arr.posc]
+    if gmodel.temperature <= 0.0:
+        return _rank_key_argmax(scores, turn.legal, arr.rank_val, arr.key_order)
+    rollouts, n_assets = turn.legal.shape
+    gumbel = -np.log(-np.log(rng.random((rollouts, n_assets))))
+    noisy = np.where(turn.legal, scores / gmodel.temperature + gumbel, float("-inf"))
+    return np.argmax(noisy, axis=1)
+
+
+def _fitted_opponent_choice(
+    arr: _RolloutArrays,
+    params: _FittedParams,
+    turn: _Turn,
+    mgr_i: int,
+) -> np.ndarray:
+    """Fitted opponent's deterministic per-rollout pick from its utility model."""
+    rollouts, n_assets = turn.legal.shape
+    pos_masks = [arr.posc == p for p in range(3)]
+    urgency = (arr.limits - turn.cnt_m) / arr.limits
+    rank_z = _fitted_rank_z(turn.legal, arr.rank_val, pos_masks, rollouts, n_assets)
+    utility = (
+        params.coef_rank[mgr_i] * rank_z
+        + params.coef_aff[mgr_i] * params.aff_matrix[mgr_i][None, :]
+        + params.need_weight[mgr_i] * urgency[:, arr.posc]
+    )
+    return _rank_key_argmax(utility, turn.legal, arr.rank_val, arr.key_order)
+
+
 def _vectorized_greedy_expected(
     state: DraftState,
     owner: str,
@@ -262,7 +308,6 @@ def _vectorized_greedy_expected(
     arr = _build_rollout_arrays(state, owner, replacement)
     rollouts = cfg.rollouts
     rows = np.arange(rollouts)
-    neg_inf = float("-inf")
     means: list[float] = []
     for asset in candidate_assets:
         # Common random numbers: identical opponent draws across candidates (pairs the
@@ -283,17 +328,7 @@ def _vectorized_greedy_expected(
                 choice = step.choice
             else:
                 _require_legal_rows(legal, arr.mgr_ids[mgr_i])
-                urgency = (arr.limits - cnt_m) / arr.limits
-                bump = gmodel.need_weight * urgency
-                # Score opponents by ``rank_value`` (public perception), matching
-                # ``GreedyOpponentModel.pick``; ``val`` (projection) would diverge.
-                scores = arr.rank_val[None, :] + bump[:, arr.posc]
-                if gmodel.temperature <= 0.0:
-                    choice = _rank_key_argmax(scores, legal, arr.rank_val, arr.key_order)
-                else:
-                    gumbel = -np.log(-np.log(rng.random((rollouts, arr.n_assets))))
-                    noisy = np.where(legal, scores / gmodel.temperature + gumbel, neg_inf)
-                    choice = np.argmax(noisy, axis=1)
+                choice = _greedy_opponent_choice(arr, gmodel, _Turn(cnt_m, legal), rng)
             alive[rows, choice] = False
             counts[rows, mgr_i, arr.posc[choice]] += 1
 
@@ -407,7 +442,6 @@ def _vectorized_fitted_expected(
     """
     arr = _build_rollout_arrays(state, owner, replacement)
     params = _build_fitted_params(models, arr)
-    pos_masks = [arr.posc == p for p in range(3)]
     rollouts = cfg.rollouts
     rows = np.arange(rollouts)
     means: list[float] = []
@@ -427,14 +461,7 @@ def _vectorized_fitted_expected(
                 choice = step.choice
             else:
                 _require_legal_rows(legal, arr.mgr_ids[mgr_i])
-                urgency = (arr.limits - cnt_m) / arr.limits
-                rank_z = _fitted_rank_z(legal, arr.rank_val, pos_masks, rollouts, arr.n_assets)
-                utility = (
-                    params.coef_rank[mgr_i] * rank_z
-                    + params.coef_aff[mgr_i] * params.aff_matrix[mgr_i][None, :]
-                    + params.need_weight[mgr_i] * urgency[:, arr.posc]
-                )
-                choice = _rank_key_argmax(utility, legal, arr.rank_val, arr.key_order)
+                choice = _fitted_opponent_choice(arr, params, _Turn(cnt_m, legal), mgr_i)
             alive[rows, choice] = False
             counts[rows, mgr_i, arr.posc[choice]] += 1
 
@@ -521,18 +548,10 @@ def choose_pick(
     expecteds = _expected_values(
         state, owner, [c.asset for c in candidates], opponent_model, replacement, cfg
     )
-    best_asset = candidates[0].asset
-    best_expected = float("-inf")
-    best_vor = float("-inf")
-    for candidate, expected in zip(candidates, expecteds, strict=True):
-        if expected > best_expected or (
-            expected == best_expected
-            and (
-                candidate.vor > best_vor
-                or (candidate.vor == best_vor and candidate.asset.key < best_asset.key)
-            )
-        ):
-            best_asset = candidate.asset
-            best_expected = expected
-            best_vor = candidate.vor
-    return best_asset
+    # argmax by expected, then VOR, then key ascending — the object-model tie-break,
+    # expressed as one deterministic sort so there is no compound branch.
+    ranked = sorted(
+        zip(candidates, expecteds, strict=True),
+        key=lambda pair: (-pair[1], -pair[0].vor, pair[0].asset.key),
+    )
+    return ranked[0][0].asset

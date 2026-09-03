@@ -116,16 +116,17 @@ class RecommendConfig:
     compute_survival: bool = True
 
     def __post_init__(self) -> None:
-        if self.rollouts < 1:
-            raise ValueError(f"rollouts must be >= 1, got {self.rollouts}")
+        checks: tuple[tuple[int, str, int], ...] = (
+            (self.rollouts, "rollouts", 1),
+            (self.max_candidates, "max_candidates", 1),
+            (self.survival_rollouts, "survival_rollouts", 1),
+            (self.top_n, "top_n", 1),
+        )
+        for value, name, minimum in checks:
+            if value < minimum:
+                raise ValueError(f"{name} must be >= {minimum}, got {value}")
         if self.depth is not None and self.depth < 1:
             raise ValueError(f"depth must be >= 1 or None, got {self.depth}")
-        if self.max_candidates < 1:
-            raise ValueError(f"max_candidates must be >= 1, got {self.max_candidates}")
-        if self.survival_rollouts < 1:
-            raise ValueError(f"survival_rollouts must be >= 1, got {self.survival_rollouts}")
-        if self.top_n < 1:
-            raise ValueError(f"top_n must be >= 1, got {self.top_n}")
 
 
 @dataclass(frozen=True)
