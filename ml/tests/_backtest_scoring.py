@@ -52,31 +52,30 @@ def _ir_swap_lookups() -> tuple[
     return skater_actual, team_actual
 
 
+def _league_row(
+    position: str,
+    *,
+    player_id: int | None = None,
+    team_id: int | None = None,
+    points_excluded: bool = False,
+    ir_activated: bool = False,
+) -> dict[str, object]:
+    return {
+        'position': position,
+        'player_id': player_id,
+        'team_id': team_id,
+        'points_excluded': points_excluded,
+        'ir_activated': ir_activated,
+    }
+
+
 def test_score_league_roster_honors_retroactive_ir_swap() -> None:
     skater_actual, team_actual = _ir_swap_lookups()
     picks = pd.DataFrame(
         [
-            {
-                'position': 'F',
-                'player_id': 1,
-                'team_id': None,
-                'points_excluded': True,
-                'ir_activated': False,
-            },
-            {
-                'position': 'IR_F',
-                'player_id': 2,
-                'team_id': None,
-                'points_excluded': False,
-                'ir_activated': True,
-            },
-            {
-                'position': 'G',
-                'player_id': None,
-                'team_id': 10,
-                'points_excluded': False,
-                'ir_activated': False,
-            },
+            _league_row('F', player_id=1, points_excluded=True),
+            _league_row('IR_F', player_id=2, ir_activated=True),
+            _league_row('G', team_id=10),
         ]
     )
     total = _score_league_roster(picks, ScoreContext(skater_actual, team_actual, 100, [1]))
@@ -87,27 +86,9 @@ def test_score_league_roster_no_swap_counts_starter_benches_ir() -> None:
     skater_actual, team_actual = _ir_swap_lookups()
     picks = pd.DataFrame(
         [
-            {
-                'position': 'F',
-                'player_id': 1,
-                'team_id': None,
-                'points_excluded': False,
-                'ir_activated': False,
-            },
-            {
-                'position': 'IR_F',
-                'player_id': 2,
-                'team_id': None,
-                'points_excluded': False,
-                'ir_activated': False,
-            },
-            {
-                'position': 'G',
-                'player_id': None,
-                'team_id': 10,
-                'points_excluded': False,
-                'ir_activated': False,
-            },
+            _league_row('F', player_id=1),
+            _league_row('IR_F', player_id=2),
+            _league_row('G', team_id=10),
         ]
     )
     total = _score_league_roster(picks, ScoreContext(skater_actual, team_actual, 100, [1]))
@@ -121,28 +102,8 @@ def test_combined_league_comparison_scores_rounds_three_and_four() -> None:
     team_actual = team_actual_goalie_points(tables['team_games'], tables['series'])
     picks = pd.DataFrame(
         [
-            {
-                'season': FOUR_ROUND_TARGET,
-                'league_name': 'Combined Fixture League',
-                'draft_event': 'R3_4',
-                'manager': 'alice',
-                'position': 'F',
-                'player_id': 1000,
-                'team_id': None,
-                'points_excluded': False,
-                'ir_activated': False,
-            },
-            {
-                'season': FOUR_ROUND_TARGET,
-                'league_name': 'Combined Fixture League',
-                'draft_event': 'R3_4',
-                'manager': 'alice',
-                'position': 'G',
-                'player_id': None,
-                'team_id': 1,
-                'points_excluded': False,
-                'ir_activated': False,
-            },
+            _league_event_row('F', player_id=1000),
+            _league_event_row('G', team_id=1),
         ]
     )
     combined_round = RoundResult(
@@ -177,6 +138,24 @@ def test_combined_league_comparison_scores_rounds_three_and_four() -> None:
     assert round_three_only == 16.0
     assert actual_points == 37.0
     assert actual_points > round_three_only
+
+
+def _league_event_row(
+    position: str,
+    *,
+    player_id: int | None = None,
+    team_id: int | None = None,
+) -> dict[str, object]:
+    row = _league_row(position, player_id=player_id, team_id=team_id)
+    row.update(
+        {
+            'season': FOUR_ROUND_TARGET,
+            'league_name': 'Combined Fixture League',
+            'draft_event': 'R3_4',
+            'manager': 'alice',
+        }
+    )
+    return row
 
 
 def test_real_2026_league_comparisons_never_pool_leagues() -> None:
