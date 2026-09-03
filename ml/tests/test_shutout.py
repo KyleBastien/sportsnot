@@ -10,6 +10,7 @@ held-out season.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +22,7 @@ from draft_oracle.models import (
     NEUTRAL_SAVE_PCT,
     SHUTOUT_FEATURE_COLUMNS,
     ShutoutConfig,
+    ShutoutFeatureContext,
     ShutoutTeamState,
     base_rate_probs,
     build_shutout_dataset,
@@ -37,40 +39,61 @@ DEFENCE = {"AAA": 0.85, "BBB": 0.6, "CCC": 0.3, "DDD": 0.1}
 SHOTS = 30
 
 
-def _game_rows(
-    *,
-    game_id: int,
-    game_date: str,
-    season_id: int,
-    game_type_id: int,
-    home: str,
-    away: str,
-    home_goals: int,
-    away_goals: int,
-) -> list[dict[str, object]]:
+@dataclass(frozen=True)
+class _GameRowsInput:
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    home: str
+    away: str
+    home_goals: int
+    away_goals: int
+
+
+@dataclass(frozen=True)
+class _RegularGameInput:
+    season_id: int
+    gid: int
+    day: int
+    home: str
+    away: str
+
+
+@dataclass(frozen=True)
+class _TeamRowInput:
+    game: _GameRowsInput
+    team: str
+    gf: int
+    ga: int
+    is_home: bool
+
+
+def _team_row(spec: _TeamRowInput) -> dict[str, object]:
+    won = spec.gf > spec.ga
+    return {
+        "season_id": spec.game.season_id,
+        "game_type_id": spec.game.game_type_id,
+        "game_id": spec.game.game_id,
+        "game_date": spec.game.game_date,
+        "team_id": TEAMS.index(spec.team) + 1,
+        "team_abbrev": spec.team,
+        "home_road": "H" if spec.is_home else "R",
+        "goals_for": spec.gf,
+        "goals_against": spec.ga,
+        "shots_against": SHOTS,
+        "points": 2 if won else 0,
+        "win": won,
+        "shutout_win": won and spec.ga == 0,
+    }
+
+
+def _game_rows(game: _GameRowsInput) -> list[dict[str, object]]:
     """Two archive-shaped rows (home + away) for one decided game."""
 
-    def row(team: str, gf: int, ga: int, is_home: bool) -> dict[str, object]:
-        won = gf > ga
-        return {
-            "season_id": season_id,
-            "game_type_id": game_type_id,
-            "game_id": game_id,
-            "game_date": game_date,
-            "team_id": TEAMS.index(team) + 1,
-            "team_abbrev": team,
-            "home_road": "H" if is_home else "R",
-            "goals_for": gf,
-            "goals_against": ga,
-            "shots_against": SHOTS,
-            "points": 2 if won else 0,
-            "win": won,
-            "shutout_win": won and ga == 0,
-        }
-
     return [
-        row(home, home_goals, away_goals, True),
-        row(away, away_goals, home_goals, False),
+        _team_row(_TeamRowInput(game, game.home, game.home_goals, game.away_goals, True)),
+        _team_row(_TeamRowInput(game, game.away, game.away_goals, game.home_goals, False)),
     ]
 
 
@@ -86,48 +109,61 @@ def _synthetic_team_games(*, seasons: list[int], seed: int = 0) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     gid = 2000000
     for season_id in seasons:
-        day = 1
-        for _ in range(4):
-            for i, home in enumerate(TEAMS):
-                for away in TEAMS[i + 1 :]:
-                    gid += 1
-                    p_home = 1.0 / (1.0 + np.exp(-(STRENGTH[home] - STRENGTH[away] + 0.4)))
-                    home_win = bool(rng.random() < p_home)
-                    winner = home if home_win else away
-                    shutout = bool(rng.random() < DEFENCE[winner])
-                    loser_goals = 0 if shutout else 2
-                    if home_win:
-                        hg, ag = 3, loser_goals
-                    else:
-                        hg, ag = loser_goals, 3
-                    date = f"{season_id // 10000}-11-{day:02d}"
-                    day = day + 1 if day < 28 else 1
-                    rows.extend(
-                        _game_rows(
-                            game_id=gid,
-                            game_date=date,
-                            season_id=season_id,
-                            game_type_id=2,
-                            home=home,
-                            away=away,
-                            home_goals=hg,
-                            away_goals=ag,
-                        )
-                    )
-        gid += 1
-        rows.extend(
-            _game_rows(
-                game_id=gid,
-                game_date=f"{season_id // 10000 + 1}-04-20",
-                season_id=season_id,
-                game_type_id=3,
-                home="AAA",
-                away="DDD",
-                home_goals=3,
-                away_goals=0,
-            )
-        )
+        regular_rows, gid = _regular_season_rows(season_id, gid, rng)
+        rows.extend(regular_rows)
+        playoff_rows, gid = _playoff_rows(season_id, gid)
+        rows.extend(playoff_rows)
     return pd.DataFrame(rows)
+
+
+def _regular_season_rows(
+    season_id: int,
+    starting_gid: int,
+    rng: np.random.Generator,
+) -> tuple[list[dict[str, object]], int]:
+    rows: list[dict[str, object]] = []
+    gid = starting_gid
+    day = 1
+    for _ in range(4):
+        for home, away in _regular_matchups():
+            gid += 1
+            rows.extend(
+                _regular_game_rows(_RegularGameInput(season_id, gid, day, home, away), rng)
+            )
+            day = day + 1 if day < 28 else 1
+    return rows, gid
+
+
+def _regular_matchups() -> list[tuple[str, str]]:
+    return [(home, away) for i, home in enumerate(TEAMS) for away in TEAMS[i + 1 :]]
+
+
+def _regular_game_rows(
+    game: _RegularGameInput,
+    rng: np.random.Generator,
+) -> list[dict[str, object]]:
+    p_home = 1.0 / (1.0 + np.exp(-(STRENGTH[game.home] - STRENGTH[game.away] + 0.4)))
+    home_win = bool(rng.random() < p_home)
+    winner = game.home if home_win else game.away
+    shutout = bool(rng.random() < DEFENCE[winner])
+    loser_goals = 0 if shutout else 2
+    hg, ag = _goals_for_result(home_win, loser_goals)
+    date = f"{game.season_id // 10000}-11-{game.day:02d}"
+    return _game_rows(
+        _GameRowsInput(game.gid, date, game.season_id, 2, game.home, game.away, hg, ag)
+    )
+
+
+def _goals_for_result(home_win: bool, loser_goals: int) -> tuple[int, int]:
+    if home_win:
+        return 3, loser_goals
+    return loser_goals, 3
+
+
+def _playoff_rows(season_id: int, starting_gid: int) -> tuple[list[dict[str, object]], int]:
+    gid = starting_gid + 1
+    date = f"{season_id // 10000 + 1}-04-20"
+    return _game_rows(_GameRowsInput(gid, date, season_id, 3, "AAA", "DDD", 3, 0)), gid
 
 
 # ── Baseline ───────────────────────────────────────────────────────────────
@@ -206,9 +242,11 @@ def test_feature_row_supplied_backup_and_risk_are_flagged() -> None:
     row = shutout_feature_row(
         _snap(0.92, 0.9, 0.1, 3.0),
         _snap(0.9, 0.9, 0.05, 2.8),
-        backup_save_pct=0.88,
-        starter_unavailability_risk=1.0,
-        goalie_injury_data_available=True,
+        context=ShutoutFeatureContext(
+            backup_save_pct=0.88,
+            starter_unavailability_risk=1.0,
+            goalie_injury_data_available=True,
+        ),
     )
     assert row["backup_save_pct"] == pytest.approx(0.88)
     assert row["goalie_split_available"] == 1.0
@@ -276,16 +314,7 @@ def test_build_dataset_counts_zero_zero_shootout_wins_as_shutouts() -> None:
 
 def test_pivot_games_warns_and_excludes_game_without_winner() -> None:
     team_games = pd.DataFrame(
-        _game_rows(
-            game_id=1,
-            game_date="2021-01-01",
-            season_id=20202021,
-            game_type_id=2,
-            home="AAA",
-            away="BBB",
-            home_goals=2,
-            away_goals=2,
-        )
+        _game_rows(_GameRowsInput(1, "2021-01-01", 20202021, 2, "AAA", "BBB", 2, 2))
     )
 
     with pytest.warns(RuntimeWarning, match="without exactly one archive winner"):

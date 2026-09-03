@@ -11,7 +11,11 @@ import pandas as pd
 
 from draft_oracle.models._series_reconstruct import _matchup_key, _MatchupRecord
 from draft_oracle.models.game_win import GameWinConfig, GameWinModel, train_game_win_model
-from draft_oracle.models.series_sim import _predict_series, reconstruct_series_matchups
+from draft_oracle.models.series_sim import (
+    _predict_series,
+    _SeriesModels,
+    reconstruct_series_matchups,
+)
 from draft_oracle.models.shutout import ShutoutConfig, ShutoutModel, train_shutout_model
 from draft_oracle.models.skater_production import (
     LABEL_COLUMN,
@@ -141,8 +145,7 @@ def _team_id_by_abbrev(team_games: pd.DataFrame) -> dict[str, int]:
 def _series_length_by_team(
     series: pd.DataFrame,
     matchups: dict[tuple[int, int, int], _MatchupRecord],
-    win_model: GameWinModel,
-    shutout_model: ShutoutModel,
+    models: _SeriesModels,
     test_year_set: set[int],
 ) -> dict[tuple[int, int, int], dict[int, float]]:
     """Length distribution per ``(year, round, team_id)`` for held-out series."""
@@ -162,9 +165,7 @@ def _series_length_by_team(
             continue
         if not _has_series_snapshots(matchup, top_id, bottom_id):
             continue
-        outcome, _sho_top, _sho_bottom = _predict_series(
-            win_model, shutout_model, matchup, top_id, bottom_id
-        )
+        outcome, _sho_top, _sho_bottom = _predict_series(models, matchup, top_id, bottom_id)
         rnd = int(row["playoff_round"]) if not pd.isna(row["playoff_round"]) else 0
         out[(year, rnd, top_id)] = dict(outcome.length_probs)
         out[(year, rnd, bottom_id)] = dict(outcome.length_probs)
@@ -232,8 +233,7 @@ def _projection_context(
         length_by_team=_series_length_by_team(
             series,
             matchups,
-            models.win,
-            models.shutout,
+            _SeriesModels(win=models.win, shutout=models.shutout),
             set(test_years),
         ),
         abbrev_to_id=_team_id_by_abbrev(team_games),
@@ -257,13 +257,17 @@ def _projection_training_frames(
     train_sk = skater_games.loc[~((skater_games["season_id"] % 10000).isin(test_year_set))]
     train_tg = team_games.loc[~((team_games["season_id"] % 10000).isin(test_year_set))]
     train_series = series.loc[~series["year"].astype(int).isin(test_year_set)]
-    if train_sk.empty or train_tg.empty or train_series.empty:
+    if _training_frames_empty((train_sk, train_tg, train_series)):
         raise ValueError("no training seasons remain after holding out the test set")
     return _ProjectionTrainingFrames(
         skater_games=train_sk,
         team_games=train_tg,
         series=train_series,
     )
+
+
+def _training_frames_empty(frames: tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]) -> bool:
+    return any(frame.empty for frame in frames)
 
 
 def _train_projection_models(

@@ -9,6 +9,7 @@ model), the availability haircut, and an end-to-end honest calibration run.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from itertools import pairwise
 
 import numpy as np
@@ -89,20 +90,27 @@ def _team_games(season: int, team: str, n: int) -> pd.DataFrame:
     )
 
 
-def _skater_games(
-    season: int, team: str, player_id: int, played_idx: list[int], toi: float
-) -> pd.DataFrame:
+@dataclass(frozen=True)
+class _SkaterGamesInput:
+    season: int
+    team: str
+    player_id: int
+    played_idx: list[int]
+    toi: float
+
+
+def _skater_games(spec: _SkaterGamesInput) -> pd.DataFrame:
     return pd.DataFrame(
         [
             {
-                "season_id": season,
+                "season_id": spec.season,
                 "game_type_id": 2,
-                "game_id": f"{team}{i:03d}",
-                "player_id": player_id,
-                "team_abbrev": team,
-                "toi_seconds": toi,
+                "game_id": f"{spec.team}{i:03d}",
+                "player_id": spec.player_id,
+                "team_abbrev": spec.team,
+                "toi_seconds": spec.toi,
             }
-            for i in played_idx
+            for i in spec.played_idx
         ]
     )
 
@@ -112,7 +120,7 @@ def test_derive_absence_spells_finds_injury_gap() -> None:
     tg = _team_games(season, team, n)
     # Plays every game except a bookended 4-game absence (games 20-23).
     played = [i for i in range(n) if i not in (20, 21, 22, 23)]
-    sg = _skater_games(season, team, 7, played, toi=1000.0)
+    sg = _skater_games(_SkaterGamesInput(season, team, 7, played, 1000.0))
     config = AbsenceSpellConfig(min_spell=2, min_appearances=20, min_median_toi=600.0)
     spells = derive_absence_spells(sg, tg, config=config)
     assert list(spells["spell_length"]) == [4]
@@ -124,12 +132,12 @@ def test_derive_absence_spells_filters_low_toi_and_low_appearances() -> None:
     tg = _team_games(season, team, n)
     played = [i for i in range(n) if i not in (20, 21, 22, 23)]
     # Low median TOI -> excluded as a fringe scratch even with a real gap.
-    sg_low_toi = _skater_games(season, team, 1, played, toi=100.0)
+    sg_low_toi = _skater_games(_SkaterGamesInput(season, team, 1, played, 100.0))
     config = AbsenceSpellConfig(min_median_toi=600.0)
     assert derive_absence_spells(sg_low_toi, tg, config=config).empty
 
     # Too few appearances -> excluded (not an established regular).
-    sg_few = _skater_games(season, team, 2, played[:10], toi=1000.0)
+    sg_few = _skater_games(_SkaterGamesInput(season, team, 2, played[:10], 1000.0))
     assert derive_absence_spells(sg_few, tg, config=config).empty
 
 
@@ -266,7 +274,7 @@ def _multi_season_archive() -> tuple[pd.DataFrame, pd.DataFrame]:
                 miss_len = 2 + int(rng.integers(0, 5))
                 missed = set(range(miss_start, miss_start + miss_len))
                 played = [i for i in range(n) if i not in missed]
-                sgs.append(_skater_games(season, team, player_id, played, toi=900.0))
+                sgs.append(_skater_games(_SkaterGamesInput(season, team, player_id, played, 900.0)))
     return pd.concat(sgs, ignore_index=True), pd.concat(tgs, ignore_index=True)
 
 

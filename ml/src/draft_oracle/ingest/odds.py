@@ -470,7 +470,6 @@ def _two_sided_row(
     home_ml: float,
 ) -> dict[str, Any]:
     devig = devig_proportional(home_ml, away_ml)
-    favorite_side = "home" if home_ml < away_ml else "away"
     return {
         "source": game.source,
         "season_end_year": game.season_end_year,
@@ -483,7 +482,7 @@ def _two_sided_row(
         "home_team_name": game.home_name,
         "away_ml": away_ml,
         "home_ml": home_ml,
-        "favorite_side": favorite_side,
+        "favorite_side": _two_sided_favorite_side(home_ml, away_ml),
         "both_sides": True,
         "covered": True,
         "away_implied": devig.away_prob,
@@ -492,6 +491,10 @@ def _two_sided_row(
         "overround": devig.overround,
         "game_key": _game_key(game.season_end_year, game.game_date, game.away_id, game.home_id),
     }
+
+
+def _two_sided_favorite_side(home_ml: float, away_ml: float) -> str:
+    return "home" if home_ml < away_ml else "away"
 
 
 def _favorite_only_row(

@@ -18,8 +18,18 @@ from draft_oracle.ingest.injuries import (
     injuries_response_to_rows,
     resolve_espn_player_id,
 )
-from draft_oracle.projection_artifact import _injured_player_ids
 from tests.test_injuries import _noop_sleep
+
+_INJURED_STATUSES = frozenset({"out", "ir", "day_to_day"})
+
+
+def _injured_player_ids(injuries: pd.DataFrame | None) -> set[int]:
+    if injuries is None or injuries.empty:
+        return set()
+    hurt = injuries.loc[
+        injuries["status"].isin(_INJURED_STATUSES) & (injuries["position"] != "G")
+    ]
+    return {int(pid) for pid in hurt["player_id"].tolist()}
 
 # ── ESPN athlete id -> NHL player id mapping (CODE_REVIEW M-11) ───────────
 

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import random as _random
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -13,6 +16,10 @@ from draft_oracle.cli._project_defaults import (
     DEFAULT_NORMALIZED_DIR,
     DEFAULT_OPPONENT_ARTIFACT_DIR,
 )
+
+if TYPE_CHECKING:
+    from draft_oracle.optimize.opponents import FittedLeagueOpponents
+    from draft_oracle.optimize.simulator import DraftAsset, DraftState, OpponentModel
 
 
 def project(
@@ -152,59 +159,102 @@ def recommend(
     passing real names to ``--managers`` attaches each manager's fitted model to their
     real seat.
     """
-    import random as _random
-    from collections.abc import Mapping
-
     from draft_oracle.cli.draft import (
         opponent_label,
         parse_managers,
         resolve_opponents_kind,
     )
-    from draft_oracle.optimize.opponents import load_committed_opponents
     from draft_oracle.optimize.recommend import (
         RecommendConfig,
         build_pool_from_projection_artifact,
         recommend_pick,
     )
-    from draft_oracle.optimize.simulator import DraftState, GreedyOpponentModel, OpponentModel
 
     manager_ids = parse_managers(managers)
-    manager_count = len(manager_ids)
-    if not 1 <= seat <= manager_count:
-        raise typer.BadParameter(f"seat must be in 1..{manager_count}")
+    _validate_seat(seat, len(manager_ids))
     opponents_kind = resolve_opponents_kind(opponents, opponent_artifact)
     pool = build_pool_from_projection_artifact(artifact_dir, ir=ir)
-    owner = manager_ids[seat - 1]
-    state = DraftState.new(manager_ids, pool, allow_ir=ir)
-
-    opponent_model: OpponentModel | Mapping[str, OpponentModel]
-    fitted = None
-    if opponents_kind == "fitted":
-        fitted = load_committed_opponents(opponent_artifact)
-        if fitted is None:
-            raise typer.BadParameter(
-                f"--opponents fitted needs a committed artifact at {opponent_artifact}"
-            )
-        opponent_model = fitted.as_mapping(manager_ids)
-    else:
-        opponent_model = GreedyOpponentModel(temperature=temperature, need_weight=4.0)
-
-    def _model_for(manager: str) -> OpponentModel:
-        if isinstance(opponent_model, Mapping):
-            return opponent_model[manager]
-        return opponent_model
-
-    rng = _random.Random(seed)
-    # Advance to the owner's first turn (opponents ahead of the owner draft via the model).
-    while state.current_manager != owner:
-        current = state.current_manager
-        state.apply_pick(_model_for(current).pick(state, current, rng))
+    setup = _build_recommend_setup(
+        manager_ids=manager_ids,
+        seat=seat,
+        ir=ir,
+        pool=pool,
+        opponents_kind=opponents_kind,
+        opponent_artifact=opponent_artifact,
+        temperature=temperature,
+    )
+    _advance_to_owner(setup.state, setup.owner, setup.opponent_model, seed)
     config = RecommendConfig(rollouts=rollouts, depth=depth or None, seed=seed)
-    result = recommend_pick(state, owner, opponent_model, config=config, managers=manager_count)
-    label = opponent_label(opponents_kind, fitted, manager_ids)
-    typer.echo(f"Recommendation for {owner} (pick #{state.pick_index + 1}, {label}):")
+    result = recommend_pick(
+        setup.state,
+        setup.owner,
+        setup.opponent_model,
+        config=config,
+        managers=len(manager_ids),
+    )
+    label = opponent_label(opponents_kind, setup.fitted, manager_ids)
+    typer.echo(f"Recommendation for {setup.owner} (pick #{setup.state.pick_index + 1}, {label}):")
     for line in result.report_lines():
         typer.echo(line)
+
+
+@dataclass(frozen=True)
+class _RecommendSetup:
+    owner: str
+    state: DraftState
+    opponent_model: OpponentModel | Mapping[str, OpponentModel]
+    fitted: FittedLeagueOpponents | None
+
+
+def _validate_seat(seat: int, manager_count: int) -> None:
+    if not 1 <= seat <= manager_count:
+        raise typer.BadParameter(f"seat must be in 1..{manager_count}")
+
+
+def _build_recommend_setup(
+    *,
+    manager_ids: list[str],
+    seat: int,
+    ir: bool,
+    pool: Sequence[DraftAsset],
+    opponents_kind: str,
+    opponent_artifact: Path,
+    temperature: float,
+) -> _RecommendSetup:
+    from draft_oracle.optimize.opponents import load_committed_opponents
+    from draft_oracle.optimize.simulator import DraftState, GreedyOpponentModel
+
+    owner = manager_ids[seat - 1]
+    state = DraftState.new(manager_ids, pool, allow_ir=ir)
+    fitted = load_committed_opponents(opponent_artifact) if opponents_kind == "fitted" else None
+    if opponents_kind == "fitted" and fitted is None:
+        raise typer.BadParameter(
+            f"--opponents fitted needs a committed artifact at {opponent_artifact}"
+        )
+    if fitted is not None:
+        return _RecommendSetup(owner, state, fitted.as_mapping(manager_ids), fitted)
+    greedy = GreedyOpponentModel(temperature=temperature, need_weight=4.0)
+    return _RecommendSetup(owner, state, greedy, None)
+
+
+def _advance_to_owner(
+    state: DraftState,
+    owner: str,
+    opponent_model: OpponentModel | Mapping[str, OpponentModel],
+    seed: int,
+) -> None:
+    rng = _random.Random(seed)
+    while state.current_manager != owner:
+        current = state.current_manager
+        state.apply_pick(_model_for(opponent_model, current).pick(state, current, rng))
+
+
+def _model_for(
+    opponent_model: OpponentModel | Mapping[str, OpponentModel], manager: str
+) -> OpponentModel:
+    if isinstance(opponent_model, Mapping):
+        return opponent_model[manager]
+    return opponent_model
 
 
 def draft_cmd(

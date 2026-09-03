@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -72,6 +72,7 @@ __all__ = [
     "ProjectionConfig",
     "ProjectionResult",
     "RoundProjection",
+    "RoundSimulationInput",
     "SeasonMetrics",
     "evaluate_skater_projections",
     "evaluate_skater_projections_from_normalized",
@@ -146,13 +147,19 @@ def _expected_games(length_probs: dict[int, float], avail_per_game: np.ndarray) 
     return float(total)
 
 
+@dataclass(frozen=True)
+class RoundSimulationInput:
+    pts_per_game: float
+    length_probs: dict[int, float]
+    avail_per_game: np.ndarray
+    n_sims: int
+
+
 def simulate_round_points(
     rng: np.random.Generator,
-    pts_per_game: float,
-    length_probs: dict[int, float],
-    avail_per_game: np.ndarray,
-    *,
-    n_sims: int,
+    scenario: RoundSimulationInput | float,
+    *legacy_args: object,
+    n_sims: int | None = None,
 ) -> np.ndarray:
     """Monte-Carlo samples of a skater's total round fantasy points.
 
@@ -162,21 +169,43 @@ def simulate_round_points(
     ``Poisson(pts_per_game)`` fantasy points (goals + assists, weighted 1 each). The
     returned array has one summed total per sim; deterministic given ``rng``.
     """
-    probs = normalize_length_probs(length_probs)
+    resolved = _round_simulation_input(scenario, legacy_args, n_sims)
+    probs = normalize_length_probs(resolved.length_probs)
     lengths = np.asarray(list(probs.keys()), dtype=int)
     weights = np.asarray(list(probs.values()), dtype=float)
-    rate = max(float(pts_per_game), 0.0)
-    horizon = int(avail_per_game.size)
+    rate = max(float(resolved.pts_per_game), 0.0)
+    horizon = int(resolved.avail_per_game.size)
 
-    drawn_lengths = rng.choice(lengths, size=int(n_sims), p=weights)
+    drawn_lengths = rng.choice(lengths, size=int(resolved.n_sims), p=weights)
     # Availability + scoring are drawn per game up to the horizon; games beyond a
     # sim's drawn length are masked out so they contribute nothing.
     game_index = np.arange(horizon)
-    avail_draw = rng.random((int(n_sims), horizon)) < avail_per_game[np.newaxis, :]
-    points_draw = rng.poisson(rate, size=(int(n_sims), horizon)).astype(float)
+    avail_draw = rng.random((int(resolved.n_sims), horizon)) < resolved.avail_per_game[
+        np.newaxis, :
+    ]
+    points_draw = rng.poisson(rate, size=(int(resolved.n_sims), horizon)).astype(float)
     played = (game_index[np.newaxis, :] < drawn_lengths[:, np.newaxis]) & avail_draw
     totals = (points_draw * played).sum(axis=1)
     return totals
+
+
+def _round_simulation_input(
+    scenario: RoundSimulationInput | float,
+    legacy_args: tuple[object, ...],
+    n_sims: int | None,
+) -> RoundSimulationInput:
+    if isinstance(scenario, RoundSimulationInput):
+        return scenario
+    if n_sims is None or len(legacy_args) != 2:
+        raise TypeError(
+            "legacy simulate_round_points calls require length_probs, availability, n_sims"
+        )
+    return RoundSimulationInput(
+        pts_per_game=float(scenario),
+        length_probs=cast(dict[int, float], legacy_args[0]),
+        avail_per_game=cast(np.ndarray, legacy_args[1]),
+        n_sims=n_sims,
+    )
 
 
 @dataclass(frozen=True)
@@ -216,7 +245,15 @@ def project_skater_round(
     """
     avail_per_game = _availability_per_game(availability_curve, availability, horizon)
     rng = np.random.default_rng(seed)
-    samples = simulate_round_points(rng, pts_per_game, length_probs, avail_per_game, n_sims=n_sims)
+    samples = simulate_round_points(
+        rng,
+        RoundSimulationInput(
+            pts_per_game=pts_per_game,
+            length_probs=length_probs,
+            avail_per_game=avail_per_game,
+            n_sims=n_sims,
+        ),
+    )
     expected_games = _expected_games(length_probs, avail_per_game)
     e_series_length = expected_series_length(length_probs)
     multiplier = expected_games / e_series_length if e_series_length > 0 else 1.0

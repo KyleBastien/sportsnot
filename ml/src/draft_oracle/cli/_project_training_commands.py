@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Annotated
 
@@ -20,6 +21,18 @@ from draft_oracle.cli._project_defaults import (
     STRATEGIES,
     Strategy,
 )
+
+
+def _yes_no(value: bool) -> str:
+    return "yes" if value else "no"
+
+
+def _echo_chosen_model(chosen_model_type: str) -> None:
+    typer.echo(f"  chosen model: {chosen_model_type}")
+
+
+def _echo_held_out_seasons(test_years: Iterable[object]) -> None:
+    typer.echo(f"  held-out seasons: {list(test_years)}")
 
 
 def train_game_win(
@@ -45,7 +58,7 @@ def train_game_win(
         use_odds=not no_odds,
     )
     typer.echo(f"Per-game win model -> {artifact_dir}")
-    typer.echo(f"  chosen model: {result.chosen_model_type}")
+    _echo_chosen_model(result.chosen_model_type)
     typer.echo(
         f"  test Brier: market+stats {result.test_brier_market:.4f} / "
         f"stats-only {result.test_brier_stats_only:.4f}"
@@ -54,7 +67,7 @@ def train_game_win(
         f"  baselines: coin-flip {result.test_brier_coin_flip:.4f} / "
         f"higher-points {result.test_brier_higher_points:.4f}"
     )
-    typer.echo(f"  beats both baselines: {'yes' if result.beats_both_baselines else 'no'}")
+    typer.echo(f"  beats both baselines: {_yes_no(result.beats_both_baselines)}")
 
 
 def train_shutout(
@@ -75,7 +88,7 @@ def train_shutout(
         config=ShutoutConfig(seed=seed),
     )
     typer.echo(f"Shutout model -> {artifact_dir}")
-    typer.echo(f"  chosen model: {result.chosen_model_type}")
+    _echo_chosen_model(result.chosen_model_type)
     typer.echo(
         f"  test Brier: model {result.test_brier_model:.4f} / "
         f"base-rate {result.test_brier_base_rate:.4f}"
@@ -85,7 +98,7 @@ def train_shutout(
         f"predicted {result.test_predicted_rate:.4f} "
         f"(rel err {result.calibration_rel_error:.1%})"
     )
-    typer.echo(f"  within +/-25%: {'yes' if result.calibrated_within_tolerance else 'no'}")
+    typer.echo(f"  within +/-25%: {_yes_no(result.calibrated_within_tolerance)}")
 
 
 def train_skater_production(
@@ -109,7 +122,7 @@ def train_skater_production(
         config=SkaterProductionConfig(seed=seed),
     )
     typer.echo(f"Skater production model -> {artifact_dir}")
-    typer.echo(f"  chosen model: {result.chosen_model_type}")
+    _echo_chosen_model(result.chosen_model_type)
     typer.echo(
         f"  test MAE: model {result.test_mae_model:.4f} / "
         f"reg-ppg {result.test_mae_baseline_reg:.4f} / "
@@ -119,7 +132,7 @@ def train_skater_production(
         f"  test Spearman: model {result.test_spearman_model:.4f} / "
         f"reg-ppg {result.test_spearman_baseline_reg:.4f}"
     )
-    typer.echo(f"  beats reg-ppg baseline: {'yes' if result.beats_reg_baseline else 'no'}")
+    typer.echo(f"  beats reg-ppg baseline: {_yes_no(result.beats_reg_baseline)}")
     typer.echo(f"  cold cases (test): {result.n_cold_cases_test}")
 
 
@@ -146,7 +159,7 @@ def train_return_time(
         f"  spell length: mean {result.mean_spell:.2f} / "
         f"median {result.median_spell:.1f} / p90 {result.p90_spell:.1f}"
     )
-    typer.echo(f"  held-out seasons: {list(result.test_years)}")
+    _echo_held_out_seasons(result.test_years)
     typer.echo(f"  calibration MAE (survival): {result.calibration_mae:.4f}")
 
 
@@ -168,7 +181,7 @@ def eval_series_sim(
         config=SeriesSimConfig(seed=seed),
     )
     typer.echo(f"Series simulator -> {artifact_dir}")
-    typer.echo(f"  held-out seasons: {list(result.test_years)}")
+    _echo_held_out_seasons(result.test_years)
     typer.echo(f"  series scored: {result.n_series_scored} (skipped {result.n_series_skipped})")
     typer.echo(
         f"  series-winner Brier: model {result.brier_series:.4f} / "
@@ -197,7 +210,7 @@ def project_skaters(
         config=ProjectionConfig(seed=seed),
     )
     typer.echo(f"Skater round projections -> {artifact_dir}")
-    typer.echo(f"  held-out seasons: {list(result.test_years)}")
+    _echo_held_out_seasons(result.test_years)
     typer.echo(
         f"  skater-rounds projected: {result.n_projected} (skipped {result.n_skipped_no_series})"
     )
@@ -211,7 +224,7 @@ def project_skaters(
         f"reg-ppg {result.test_spearman_baseline_reg:.4f} / "
         f"prev-round {result.test_spearman_baseline_prev:.4f}"
     )
-    typer.echo(f"  beats both baselines: {'yes' if result.beats_both_baselines else 'no'}")
+    typer.echo(f"  beats both baselines: {_yes_no(result.beats_both_baselines)}")
 
 
 def train_opponents(

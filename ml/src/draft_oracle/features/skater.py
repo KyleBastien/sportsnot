@@ -137,7 +137,8 @@ def age_years(
     Returns ``0.0`` for an unknown/missing birth date so the feature stays
     numeric and leakage-free (age uses no game data).
     """
-    if birth_date is None or (isinstance(birth_date, float) and pd.isna(birth_date)):
+    missing_float = isinstance(birth_date, float) and pd.isna(birth_date)
+    if birth_date is None or missing_float:
         return 0.0
     birth = pd.to_datetime(birth_date, errors="coerce")
     if pd.isna(birth):

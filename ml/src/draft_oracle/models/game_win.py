@@ -685,6 +685,103 @@ def _train_variant(
     return _fit(builder(seed), train, features)
 
 
+@dataclass(frozen=True)
+class _GameWinSplitFrames:
+    split: TemporalSplit
+    train: pd.DataFrame
+    val: pd.DataFrame
+    test: pd.DataFrame
+    train_val: pd.DataFrame
+
+
+@dataclass(frozen=True)
+class _GameWinEvaluation:
+    val_brier: dict[str, float]
+    chosen: str
+    test_brier_market: float
+    test_brier_stats: float
+    test_brier_coin: float
+    test_brier_points: float
+    test_market_coverage: float
+    market_coverage_by_season: dict[int, SeasonMarketCoverage]
+
+
+def _game_win_split_frames(dataset: pd.DataFrame, config: GameWinConfig) -> _GameWinSplitFrames:
+    years = [int(y) for y in dataset["season_end_year"].unique()]
+    split = default_temporal_split(years, n_val=config.n_val_seasons, n_test=config.n_test_seasons)
+    train = _rows_for_years(dataset, split.train_years)
+    val = _rows_for_years(dataset, split.val_years)
+    test = _rows_for_years(dataset, split.test_years)
+    return _GameWinSplitFrames(
+        split=split,
+        train=train,
+        val=val,
+        test=test,
+        train_val=pd.concat([train, val], ignore_index=True),
+    )
+
+
+def _game_win_validation_brier(frames: _GameWinSplitFrames, seed: int) -> dict[str, float]:
+    val_brier: dict[str, float] = {}
+    for model_type in ("logistic_regression", "lightgbm"):
+        fitted = _train_variant(
+            frames.train, MARKET_FEATURE_COLUMNS, model_type=model_type, seed=seed
+        )
+        val_brier[model_type] = brier_score(
+            _predict(fitted, frames.val, MARKET_FEATURE_COLUMNS), frames.val["home_win"]
+        )
+    return val_brier
+
+
+def _evaluate_game_win_model(
+    dataset: pd.DataFrame,
+    frames: _GameWinSplitFrames,
+    config: GameWinConfig,
+) -> _GameWinEvaluation:
+    val_brier = _game_win_validation_brier(frames, config.seed)
+    chosen = min(val_brier, key=lambda k: val_brier[k])
+    market_model = _train_variant(
+        frames.train_val, MARKET_FEATURE_COLUMNS, model_type=chosen, seed=config.seed
+    )
+    stats_model = _train_variant(
+        frames.train_val, STAT_FEATURE_COLUMNS, model_type=chosen, seed=config.seed
+    )
+    return _GameWinEvaluation(
+        val_brier=val_brier,
+        chosen=chosen,
+        test_brier_market=brier_score(
+            _predict(market_model, frames.test, MARKET_FEATURE_COLUMNS), frames.test["home_win"]
+        ),
+        test_brier_stats=brier_score(
+            _predict(stats_model, frames.test, STAT_FEATURE_COLUMNS), frames.test["home_win"]
+        ),
+        test_brier_coin=brier_score(coin_flip_probs(len(frames.test)), frames.test["home_win"]),
+        test_brier_points=brier_score(
+            baseline_higher_points_probs(frames.test), frames.test["home_win"]
+        ),
+        test_market_coverage=float(frames.test["market_available"].mean())
+        if len(frames.test)
+        else 0.0,
+        market_coverage_by_season=_market_coverage_by_season(dataset, frames.split),
+    )
+
+
+def _fit_production_game_win_model(
+    dataset: pd.DataFrame,
+    model_type: str,
+    seed: int,
+) -> GameWinModel:
+    production = _train_variant(
+        dataset, MARKET_FEATURE_COLUMNS, model_type=model_type, seed=seed
+    )
+    return GameWinModel(
+        estimator=production,
+        feature_columns=MARKET_FEATURE_COLUMNS,
+        model_type=model_type,
+        uses_market=True,
+    )
+
+
 def train_game_win_model(
     team_games: pd.DataFrame,
     *,
@@ -710,68 +807,25 @@ def train_game_win_model(
     if dataset.empty:
         raise ValueError("no games available to train the per-game win model")
 
-    years = [int(y) for y in dataset["season_end_year"].unique()]
-    split = default_temporal_split(years, n_val=config.n_val_seasons, n_test=config.n_test_seasons)
-    train = _rows_for_years(dataset, split.train_years)
-    val = _rows_for_years(dataset, split.val_years)
-    test = _rows_for_years(dataset, split.test_years)
-    train_val = pd.concat([train, val], ignore_index=True)
-
-    # Model selection on the market feature set (best available information).
-    val_brier: dict[str, float] = {}
-    for model_type in ("logistic_regression", "lightgbm"):
-        fitted = _train_variant(
-            train, MARKET_FEATURE_COLUMNS, model_type=model_type, seed=config.seed
-        )
-        val_brier[model_type] = brier_score(
-            _predict(fitted, val, MARKET_FEATURE_COLUMNS), val["home_win"]
-        )
-    chosen = min(val_brier, key=lambda k: val_brier[k])
-
-    # Refit the chosen model on train+val for the held-out test (both variants).
-    market_model = _train_variant(
-        train_val, MARKET_FEATURE_COLUMNS, model_type=chosen, seed=config.seed
-    )
-    stats_model = _train_variant(
-        train_val, STAT_FEATURE_COLUMNS, model_type=chosen, seed=config.seed
-    )
-    test_brier_market = brier_score(
-        _predict(market_model, test, MARKET_FEATURE_COLUMNS), test["home_win"]
-    )
-    test_brier_stats = brier_score(
-        _predict(stats_model, test, STAT_FEATURE_COLUMNS), test["home_win"]
-    )
-    test_brier_coin = brier_score(coin_flip_probs(len(test)), test["home_win"])
-    test_brier_points = brier_score(baseline_higher_points_probs(test), test["home_win"])
-    coverage = float(test["market_available"].mean()) if len(test) else 0.0
-    coverage_by_season = _market_coverage_by_season(dataset, split)
-
-    # Production model: chosen type, market features, all available seasons.
-    production = _train_variant(
-        dataset, MARKET_FEATURE_COLUMNS, model_type=chosen, seed=config.seed
-    )
-    model = GameWinModel(
-        estimator=production,
-        feature_columns=MARKET_FEATURE_COLUMNS,
-        model_type=chosen,
-        uses_market=True,
-    )
+    frames = _game_win_split_frames(dataset, config)
+    evaluation = _evaluate_game_win_model(dataset, frames, config)
+    model = _fit_production_game_win_model(dataset, evaluation.chosen, config.seed)
 
     return GameWinResult(
         model=model,
         config=config,
-        split=split,
-        chosen_model_type=chosen,
-        val_brier_by_model=val_brier,
-        test_brier_market=test_brier_market,
-        test_brier_stats_only=test_brier_stats,
-        test_brier_coin_flip=test_brier_coin,
-        test_brier_higher_points=test_brier_points,
-        n_train=len(train),
-        n_val=len(val),
-        n_test=len(test),
-        test_market_coverage=coverage,
-        market_coverage_by_season=coverage_by_season,
+        split=frames.split,
+        chosen_model_type=evaluation.chosen,
+        val_brier_by_model=evaluation.val_brier,
+        test_brier_market=evaluation.test_brier_market,
+        test_brier_stats_only=evaluation.test_brier_stats,
+        test_brier_coin_flip=evaluation.test_brier_coin,
+        test_brier_higher_points=evaluation.test_brier_points,
+        n_train=len(frames.train),
+        n_val=len(frames.val),
+        n_test=len(frames.test),
+        test_market_coverage=evaluation.test_market_coverage,
+        market_coverage_by_season=evaluation.market_coverage_by_season,
     )
 
 

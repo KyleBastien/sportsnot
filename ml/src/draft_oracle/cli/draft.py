@@ -94,13 +94,27 @@ def resolve_manager(managers: list[str], token: str) -> str | None:
     if not stripped:
         return None
     if stripped.isdigit():
-        index = int(stripped)
-        if 1 <= index <= len(managers):
-            return managers[index - 1]
-        return None
+        return _manager_by_seat(managers, int(stripped))
+    exact = _manager_by_exact_id(managers, stripped)
+    if exact is not None:
+        return exact
+    return _manager_by_prefix(managers, stripped)
+
+
+def _manager_by_seat(managers: list[str], index: int) -> str | None:
+    if 1 <= index <= len(managers):
+        return managers[index - 1]
+    return None
+
+
+def _manager_by_exact_id(managers: list[str], stripped: str) -> str | None:
     for manager in managers:
         if manager.lower() == stripped:
             return manager
+    return None
+
+
+def _manager_by_prefix(managers: list[str], stripped: str) -> str | None:
     prefixed = [manager for manager in managers if manager.lower().startswith(stripped)]
     if len(prefixed) == 1:
         return prefixed[0]
@@ -560,6 +574,13 @@ _HELP_LINES = [
 ]
 
 
+@dataclass
+class _LoopState:
+    session: DraftSession
+    session_path: Path | None
+    echo: Callable[[str], None]
+
+
 def _run_loop(
     session: DraftSession,
     session_path: Path | None,
@@ -568,62 +589,103 @@ def _run_loop(
     echo: Callable[[str], None] = typer.echo,
 ) -> DraftSession:
     """Drive an interactive session until EOF/quit. Returns the final session."""
+    state = _LoopState(session, session_path, echo)
+    _show_help_banner(echo)
+    _autosave(state)
+    while True:
+        parsed = _read_command(state.session, input_fn, echo)
+        if parsed is None:
+            break
+        if _handle_loop_command(state, parsed):
+            break
+    _autosave(state)
+    return state.session
+
+
+def _show_help_banner(echo: Callable[[str], None]) -> None:
     echo("Draft Oracle interactive assistant (US-024). Type 'help' for commands.")
-    for line in _HELP_LINES:
+    _echo_lines(echo, _HELP_LINES)
+
+
+def _read_command(
+    session: DraftSession,
+    input_fn: Callable[[str], str],
+    echo: Callable[[str], None],
+) -> ParsedCommand | None:
+    try:
+        return parse_command(input_fn(_prompt(session)))
+    except (EOFError, KeyboardInterrupt):
+        echo("")
+        return None
+
+
+def _prompt(session: DraftSession) -> str:
+    if session.state.is_complete:
+        return "[draft complete] > "
+    return f"[#{session.state.pick_index + 1} {session.state.current_manager}] > "
+
+
+def _handle_loop_command(state: _LoopState, parsed: ParsedCommand) -> bool:
+    if parsed.name == "":
+        return False
+    if parsed.error:
+        state.echo(parsed.error)
+        return False
+    if parsed.name == "quit":
+        return True
+    handler = _LOOP_HANDLERS.get(parsed.name)
+    if handler is not None:
+        handler(state, parsed)
+        return False
+    _handle_action_command(state, parsed)
+    return False
+
+
+def _handle_help(state: _LoopState, _parsed: ParsedCommand) -> None:
+    _echo_lines(state.echo, _HELP_LINES)
+
+
+def _handle_resume(state: _LoopState, parsed: ParsedCommand) -> None:
+    assert parsed.path is not None
+    resume_path = Path(parsed.path)
+    state.session = DraftSession.resume(resume_path)
+    state.session_path = resume_path
+    state.echo(
+        f"resumed {len(state.session.picks)} pick(s) from {parsed.path}; "
+        f"autosave target switched to {parsed.path}"
+    )
+    _autosave(state)
+
+
+def _handle_save(state: _LoopState, parsed: ParsedCommand) -> None:
+    assert parsed.path is not None
+    state.session.save(Path(parsed.path))
+    state.echo(f"saved session -> {parsed.path}")
+
+
+def _handle_action_command(state: _LoopState, parsed: ParsedCommand) -> None:
+    result = _dispatch(state.session, parsed)
+    state.echo(result.message)
+    _echo_lines(state.echo, result.lines)
+    if parsed.name in ("pick", "undo") and result.ok:
+        _autosave(state)
+
+
+def _echo_lines(echo: Callable[[str], None], lines: list[str]) -> None:
+    for line in lines:
         echo(line)
 
-    def _autosave() -> None:
-        if session_path is not None:
-            session.save(session_path)
 
-    _autosave()
-    while True:
-        if session.state.is_complete:
-            prompt = "[draft complete] > "
-        else:
-            prompt = f"[#{session.state.pick_index + 1} {session.state.current_manager}] > "
-        try:
-            raw = input_fn(prompt)
-        except (EOFError, KeyboardInterrupt):
-            echo("")
-            break
-        parsed = parse_command(raw)
-        if parsed.name == "":
-            continue
-        if parsed.error:
-            echo(parsed.error)
-            continue
-        if parsed.name == "quit":
-            break
-        if parsed.name == "help":
-            for help_line in _HELP_LINES:
-                echo(help_line)
-            continue
-        if parsed.name == "resume":
-            assert parsed.path is not None
-            resume_path = Path(parsed.path)
-            session = DraftSession.resume(resume_path)
-            session_path = resume_path
-            echo(
-                f"resumed {len(session.picks)} pick(s) from {parsed.path}; "
-                f"autosave target switched to {parsed.path}"
-            )
-            _autosave()
-            continue
-        if parsed.name == "save":
-            assert parsed.path is not None
-            session.save(Path(parsed.path))
-            echo(f"saved session -> {parsed.path}")
-            continue
+def _autosave(state: _LoopState) -> None:
+    if state.session_path is not None:
+        state.session.save(state.session_path)
 
-        result = _dispatch(session, parsed)
-        echo(result.message)
-        for out_line in result.lines:
-            echo(out_line)
-        if parsed.name in ("pick", "undo") and result.ok:
-            _autosave()
-    _autosave()
-    return session
+
+_LOOP_HANDLERS: dict[str, Callable[[_LoopState, ParsedCommand], None]] = {
+    "help": _handle_help,
+    "resume": _handle_resume,
+    "save": _handle_save,
+}
 
 
 def _dispatch(session: DraftSession, parsed: ParsedCommand) -> ActionResult:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
@@ -13,6 +14,16 @@ from draft_oracle.models.skater_production import (
     _assign_rounds,
     _series_round_map,
 )
+
+
+@dataclass(frozen=True)
+class RoundLeakageCheck:
+    games: pd.DataFrame
+    round_ids: set[int]
+    cutoff: str | pd.Timestamp
+    date_col: str = "game_date"
+    label: str = "games"
+    authoritative_dates: pd.DataFrame | Mapping[int, Any] | None = None
 
 
 def round_game_ids(
@@ -30,25 +41,21 @@ def round_game_ids(
     return {int(gid) for gid in po["game_id"].unique()}
 
 
-def assert_round_inputs_leakfree(
-    games: pd.DataFrame,
-    round_ids: set[int],
-    cutoff: str | pd.Timestamp,
-    *,
-    date_col: str = "game_date",
-    label: str = "games",
-    authoritative_dates: pd.DataFrame | Mapping[int, Any] | None = None,
-) -> None:
+def assert_round_inputs_leakfree(check: RoundLeakageCheck) -> None:
     """Fail loudly if the as-of inputs for a round contain that round's data."""
-    cutoff_ts = pd.Timestamp(cutoff)
-    frame = games.copy()
-    frame[date_col] = pd.to_datetime(frame[date_col])
-    train = frame.loc[frame[date_col] < cutoff_ts]
+    cutoff_ts = pd.Timestamp(check.cutoff)
+    frame = check.games.copy()
+    frame[check.date_col] = pd.to_datetime(frame[check.date_col])
+    train = frame.loc[frame[check.date_col] < cutoff_ts]
     _assert_authoritative_dates_leakfree(
-        train, authoritative_dates, cutoff_ts, date_col=date_col, label=label
+        train,
+        check.authoritative_dates,
+        cutoff_ts,
+        date_col=check.date_col,
+        label=check.label,
     )
-    assert_no_leakage(train, cutoff_ts, date_col=date_col)
-    _assert_round_ids_absent(train, round_ids, cutoff_ts, label=label)
+    assert_no_leakage(train, cutoff_ts, date_col=check.date_col)
+    _assert_round_ids_absent(train, check.round_ids, cutoff_ts, label=check.label)
 
 
 def _assert_authoritative_dates_leakfree(

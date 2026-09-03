@@ -15,6 +15,8 @@ import pytest
 
 from draft_oracle.ingest.nhl_api import (
     NHLApiClient,
+    NHLApiClientConfig,
+    NHLApiClientRuntime,
     NHLApiError,
     ResponseCache,
 )
@@ -57,10 +59,11 @@ def make_client(
         transport = _routed_transport(routes, counter)
         client = NHLApiClient(
             cache_dir=tmp_path / "cache",
-            delay=0.0,
-            retry_backoff=0.0,
-            sleep=_noop_sleep,
-            client=httpx.Client(transport=transport),
+            config=NHLApiClientConfig(delay=0.0, retry_backoff=0.0),
+            runtime=NHLApiClientRuntime(
+                client=httpx.Client(transport=transport),
+                sleep=_noop_sleep,
+            ),
         )
         created.append(client)
         return client
@@ -256,10 +259,11 @@ def test_cache_persists_across_client_instances(
         transport = _routed_transport({"/v1/roster/BUF/20252026": payload}, calls)
         return NHLApiClient(
             cache_dir=tmp_path / "cache",
-            delay=0.0,
-            retry_backoff=0.0,
-            sleep=_noop_sleep,
-            client=httpx.Client(transport=transport),
+            config=NHLApiClientConfig(delay=0.0, retry_backoff=0.0),
+            runtime=NHLApiClientRuntime(
+                client=httpx.Client(transport=transport),
+                sleep=_noop_sleep,
+            ),
         )
 
     with build() as first:
@@ -296,11 +300,11 @@ def test_retry_then_success(tmp_path: Path) -> None:
     sleeps: list[float] = []
     client = NHLApiClient(
         cache_dir=tmp_path / "cache",
-        delay=0.0,
-        retry_backoff=0.5,
-        max_attempts=4,
-        sleep=sleeps.append,
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        config=NHLApiClientConfig(delay=0.0, retry_backoff=0.5, max_attempts=4),
+        runtime=NHLApiClientRuntime(
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            sleep=sleeps.append,
+        ),
     )
     with client:
         roster = client.team_roster("BUF", 20252026)
@@ -316,11 +320,11 @@ def test_retry_exhausted_raises_loudly(tmp_path: Path) -> None:
 
     client = NHLApiClient(
         cache_dir=tmp_path / "cache",
-        delay=0.0,
-        retry_backoff=0.0,
-        max_attempts=3,
-        sleep=_noop_sleep,
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        config=NHLApiClientConfig(delay=0.0, retry_backoff=0.0, max_attempts=3),
+        runtime=NHLApiClientRuntime(
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            sleep=_noop_sleep,
+        ),
     )
     with client, pytest.raises(NHLApiError):
         client.player_info(8478403)
@@ -328,4 +332,4 @@ def test_retry_exhausted_raises_loudly(tmp_path: Path) -> None:
 
 def test_invalid_max_attempts_rejected(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
-        NHLApiClient(cache_dir=tmp_path, max_attempts=0)
+        NHLApiClient(cache_dir=tmp_path, config=NHLApiClientConfig(max_attempts=0))

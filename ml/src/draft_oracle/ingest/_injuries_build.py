@@ -289,7 +289,7 @@ def _injuries_result(
     fetched: _SourceFetchResult,
     warnings: list[str],
 ) -> InjuriesResult:
-    source_rows = len(source)
+    source_rows = _source_row_count(source)
     override_rows = int((merged["source"] == SOURCE_OVERRIDE).sum()) if not merged.empty else 0
     return InjuriesResult(
         out_dir=options.out_dir,
@@ -300,6 +300,10 @@ def _injuries_result(
         unresolved_player_ids=fetched.unresolved,
         warnings=warnings,
     )
+
+
+def _source_row_count(source: pd.DataFrame) -> int:
+    return len(source)
 
 
 def _injury_build_options(

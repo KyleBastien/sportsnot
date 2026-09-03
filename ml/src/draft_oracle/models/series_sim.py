@@ -36,8 +36,8 @@ every metric is reported as measured.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Hashable, Mapping, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -492,9 +492,14 @@ def _held_out_years(series: pd.DataFrame, n_test: int) -> tuple[int, ...]:
     return tuple(years[-n_test:]) if n_test > 0 else ()
 
 
+@dataclass(frozen=True)
+class _SeriesModels:
+    win: GameWinModel
+    shutout: ShutoutModel
+
+
 def _predict_series(
-    win_model: GameWinModel,
-    shutout_model: ShutoutModel,
+    models: _SeriesModels,
     matchup: _MatchupRecord,
     top_id: int,
     bottom_id: int,
@@ -507,11 +512,11 @@ def _predict_series(
 
     # Top seed holds home ice. p_top_home from the top-home matchup; p_top_away is
     # 1 - P(bottom wins when bottom hosts).
-    p_top_home = win_model.predict_matchup(top_win, bottom_win, is_playoff=True)
-    p_top_away = 1.0 - win_model.predict_matchup(bottom_win, top_win, is_playoff=True)
+    p_top_home = models.win.predict_matchup(top_win, bottom_win, is_playoff=True)
+    p_top_away = 1.0 - models.win.predict_matchup(bottom_win, top_win, is_playoff=True)
 
-    shutout_top = shutout_model.predict_matchup(top_sho, bottom_sho)
-    shutout_bottom = shutout_model.predict_matchup(bottom_sho, top_sho)
+    shutout_top = models.shutout.predict_matchup(top_sho, bottom_sho)
+    shutout_bottom = models.shutout.predict_matchup(bottom_sho, top_sho)
 
     outcome = simulate_series(
         p_top_home,
@@ -520,6 +525,41 @@ def _predict_series(
         shutout_prob_b=shutout_bottom,
     )
     return outcome, shutout_top, shutout_bottom
+
+
+@dataclass
+class _SeriesEvalState:
+    predicted_probs: list[float] = field(default_factory=list)
+    actual_top_wins: list[float] = field(default_factory=list)
+    predicted_length: dict[int, float] = field(
+        default_factory=lambda: dict.fromkeys(_SERIES_LENGTHS, 0.0)
+    )
+    observed_length: dict[int, int] = field(
+        default_factory=lambda: dict.fromkeys(_SERIES_LENGTHS, 0)
+    )
+    predicted_shutouts: dict[int, float] = field(default_factory=dict)
+    observed_shutouts: dict[int, int] = field(default_factory=dict)
+    n_scored: int = 0
+    n_skipped: int = 0
+
+
+@dataclass(frozen=True)
+class _SeriesScoreContext:
+    matchups: dict[tuple[int, int, int], _MatchupRecord]
+    models: _SeriesModels
+    state: _SeriesEvalState
+
+
+@dataclass(frozen=True)
+class _ScoredSeries:
+    row: Mapping[Hashable, Any]
+    state: _SeriesEvalState
+    matchup: _MatchupRecord
+    outcome: SeriesOutcome
+    top_id: int
+    winner_id: int
+    shutout_top: float
+    shutout_bottom: float
 
 
 def evaluate_series_sim(
@@ -545,76 +585,148 @@ def evaluate_series_sim(
     if train_games.empty:
         raise ValueError("no training seasons remain after holding out the test set")
 
-    win_result = train_game_win_model(
-        train_games, odds=None, config=GameWinConfig(seed=config.seed)
-    )
-    shutout_result = train_shutout_model(train_games, config=ShutoutConfig(seed=config.seed))
-    win_model = win_result.model
-    shutout_model = shutout_result.model
-
+    models = _train_series_models(train_games, config.seed)
     matchups = reconstruct_series_matchups(team_games)
+    state = _score_held_out_series(
+        series.loc[series["year"].isin(test_year_set)],
+        matchups,
+        models,
+    )
+    probs_arr = np.asarray(state.predicted_probs, dtype=float)
+    labels_arr = np.asarray(state.actual_top_wins, dtype=float)
+    length_bins = _series_length_bins(state.predicted_length, state.observed_length)
 
-    predicted_probs: list[float] = []
-    actual_top_wins: list[float] = []
-    predicted_length: dict[int, float] = dict.fromkeys(_SERIES_LENGTHS, 0.0)
-    observed_length: dict[int, int] = dict.fromkeys(_SERIES_LENGTHS, 0)
-    predicted_shutouts: dict[int, float] = {}
-    observed_shutouts: dict[int, int] = {}
-    n_scored = 0
-    n_skipped = 0
-
-    held_out = series.loc[series["year"].isin(test_year_set)]
-    for row in held_out.to_dict("records"):
-        top_id = row["top_seed_team_id"]
-        bottom_id = row["bottom_seed_team_id"]
-        winner_id = row["winning_team_id"]
-        if pd.isna(top_id) or pd.isna(bottom_id) or pd.isna(winner_id):
-            n_skipped += 1
-            continue
-        top_id = int(top_id)
-        bottom_id = int(bottom_id)
-        key = _matchup_key(int(row["year"]), top_id, bottom_id)
-        matchup = matchups.get(key)
-        if (
-            matchup is None
-            or top_id not in matchup.win_snapshots
-            or bottom_id not in matchup.win_snapshots
-        ):
-            n_skipped += 1
-            continue
-
-        outcome, shutout_top, shutout_bottom = _predict_series(
-            win_model, shutout_model, matchup, top_id, bottom_id
-        )
-
-        top_won = 1.0 if int(winner_id) == top_id else 0.0
-        predicted_probs.append(outcome.p_a_win_series)
-        actual_top_wins.append(top_won)
-
-        actual_len = int(row["top_seed_wins"]) + int(row["bottom_seed_wins"])
-        if actual_len in observed_length:
-            observed_length[actual_len] += 1
-        for length, prob in outcome.length_probs.items():
-            predicted_length[length] += prob
-
-        rnd = int(row["playoff_round"]) if not pd.isna(row["playoff_round"]) else 0
-        predicted_shutouts[rnd] = predicted_shutouts.get(rnd, 0.0) + (
-            outcome.e_wins_a * shutout_top + outcome.e_wins_b * shutout_bottom
-        )
-        observed_shutouts[rnd] = observed_shutouts.get(rnd, 0) + matchup.observed_shutouts
-        n_scored += 1
-
-    probs_arr = np.asarray(predicted_probs, dtype=float)
-    labels_arr = np.asarray(actual_top_wins, dtype=float)
-    brier_series = brier_score(probs_arr, labels_arr) if n_scored else float("nan")
-    brier_higher = brier_score(np.ones_like(labels_arr), labels_arr) if n_scored else float("nan")
-    brier_coin = (
-        brier_score(np.full_like(labels_arr, 0.5), labels_arr) if n_scored else float("nan")
+    return SeriesSimResult(
+        config=config,
+        test_years=test_years,
+        n_series_scored=state.n_scored,
+        n_series_skipped=state.n_skipped,
+        brier_series=_series_brier(probs_arr, labels_arr, state.n_scored),
+        brier_higher_seed=_higher_seed_brier(labels_arr, state.n_scored),
+        brier_coin_flip=_coin_flip_brier(labels_arr, state.n_scored),
+        calibration_bins=_series_calibration_bins(
+            probs_arr, labels_arr, n_bins=config.calibration_bins
+        ),
+        length_bins=length_bins,
+        predicted_shutouts_by_round=state.predicted_shutouts,
+        observed_shutouts_by_round=state.observed_shutouts,
     )
 
+
+def _train_series_models(train_games: pd.DataFrame, seed: int) -> _SeriesModels:
+    win_result = train_game_win_model(train_games, odds=None, config=GameWinConfig(seed=seed))
+    shutout_result = train_shutout_model(train_games, config=ShutoutConfig(seed=seed))
+    return _SeriesModels(win=win_result.model, shutout=shutout_result.model)
+
+
+def _score_held_out_series(
+    held_out: pd.DataFrame,
+    matchups: dict[tuple[int, int, int], _MatchupRecord],
+    models: _SeriesModels,
+) -> _SeriesEvalState:
+    state = _SeriesEvalState()
+    context = _SeriesScoreContext(matchups=matchups, models=models, state=state)
+    for row in held_out.to_dict("records"):
+        _score_series_row(row, context)
+    return state
+
+
+def _score_series_row(
+    row: Mapping[Hashable, Any],
+    context: _SeriesScoreContext,
+) -> None:
+    ids = _series_row_ids(row)
+    if ids is None:
+        context.state.n_skipped += 1
+        return
+
+    top_id, bottom_id, winner_id = ids
+    matchup = _series_matchup(row, context.matchups, top_id, bottom_id)
+    if not _matchup_ready(matchup, top_id, bottom_id):
+        context.state.n_skipped += 1
+        return
+
+    assert matchup is not None
+    outcome, shutout_top, shutout_bottom = _predict_series(
+        context.models, matchup, top_id, bottom_id
+    )
+    _record_scored_series(
+        _ScoredSeries(
+            row=row,
+            state=context.state,
+            matchup=matchup,
+            outcome=outcome,
+            top_id=top_id,
+            winner_id=winner_id,
+            shutout_top=shutout_top,
+            shutout_bottom=shutout_bottom,
+        )
+    )
+
+
+def _series_row_ids(row: Mapping[Hashable, Any]) -> tuple[int, int, int] | None:
+    top_id = row["top_seed_team_id"]
+    bottom_id = row["bottom_seed_team_id"]
+    winner_id = row["winning_team_id"]
+    missing_ids = [pd.isna(value) for value in (top_id, bottom_id, winner_id)]
+    if any(missing_ids):
+        return None
+    return int(top_id), int(bottom_id), int(winner_id)
+
+
+def _series_matchup(
+    row: Mapping[Hashable, Any],
+    matchups: dict[tuple[int, int, int], _MatchupRecord],
+    top_id: int,
+    bottom_id: int,
+) -> _MatchupRecord | None:
+    key = _matchup_key(int(row["year"]), top_id, bottom_id)
+    return matchups.get(key)
+
+
+def _matchup_ready(
+    matchup: _MatchupRecord | None,
+    top_id: int,
+    bottom_id: int,
+) -> bool:
+    if matchup is None:
+        return False
+    has_top = top_id in matchup.win_snapshots
+    has_bottom = bottom_id in matchup.win_snapshots
+    return has_top and has_bottom
+
+
+def _record_scored_series(scored: _ScoredSeries) -> None:
+    row = scored.row
+    state = scored.state
+    top_won = 1.0 if scored.winner_id == scored.top_id else 0.0
+    state.predicted_probs.append(scored.outcome.p_a_win_series)
+    state.actual_top_wins.append(top_won)
+
+    actual_len = int(row["top_seed_wins"]) + int(row["bottom_seed_wins"])
+    if actual_len in state.observed_length:
+        state.observed_length[actual_len] += 1
+    for length, prob in scored.outcome.length_probs.items():
+        state.predicted_length[length] += prob
+
+    rnd = int(row["playoff_round"]) if not pd.isna(row["playoff_round"]) else 0
+    state.predicted_shutouts[rnd] = state.predicted_shutouts.get(rnd, 0.0) + (
+        scored.outcome.e_wins_a * scored.shutout_top
+        + scored.outcome.e_wins_b * scored.shutout_bottom
+    )
+    state.observed_shutouts[rnd] = (
+        state.observed_shutouts.get(rnd, 0) + scored.matchup.observed_shutouts
+    )
+    state.n_scored += 1
+
+
+def _series_length_bins(
+    predicted_length: dict[int, float],
+    observed_length: dict[int, int],
+) -> list[LengthBin]:
     total_pred_len = sum(predicted_length.values())
     total_obs_len = sum(observed_length.values())
-    length_bins = [
+    return [
         LengthBin(
             length=length,
             predicted_rate=(predicted_length[length] / total_pred_len)
@@ -625,21 +737,17 @@ def evaluate_series_sim(
         for length in _SERIES_LENGTHS
     ]
 
-    return SeriesSimResult(
-        config=config,
-        test_years=test_years,
-        n_series_scored=n_scored,
-        n_series_skipped=n_skipped,
-        brier_series=brier_series,
-        brier_higher_seed=brier_higher,
-        brier_coin_flip=brier_coin,
-        calibration_bins=_series_calibration_bins(
-            probs_arr, labels_arr, n_bins=config.calibration_bins
-        ),
-        length_bins=length_bins,
-        predicted_shutouts_by_round=predicted_shutouts,
-        observed_shutouts_by_round=observed_shutouts,
-    )
+
+def _series_brier(probs: np.ndarray, labels: np.ndarray, n_scored: int) -> float:
+    return brier_score(probs, labels) if n_scored else float("nan")
+
+
+def _higher_seed_brier(labels: np.ndarray, n_scored: int) -> float:
+    return brier_score(np.ones_like(labels), labels) if n_scored else float("nan")
+
+
+def _coin_flip_brier(labels: np.ndarray, n_scored: int) -> float:
+    return brier_score(np.full_like(labels, 0.5), labels) if n_scored else float("nan")
 
 
 DEFAULT_NORMALIZED_DIR = Path("data/normalized")

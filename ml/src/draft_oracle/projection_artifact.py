@@ -60,6 +60,7 @@ from draft_oracle._projection_combined import (
     _COMBINED_CHEATSHEET_NOTE,
     _COMBINED_DRAFT_ROUND,
     _COMBINED_SCORED_ROUNDS,
+    CombinedValuationInput,
     _apply_combined_valuation,
 )
 from draft_oracle._projection_io import (
@@ -72,7 +73,7 @@ from draft_oracle._projection_io import (
     _require_complete_snapshot,
     _snapshot_id_for,
 )
-from draft_oracle._projection_slot_report import _build_slot_report
+from draft_oracle._projection_slot_report import SlotReportInput, _build_slot_report
 from draft_oracle.features.skater import FEATURE_SET_VERSION, build_skater_features
 from draft_oracle.models.game_win import (
     GAME_WIN_MODEL_VERSION,
@@ -95,8 +96,8 @@ from draft_oracle.models.returns import (
 )
 from draft_oracle.models.series_sim import (
     SERIES_SIM_VERSION,
-    _predict_series,
     reconstruct_series_matchups,
+    simulate_series,
 )
 from draft_oracle.models.shutout import (
     SHUTOUT_MODEL_VERSION,
@@ -226,6 +227,17 @@ class ProjectArtifactResult:
     slot_strategies: SlotStrategyReport | None = None
 
 
+@dataclass(frozen=True)
+class _IrStashInput:
+    skaters: pd.DataFrame
+    cheatsheet: CheatSheet
+    injuries: pd.DataFrame | None
+    length_by_abbrev: dict[str, dict[int, float]]
+    train_sk: pd.DataFrame
+    train_tg: pd.DataFrame
+    config: ProjectArtifactConfig
+
+
 def _injured_player_ids(injuries: pd.DataFrame | None) -> set[int]:
     """Skater player ids currently out/IR/day-to-day (goalies excluded here)."""
     if injuries is None or injuries.empty:
@@ -291,7 +303,7 @@ def _build_team_rows(
             )
             continue
 
-        outcome, shutout_top, shutout_bottom = _predict_series(
+        outcome, shutout_top, shutout_bottom = _predict_matchup_series(
             win_model, shutout_model, matchup, top_id, bottom_id
         )
         length_by_abbrev[top_abbrev] = dict(outcome.length_probs)
@@ -327,6 +339,33 @@ def _build_team_rows(
         )
 
     return team_rows, length_by_abbrev
+
+
+def _predict_matchup_series(
+    win_model: Any,
+    shutout_model: Any,
+    matchup: Any,
+    top_id: int,
+    bottom_id: int,
+) -> tuple[Any, float, float]:
+    top_win = matchup.win_snapshots[top_id]
+    bottom_win = matchup.win_snapshots[bottom_id]
+    top_sho = matchup.shutout_snapshots[top_id]
+    bottom_sho = matchup.shutout_snapshots[bottom_id]
+    p_top_home = win_model.predict_matchup(top_win, bottom_win, is_playoff=True)
+    p_top_away = 1.0 - win_model.predict_matchup(bottom_win, top_win, is_playoff=True)
+    shutout_top = shutout_model.predict_matchup(top_sho, bottom_sho)
+    shutout_bottom = shutout_model.predict_matchup(bottom_sho, top_sho)
+    return (
+        simulate_series(
+            p_top_home,
+            p_top_away,
+            shutout_prob_a=shutout_top,
+            shutout_prob_b=shutout_bottom,
+        ),
+        shutout_top,
+        shutout_bottom,
+    )
 
 
 def _build_skater_rows(
@@ -413,15 +452,7 @@ def _fit_return_model(
     return fit_return_time_model(spells, horizon=horizon)
 
 
-def _apply_ir_stash(
-    skaters: pd.DataFrame,
-    cheatsheet: CheatSheet,
-    injuries: pd.DataFrame | None,
-    length_by_abbrev: dict[str, dict[int, float]],
-    train_sk: pd.DataFrame,
-    train_tg: pd.DataFrame,
-    config: ProjectArtifactConfig,
-) -> list[StashValuation]:
+def _apply_ir_stash(request: _IrStashInput) -> list[StashValuation]:
     """Value injured F/D as IR stashes and fold the result into the sheet + table.
 
     Composes the US-015 return-time curve with each injured skater's US-016 per-game
@@ -429,20 +460,53 @@ def _apply_ir_stash(
     ``ir_stash_ev`` / ``ir_stash_value`` / ``ir_verdict`` columns) and attaches the
     rendered IR section to ``cheatsheet``; returns the valuations for the manifest.
     """
+    skaters = request.skaters
+    config = request.config
     if not config.ir or skaters.empty:
         return []
     injured = skaters.loc[skaters["injured"] & skaters["position"].isin(("F", "D"))]
     if injured.empty:
         return []
 
-    status_by_id: dict[int, str] = {}
-    if injuries is not None and not injuries.empty:
-        for rec in injuries.to_dict("records"):
-            pid = rec.get("player_id")
-            if pid is not None and pd.notna(pid):
-                status_by_id[int(pid)] = str(rec.get("status") or "out")
+    model = _fit_return_model(request.train_sk, request.train_tg, config.horizon)
+    inputs = _stash_inputs(
+        injured,
+        request.length_by_abbrev,
+        _status_by_player_id(request.injuries),
+        model,
+    )
+    valuations = build_stash_valuations(
+        inputs,
+        {
+            "F": request.cheatsheet.replacement_forward,
+            "D": request.cheatsheet.replacement_defense,
+        },
+        seed=config.seed,
+        n_sims=config.n_sims,
+        horizon=config.horizon,
+    )
+    _write_stash_columns(skaters, valuations)
+    request.cheatsheet.ir_section = render_ir_section(valuations)
+    return valuations
 
-    model = _fit_return_model(train_sk, train_tg, config.horizon)
+
+def _status_by_player_id(injuries: pd.DataFrame | None) -> dict[int, str]:
+    if injuries is None or injuries.empty:
+        return {}
+    statuses: dict[int, str] = {}
+    for rec in injuries.to_dict("records"):
+        pid = rec.get("player_id")
+        if pid is not None and pd.notna(pid):
+            statuses[int(pid)] = str(rec.get("status") or "out")
+    return statuses
+
+
+def _stash_inputs(
+    injured: pd.DataFrame,
+    length_by_abbrev: dict[str, dict[int, float]],
+    status_by_id: dict[int, str],
+    model: ReturnTimeModel,
+) -> list[StashInput]:
     inputs: list[StashInput] = []
     for rec in injured.to_dict("records"):
         team_abbrev = str(rec["team_abbrev"])
@@ -465,19 +529,10 @@ def _apply_ir_stash(
                 expected_games_available=float(sum(curve)),
             )
         )
+    return inputs
 
-    replacement_by_position = {
-        "F": cheatsheet.replacement_forward,
-        "D": cheatsheet.replacement_defense,
-    }
-    valuations = build_stash_valuations(
-        inputs,
-        replacement_by_position,
-        seed=config.seed,
-        n_sims=config.n_sims,
-        horizon=config.horizon,
-    )
 
+def _write_stash_columns(skaters: pd.DataFrame, valuations: list[StashValuation]) -> None:
     by_id = {val.player_id: val for val in valuations}
     for column, attr in (
         ("ir_stash_ev", "stash_ev"),
@@ -486,11 +541,9 @@ def _apply_ir_stash(
         skaters[column] = skaters["player_id"].map(
             lambda pid, a=attr: getattr(by_id[int(pid)], a) if int(pid) in by_id else float("nan")
         )
-    skaters["ir_verdict"] = skaters["player_id"].map(
-        lambda pid: by_id[int(pid)].verdict if int(pid) in by_id else ""
-    )
-    cheatsheet.ir_section = render_ir_section(valuations)
-    return valuations
+        skaters["ir_verdict"] = skaters["player_id"].map(
+            lambda pid: by_id[int(pid)].verdict if int(pid) in by_id else ""
+        )
 
 
 def build_projection_artifact(
@@ -565,7 +618,15 @@ def build_projection_artifact(
     combined_diagnostics: list[dict[str, Any]] | None = None
     if config.combine_final_rounds and int(playoff_round) == _COMBINED_DRAFT_ROUND:
         combined = _apply_combined_valuation(
-            team_rows, round_series, matchups, win_model, shutout_model, int(season), warnings
+            CombinedValuationInput(
+                team_rows,
+                round_series,
+                matchups,
+                win_model,
+                shutout_model,
+                int(season),
+                warnings,
+            )
         )
         if combined is not None:
             combined_by_abbrev, combined_diagnostics = combined
@@ -604,10 +665,12 @@ def build_projection_artifact(
     if combined_diagnostics is not None:
         cheatsheet.note = _COMBINED_CHEATSHEET_NOTE
     ir_valuations = _apply_ir_stash(
-        skaters, cheatsheet, injuries, length_by_abbrev, train_sk, train_tg, config
+        _IrStashInput(skaters, cheatsheet, injuries, length_by_abbrev, train_sk, train_tg, config)
     )
 
-    slot_report = _build_slot_report(skaters, teams, league_picks, warnings, config)
+    slot_report = _build_slot_report(
+        SlotReportInput(skaters, teams, league_picks, warnings, config)
+    )
 
     manifest = add_git_provenance(
         {
@@ -689,12 +752,9 @@ def build_projection_artifact(
 
 def _finalize_skaters(rows: list[dict[str, Any]]) -> pd.DataFrame:
     """Deterministically ordered skater table with the fixed column layout."""
-    if not rows:
-        return pd.DataFrame({col: pd.Series(dtype="object") for col in SKATER_COLUMNS})
-    df = pd.DataFrame(rows)[list(SKATER_COLUMNS)]
-    df = df.sort_values(
-        ["expected_points", "player_id"], ascending=[False, True], kind="stable"
-    ).reset_index(drop=True)
+    df = _finalized_frame(
+        rows, SKATER_COLUMNS, sort_columns=["expected_points", "player_id"]
+    )
     df["player_id"] = df["player_id"].astype("int64")
     df["injured"] = df["injured"].astype(bool)
     df["low_confidence"] = df["low_confidence"].astype(bool)
@@ -703,16 +763,22 @@ def _finalize_skaters(rows: list[dict[str, Any]]) -> pd.DataFrame:
 
 def _finalize_teams(rows: list[dict[str, Any]]) -> pd.DataFrame:
     """Deterministically ordered team table with the fixed column layout."""
-    if not rows:
-        return pd.DataFrame({col: pd.Series(dtype="object") for col in TEAM_COLUMNS})
-    df = pd.DataFrame(rows)[list(TEAM_COLUMNS)]
-    df = df.sort_values(
-        ["p_series_win", "team_id"], ascending=[False, True], kind="stable"
-    ).reset_index(drop=True)
+    df = _finalized_frame(rows, TEAM_COLUMNS, sort_columns=["p_series_win", "team_id"])
     df["team_id"] = df["team_id"].astype("int64")
     df["playoff_round"] = df["playoff_round"].astype("int64")
     df["is_top_seed"] = df["is_top_seed"].astype(bool)
     return df
+
+
+def _finalized_frame(
+    rows: list[dict[str, Any]], columns: tuple[str, ...], *, sort_columns: list[str]
+) -> pd.DataFrame:
+    if not rows:
+        return pd.DataFrame({col: pd.Series(dtype="object") for col in columns})
+    df = pd.DataFrame(rows)[list(columns)]
+    return df.sort_values(sort_columns, ascending=[False, True], kind="stable").reset_index(
+        drop=True
+    )
 
 
 def write_projection_artifact(result: ProjectArtifactResult, out_dir: Path) -> Path:

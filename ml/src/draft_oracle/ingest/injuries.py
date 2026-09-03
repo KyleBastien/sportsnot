@@ -385,10 +385,14 @@ def resolve_player_ids(
             resolver,
         )
         resolved_ids.append(_resolved_player_id(rec, result))
-        if result.player_id is None and result.method == "unresolved":
+        if _is_unresolved_skater(result):
             unresolved.append(int(rec["espn_id"]))
     df["player_id"] = resolved_ids
     return df, unresolved
+
+
+def _is_unresolved_skater(result: PlayerIdResolution) -> bool:
+    return result.player_id is None and result.method == "unresolved"
 
 
 def _current_team_by_player_id(players: pd.DataFrame) -> dict[int, Any]:

@@ -29,6 +29,19 @@ class AbsenceSpellConfig:
     min_team_games: int = 40
 
 
+@dataclass(frozen=True)
+class _TeamSeasonKey:
+    season: Any
+    team: Any
+
+
+@dataclass(frozen=True)
+class _PlayerAbsenceContext:
+    key: _TeamSeasonKey
+    player_id: Any
+    config: AbsenceSpellConfig
+
+
 def spells_from_sequence(present: list[bool], min_spell: int) -> list[int]:
     """Bookended missed-game run lengths from a team's appear/miss sequence."""
     idxs = [i for i, p in enumerate(present) if p]
@@ -101,48 +114,45 @@ def _absence_spell_rows(
     for (season, team), team_grp in team_games.groupby(
         ["season_id", "team_abbrev"], sort=False
     ):
-        rows.extend(_team_absence_spell_rows(skater_games, team_grp, season, team, config))
+        rows.extend(
+            _team_absence_spell_rows(skater_games, team_grp, _TeamSeasonKey(season, team), config)
+        )
     return rows
 
 
 def _team_absence_spell_rows(
     skater_games: pd.DataFrame,
     team_games: pd.DataFrame,
-    season: Any,
-    team: Any,
+    key: _TeamSeasonKey,
     config: AbsenceSpellConfig,
 ) -> list[dict[str, Any]]:
     game_seq = _team_game_sequence(team_games)
     if len(game_seq) < config.min_team_games:
         return []
     players = skater_games.loc[
-        (skater_games["season_id"] == season) & (skater_games["team_abbrev"] == team)
+        (skater_games["season_id"] == key.season) & (skater_games["team_abbrev"] == key.team)
     ]
     rows: list[dict[str, Any]] = []
     for player_id, player_games in players.groupby("player_id", sort=False):
-        rows.extend(
-            _player_absence_spell_rows(game_seq, player_games, season, team, player_id, config)
-        )
+        context = _PlayerAbsenceContext(key=key, player_id=player_id, config=config)
+        rows.extend(_player_absence_spell_rows(game_seq, player_games, context))
     return rows
 
 
 def _player_absence_spell_rows(
     game_seq: list[str],
     player_games: pd.DataFrame,
-    season: Any,
-    team: Any,
-    player_id: Any,
-    config: AbsenceSpellConfig,
+    context: _PlayerAbsenceContext,
 ) -> list[dict[str, Any]]:
-    result = _spells_for_team_player(game_seq, player_games, config)
+    result = _spells_for_team_player(game_seq, player_games, context.config)
     if result is None:
         return []
     n_app, median_toi, spells = result
     return [
         {
-            "season_id": int(season),
-            "team_abbrev": str(team),
-            "player_id": player_id,
+            "season_id": int(context.key.season),
+            "team_abbrev": str(context.key.team),
+            "player_id": context.player_id,
             "spell_length": int(length),
             "median_toi_seconds": median_toi,
             "n_appearances": int(n_app),

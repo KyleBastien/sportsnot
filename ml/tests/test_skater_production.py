@@ -9,6 +9,8 @@ end-to-end train that reports honest held-out metrics per season.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -172,7 +174,11 @@ def _synthetic_archive(
                                 continue
                             g, a = _draw_ga(rng, rate)
                             sk_rows.append(
-                                _skater_row(p, players[p], gid, date, season_id, 2, team, opp, g, a)
+                                _skater_row(
+                                    _SkaterRowInput(
+                                        p, players[p], gid, date, season_id, 2, team, opp, g, a
+                                    )
+                                )
                             )
         # First-round playoff: AAA vs DDD, six games.
         for gnum in range(6):
@@ -186,7 +192,11 @@ def _synthetic_archive(
                         continue
                     g, a = _draw_ga(rng, rate)
                     sk_rows.append(
-                        _skater_row(p, players[p], gid, date, season_id, 3, team, opp, g, a)
+                        _skater_row(
+                            _SkaterRowInput(
+                                p, players[p], gid, date, season_id, 3, team, opp, g, a
+                            )
+                        )
                     )
 
     skater_games = pd.DataFrame(sk_rows)
@@ -197,48 +207,52 @@ def _synthetic_archive(
 
 
 def _draw_ga(rng: np.random.Generator, rate: float) -> tuple[int, int]:
-    goals = int(rng.poisson(max(rate * 0.5, 0.01)))
-    assists = int(rng.poisson(max(rate * 0.5, 0.01)))
-    return goals, assists
+    return _draw_count(rng, rate), _draw_count(rng, rate)
 
 
-def _skater_row(
-    player_id: int,
-    meta: tuple[str, float, str],
-    game_id: int,
-    game_date: str,
-    season_id: int,
-    game_type_id: int,
-    team: str,
-    opp: str,
-    goals: int,
-    assists: int,
-) -> dict[str, object]:
-    _team, _rate, pos = meta
+def _draw_count(rng: np.random.Generator, rate: float) -> int:
+    return int(rng.poisson(max(rate * 0.5, 0.01)))
+
+
+@dataclass(frozen=True)
+class _SkaterRowInput:
+    player_id: int
+    meta: tuple[str, float, str]
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    team: str
+    opp: str
+    goals: int
+    assists: int
+
+def _skater_row(spec: _SkaterRowInput) -> dict[str, object]:
+    _team, _rate, pos = spec.meta
     return {
-        "season_id": season_id,
-        "game_type_id": game_type_id,
-        "game_id": game_id,
-        "game_date": game_date,
-        "player_id": player_id,
-        "player_name": f"{team}-{player_id}",
+        "season_id": spec.season_id,
+        "game_type_id": spec.game_type_id,
+        "game_id": spec.game_id,
+        "game_date": spec.game_date,
+        "player_id": spec.player_id,
+        "player_name": f"{spec.team}-{spec.player_id}",
         "position_code": "C" if pos == "F" else "D",
         "position": pos,
         "shoots_catches": "L",
-        "team_abbrev": team,
-        "opponent_team_abbrev": opp,
+        "team_abbrev": spec.team,
+        "opponent_team_abbrev": spec.opp,
         "home_road": "H",
-        "goals": goals,
-        "assists": assists,
-        "points": goals + assists,
-        "shots": goals * 3 + 2,
+        "goals": spec.goals,
+        "assists": spec.assists,
+        "points": spec.goals + spec.assists,
+        "shots": spec.goals * 3 + 2,
         "toi_seconds": 1000,
         "pp_goals": 0,
         "pp_points": 0,
         "sh_goals": 0,
         "sh_points": 0,
-        "ev_goals": goals,
-        "ev_points": goals + assists,
+        "ev_goals": spec.goals,
+        "ev_points": spec.goals + spec.assists,
         "plus_minus": 0,
         "penalty_minutes": 0,
         "game_winning_goals": 0,

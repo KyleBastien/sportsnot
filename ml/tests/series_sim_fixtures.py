@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -16,66 +17,74 @@ DEFENCE = {"AAA": 0.7, "BBB": 0.5, "CCC": 0.3, "DDD": 0.1}
 SHOTS = 30
 
 
-def _team_row(
-    *,
-    season_id: int,
-    game_type_id: int,
-    game_id: int,
-    game_date: str,
-    team: str,
-    gf: int,
-    ga: int,
-    is_home: bool,
-) -> dict[str, object]:
-    won = gf > ga
+@dataclass(frozen=True)
+class _TeamRowInput:
+    season_id: int
+    game_type_id: int
+    game_id: int
+    game_date: str
+    team: str
+    gf: int
+    ga: int
+    is_home: bool
+
+
+@dataclass(frozen=True)
+class _GameRowsInput:
+    season_id: int
+    game_type_id: int
+    game_id: int
+    game_date: str
+    home: str
+    away: str
+    home_goals: int
+    away_goals: int
+
+
+def _team_row(spec: _TeamRowInput) -> dict[str, object]:
+    won = spec.gf > spec.ga
     return {
-        "season_id": season_id,
-        "game_type_id": game_type_id,
-        "game_id": game_id,
-        "game_date": game_date,
-        "team_id": TEAMS.index(team) + 1,
-        "team_abbrev": team,
-        "home_road": "H" if is_home else "R",
-        "goals_for": gf,
-        "goals_against": ga,
+        "season_id": spec.season_id,
+        "game_type_id": spec.game_type_id,
+        "game_id": spec.game_id,
+        "game_date": spec.game_date,
+        "team_id": TEAMS.index(spec.team) + 1,
+        "team_abbrev": spec.team,
+        "home_road": "H" if spec.is_home else "R",
+        "goals_for": spec.gf,
+        "goals_against": spec.ga,
         "shots_against": SHOTS,
         "points": 2 if won else 0,
         "win": won,
-        "shutout_win": won and ga == 0,
+        "shutout_win": won and spec.ga == 0,
     }
 
 
-def _game_rows(
-    *,
-    season_id: int,
-    game_type_id: int,
-    game_id: int,
-    game_date: str,
-    home: str,
-    away: str,
-    home_goals: int,
-    away_goals: int,
-) -> list[dict[str, object]]:
+def _game_rows(game: _GameRowsInput) -> list[dict[str, object]]:
     return [
         _team_row(
-            season_id=season_id,
-            game_type_id=game_type_id,
-            game_id=game_id,
-            game_date=game_date,
-            team=home,
-            gf=home_goals,
-            ga=away_goals,
-            is_home=True,
+            _TeamRowInput(
+                game.season_id,
+                game.game_type_id,
+                game.game_id,
+                game.game_date,
+                game.home,
+                game.home_goals,
+                game.away_goals,
+                True,
+            )
         ),
         _team_row(
-            season_id=season_id,
-            game_type_id=game_type_id,
-            game_id=game_id,
-            game_date=game_date,
-            team=away,
-            gf=away_goals,
-            ga=home_goals,
-            is_home=False,
+            _TeamRowInput(
+                game.season_id,
+                game.game_type_id,
+                game.game_id,
+                game.game_date,
+                game.away,
+                game.away_goals,
+                game.home_goals,
+                False,
+            )
         ),
     ]
 
@@ -104,14 +113,7 @@ def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFr
                     day = day + 1 if day < 28 else 1
                     team_rows.extend(
                         _game_rows(
-                            season_id=season_id,
-                            game_type_id=2,
-                            game_id=gid,
-                            game_date=date,
-                            home=home,
-                            away=away,
-                            home_goals=hg,
-                            away_goals=ag,
+                            _GameRowsInput(season_id, 2, gid, date, home, away, hg, ag)
                         )
                     )
 
@@ -135,14 +137,16 @@ def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFr
                 hg, ag = lg, wg
             team_rows.extend(
                 _game_rows(
-                    season_id=season_id,
-                    game_type_id=3,
-                    game_id=gid,
-                    game_date=f"{end_year}-04-{10 + offset:02d}",
-                    home=host,
-                    away=visitor,
-                    home_goals=hg,
-                    away_goals=ag,
+                    _GameRowsInput(
+                        season_id,
+                        3,
+                        gid,
+                        f"{end_year}-04-{10 + offset:02d}",
+                        host,
+                        visitor,
+                        hg,
+                        ag,
+                    )
                 )
             )
         series_rows.append(
@@ -168,15 +172,17 @@ def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFr
 
 def _real_team_games(season_label: str | None = None) -> pd.DataFrame:
     archive_dir = Path("data/raw/nhl-archive")
-    paths = (
-        [archive_dir / f"team-games-{season_label}.csv.gz"]
-        if season_label is not None
-        else sorted(archive_dir.glob("team-games-*.csv.gz"))
-    )
+    paths = _archive_paths(archive_dir, season_label)
     return pd.concat(
         [normalize_team_games(pd.read_csv(path)) for path in paths],
         ignore_index=True,
     )
+
+
+def _archive_paths(archive_dir: Path, season_label: str | None) -> list[Path]:
+    if season_label is not None:
+        return [archive_dir / f"team-games-{season_label}.csv.gz"]
+    return sorted(archive_dir.glob("team-games-*.csv.gz"))
 
 
 def _overlap_row(
@@ -230,5 +236,4 @@ def _overlap_game(
             opp=home, gf=ag, ga=hg, is_home=False,
         ),
     ]
-
 

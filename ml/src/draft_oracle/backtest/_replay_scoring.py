@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
@@ -18,6 +19,14 @@ from draft_oracle.rules import goalie_series_points, player_points
 
 ActualLookup = dict[tuple[int, int, int], int]
 AssetKey = tuple[str, int]
+
+
+@dataclass(frozen=True)
+class ScoreContext:
+    skater_actual: ActualLookup
+    team_actual: ActualLookup
+    season_id: int
+    scored_rounds: Sequence[int]
 
 
 def skater_actual_points(
@@ -55,11 +64,7 @@ def team_actual_goalie_points(
 def _score_active_roster(
     state: DraftState,
     manager: str,
-    skater_actual: ActualLookup,
-    team_actual: ActualLookup,
-    *,
-    season_id: int,
-    scored_rounds: Sequence[int],
+    context: ScoreContext,
 ) -> float:
     """Actual points of ``manager``'s active roster (F/D/G; IR slots excluded)."""
     total = 0.0
@@ -67,19 +72,25 @@ def _score_active_roster(
         if slot.position in ("IR_F", "IR_D"):
             continue
         if slot.player_id is not None:
-            total += _actual_points(skater_actual, season_id, scored_rounds, slot.player_id)
+            total += _actual_points(
+                context.skater_actual,
+                context.season_id,
+                context.scored_rounds,
+                slot.player_id,
+            )
         elif slot.team_id is not None:
-            total += _actual_points(team_actual, season_id, scored_rounds, slot.team_id)
+            total += _actual_points(
+                context.team_actual,
+                context.season_id,
+                context.scored_rounds,
+                slot.team_id,
+            )
     return total
 
 
 def _score_league_roster(
     picks: pd.DataFrame,
-    skater_actual: ActualLookup,
-    team_actual: ActualLookup,
-    *,
-    season_id: int,
-    scored_rounds: Sequence[int],
+    context: ScoreContext,
 ) -> float:
     """Actual active-roster points of one league manager's real picks."""
     total = 0.0
@@ -89,7 +100,7 @@ def _score_league_roster(
         if asset is None or asset in seen:
             continue
         seen.add(asset)
-        total += _asset_points(asset, skater_actual, team_actual, season_id, scored_rounds)
+        total += _asset_points(asset, context)
     return total
 
 
@@ -113,17 +124,21 @@ def _inactive_pick(rec: Mapping[Hashable, Any]) -> bool:
     return points_excluded or (position in ("IR_F", "IR_D") and not ir_activated)
 
 
-def _asset_points(
-    asset: AssetKey,
-    skater_actual: ActualLookup,
-    team_actual: ActualLookup,
-    season_id: int,
-    scored_rounds: Sequence[int],
-) -> float:
+def _asset_points(asset: AssetKey, context: ScoreContext) -> float:
     kind, asset_id = asset
     if kind == "team":
-        return _actual_points(team_actual, season_id, scored_rounds, asset_id)
-    return _actual_points(skater_actual, season_id, scored_rounds, asset_id)
+        return _actual_points(
+            context.team_actual,
+            context.season_id,
+            context.scored_rounds,
+            asset_id,
+        )
+    return _actual_points(
+        context.skater_actual,
+        context.season_id,
+        context.scored_rounds,
+        asset_id,
+    )
 
 
 def _actual_points(

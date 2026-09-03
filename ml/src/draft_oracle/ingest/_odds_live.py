@@ -304,15 +304,17 @@ def _odds_api_event_row(event: OddsApiEvent) -> dict[str, Any] | None:
     if game is None:
         return None
     home_prices, away_prices = _odds_api_h2h_prices(event, game.home_id, game.away_id)
-    if not home_prices:
-        return cast("dict[str, Any]", _uncovered_row(game))
-    if not away_prices:
+    if not _has_price_pair(home_prices, away_prices):
         return cast("dict[str, Any]", _uncovered_row(game))
     return _two_sided_row(
         game,
         away_ml=_median(away_prices),
         home_ml=_median(home_prices),
     )
+
+
+def _has_price_pair(home_prices: list[float], away_prices: list[float]) -> bool:
+    return bool(home_prices) and bool(away_prices)
 
 
 def _odds_api_game(event: OddsApiEvent) -> OddsRowGame | None:

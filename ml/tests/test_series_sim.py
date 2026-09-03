@@ -30,6 +30,7 @@ from draft_oracle.rules import goalie_series_points
 from tests.series_sim_fixtures import (
     TEAMS,
     _game_rows,
+    _GameRowsInput,
     _overlap_game,
     _real_team_games,
     _synthetic_league,
@@ -179,14 +180,7 @@ def test_pivot_all_games_retains_real_shootout_winner() -> None:
 def test_pivot_all_games_warns_and_excludes_game_without_winner() -> None:
     team_games = pd.DataFrame(
         _game_rows(
-            season_id=20202021,
-            game_type_id=2,
-            game_id=1,
-            game_date="2021-01-01",
-            home="AAA",
-            away="BBB",
-            home_goals=2,
-            away_goals=2,
+            _GameRowsInput(20202021, 2, 1, "2021-01-01", "AAA", "BBB", 2, 2)
         )
     )
 

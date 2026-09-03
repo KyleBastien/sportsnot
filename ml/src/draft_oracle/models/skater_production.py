@@ -511,75 +511,104 @@ class SkaterProductionResult:
 
     def report_lines(self) -> list[str]:
         """Human-readable evaluation report (Markdown; ASCII only)."""
-        cfg = self.config
-        lines = [
-            f"# Skater per-game production model ({SKATER_PRODUCTION_VERSION})",
-            "",
-            "Predicts `E[G+A per game]` for a skater in the upcoming playoff round from",
-            "the as-of US-009 skater feature matrix. Each historical round is one training",
-            "example: features are frozen at the round start (leakage-free) and the label is",
-            "the skater's observed goals+assists per game in that round.",
-            "",
-            "## Reproducibility",
-            f"- Seed: {cfg.seed}",
-            f"- Shrinkage: estimate * n/(n+{cfg.shrink_k:g}) + prior * k/(n+k), "
-            "prior = position+team mean",
-            f"- Low-confidence flag: fewer than {cfg.min_confident_games} regular-season games",
-            f"- Train seasons (end year): {list(self.split.train_years)} ({self.n_train} rows)",
-            f"- Validation seasons: {list(self.split.val_years)} ({self.n_val} rows)",
-            f"- Test seasons (held out): {list(self.split.test_years)} ({self.n_test} rows)",
-            "- Splits are strictly temporal: each round is predicted using only data",
-            "  available before that round (SPEC section 6).",
-            "",
-            "## Model selection (validation MAE, lower is better)",
-        ]
-        for model_type, mae in sorted(self.val_mae_by_model.items()):
-            marker = "  <- chosen" if model_type == self.chosen_model_type else ""
-            lines.append(f"- {model_type}: {mae:.4f}{marker}")
-        lines += [
-            "",
-            f"Chosen model: **{self.chosen_model_type}** (lowest validation MAE).",
-            "It is refit on train + validation seasons before the held-out test.",
-            "",
-            "## Held-out test error vs. fixed baselines (per-game points)",
-            f"- production model (shrunk): MAE {self.test_mae_model:.4f}, "
-            f"Spearman {self.test_spearman_model:.4f}",
-            f"- raw model (no shrinkage):  MAE {self.test_mae_raw:.4f}",
-            f"- baseline (a) reg-season points/game: MAE {self.test_mae_baseline_reg:.4f}, "
-            f"Spearman {self.test_spearman_baseline_reg:.4f}",
-            f"- baseline (b) training mean:          MAE {self.test_mae_baseline_mean:.4f}",
-            "",
-            f"- Beats reg-season-ppg baseline: {'yes' if self.beats_reg_baseline else 'NO'}",
-            f"- Beats training-mean baseline:  {'yes' if self.beats_mean_baseline else 'NO'}",
-            "",
-            "## Per held-out season (MAE, Spearman rank correlation)",
-        ]
-        for m in self.per_season:
-            lines.append(
-                f"- {m.season_end_year}: n={m.n}, MAE {m.mae:.4f}, Spearman {m.spearman:.4f}"
-            )
-        lines += [
-            "",
-            "## Cold cases",
-            f"- Test-season labeled skaters with no regular-season feature row: "
-            f"{self.n_cold_cases_test}.",
-            "  These rookies/no-sample skaters are priced from the position+team prior with a",
-            "  low-confidence flag (`project_cold`), never crashing the pipeline.",
-            "",
-        ]
-        if not self.beats_reg_baseline:
-            lines += [
-                "## Honest note on a missed target",
-                "The model did not beat the regular-season points/game baseline on this split.",
-                "Reported as-is (SPEC section 7): baselines, splits, and seeds are unchanged.",
-                "Playoff per-game production is famously noisy over 4-7 games, so a strong",
-                "season-rate baseline is hard to beat on MAE; rank correlation (Spearman) is the",
-                "more informative signal for draft ordering. A plausible improvement: add",
-                "opponent-defense and expected-games context (US-010 team-series features) and",
-                "widen the training window before scoring the held-out seasons.",
-                "",
-            ]
+        lines = _production_report_intro(self)
+        lines.extend(_production_model_selection_lines(self))
+        lines.extend(_production_test_lines(self))
+        lines.extend(_production_per_season_lines(self))
+        lines.extend(_production_cold_case_lines(self))
+        lines.extend(_production_honest_note_lines(self))
         return lines
+
+
+def _production_report_intro(result: SkaterProductionResult) -> list[str]:
+    cfg = result.config
+    return [
+        f"# Skater per-game production model ({SKATER_PRODUCTION_VERSION})",
+        "",
+        "Predicts `E[G+A per game]` for a skater in the upcoming playoff round from",
+        "the as-of US-009 skater feature matrix. Each historical round is one training",
+        "example: features are frozen at the round start (leakage-free) and the label is",
+        "the skater's observed goals+assists per game in that round.",
+        "",
+        "## Reproducibility",
+        f"- Seed: {cfg.seed}",
+        f"- Shrinkage: estimate * n/(n+{cfg.shrink_k:g}) + prior * k/(n+k), "
+        "prior = position+team mean",
+        f"- Low-confidence flag: fewer than {cfg.min_confident_games} regular-season games",
+        f"- Train seasons (end year): {list(result.split.train_years)} ({result.n_train} rows)",
+        f"- Validation seasons: {list(result.split.val_years)} ({result.n_val} rows)",
+        f"- Test seasons (held out): {list(result.split.test_years)} ({result.n_test} rows)",
+        "- Splits are strictly temporal: each round is predicted using only data",
+        "  available before that round (SPEC section 6).",
+        "",
+        "## Model selection (validation MAE, lower is better)",
+    ]
+
+
+def _production_model_selection_lines(result: SkaterProductionResult) -> list[str]:
+    lines: list[str] = []
+    for model_type, mae in sorted(result.val_mae_by_model.items()):
+        marker = "  <- chosen" if model_type == result.chosen_model_type else ""
+        lines.append(f"- {model_type}: {mae:.4f}{marker}")
+    lines += [
+        "",
+        f"Chosen model: **{result.chosen_model_type}** (lowest validation MAE).",
+        "It is refit on train + validation seasons before the held-out test.",
+    ]
+    return lines
+
+
+def _production_test_lines(result: SkaterProductionResult) -> list[str]:
+    return [
+        "",
+        "## Held-out test error vs. fixed baselines (per-game points)",
+        f"- production model (shrunk): MAE {result.test_mae_model:.4f}, "
+        f"Spearman {result.test_spearman_model:.4f}",
+        f"- raw model (no shrinkage):  MAE {result.test_mae_raw:.4f}",
+        f"- baseline (a) reg-season points/game: MAE {result.test_mae_baseline_reg:.4f}, "
+        f"Spearman {result.test_spearman_baseline_reg:.4f}",
+        f"- baseline (b) training mean:          MAE {result.test_mae_baseline_mean:.4f}",
+        "",
+        f"- Beats reg-season-ppg baseline: {'yes' if result.beats_reg_baseline else 'NO'}",
+        f"- Beats training-mean baseline:  {'yes' if result.beats_mean_baseline else 'NO'}",
+        "",
+        "## Per held-out season (MAE, Spearman rank correlation)",
+    ]
+
+
+def _production_per_season_lines(result: SkaterProductionResult) -> list[str]:
+    return [
+        f"- {m.season_end_year}: n={m.n}, MAE {m.mae:.4f}, Spearman {m.spearman:.4f}"
+        for m in result.per_season
+    ]
+
+
+def _production_cold_case_lines(result: SkaterProductionResult) -> list[str]:
+    return [
+        "",
+        "## Cold cases",
+        f"- Test-season labeled skaters with no regular-season feature row: "
+        f"{result.n_cold_cases_test}.",
+        "  These rookies/no-sample skaters are priced from the position+team prior with a",
+        "  low-confidence flag (`project_cold`), never crashing the pipeline.",
+        "",
+    ]
+
+
+def _production_honest_note_lines(result: SkaterProductionResult) -> list[str]:
+    if result.beats_reg_baseline:
+        return []
+    return [
+        "## Honest note on a missed target",
+        "The model did not beat the regular-season points/game baseline on this split.",
+        "Reported as-is (SPEC section 7): baselines, splits, and seeds are unchanged.",
+        "Playoff per-game production is famously noisy over 4-7 games, so a strong",
+        "season-rate baseline is hard to beat on MAE; rank correlation (Spearman) is the",
+        "more informative signal for draft ordering. A plausible improvement: add",
+        "opponent-defense and expected-games context (US-010 team-series features) and",
+        "widen the training window before scoring the held-out seasons.",
+        "",
+    ]
 
 
 # ── Training + evaluation ──────────────────────────────────────────────────

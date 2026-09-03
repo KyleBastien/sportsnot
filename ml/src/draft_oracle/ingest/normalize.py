@@ -557,13 +557,19 @@ def _cached_normalize_result(
     manifest = _read_manifest(out_dir)
     if manifest is None:
         return None
-    if manifest.get("sources") != signature:
+    if not _cached_manifest_matches(manifest, signature):
         return None
     if not _tables_present(out_dir):
         return None
     counts = manifest.get("row_counts")
     cached_counts = counts if isinstance(counts, dict) else {}
     return NormalizeResult(out_dir=out_dir, seasons=labels, row_counts=cached_counts, skipped=True)
+
+
+def _cached_manifest_matches(
+    manifest: Mapping[str, object], signature: Mapping[str, int]
+) -> bool:
+    return manifest.get("sources") == signature
 
 
 def _write_normalized_tables(tables: Mapping[str, pd.DataFrame], out_dir: Path) -> dict[str, int]:

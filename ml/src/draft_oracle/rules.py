@@ -203,12 +203,28 @@ def _eliminated_reasons(
     eliminated_team_ids: frozenset[int],
     player_team_ids: Mapping[int, int],
 ) -> list[str]:
+    return [
+        reason
+        for slot in slots
+        for reason in _slot_eliminated_reasons(slot, eliminated_team_ids, player_team_ids)
+    ]
+
+
+def _slot_eliminated_reasons(
+    slot: RosterSlot,
+    eliminated_team_ids: frozenset[int],
+    player_team_ids: Mapping[int, int],
+) -> list[str]:
     reasons: list[str] = []
-    for slot in slots:
-        if slot.team_id is not None and slot.team_id in eliminated_team_ids:
-            reasons.append(f"Team {slot.team_id} is eliminated")
-        if slot.player_id is not None:
-            team_id = player_team_ids.get(slot.player_id)
-            if team_id is not None and team_id in eliminated_team_ids:
-                reasons.append(f"Player {slot.player_id} is on eliminated team {team_id}")
+    if slot.team_id is not None and slot.team_id in eliminated_team_ids:
+        reasons.append(f"Team {slot.team_id} is eliminated")
+    player_team_id = _player_team_id(slot, player_team_ids)
+    if player_team_id in eliminated_team_ids:
+        reasons.append(f"Player {slot.player_id} is on eliminated team {player_team_id}")
     return reasons
+
+
+def _player_team_id(slot: RosterSlot, player_team_ids: Mapping[int, int]) -> int | None:
+    if slot.player_id is None:
+        return None
+    return player_team_ids.get(slot.player_id)

@@ -18,7 +18,9 @@ from typer.testing import CliRunner
 
 from draft_oracle.backtest.replay import (
     BacktestConfig,
+    RoundLeakageCheck,
     RoundResult,
+    ScoreContext,
     SlotResult,
     _draft_events,
     _league_comparisons,
@@ -197,18 +199,22 @@ def test_leakage_guard_spans_the_combined_r3_r4_game_union() -> None:
     r3_start = starts[season_id][3]
     # The combined event drafts before round 3, so neither round-3 nor round-4 games
     # may appear in the as-of slice -- the guard is clean over the two-round union.
-    assert_round_inputs_leakfree(tables["team_games"], union, r3_start, label="team")
-    assert_round_inputs_leakfree(tables["skater_games"], union, r3_start, label="skater")
+    assert_round_inputs_leakfree(
+        RoundLeakageCheck(tables["team_games"], union, r3_start, label="team")
+    )
+    assert_round_inputs_leakfree(
+        RoundLeakageCheck(tables["skater_games"], union, r3_start, label="skater")
+    )
 
     # A cutoff after the final has begun pulls both rounds of the union into the slice.
     leaked_cutoff = f"{FOUR_ROUND_TARGET}-06-01"
     with pytest.raises(LeakageError, match="leaked into the as-of"):
         assert_round_inputs_leakfree(
-            tables["team_games"], union, leaked_cutoff, label="team"
+            RoundLeakageCheck(tables["team_games"], union, leaked_cutoff, label="team")
         )
     with pytest.raises(LeakageError, match="leaked into the as-of"):
         assert_round_inputs_leakfree(
-            tables["skater_games"], union, leaked_cutoff, label="skater"
+            RoundLeakageCheck(tables["skater_games"], union, leaked_cutoff, label="skater")
         )
 
 
@@ -355,9 +361,7 @@ def test_score_league_roster_honors_retroactive_ir_swap() -> None:
              "points_excluded": False, "ir_activated": False},
         ]
     )
-    total = _score_league_roster(
-        picks, skater_actual, team_actual, season_id=100, scored_rounds=[1]
-    )
+    total = _score_league_roster(picks, ScoreContext(skater_actual, team_actual, 100, [1]))
     # Excluded starter (7) drops, activated IR_F (4) counts, goalie (6): 10, not 13.
     assert total == 10.0
 
@@ -374,9 +378,7 @@ def test_score_league_roster_no_swap_counts_starter_benches_ir() -> None:
              "points_excluded": False, "ir_activated": False},
         ]
     )
-    total = _score_league_roster(
-        picks, skater_actual, team_actual, season_id=100, scored_rounds=[1]
-    )
+    total = _score_league_roster(picks, ScoreContext(skater_actual, team_actual, 100, [1]))
     # No activation: starter (7) counts, bench IR (4) scores zero, goalie (6): 13.
     assert total == 13.0
 
@@ -439,10 +441,7 @@ def test_combined_league_comparison_scores_rounds_three_and_four() -> None:
     actual_points = comparisons[0].managers[0].actual_points
     round_three_only = _score_league_roster(
         picks,
-        skater_actual,
-        team_actual,
-        season_id=season_id,
-        scored_rounds=[3],
+        ScoreContext(skater_actual, team_actual, season_id, [3]),
     )
     assert round_three_only == 16.0
     assert actual_points == 37.0
@@ -535,10 +534,7 @@ def test_real_2024_levi_r3_4_roster_scores_corrected_64_points() -> None:
     assert (
         _score_league_roster(
             roster,
-            skater_actual,
-            team_actual,
-            season_id=20232024,
-            scored_rounds=[3, 4],
+            ScoreContext(skater_actual, team_actual, 20232024, [3, 4]),
         )
         == 64.0
     )
@@ -626,7 +622,9 @@ def test_leakage_guard_passes_on_correct_cutoff() -> None:
     )
     assert ids  # the round has games
     # The true cutoff is the round-1 start; no round game precedes it.
-    assert_round_inputs_leakfree(tables["team_games"], ids, "2022-04-15", label="team")
+    assert_round_inputs_leakfree(
+        RoundLeakageCheck(tables["team_games"], ids, "2022-04-15", label="team")
+    )
 
 
 def test_leakage_guard_raises_when_round_games_leak() -> None:
@@ -637,7 +635,9 @@ def test_leakage_guard_raises_when_round_games_leak() -> None:
     )
     # A cutoff after the round has begun pulls round-1 games into the as-of slice.
     with pytest.raises(LeakageError, match="leaked into the as-of"):
-        assert_round_inputs_leakfree(tables["team_games"], ids, "2022-05-01", label="team")
+        assert_round_inputs_leakfree(
+            RoundLeakageCheck(tables["team_games"], ids, "2022-05-01", label="team")
+        )
 
 
 def test_leakage_guard_catches_skater_team_date_desync() -> None:
@@ -651,16 +651,20 @@ def test_leakage_guard_catches_skater_team_date_desync() -> None:
     round_ids: set[int] = set()  # a future round, so the game-id identity check can't catch it
 
     # Self-date check alone passes -- the desynced row survives the pre-cutoff filter.
-    assert_round_inputs_leakfree(skater_games, round_ids, cutoff, label="skater")
+    assert_round_inputs_leakfree(
+        RoundLeakageCheck(skater_games, round_ids, cutoff, label="skater")
+    )
 
     # The independent authoritative-date source catches the leak.
     with pytest.raises(LeakageError, match="desynced past cutoff"):
         assert_round_inputs_leakfree(
-            skater_games,
-            round_ids,
-            cutoff,
-            label="skater",
-            authoritative_dates=team_games,
+            RoundLeakageCheck(
+                skater_games,
+                round_ids,
+                cutoff,
+                label="skater",
+                authoritative_dates=team_games,
+            )
         )
 
 

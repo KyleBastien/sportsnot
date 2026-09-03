@@ -363,13 +363,21 @@ def _synthetic_archive(
 
 
 def _projection_config() -> ProjectionConfig:
+    production_config = _production_config()
     return ProjectionConfig(
         seed=20260827,
         n_test_seasons=2,
         n_sims=300,
-        production_config=SkaterProductionConfig(
-            seed=20260827, n_val_seasons=1, n_test_seasons=1, min_confident_games=5
-        ),
+        production_config=production_config,
+    )
+
+
+def _production_config() -> SkaterProductionConfig:
+    return SkaterProductionConfig(
+        seed=20260827,
+        n_val_seasons=1,
+        n_test_seasons=1,
+        min_confident_games=5,
     )
 
 

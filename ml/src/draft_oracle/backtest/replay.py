@@ -28,53 +28,62 @@ and score. Per-round intermediate results are persisted under
 from __future__ import annotations
 
 import json
-import random
 from collections.abc import Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
 
 import pandas as pd
 
-from draft_oracle import __version__
+from draft_oracle.backtest._replay_eval import (
+    _build_projection_eval,
+    _build_series_evals,
+    _market_series_prob,
+    _round_series,
+)
+from draft_oracle.backtest._replay_events import (
+    _draft_events,
+    _draft_shortfall,
+    _season_id_for,
+    _season_rounds,
+)
+from draft_oracle.backtest._replay_league import _league_comparisons
 from draft_oracle.backtest._replay_leakage import (
+    RoundLeakageCheck,
     assert_round_inputs_leakfree,
     round_game_ids,
 )
+from draft_oracle.backtest._replay_opponents import (
+    _fit_opponents_for_season,
+    _managers_and_opponents,
+)
+from draft_oracle.backtest._replay_playout import _play_oracle_draft
 from draft_oracle.backtest._replay_scoring import (
+    ScoreContext,
     _score_active_roster,
     _score_league_roster,
     skater_actual_points,
     team_actual_goalie_points,
 )
-from draft_oracle.models.series_sim import simulate_series
-from draft_oracle.optimize.opponents import (
-    FittedLeagueOpponents,
-    OpponentFitConfig,
-    dedupe_duplicate_events,
-    event_keys,
-    fit_opponent_models,
+from draft_oracle.backtest._replay_types import (
+    STRATEGIES,
+    BacktestConfig,
+    BacktestResult,
+    LeagueComparison,
+    LeagueManagerRoster,
+    ProjectionEval,
+    RoundResult,
+    SeriesEval,
+    SlotResult,
+    Strategy,
 )
-from draft_oracle.optimize.recommend import (
-    RecommendConfig,
-    build_pool_from_frames,
-    choose_pick,
-    greedy_vor_pick,
-    replacement_levels,
-)
+from draft_oracle.optimize.recommend import build_pool_from_frames
 from draft_oracle.optimize.simulator import (
-    DraftAsset,
     DraftState,
-    GreedyOpponentModel,
-    OpponentModel,
-    _resolve_model,
-    roster_capacity,
 )
 from draft_oracle.projection_artifact import (
     DEFAULT_NORMALIZED_DIR,
     SNAPSHOTS_SUBDIR,
-    ProjectArtifactConfig,
     _load_league_picks,
     _load_tables,
     _require_complete_snapshot,
@@ -90,6 +99,9 @@ for _exported in (
     team_actual_goalie_points,
     _score_active_roster,
     _score_league_roster,
+    _draft_events,
+    _league_comparisons,
+    _market_series_prob,
 ):
     _exported.__module__ = __name__
 
@@ -101,10 +113,15 @@ __all__ = [
     "LeagueComparison",
     "LeagueManagerRoster",
     "ProjectionEval",
+    "RoundLeakageCheck",
     "RoundResult",
+    "ScoreContext",
     "SeriesEval",
     "SlotResult",
     "Strategy",
+    "_draft_events",
+    "_league_comparisons",
+    "_market_series_prob",
     "_score_active_roster",
     "_score_league_roster",
     "assert_round_inputs_leakfree",
@@ -115,506 +132,15 @@ __all__ = [
     "team_actual_goalie_points",
 ]
 
-# Playoff round -> the league's redraft event covering it (rounds 3+4 share R3_4).
-ROUND_TO_DRAFT_EVENT: dict[int, str] = {1: "R1", 2: "R2", 3: "R3_4", 4: "R3_4"}
-
 DEFAULT_BACKTEST_ROOT = Path("artifacts/backtests")
 
-Strategy = Literal["oracle", "greedy_vor", "one_step", "random_legal"]
-STRATEGIES: tuple[Strategy, ...] = ("oracle", "greedy_vor", "one_step", "random_legal")
 
 
-# ── Configuration ─────────────────────────────────────────────────────────
 
 
-@dataclass(frozen=True)
-class BacktestConfig:
-    """Knobs for a reproducible backtest run (all deterministic given the inputs).
 
-    ``strategies`` is the set of oracle policies seated in each slot; ``"oracle"``
-    is the multi-step rollout, the others are the US-026 baselines. ``n_drafts`` is
-    the number of seeded drafts per (round, slot) — opponent stochasticity is
-    averaged over them. ``managers`` sizes the league; ``ir`` toggles IR slots.
-    """
 
-    seed: int = 20260827
-    managers: int = 4
-    ir: bool = False
-    n_drafts: int = 1
-    rollouts: int = 40
-    max_candidates: int = 6
-    opponent_temperature: float = 0.75
-    depth: int | None = None
-    strategies: tuple[Strategy, ...] = ("oracle",)
-    project_config: ProjectArtifactConfig | None = None
-    run_id: str = ""
 
-    def __post_init__(self) -> None:
-        if self.managers < 2:
-            raise ValueError(f"managers must be >= 2, got {self.managers}")
-        if self.n_drafts < 1:
-            raise ValueError(f"n_drafts must be >= 1, got {self.n_drafts}")
-        if not self.strategies:
-            raise ValueError("strategies must be non-empty")
-        for strategy in self.strategies:
-            if strategy not in STRATEGIES:
-                raise ValueError(f"unknown strategy {strategy!r}; choose from {STRATEGIES}")
-
-    def recommend_config(self) -> RecommendConfig:
-        """The rollout config the multi-step / one-step oracle policies use."""
-        return RecommendConfig(
-            rollouts=self.rollouts,
-            depth=self.depth,
-            max_candidates=self.max_candidates,
-            compute_survival=False,
-            seed=self.seed,
-        )
-
-    def artifact_config(self) -> ProjectArtifactConfig:
-        """The projection-artifact config (seeded sub-models), slot report disabled."""
-        if self.project_config is not None:
-            return self.project_config
-        return ProjectArtifactConfig(seed=self.seed, managers=self.managers, ir=self.ir)
-
-    def resolved_run_id(self, seasons: list[int]) -> str:
-        """Deterministic run id from the seasons + seed unless one is pinned."""
-        if self.run_id:
-            return self.run_id
-        seasons_part = "-".join(str(s) for s in sorted(seasons))
-        return f"{seasons_part}-seed{self.seed}"
-
-
-# ── Result records ──────────────────────────────────────────────────────────
-
-
-@dataclass(frozen=True)
-class SeriesEval:
-    """One backtested series: the model's win probability vs. the actual winner.
-
-    ``p_top_stat`` is the stat-only series-model probability the top seed wins its
-    round (the number the projection artifact actually drafted from). ``p_top_market``
-    is a market-aware probability derived from the series' game-1 (pre-series) de-vigged
-    betting line for the same series, or ``None`` where no historical odds cover it. Both
-    are scored against ``top_won`` (1 if the top seed won the series) via the Brier score
-    in reporting.
-    """
-
-    top_id: int
-    bottom_id: int
-    top_seed_abbrev: str
-    bottom_seed_abbrev: str
-    top_won: int
-    p_top_stat: float
-    p_top_market: float | None
-
-    def manifest(self) -> dict[str, Any]:
-        return {
-            "top_id": self.top_id,
-            "bottom_id": self.bottom_id,
-            "top": self.top_seed_abbrev,
-            "bottom": self.bottom_seed_abbrev,
-            "top_won": self.top_won,
-            "p_top_stat": round(self.p_top_stat, 6),
-            "p_top_market": None if self.p_top_market is None else round(self.p_top_market, 6),
-        }
-
-
-@dataclass(frozen=True)
-class ProjectionEval:
-    """As-of projections paired with the realized outcome for one round.
-
-    ``skaters`` is ``(player_id, projected_points, actual_points)`` for every eligible
-    skater; ``teams`` is ``(team_id, projected_goalie_points, actual_goalie_points)``
-    for every eligible team. Reporting turns these into projection MAE and rank
-    correlation per season and in aggregate — actuals only ever score, never a pick.
-    """
-
-    skaters: list[tuple[int, float, float]] = field(default_factory=list)
-    teams: list[tuple[int, float, float]] = field(default_factory=list)
-
-    def manifest(self) -> dict[str, Any]:
-        return {
-            "skaters": [[pid, round(p, 6), round(a, 6)] for pid, p, a in self.skaters],
-            "teams": [[tid, round(p, 6), round(a, 6)] for tid, p, a in self.teams],
-        }
-
-
-@dataclass(frozen=True)
-class SlotResult:
-    """One seeded draft of one strategy seated at one snake slot."""
-
-    strategy: str
-    seat: int
-    oracle_manager: str
-    draft_index: int
-    oracle_points: float
-    opponent_points: dict[str, float]
-    roster_keys: list[str]
-
-    @property
-    def is_win(self) -> bool:
-        """Whether the oracle roster strictly outscored every opponent this draft."""
-        if not self.opponent_points:
-            return False
-        return self.oracle_points > max(self.opponent_points.values())
-
-    def manifest(self) -> dict[str, Any]:
-        return {
-            "strategy": self.strategy,
-            "seat": self.seat,
-            "oracle_manager": self.oracle_manager,
-            "draft_index": self.draft_index,
-            "oracle_points": round(self.oracle_points, 6),
-            "opponent_points": {k: round(v, 6) for k, v in self.opponent_points.items()},
-            "roster_keys": self.roster_keys,
-        }
-
-
-@dataclass(frozen=True)
-class RoundResult:
-    """Replay of one playoff round: as-of cutoff, opponents, and per-slot scores."""
-
-    season: int
-    season_id: int
-    playoff_round: int
-    as_of_cutoff: str
-    opponents_kind: str
-    eligible_team_abbrevs: list[str]
-    leakage_ok: bool
-    scored_rounds: list[int] = field(default_factory=list)
-    slot_results: list[SlotResult] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    projection_eval: ProjectionEval | None = None
-    series_evals: list[SeriesEval] = field(default_factory=list)
-
-    def manifest(self) -> dict[str, Any]:
-        return {
-            "season": self.season,
-            "season_id": self.season_id,
-            "playoff_round": self.playoff_round,
-            "scored_rounds": self.scored_rounds or [self.playoff_round],
-            "as_of_cutoff": self.as_of_cutoff,
-            "opponents_kind": self.opponents_kind,
-            "eligible_team_abbrevs": self.eligible_team_abbrevs,
-            "leakage_ok": self.leakage_ok,
-            "slot_results": [s.manifest() for s in self.slot_results],
-            "warnings": self.warnings,
-            "projection_eval": (
-                self.projection_eval.manifest() if self.projection_eval is not None else None
-            ),
-            "series_evals": [s.manifest() for s in self.series_evals],
-        }
-
-
-@dataclass(frozen=True)
-class LeagueManagerRoster:
-    """A real league manager's actual active-roster points for a backtested round."""
-
-    manager: str
-    actual_points: float
-
-    def manifest(self) -> dict[str, Any]:
-        return {"manager": self.manager, "actual_points": round(self.actual_points, 6)}
-
-
-@dataclass(frozen=True)
-class LeagueComparison:
-    """Oracle simulated rosters vs. what the league's managers actually drafted.
-
-    Populated only where a backtested season/round overlaps the committed league draft
-    history. ``oracle_mean_points`` / ``oracle_best_points`` aggregate the oracle policy
-    across the snake slots for the round; ``managers`` are one named league's real
-    active-roster scores through the same rules engine. Separate leagues always produce
-    separate comparison rows.
-    """
-
-    season: int
-    playoff_round: int
-    draft_event: str
-    managers: list[LeagueManagerRoster]
-    oracle_mean_points: float
-    oracle_best_points: float
-    league_name: str | None = None
-
-    @property
-    def league_mean_points(self) -> float:
-        if not self.managers:
-            return float("nan")
-        return sum(m.actual_points for m in self.managers) / len(self.managers)
-
-    @property
-    def league_best_points(self) -> float:
-        if not self.managers:
-            return float("nan")
-        return max(m.actual_points for m in self.managers)
-
-    def manifest(self) -> dict[str, Any]:
-        return {
-            "season": self.season,
-            "playoff_round": self.playoff_round,
-            "draft_event": self.draft_event,
-            "league_name": self.league_name,
-            "oracle_mean_points": round(self.oracle_mean_points, 6),
-            "oracle_best_points": round(self.oracle_best_points, 6),
-            "league_mean_points": round(self.league_mean_points, 6),
-            "league_best_points": round(self.league_best_points, 6),
-            "managers": [m.manifest() for m in self.managers],
-        }
-
-
-@dataclass(frozen=True)
-class BacktestResult:
-    """A full backtest run: config, per-round replays, and a written manifest."""
-
-    run_id: str
-    seasons: list[int]
-    config: BacktestConfig
-    rounds: list[RoundResult]
-    generated_at: str
-    league_comparisons: list[LeagueComparison] = field(default_factory=list)
-
-    def manifest(self) -> dict[str, Any]:
-        return {
-            "run_id": self.run_id,
-            "package_version": __version__,
-            "seasons": self.seasons,
-            "generated_at": self.generated_at,
-            "config": {
-                "seed": self.config.seed,
-                "managers": self.config.managers,
-                "ir": self.config.ir,
-                "n_drafts": self.config.n_drafts,
-                "rollouts": self.config.rollouts,
-                "max_candidates": self.config.max_candidates,
-                "opponent_temperature": self.config.opponent_temperature,
-                "depth": self.config.depth,
-                "strategies": list(self.config.strategies),
-            },
-            "rounds": [
-                {
-                    "season": r.season,
-                    "playoff_round": r.playoff_round,
-                    "as_of_cutoff": r.as_of_cutoff,
-                    "opponents_kind": r.opponents_kind,
-                    "leakage_ok": r.leakage_ok,
-                    "slots": len({s.seat for s in r.slot_results}),
-                    "drafts": len(r.slot_results),
-                }
-                for r in self.rounds
-            ],
-            "league_comparisons": [c.manifest() for c in self.league_comparisons],
-            "leakage_ok": all(r.leakage_ok for r in self.rounds),
-        }
-
-
-# ── Opponents ───────────────────────────────────────────────────────────────
-
-
-def _top_managers(fitted: FittedLeagueOpponents, limit: int) -> list[str]:
-    """The ``limit`` most active historical managers (deterministic tie-break)."""
-    ranked = sorted(fitted.manager_pick_counts.items(), key=lambda kv: (-kv[1], kv[0]))
-    return [manager for manager, _ in ranked[:limit]]
-
-
-def _fit_opponents_for_season(
-    league_picks: pd.DataFrame | None, season: int, config: BacktestConfig
-) -> FittedLeagueOpponents | None:
-    """Fit opponents leave-one-season-out; ``None`` when history omits the season.
-
-    The fitted model trains on every league season *except* the one being
-    backtested, so a season never informs its own opponents (SPEC section 6). If the
-    league history does not cover ``season`` (or nothing is left after excluding it),
-    the caller falls back to the greedy opponent.
-    """
-    if league_picks is None or "season" not in league_picks.columns:
-        return None
-    seasons = {int(s) for s in league_picks["season"].unique()}
-    if season not in seasons:
-        return None
-    train = league_picks.loc[league_picks["season"].astype(int) != season]
-    if train.empty:
-        return None
-    return fit_opponent_models(train, OpponentFitConfig(temperature=config.opponent_temperature))
-
-
-def _managers_and_opponents(
-    fitted: FittedLeagueOpponents | None, config: BacktestConfig
-) -> tuple[list[str], OpponentModel | dict[str, OpponentModel], str]:
-    """Resolve the manager ids, opponent policy, and a label for the round."""
-    if fitted is not None:
-        managers_list = _top_managers(fitted, config.managers)
-        while len(managers_list) < config.managers:
-            managers_list.append(f"seat{len(managers_list) + 1}")
-        return managers_list, fitted.as_mapping(managers_list), "fitted-league"
-    managers_list = [f"seat{i + 1}" for i in range(config.managers)]
-    greedy = GreedyOpponentModel(temperature=config.opponent_temperature)
-    return managers_list, greedy, "greedy"
-
-
-# ── Draft playout ───────────────────────────────────────────────────────────
-
-
-def _oracle_pick(
-    strategy: Strategy,
-    state: DraftState,
-    oracle: str,
-    opponent_model: OpponentModel | dict[str, OpponentModel],
-    config: BacktestConfig,
-    rng: random.Random,
-) -> DraftAsset:
-    """The asset the oracle drafts under ``strategy`` at the current slot."""
-    if strategy == "random_legal":
-        legal = state.legal_assets(oracle)
-        if not legal:
-            raise ValueError(f"oracle {oracle!r} has no legal pick")
-        return legal[rng.randrange(len(legal))]
-    if strategy == "greedy_vor":
-        replacement = replacement_levels(state, config.managers)
-        return greedy_vor_pick(state, oracle, replacement)
-    cfg = config.recommend_config()
-    if strategy == "one_step":
-        cfg = replace(cfg, depth=1)
-    return choose_pick(state, oracle, opponent_model, config=cfg, managers=config.managers)
-
-
-def _play_oracle_draft(
-    base_state: DraftState,
-    oracle: str,
-    strategy: Strategy,
-    opponent_model: OpponentModel | dict[str, OpponentModel],
-    config: BacktestConfig,
-    seed: int,
-) -> DraftState:
-    """Play a full draft with ``oracle`` seated under ``strategy`` vs. opponents.
-
-    Opponents draw from one seeded ``rng`` so the whole playout is determined by
-    ``(base_state, seed)``; the oracle's own policy is deterministic given the state.
-    """
-    state = base_state.copy()
-    rng = random.Random(seed)
-    while not state.is_complete:
-        current = state.current_manager
-        if current == oracle:
-            asset = _oracle_pick(strategy, state, oracle, opponent_model, config, rng)
-        else:
-            model = _resolve_model(opponent_model, current)
-            asset = model.pick(state, current, rng)
-        state.apply_pick(asset)
-    return state
-
-
-# ── As-of projection & series evaluation capture (US-026) ───────────────────
-
-
-def _round_series(series: pd.DataFrame, season: int, playoff_round: int) -> pd.DataFrame:
-    """The ``series`` rows for one backtested season+round."""
-    return series.loc[
-        (series["year"].astype(int) == int(season))
-        & (series["playoff_round"].astype("Int64") == int(playoff_round))
-    ]
-
-
-def _market_series_prob(
-    odds: pd.DataFrame | None, top_id: int, bottom_id: int, season: int
-) -> float | None:
-    """Market-implied ``P(top seed wins the series)`` from the series' game-1 line.
-
-    Locates the *first* (pre-series) playoff game between the two teams that season,
-    reads the de-vigged implied win probability for the top seed from that single
-    game-1 moneyline, and runs it through the exact best-of-7 series model. Only the
-    game-1 line — set before any series game is played — informs the number, so this is
-    a genuine *as-of-round-start* benchmark: in-series (game 2+) closing lines are never
-    averaged in (CODE_REVIEW M-5). The game-1 probability is applied symmetrically to
-    both venues because only one venue's line (the top seed's home opener) exists before
-    the series starts. ``None`` when no committed odds cover the matchup. This is a
-    post-hoc calibration measurement of the series model under market inputs — it is
-    never used to make a pick.
-    """
-    if odds is None or odds.empty:
-        return None
-    scoped = odds.loc[
-        (odds["season_end_year"].astype(int) == int(season))
-        & odds["is_playoff"].fillna(False).astype(bool)
-        & (
-            ((odds["home_team_id"] == top_id) & (odds["away_team_id"] == bottom_id))
-            | ((odds["home_team_id"] == bottom_id) & (odds["away_team_id"] == top_id))
-        )
-    ].dropna(subset=["home_implied", "away_implied"])
-    if scoped.empty:
-        return None
-    # Game 1 is the earliest-dated game between the two teams; ``game_date`` is an ISO
-    # string so a lexical minimum is chronological. Restricting to that date drops every
-    # mid-series closing line.
-    game_one_date = scoped["game_date"].min()
-    game_one = scoped.loc[scoped["game_date"] == game_one_date]
-    top_home = game_one.loc[game_one["home_team_id"] == top_id, "home_implied"].astype(float)
-    top_away = game_one.loc[game_one["away_team_id"] == top_id, "away_implied"].astype(float)
-    top_probs = pd.concat([top_home, top_away])
-    if top_probs.empty:
-        return None
-    p_top_game_one = float(top_probs.mean())
-    return simulate_series(p_top_game_one, p_top_game_one).p_a_win_series
-
-
-def _build_projection_eval(
-    result: Any,
-    skater_actual: dict[tuple[int, int, int], int],
-    team_actual: dict[tuple[int, int, int], int],
-    *,
-    season_id: int,
-    scored_rounds: Sequence[int],
-) -> ProjectionEval:
-    """Pair every as-of projection with its realized outcome across the scored rounds."""
-    skaters: list[tuple[int, float, float]] = []
-    for rec in result.skaters.to_dict("records"):
-        pid = int(rec["player_id"])
-        projected = float(rec["expected_points"])
-        actual = float(sum(skater_actual.get((season_id, rnd, pid), 0) for rnd in scored_rounds))
-        skaters.append((pid, projected, actual))
-    teams: list[tuple[int, float, float]] = []
-    for rec in result.teams.to_dict("records"):
-        tid = int(rec["team_id"])
-        projected = float(rec["e_goalie_points"])
-        actual = float(sum(team_actual.get((season_id, rnd, tid), 0) for rnd in scored_rounds))
-        teams.append((tid, projected, actual))
-    return ProjectionEval(skaters=skaters, teams=teams)
-
-
-def _build_series_evals(
-    result: Any,
-    round_series: pd.DataFrame,
-    odds: pd.DataFrame | None,
-    *,
-    season: int,
-) -> list[SeriesEval]:
-    """Per-series stat-only + market-aware win probabilities vs. the actual winner."""
-    stat_by_team = {
-        int(rec["team_id"]): float(rec["p_series_win"]) for rec in result.teams.to_dict("records")
-    }
-    evals: list[SeriesEval] = []
-    for row in round_series.to_dict("records"):
-        top_raw = row.get("top_seed_team_id")
-        bottom_raw = row.get("bottom_seed_team_id")
-        winner_raw = row.get("winning_team_id")
-        if pd.isna(top_raw) or pd.isna(bottom_raw) or pd.isna(winner_raw):
-            continue
-        top_id = int(top_raw)
-        bottom_id = int(bottom_raw)
-        if top_id not in stat_by_team:
-            continue
-        top_won = 1 if int(winner_raw) == top_id else 0
-        evals.append(
-            SeriesEval(
-                top_id=top_id,
-                bottom_id=bottom_id,
-                top_seed_abbrev=str(row.get("top_seed_abbrev", "")),
-                bottom_seed_abbrev=str(row.get("bottom_seed_abbrev", "")),
-                top_won=top_won,
-                p_top_stat=stat_by_team[top_id],
-                p_top_market=_market_series_prob(odds, top_id, bottom_id, season),
-            )
-        )
-    return evals
 
 
 # ── Round / season / run orchestration ─────────────────────────────────────
@@ -669,13 +195,17 @@ def replay_round(
         round_ids |= round_game_ids(
             tables["team_games"], tables["series"], season_id=season_id, playoff_round=rnd
         )
-    assert_round_inputs_leakfree(tables["team_games"], round_ids, cutoff, label="team")
     assert_round_inputs_leakfree(
-        tables["skater_games"],
-        round_ids,
-        cutoff,
-        label="skater",
-        authoritative_dates=tables["team_games"],
+        RoundLeakageCheck(tables["team_games"], round_ids, cutoff, label="team")
+    )
+    assert_round_inputs_leakfree(
+        RoundLeakageCheck(
+            tables["skater_games"],
+            round_ids,
+            cutoff,
+            label="skater",
+            authoritative_dates=tables["team_games"],
+        )
     )
 
     fitted = _fit_opponents_for_season(league_picks, season, config)
@@ -683,6 +213,7 @@ def replay_round(
 
     pool = build_pool_from_frames(result.skaters, result.teams, ir=config.ir)
     warnings = list(result.warnings)
+    score_context = ScoreContext(skater_actual, team_actual, season_id, scored)
 
     shortfall = _draft_shortfall(pool, config.managers, config.ir)
     if shortfall is not None:
@@ -720,10 +251,7 @@ def replay_round(
                     manager: _score_active_roster(
                         final,
                         manager,
-                        skater_actual,
-                        team_actual,
-                        season_id=season_id,
-                        scored_rounds=scored,
+                        score_context,
                     )
                     for manager in managers_list
                     if manager != oracle
@@ -731,10 +259,7 @@ def replay_round(
                 oracle_points = _score_active_roster(
                     final,
                     oracle,
-                    skater_actual,
-                    team_actual,
-                    season_id=season_id,
-                    scored_rounds=scored,
+                    score_context,
                 )
                 roster_keys = [a.key for a in final.rosters[oracle].all_assets()]
                 slot_results.append(
@@ -765,127 +290,14 @@ def replay_round(
     )
 
 
-def _draft_shortfall(pool: list[DraftAsset], managers: int, allow_ir: bool) -> str | None:
-    """Describe why ``pool`` cannot fill a ``managers``-way draft, or ``None`` if it can.
-
-    Late playoff rounds have too few eligible teams to seat a full league — the Cup
-    Final's two teams cannot supply four managers a unique goalie, for instance. This
-    reports the first unmet positional demand so the round is skipped honestly rather
-    than crashing mid-draft (SPEC section 7).
-    """
-    capacity = roster_capacity(allow_ir)
-    have = {"F": 0, "D": 0, "G": 0}
-    for asset in pool:
-        have[asset.position] += 1
-    demand = {
-        "F": capacity.forwards * managers,
-        "D": capacity.defense * managers,
-        "G": capacity.goalies * managers,
-    }
-    for position in ("F", "D", "G"):
-        if have[position] < demand[position]:
-            return f"{position}: {have[position]} available < {demand[position]} needed"
-    return None
 
 
-def _season_id_for(series: pd.DataFrame, season: int) -> int:
-    """Resolve the numeric ``season_id`` for a backtested season from the series table."""
-    scoped = series.loc[series["year"].astype(int) == int(season)]
-    if scoped.empty:
-        raise ValueError(f"no series rows for season {season}")
-    return int(scoped["season_id"].iloc[0])
 
 
-def _season_rounds(series: pd.DataFrame, season: int) -> list[int]:
-    """Best-of-7 playoff rounds (1-4) present for ``season`` (round 0 excluded)."""
-    scoped = series.loc[series["year"].astype(int) == int(season)]
-    rounds = sorted({int(r) for r in scoped["playoff_round"].unique() if int(r) >= 1})
-    return rounds
 
 
-def _draft_events(rounds: list[int]) -> list[tuple[int, list[int]]]:
-    """Group playoff rounds into the league's draft events.
-
-    Returns ``(draft_round, scored_rounds)`` per event, where ``draft_round`` is the
-    earliest round of the event (whose as-of projection drives the draft) and
-    ``scored_rounds`` is every round the drafted roster is scored across. Rounds 3 and
-    4 collapse into the single combined ``R3_4`` event (:data:`ROUND_TO_DRAFT_EVENT`).
-    """
-    by_event: dict[str, list[int]] = {}
-    for rnd in rounds:
-        event = ROUND_TO_DRAFT_EVENT.get(rnd, f"R{rnd}")
-        by_event.setdefault(event, []).append(rnd)
-    events = [(min(grouped), sorted(grouped)) for grouped in by_event.values()]
-    return sorted(events)
 
 
-def _league_comparisons(
-    rounds: list[RoundResult],
-    league_picks: pd.DataFrame | None,
-    skater_actual: dict[tuple[int, int, int], int],
-    team_actual: dict[tuple[int, int, int], int],
-) -> list[LeagueComparison]:
-    """Compare oracle simulated rosters to real league rosters where seasons overlap.
-
-    For each backtested round whose ``(season, draft_event)`` appears in the committed
-    league draft history, score every real manager's active roster through the rules
-    engine and pair it with the oracle policy's mean/best simulated points that round.
-    Every overlapping league is reported separately because the replay config has no
-    simulated-league identity; manager rosters and league aggregates never cross a
-    ``league_name`` boundary. Duplicate source copies are app-preferred after preserving
-    any asset-level exclusion flag. Rounds without league overlap are simply omitted.
-    """
-    if league_picks is None or league_picks.empty or "season" not in league_picks.columns:
-        return []
-    prepared = dedupe_duplicate_events(league_picks)
-    comparisons: list[LeagueComparison] = []
-    for rnd in rounds:
-        event = ROUND_TO_DRAFT_EVENT.get(rnd.playoff_round)
-        if event is None:
-            continue
-        scored = rnd.scored_rounds or [rnd.playoff_round]
-        scoped = prepared.loc[
-            (prepared["season"].astype(int) == int(rnd.season))
-            & (prepared["draft_event"].astype(str) == event)
-        ]
-        if scoped.empty:
-            continue
-        oracle_points = [s.oracle_points for s in rnd.slot_results if s.strategy == "oracle"]
-        if not oracle_points:
-            continue
-        for _, league_picks_for_event in scoped.groupby(
-            event_keys(scoped), sort=True, dropna=False
-        ):
-            league_name: str | None = None
-            if "league_name" in league_picks_for_event.columns:
-                raw_league_name = league_picks_for_event["league_name"].iloc[0]
-                if pd.notna(raw_league_name):
-                    league_name = str(raw_league_name)
-            managers = [
-                LeagueManagerRoster(
-                    manager=str(manager),
-                    actual_points=_score_league_roster(
-                        picks,
-                        skater_actual,
-                        team_actual,
-                        season_id=rnd.season_id,
-                        scored_rounds=scored,
-                    ),
-                )
-                for manager, picks in league_picks_for_event.groupby("manager")
-            ]
-            comparisons.append(
-                LeagueComparison(
-                    season=rnd.season,
-                    playoff_round=rnd.playoff_round,
-                    draft_event=event,
-                    managers=sorted(managers, key=lambda m: (-m.actual_points, m.manager)),
-                    oracle_mean_points=sum(oracle_points) / len(oracle_points),
-                    oracle_best_points=max(oracle_points),
-                    league_name=league_name,
-                )
-            )
-    return comparisons
 
 
 def run_backtest(

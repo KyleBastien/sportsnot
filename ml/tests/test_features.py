@@ -8,6 +8,7 @@ builder, and the mandatory leakage guard.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
@@ -36,108 +37,76 @@ ROUND1_START = "2024-04-20"
 ROUND2_START = "2024-05-05"
 
 
-def _skater_row(
-    *,
-    game_id: int,
-    game_date: str,
-    player_id: int,
-    team: str,
-    goals: int,
-    assists: int,
-    shots: int,
-    pp_points: int,
-    toi: int,
-    game_type: int = 2,
-) -> dict[str, object]:
+@dataclass(frozen=True)
+class _SkaterRowInput:
+    game_id: int
+    game_date: str
+    player_id: int
+    team: str
+    goals: int
+    assists: int
+    shots: int
+    pp_points: int
+    toi: int
+    game_type: int = 2
+
+
+def _skater_row(spec: _SkaterRowInput) -> dict[str, object]:
     return {
         "season_id": SEASON,
-        "game_type_id": game_type,
-        "game_id": game_id,
-        "game_date": game_date,
-        "player_id": player_id,
-        "team_abbrev": team,
-        "goals": goals,
-        "assists": assists,
-        "shots": shots,
-        "pp_points": pp_points,
-        "toi_seconds": toi,
+        "game_type_id": spec.game_type,
+        "game_id": spec.game_id,
+        "game_date": spec.game_date,
+        "player_id": spec.player_id,
+        "team_abbrev": spec.team,
+        "goals": spec.goals,
+        "assists": spec.assists,
+        "shots": spec.shots,
+        "pp_points": spec.pp_points,
+        "toi_seconds": spec.toi,
     }
 
 
 def _skater_games() -> pd.DataFrame:
-    rows = [
-        # Alice (100, F, TOR): 3 reg games — 6G / 3A / 20 shots / 4 PP pts.
-        _skater_row(
-            game_id=1,
-            game_date="2024-01-05",
-            player_id=100,
-            team="TOR",
-            goals=2,
-            assists=1,
-            shots=7,
-            pp_points=2,
-            toi=1200,
-        ),
-        _skater_row(
-            game_id=2,
-            game_date="2024-02-10",
-            player_id=100,
-            team="TOR",
-            goals=2,
-            assists=1,
-            shots=6,
-            pp_points=1,
-            toi=1200,
-        ),
-        _skater_row(
-            game_id=3,
-            game_date="2024-03-15",
-            player_id=100,
-            team="TOR",
-            goals=2,
-            assists=1,
-            shots=7,
-            pp_points=1,
-            toi=1200,
-        ),
-        # Bob (200, D, TOR): 2 reg games — 1G / 1A / 5 shots / 0 PP pts.
-        _skater_row(
-            game_id=1,
-            game_date="2024-01-05",
-            player_id=200,
-            team="TOR",
-            goals=1,
-            assists=0,
-            shots=3,
-            pp_points=0,
-            toi=1500,
-        ),
-        _skater_row(
-            game_id=2,
-            game_date="2024-02-10",
-            player_id=200,
-            team="TOR",
-            goals=0,
-            assists=1,
-            shots=2,
-            pp_points=0,
-            toi=1500,
-        ),
-        # Gordie (300, goalie/None): must be dropped from the skater pool.
-        _skater_row(
-            game_id=1,
-            game_date="2024-01-05",
-            player_id=300,
-            team="TOR",
-            goals=0,
-            assists=0,
-            shots=0,
-            pp_points=0,
-            toi=3600,
-        ),
-    ]
-    return pd.DataFrame(rows)
+    return pd.DataFrame(
+        [
+            _skater_row(
+                _SkaterRowInput(
+                    game_id,
+                    game_date,
+                    player_id,
+                    team,
+                    goals,
+                    assists,
+                    shots,
+                    pp_points,
+                    toi,
+                )
+            )
+            for (
+                game_id,
+                game_date,
+                player_id,
+                team,
+                goals,
+                assists,
+                shots,
+                pp_points,
+                toi,
+            ) in _skater_game_specs()
+        ]
+    )
 
+
+def _skater_game_specs() -> list[tuple[int, str, int, str, int, int, int, int, int]]:
+    return [
+        (1, "2024-01-05", 100, "TOR", 2, 1, 7, 2, 1200),
+        (2, "2024-02-10", 100, "TOR", 2, 1, 6, 1, 1200),
+        (3, "2024-03-15", 100, "TOR", 2, 1, 7, 1, 1200),
+        (1, "2024-01-05", 200, "TOR", 1, 0, 3, 0, 1500),
+        (2, "2024-02-10", 200, "TOR", 0, 1, 2, 0, 1500),
+        (1, "2024-01-05", 300, "TOR", 0, 0, 0, 0, 3600),
+    ]
 
 def _players() -> pd.DataFrame:
     return pd.DataFrame(
@@ -230,15 +199,17 @@ def test_as_of_excludes_cutoff_date_games() -> None:
             pd.DataFrame(
                 [
                     _skater_row(
-                        game_id=9,
-                        game_date=ROUND1_START,
-                        player_id=100,
-                        team="TOR",
-                        goals=100,
-                        assists=0,
-                        shots=1,
-                        pp_points=0,
-                        toi=1200,
+                        _SkaterRowInput(
+                            9,
+                            ROUND1_START,
+                            100,
+                            "TOR",
+                            100,
+                            0,
+                            1,
+                            0,
+                            1200,
+                        )
                     ),
                 ]
             ),
@@ -254,15 +225,17 @@ def test_assert_no_leakage_raises_on_future_game() -> None:
     leaked = pd.DataFrame(
         [
             _skater_row(
-                game_id=9,
-                game_date="2024-04-22",
-                player_id=100,
-                team="TOR",
-                goals=5,
-                assists=0,
-                shots=1,
-                pp_points=0,
-                toi=1200,
+                _SkaterRowInput(
+                    9,
+                    "2024-04-22",
+                    100,
+                    "TOR",
+                    5,
+                    0,
+                    1,
+                    0,
+                    1200,
+                )
             ),
         ]
     )
@@ -279,15 +252,17 @@ def test_build_ignores_games_on_or_after_cutoff() -> None:
             pd.DataFrame(
                 [
                     _skater_row(
-                        game_id=9,
-                        game_date=ROUND1_START,
-                        player_id=100,
-                        team="TOR",
-                        goals=100,
-                        assists=0,
-                        shots=1,
-                        pp_points=0,
-                        toi=1200,
+                        _SkaterRowInput(
+                            9,
+                            ROUND1_START,
+                            100,
+                            "TOR",
+                            100,
+                            0,
+                            1,
+                            0,
+                            1200,
+                        )
                     ),
                 ]
             ),
@@ -361,16 +336,18 @@ def test_last_n_window_reflects_prior_playoff_games() -> None:
             pd.DataFrame(
                 [
                     _skater_row(
-                        game_id=50,
-                        game_date="2024-04-22",
-                        player_id=100,
-                        team="TOR",
-                        goals=0,
-                        assists=0,
-                        shots=1,
-                        pp_points=0,
-                        toi=1200,
-                        game_type=3,
+                        _SkaterRowInput(
+                            50,
+                            "2024-04-22",
+                            100,
+                            "TOR",
+                            0,
+                            0,
+                            1,
+                            0,
+                            1200,
+                            game_type=3,
+                        )
                     ),
                 ]
             ),

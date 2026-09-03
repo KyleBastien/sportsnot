@@ -694,24 +694,42 @@ def _point_columns_contradict(
     """
     if not _can_crosscheck_points(record):
         return False
-    columns = (
+    observed = _observed_point_split(record)
+    if observed is None:
+        return False
+    expected = _expected_point_split(record, archive_points)
+    return _all_point_values_contradict(observed, expected)
+
+
+def _observed_point_split(record: dict[str, Any]) -> tuple[int, int, int] | None:
+    values = (
         record["points_for_round"],
         record["points_when_drafted"],
         record["current_total_points"],
     )
-    if any(value is None for value in columns):
-        return False
-    event_rounds, prior_rounds = _DRAFT_EVENT_ROUNDS[str(record["draft_event"])]
+    if any(value is None for value in values):
+        return None
+    return int(values[0]), int(values[1]), int(values[2])
+
+
+def _expected_point_split(
+    record: dict[str, Any], archive_points: dict[tuple[int, int, int], int]
+) -> tuple[int, int, int]:
     season = int(record["season"])
     player_id = int(record["player_id"])
+    event_rounds, prior_rounds = _DRAFT_EVENT_ROUNDS[str(record["draft_event"])]
     event_points = sum(
         archive_points.get((season, player_id, playoff_round), 0) for playoff_round in event_rounds
     )
     prior_points = sum(
         archive_points.get((season, player_id, playoff_round), 0) for playoff_round in prior_rounds
     )
-    expected = (event_points, prior_points, event_points + prior_points)
-    observed = tuple(int(value) for value in columns)
+    return event_points, prior_points, event_points + prior_points
+
+
+def _all_point_values_contradict(
+    observed: tuple[int, int, int], expected: tuple[int, int, int]
+) -> bool:
     return all(
         abs(actual - wanted) > POINT_CROSSCHECK_TOLERANCE
         for actual, wanted in zip(observed, expected, strict=True)

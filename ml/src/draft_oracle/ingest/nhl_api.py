@@ -23,7 +23,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
-from typing import Any, cast
+from typing import Any
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -271,24 +271,10 @@ class NHLApiClientConfig:
     timeout: float = DEFAULT_TIMEOUT
 
 
-def _nhl_client_config(
-    config: NHLApiClientConfig | None, legacy: Mapping[str, object]
-) -> NHLApiClientConfig:
-    allowed = {"web_base", "stats_base", "delay", "max_attempts", "retry_backoff", "timeout"}
-    unexpected = set(legacy) - allowed
-    if unexpected:
-        raise TypeError(f"unexpected NHLApiClient option(s): {sorted(unexpected)}")
-    base_config = config or NHLApiClientConfig()
-    return NHLApiClientConfig(
-        web_base=str(legacy.get("web_base", base_config.web_base)),
-        stats_base=str(legacy.get("stats_base", base_config.stats_base)),
-        delay=float(cast("float | int", legacy.get("delay", base_config.delay))),
-        max_attempts=int(cast("float | int", legacy.get("max_attempts", base_config.max_attempts))),
-        retry_backoff=float(
-            cast("float | int", legacy.get("retry_backoff", base_config.retry_backoff))
-        ),
-        timeout=float(cast("float | int", legacy.get("timeout", base_config.timeout))),
-    )
+@dataclass(frozen=True)
+class NHLApiClientRuntime:
+    client: httpx.Client | None = None
+    sleep: Callable[[float], None] = time.sleep
 
 
 class NHLApiClient:
@@ -318,11 +304,10 @@ class NHLApiClient:
         cache_dir: Path | str = DEFAULT_CACHE_DIR,
         *,
         config: NHLApiClientConfig | None = None,
-        client: httpx.Client | None = None,
-        sleep: Callable[[float], None] = time.sleep,
-        **legacy: object,
+        runtime: NHLApiClientRuntime | None = None,
     ) -> None:
-        config = _nhl_client_config(config, legacy)
+        config = config or NHLApiClientConfig()
+        runtime = runtime or NHLApiClientRuntime()
         if config.max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
         self.web_base = config.web_base.rstrip("/")
@@ -331,9 +316,11 @@ class NHLApiClient:
         self.max_attempts = config.max_attempts
         self.retry_backoff = config.retry_backoff
         self._cache = ResponseCache(Path(cache_dir))
-        self._sleep = sleep
-        self._owns_client = client is None
-        self._client = client if client is not None else httpx.Client(timeout=config.timeout)
+        self._sleep = runtime.sleep
+        self._owns_client = runtime.client is None
+        self._client = (
+            runtime.client if runtime.client is not None else httpx.Client(timeout=config.timeout)
+        )
 
     # -- lifecycle ---------------------------------------------------------
 

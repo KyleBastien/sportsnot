@@ -362,15 +362,8 @@ def _build_pick(pick_input: _SheetPickInput) -> dict[str, object]:
     block = pick_input.block
     points_for_round = _num(_cell(row, 4))
     fields = _sheet_point_fields(row, block.event)
-    points_excluded = fields.status in ("Dropped", "Not playing")
-    ir_activated = fields.status == "Activated"
-
     key = (block.season, block.event, block.manager, pick_input.label)
-    swap = _UNFLAGGED_SWAPS.get(key)
-    if swap == "excluded":
-        points_excluded = True
-    elif swap == "activated":
-        ir_activated = True
+    points_excluded, ir_activated = _pick_availability_flags(fields.status, key)
 
     return {
         "season": block.season,
@@ -395,6 +388,15 @@ def _build_pick(pick_input: _SheetPickInput) -> dict[str, object]:
         "note": fields.note,
         "is_scored": block.scored,
     }
+
+
+def _pick_availability_flags(
+    status: str | None, key: tuple[int, str, str, str]
+) -> tuple[bool, bool]:
+    return (
+        status in ("Dropped", "Not playing") or _UNFLAGGED_SWAPS.get(key) == "excluded",
+        status == "Activated" or _UNFLAGGED_SWAPS.get(key) == "activated",
+    )
 
 
 def _sheet_point_fields(row: list[str], event: str) -> _SheetPointFields:

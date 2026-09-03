@@ -94,6 +94,13 @@ class _WinnerFrame:
     pregame_games: int
 
 
+@dataclass(frozen=True)
+class ShutoutFeatureContext:
+    backup_save_pct: float | None = None
+    starter_unavailability_risk: float = 0.0
+    goalie_injury_data_available: bool = False
+
+
 def _save_pct(goals_against: float, shots_against: float) -> float:
     """Team save percentage ``1 - GA / shots-against`` (``0.0`` with no shots)."""
     if shots_against <= 0:
@@ -105,22 +112,25 @@ def shutout_feature_row(
     winner: dict[str, float],
     loser: dict[str, float],
     *,
-    backup_save_pct: float | None = None,
-    starter_unavailability_risk: float = 0.0,
-    goalie_injury_data_available: bool = False,
+    context: ShutoutFeatureContext | None = None,
 ) -> dict[str, float]:
     """Build the model feature row for a winner/loser matchup from state snapshots."""
+    resolved = context or ShutoutFeatureContext()
     return {
         "winner_save_pct_season": winner["save_pct_season"],
         "winner_save_pct_l15": winner["save_pct_l15"],
         "winner_team_shutout_rate": winner["team_shutout_rate"],
         "opponent_goals_for_per_game": loser["goals_for_per_game"],
         "backup_save_pct": (
-            NEUTRAL_SAVE_PCT if backup_save_pct is None else float(backup_save_pct)
+            NEUTRAL_SAVE_PCT
+            if resolved.backup_save_pct is None
+            else float(resolved.backup_save_pct)
         ),
-        "goalie_split_available": 0.0 if backup_save_pct is None else 1.0,
-        "starter_unavailability_risk": float(starter_unavailability_risk),
-        "goalie_injury_data_available": 1.0 if goalie_injury_data_available else 0.0,
+        "goalie_split_available": 0.0 if resolved.backup_save_pct is None else 1.0,
+        "starter_unavailability_risk": float(resolved.starter_unavailability_risk),
+        "goalie_injury_data_available": (
+            1.0 if resolved.goalie_injury_data_available else 0.0
+        ),
     }
 
 

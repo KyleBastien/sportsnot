@@ -57,6 +57,7 @@ from draft_oracle.models._shutout_dataset import (
     NEUTRAL_SAVE_PCT as NEUTRAL_SAVE_PCT,
 )
 from draft_oracle.models._shutout_dataset import (
+    ShutoutFeatureContext,
     ShutoutTeamState,
 )
 from draft_oracle.models._shutout_dataset import (
@@ -84,6 +85,7 @@ __all__ = [
     "SHUTOUT_MODEL_VERSION",
     "CalibrationBin",
     "ShutoutConfig",
+    "ShutoutFeatureContext",
     "ShutoutModel",
     "ShutoutResult",
     "ShutoutTeamState",
@@ -94,7 +96,12 @@ __all__ = [
     "train_shutout_model",
 ]
 
-for public_obj in (ShutoutTeamState, build_shutout_dataset, shutout_feature_row):
+for public_obj in (
+    ShutoutFeatureContext,
+    ShutoutTeamState,
+    build_shutout_dataset,
+    shutout_feature_row,
+):
     public_obj.__module__ = __name__
 
 SHUTOUT_MODEL_VERSION = "shutout-v1"
@@ -227,6 +234,113 @@ def _train_variant(frame: pd.DataFrame, *, model_type: str, seed: int) -> Any:
     return _fit(builder(seed), frame, SHUTOUT_FEATURE_COLUMNS)
 
 
+@dataclass(frozen=True)
+class _ShutoutSplitFrames:
+    split: TemporalSplit
+    train: pd.DataFrame
+    val: pd.DataFrame
+    test: pd.DataFrame
+    train_val: pd.DataFrame
+
+
+@dataclass(frozen=True)
+class _ShutoutValidation:
+    val_brier: dict[str, float]
+    val_probs_by_model: dict[str, np.ndarray]
+    chosen: str
+
+
+@dataclass(frozen=True)
+class _ShutoutEvaluation:
+    test_brier_model: float
+    test_brier_base: float
+    train_rate: float
+    observed_rate: float
+    predicted_rate: float
+    bins: list[CalibrationBin]
+    shrink_weight: float
+    val_brier_by_shrinkage: dict[str, float]
+    test_brier_model_unshrunk: float
+
+
+def _shutout_split_frames(dataset: pd.DataFrame, config: ShutoutConfig) -> _ShutoutSplitFrames:
+    years = [int(y) for y in dataset["season_end_year"].unique()]
+    split = default_temporal_split(years, n_val=config.n_val_seasons, n_test=config.n_test_seasons)
+    train = _rows_for_years(dataset, split.train_years)
+    val = _rows_for_years(dataset, split.val_years)
+    test = _rows_for_years(dataset, split.test_years)
+    return _ShutoutSplitFrames(
+        split=split,
+        train=train,
+        val=val,
+        test=test,
+        train_val=pd.concat([train, val], ignore_index=True),
+    )
+
+
+def _validate_shutout_models(frames: _ShutoutSplitFrames, seed: int) -> _ShutoutValidation:
+    val_brier: dict[str, float] = {}
+    val_probs_by_model: dict[str, np.ndarray] = {}
+    for model_type in ("logistic_regression", "lightgbm"):
+        fitted = _train_variant(frames.train, model_type=model_type, seed=seed)
+        preds = _predict(fitted, frames.val, SHUTOUT_FEATURE_COLUMNS)
+        val_probs_by_model[model_type] = preds
+        val_brier[model_type] = brier_score(preds, frames.val["is_shutout"])
+    chosen = min(val_brier, key=lambda k: val_brier[k])
+    return _ShutoutValidation(
+        val_brier=val_brier,
+        val_probs_by_model=val_probs_by_model,
+        chosen=chosen,
+    )
+
+
+def _evaluate_shutout_model(
+    frames: _ShutoutSplitFrames,
+    validation: _ShutoutValidation,
+    config: ShutoutConfig,
+) -> _ShutoutEvaluation:
+    train_base_rate = float(frames.train["is_shutout"].mean())
+    val_labels = frames.val["is_shutout"].to_numpy(dtype=float)
+    shrink_weight, val_brier_by_shrinkage = _select_shrinkage_weight(
+        validation.val_probs_by_model[validation.chosen],
+        val_labels,
+        base_rate=train_base_rate,
+        grid=config.shrinkage_grid,
+    )
+    holdout_model = _train_variant(frames.train_val, model_type=validation.chosen, seed=config.seed)
+    test_probs_raw = _predict(holdout_model, frames.test, SHUTOUT_FEATURE_COLUMNS)
+    test_labels = frames.test["is_shutout"].to_numpy(dtype=float)
+    train_rate = float(frames.train_val["is_shutout"].mean())
+    test_probs = _apply_shrinkage(test_probs_raw, weight=shrink_weight, base_rate=train_rate)
+    return _ShutoutEvaluation(
+        test_brier_model=brier_score(test_probs, test_labels),
+        test_brier_base=brier_score(base_rate_probs(len(frames.test), train_rate), test_labels),
+        train_rate=train_rate,
+        observed_rate=float(test_labels.mean()) if test_labels.size else float("nan"),
+        predicted_rate=float(test_probs.mean()) if test_probs.size else float("nan"),
+        bins=_calibration_bins(test_probs, test_labels, n_bins=config.calibration_bins),
+        shrink_weight=shrink_weight,
+        val_brier_by_shrinkage=val_brier_by_shrinkage,
+        test_brier_model_unshrunk=brier_score(test_probs_raw, test_labels),
+    )
+
+
+def _fit_production_shutout_model(
+    dataset: pd.DataFrame,
+    chosen: str,
+    shrink_weight: float,
+    seed: int,
+) -> ShutoutModel:
+    production = _train_variant(dataset, model_type=chosen, seed=seed)
+    return ShutoutModel(
+        estimator=production,
+        feature_columns=SHUTOUT_FEATURE_COLUMNS,
+        model_type=chosen,
+        shrinkage_weight=shrink_weight,
+        base_rate=float(dataset["is_shutout"].mean()),
+    )
+
+
 @dataclass
 class ShutoutModel:
     """A fitted shutout-probability estimator (monotone in goalie quality).
@@ -259,17 +373,13 @@ class ShutoutModel:
         winner: dict[str, float],
         loser: dict[str, float],
         *,
-        backup_save_pct: float | None = None,
-        starter_unavailability_risk: float = 0.0,
-        goalie_injury_data_available: bool = False,
+        context: ShutoutFeatureContext | None = None,
     ) -> float:
         """``P(shutout | winner beats loser)`` for one matchup from proxy dicts."""
         row = shutout_feature_row(
             winner,
             loser,
-            backup_save_pct=backup_save_pct,
-            starter_unavailability_risk=starter_unavailability_risk,
-            goalie_injury_data_available=goalie_injury_data_available,
+            context=context,
         )
         frame = pd.DataFrame([row])
         return float(self.predict_shutout_prob(frame)[0])
@@ -573,76 +683,32 @@ def train_shutout_model(
     if dataset.empty:
         raise ValueError("no games available to train the shutout model")
 
-    years = [int(y) for y in dataset["season_end_year"].unique()]
-    split = default_temporal_split(years, n_val=config.n_val_seasons, n_test=config.n_test_seasons)
-    train = _rows_for_years(dataset, split.train_years)
-    val = _rows_for_years(dataset, split.val_years)
-    test = _rows_for_years(dataset, split.test_years)
-    train_val = pd.concat([train, val], ignore_index=True)
-
-    val_brier: dict[str, float] = {}
-    val_probs_by_model: dict[str, np.ndarray] = {}
-    for model_type in ("logistic_regression", "lightgbm"):
-        fitted = _train_variant(train, model_type=model_type, seed=config.seed)
-        preds = _predict(fitted, val, SHUTOUT_FEATURE_COLUMNS)
-        val_probs_by_model[model_type] = preds
-        val_brier[model_type] = brier_score(preds, val["is_shutout"])
-    chosen = min(val_brier, key=lambda k: val_brier[k])
-
-    # Shrinkage toward the base rate is selected on the validation fold ONLY -- the
-    # held-out test never tunes it (US-105 / CODE_REVIEW: the raw model shows no
-    # held-out skill, so pull it back toward the playoff base rate if that helps).
-    train_base_rate = float(train["is_shutout"].mean())
-    val_labels = val["is_shutout"].to_numpy(dtype=float)
-    shrink_weight, val_brier_by_shrinkage = _select_shrinkage_weight(
-        val_probs_by_model[chosen],
-        val_labels,
-        base_rate=train_base_rate,
-        grid=config.shrinkage_grid,
-    )
-
-    holdout_model = _train_variant(train_val, model_type=chosen, seed=config.seed)
-    test_probs_raw = _predict(holdout_model, test, SHUTOUT_FEATURE_COLUMNS)
-    test_labels = test["is_shutout"].to_numpy(dtype=float)
-
-    train_rate = float(train_val["is_shutout"].mean())
-    test_probs = _apply_shrinkage(test_probs_raw, weight=shrink_weight, base_rate=train_rate)
-    test_brier_model = brier_score(test_probs, test_labels)
-    test_brier_model_unshrunk = brier_score(test_probs_raw, test_labels)
-    test_brier_base = brier_score(base_rate_probs(len(test), train_rate), test_labels)
-    observed_rate = float(test_labels.mean()) if test_labels.size else float("nan")
-    predicted_rate = float(test_probs.mean()) if test_probs.size else float("nan")
-    bins = _calibration_bins(test_probs, test_labels, n_bins=config.calibration_bins)
-
-    production_base_rate = float(dataset["is_shutout"].mean())
-    production = _train_variant(dataset, model_type=chosen, seed=config.seed)
-    model = ShutoutModel(
-        estimator=production,
-        feature_columns=SHUTOUT_FEATURE_COLUMNS,
-        model_type=chosen,
-        shrinkage_weight=shrink_weight,
-        base_rate=production_base_rate,
+    frames = _shutout_split_frames(dataset, config)
+    validation = _validate_shutout_models(frames, config.seed)
+    evaluation = _evaluate_shutout_model(frames, validation, config)
+    model = _fit_production_shutout_model(
+        dataset, validation.chosen, evaluation.shrink_weight, config.seed
     )
 
     return ShutoutResult(
         model=model,
         config=config,
-        split=split,
-        chosen_model_type=chosen,
-        val_brier_by_model=val_brier,
-        test_brier_model=test_brier_model,
-        test_brier_base_rate=test_brier_base,
-        train_shutout_rate=train_rate,
-        test_observed_rate=observed_rate,
-        test_predicted_rate=predicted_rate,
-        calibration_bins=bins,
-        n_train=len(train),
-        n_val=len(val),
-        n_test=len(test),
-        shrinkage_weight=shrink_weight,
-        shrinkage_base_rate=train_rate,
-        val_brier_by_shrinkage=val_brier_by_shrinkage,
-        test_brier_model_unshrunk=test_brier_model_unshrunk,
+        split=frames.split,
+        chosen_model_type=validation.chosen,
+        val_brier_by_model=validation.val_brier,
+        test_brier_model=evaluation.test_brier_model,
+        test_brier_base_rate=evaluation.test_brier_base,
+        train_shutout_rate=evaluation.train_rate,
+        test_observed_rate=evaluation.observed_rate,
+        test_predicted_rate=evaluation.predicted_rate,
+        calibration_bins=evaluation.bins,
+        n_train=len(frames.train),
+        n_val=len(frames.val),
+        n_test=len(frames.test),
+        shrinkage_weight=evaluation.shrink_weight,
+        shrinkage_base_rate=evaluation.train_rate,
+        val_brier_by_shrinkage=evaluation.val_brier_by_shrinkage,
+        test_brier_model_unshrunk=evaluation.test_brier_model_unshrunk,
     )
 
 

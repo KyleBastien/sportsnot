@@ -306,12 +306,18 @@ def _favorite_rows_from_games(
     if resolve_favorite is None:
         resolve_favorite = _kaggle_favorite_side
     context = _FavoriteRowsContext(source, resolve_favorite, placeholder_seasons)
-    rows: list[dict[str, Any]] = []
+    return [_favorite_game_row(game) for game in _favorite_games(grouped, context)]
+
+
+def _favorite_games(
+    grouped: pd.DataFrame, context: _FavoriteRowsContext
+) -> list[_FavoriteGame]:
+    games: list[_FavoriteGame] = []
     for game_id, pair in grouped.groupby("game_id", sort=True):
-        favorite_game = _favorite_game_from_pair(game_id, pair, context)
-        if favorite_game is not None:
-            rows.append(_favorite_game_row(favorite_game))
-    return rows
+        game = _favorite_game_from_pair(game_id, pair, context)
+        if game is not None:
+            games.append(game)
+    return games
 
 
 def _favorite_game_from_pair(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
 
 import pandas as pd
@@ -34,14 +35,21 @@ class _SlotReportConfig(Protocol):
     def resolved_slot_config(self) -> SlotStrategyConfig: ...
 
 
-def _build_slot_report(
-    skaters: pd.DataFrame,
-    teams: pd.DataFrame,
-    league_picks: pd.DataFrame | None,
-    warnings: list[str],
-    config: _SlotReportConfig,
-) -> SlotStrategyReport | None:
+@dataclass(frozen=True)
+class SlotReportInput:
+    skaters: pd.DataFrame
+    teams: pd.DataFrame
+    league_picks: pd.DataFrame | None
+    warnings: list[str]
+    config: _SlotReportConfig
+
+
+def _build_slot_report(request: SlotReportInput) -> SlotStrategyReport | None:
     """Build the per-slot strategy report (US-023), or ``None`` when disabled/empty."""
+    skaters = request.skaters
+    teams = request.teams
+    warnings = request.warnings
+    config = request.config
     if not config.slot_strategies:
         return None
     if skaters.empty and teams.empty:
@@ -56,7 +64,7 @@ def _build_slot_report(
         pool,
         managers=config.managers,
         allow_ir=config.ir,
-        opponents=_fit_slot_opponents(league_picks, warnings),
+        opponents=_fit_slot_opponents(request.league_picks, warnings),
         config=config.resolved_slot_config,
     )
 

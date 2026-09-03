@@ -212,7 +212,7 @@ def _cluster_members(anchor: dict[str, Any], bucket: list[dict[str, Any]]) -> li
             if not rec["_used"]
             and rec["_pos"] != anchor["_pos"]
             and rec["_date"] is not None
-            and abs((rec["_date"] - anchor_date).days) <= 1
+            and _within_one_day(rec["_date"], anchor_date)
         ),
         key=lambda r: abs((r["_date"] - anchor_date).days),
     )
@@ -292,10 +292,14 @@ def _local_date_key(row: dict[str, Any]) -> tuple[int, int, int] | None:
 
 
 def _nearest_local_date(candidates: tuple[date, ...], current: date) -> date | None:
-    within = [d for d in candidates if abs((d - current).days) <= 1]
+    within = [d for d in candidates if _within_one_day(d, current)]
     if not within:
         return None
     return min(within, key=lambda d: (abs((d - current).days), d.toordinal()))
+
+
+def _within_one_day(candidate: date, current: date) -> bool:
+    return abs((candidate - current).days) <= 1
 
 
 def _rewrite_local_game_date(row: dict[str, Any], key: tuple[int, int, int], nearest: date) -> None:

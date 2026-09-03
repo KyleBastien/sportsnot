@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -91,26 +92,29 @@ def parse_command(line: str) -> ParsedCommand:
     tokens = stripped.split()
     cmd = tokens[0].lower()
     rest = tokens[1:]
+    parser = _COMMAND_PARSERS.get(cmd)
+    if parser is None:
+        return ParsedCommand(cmd, error=f"unknown command {cmd!r}")
+    return parser(rest)
 
-    if cmd in ("pick", "p"):
-        return _parse_pick(rest)
-    if cmd in ("undo", "u"):
-        return ParsedCommand("undo")
-    if cmd in ("board", "b"):
-        return ParsedCommand("board")
-    if cmd in ("roster", "r"):
-        return ParsedCommand("roster", manager_name=rest[0] if rest else None)
-    if cmd in ("recommend", "rec"):
-        return _parse_recommend(rest)
-    if cmd == "save":
-        return _parse_path_command("save", rest)
-    if cmd in ("resume", "load"):
-        return _parse_path_command("resume", rest)
-    if cmd in ("help", "h", "?"):
-        return ParsedCommand("help")
-    if cmd in ("quit", "exit", "q"):
-        return ParsedCommand("quit")
-    return ParsedCommand(cmd, error=f"unknown command {cmd!r}")
+
+CommandParser = Callable[[list[str]], ParsedCommand]
+
+
+def _constant_command(name: str) -> CommandParser:
+    return lambda _rest: ParsedCommand(name)
+
+
+def _parse_roster(rest: list[str]) -> ParsedCommand:
+    return ParsedCommand("roster", manager_name=rest[0] if rest else None)
+
+
+def _parse_save(rest: list[str]) -> ParsedCommand:
+    return _parse_path_command("save", rest)
+
+
+def _parse_resume(rest: list[str]) -> ParsedCommand:
+    return _parse_path_command("resume", rest)
 
 
 def _parse_pick(rest: list[str]) -> ParsedCommand:
@@ -146,3 +150,26 @@ def _parse_depth(token: str) -> int | None:
         return int(token)
     except ValueError:
         return None
+
+
+_COMMAND_PARSERS: dict[str, CommandParser] = {
+    "?": _constant_command("help"),
+    "b": _constant_command("board"),
+    "board": _constant_command("board"),
+    "exit": _constant_command("quit"),
+    "h": _constant_command("help"),
+    "help": _constant_command("help"),
+    "load": _parse_resume,
+    "p": _parse_pick,
+    "pick": _parse_pick,
+    "q": _constant_command("quit"),
+    "quit": _constant_command("quit"),
+    "r": _parse_roster,
+    "rec": _parse_recommend,
+    "recommend": _parse_recommend,
+    "resume": _parse_resume,
+    "roster": _parse_roster,
+    "save": _parse_save,
+    "u": _constant_command("undo"),
+    "undo": _constant_command("undo"),
+}
