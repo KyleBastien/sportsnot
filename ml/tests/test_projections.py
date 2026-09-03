@@ -27,7 +27,7 @@ from draft_oracle.models import (
     project_skater_round,
     simulate_round_points,
 )
-from draft_oracle.models.projections import project_skater_combined
+from draft_oracle.models.projections import SkaterRoundRequest, project_skater_combined
 from draft_oracle.models.series_sim import HOME_ICE_PATTERN
 
 # ── Pure primitives ────────────────────────────────────────────────────────
@@ -79,13 +79,13 @@ def test_simulate_round_points_mean_matches_rate_times_games() -> None:
 
 def test_project_skater_round_is_reproducible_under_seed() -> None:
     length_probs = {4: 0.1, 5: 0.3, 6: 0.35, 7: 0.25}
-    a = project_skater_round(0.7, length_probs, seed=123, n_sims=500)
-    b = project_skater_round(0.7, length_probs, seed=123, n_sims=500)
+    a = project_skater_round(SkaterRoundRequest(0.7, length_probs), seed=123, n_sims=500)
+    b = project_skater_round(SkaterRoundRequest(0.7, length_probs), seed=123, n_sims=500)
     assert a == b
 
 
 def test_project_skater_round_quantiles_are_ordered() -> None:
-    proj = project_skater_round(0.6, {5: 0.5, 6: 0.5}, seed=42, n_sims=3000)
+    proj = project_skater_round(SkaterRoundRequest(0.6, {5: 0.5, 6: 0.5}), seed=42, n_sims=3000)
     assert proj.p10 <= proj.p50 <= proj.p90
     assert proj.expected_points == pytest.approx(proj.pts_per_game * proj.expected_games, rel=0.1)
 
@@ -95,7 +95,7 @@ def test_project_skater_round_quantiles_are_ordered() -> None:
 
 def test_project_skater_combined_reduces_to_single_round_when_no_advance() -> None:
     length_probs = {4: 0.1, 5: 0.3, 6: 0.35, 7: 0.25}
-    single = project_skater_round(0.7, length_probs, seed=99, n_sims=6000)
+    single = project_skater_round(SkaterRoundRequest(0.7, length_probs), seed=99, n_sims=6000)
     combined = project_skater_combined(
         0.7, length_probs, 0.0, {6: 1.0}, seed=99, n_sims=6000
     )
@@ -109,8 +109,8 @@ def test_project_skater_combined_adds_conditional_next_round() -> None:
     first = {5: 0.5, 6: 0.5}
     second = {5: 0.5, 6: 0.5}
     p_advance = 0.6
-    r3 = project_skater_round(0.8, first, seed=7, n_sims=8000)
-    r4 = project_skater_round(0.8, second, seed=7, n_sims=8000)
+    r3 = project_skater_round(SkaterRoundRequest(0.8, first), seed=7, n_sims=8000)
+    r4 = project_skater_round(SkaterRoundRequest(0.8, second), seed=7, n_sims=8000)
     combined = project_skater_combined(
         0.8, first, p_advance, second, seed=7, n_sims=8000
     )
@@ -136,7 +136,9 @@ def test_project_skater_round_availability_curve_wins_over_multiplier() -> None:
     # A curve that blanks the first three games halves a 6-game slate roughly.
     curve = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]
     proj = project_skater_round(
-        1.0, length_probs, availability_curve=curve, availability=1.0, seed=1, n_sims=8000
+        SkaterRoundRequest(1.0, length_probs, availability_curve=curve, availability=1.0),
+        seed=1,
+        n_sims=8000,
     )
     # 6-game series, available only for games 4,5,6 -> 3 expected games.
     assert proj.expected_games == pytest.approx(3.0)
@@ -144,7 +146,11 @@ def test_project_skater_round_availability_curve_wins_over_multiplier() -> None:
 
 
 def test_project_skater_round_scalar_availability_haircut() -> None:
-    proj = project_skater_round(1.0, {6: 1.0}, availability=0.5, seed=2, n_sims=8000)
+    proj = project_skater_round(
+        SkaterRoundRequest(1.0, {6: 1.0}, availability=0.5),
+        seed=2,
+        n_sims=8000,
+    )
     assert proj.expected_games == pytest.approx(3.0)
     assert proj.availability_multiplier == pytest.approx(0.5)
 
@@ -155,7 +161,11 @@ def test_project_skater_round_scalar_availability_haircut() -> None:
     seed=st.integers(min_value=0, max_value=10_000),
 )
 def test_quantiles_never_decrease_property(ppg: float, seed: int) -> None:
-    proj = project_skater_round(ppg, {4: 0.25, 5: 0.25, 6: 0.25, 7: 0.25}, seed=seed, n_sims=400)
+    proj = project_skater_round(
+        SkaterRoundRequest(ppg, {4: 0.25, 5: 0.25, 6: 0.25, 7: 0.25}),
+        seed=seed,
+        n_sims=400,
+    )
     assert proj.p10 <= proj.p50 <= proj.p90
     assert proj.expected_points >= 0.0
 

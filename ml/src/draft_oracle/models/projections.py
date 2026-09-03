@@ -74,6 +74,7 @@ __all__ = [
     "RoundProjection",
     "RoundSimulationInput",
     "SeasonMetrics",
+    "SkaterRoundRequest",
     "evaluate_skater_projections",
     "evaluate_skater_projections_from_normalized",
     "expected_series_length",
@@ -226,12 +227,17 @@ class RoundProjection:
     availability_multiplier: float
 
 
+@dataclass(frozen=True)
+class SkaterRoundRequest:
+    pts_per_game: float
+    length_probs: dict[int, float]
+    availability_curve: list[float] | tuple[float, ...] | None = None
+    availability: float = 1.0
+
+
 def project_skater_round(
-    pts_per_game: float,
-    length_probs: dict[int, float],
+    request: SkaterRoundRequest,
     *,
-    availability_curve: list[float] | tuple[float, ...] | None = None,
-    availability: float = 1.0,
     seed: int = 20260827,
     n_sims: int = DEFAULT_N_SIMS,
     horizon: int = DEFAULT_HORIZON,
@@ -243,19 +249,23 @@ def project_skater_round(
     ``seed``. ``availability_curve`` (US-015 per-game probabilities) takes precedence
     over the scalar ``availability`` multiplier.
     """
-    avail_per_game = _availability_per_game(availability_curve, availability, horizon)
+    avail_per_game = _availability_per_game(
+        request.availability_curve,
+        request.availability,
+        horizon,
+    )
     rng = np.random.default_rng(seed)
     samples = simulate_round_points(
         rng,
         RoundSimulationInput(
-            pts_per_game=pts_per_game,
-            length_probs=length_probs,
+            pts_per_game=request.pts_per_game,
+            length_probs=request.length_probs,
             avail_per_game=avail_per_game,
             n_sims=n_sims,
         ),
     )
-    expected_games = _expected_games(length_probs, avail_per_game)
-    e_series_length = expected_series_length(length_probs)
+    expected_games = _expected_games(request.length_probs, avail_per_game)
+    e_series_length = expected_series_length(request.length_probs)
     multiplier = expected_games / e_series_length if e_series_length > 0 else 1.0
     p10, p50, p90 = (float(np.quantile(samples, q)) for q in (0.10, 0.50, 0.90))
     return RoundProjection(
@@ -263,7 +273,7 @@ def project_skater_round(
         p10=p10,
         p50=p50,
         p90=p90,
-        pts_per_game=max(float(pts_per_game), 0.0),
+        pts_per_game=max(float(request.pts_per_game), 0.0),
         expected_games=expected_games,
         availability_multiplier=multiplier,
     )

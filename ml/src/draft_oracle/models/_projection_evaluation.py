@@ -19,6 +19,7 @@ from draft_oracle.models.series_sim import (
 from draft_oracle.models.shutout import ShutoutConfig, ShutoutModel, train_shutout_model
 from draft_oracle.models.skater_production import (
     LABEL_COLUMN,
+    ProductionDatasetRequest,
     SkaterProductionConfig,
     SkaterProductionModel,
     build_production_dataset,
@@ -30,7 +31,7 @@ from draft_oracle.models.skater_production import (
 from draft_oracle.rules import player_points
 
 if TYPE_CHECKING:
-    from draft_oracle.models.projections import RoundProjection
+    from draft_oracle.models.projections import RoundProjection, SkaterRoundRequest
 
 
 class _ProjectionConfigLike(Protocol):
@@ -53,11 +54,8 @@ class _ProjectionConfigLike(Protocol):
 class _ProjectRound(Protocol):
     def __call__(
         self,
-        pts_per_game: float,
-        length_probs: dict[int, float],
+        request: SkaterRoundRequest,
         *,
-        availability_curve: list[float] | tuple[float, ...] | None = None,
-        availability: float = 1.0,
         seed: int = ...,
         n_sims: int = ...,
         horizon: int = ...,
@@ -306,11 +304,13 @@ def _projection_scores(
     baseline_reg_games: float,
 ) -> _ProjectionScores:
     dataset = build_production_dataset(
-        skater_games,
-        players,
-        team_games,
-        series,
-        config=context.production_config,
+        ProductionDatasetRequest(
+            skater_games,
+            players,
+            team_games,
+            series,
+            context.production_config,
+        )
     )
     test = dataset.loc[dataset["season_end_year"].isin(context.test_year_set)].reset_index(
         drop=True
@@ -351,6 +351,8 @@ def _projection_row(
     project_round: _ProjectRound,
     baseline_reg_games: float,
 ) -> dict[str, float] | None:
+    from draft_oracle.models.projections import SkaterRoundRequest
+
     season_id = int(rec["season_id"])
     year = season_id % 10000
     rnd = int(rec["playoff_round"])
@@ -363,8 +365,7 @@ def _projection_row(
         return None
 
     projection = project_round(
-        float(rec["projected_points_per_game"]),
-        length_probs,
+        SkaterRoundRequest(float(rec["projected_points_per_game"]), length_probs),
         seed=_row_seed(context.config.seed, season_id, rnd, player_id),
         n_sims=context.config.n_sims,
         horizon=context.config.horizon,

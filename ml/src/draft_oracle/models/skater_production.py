@@ -210,13 +210,17 @@ def shrink_to_prior(estimate: float, prior: float, n_games: float, k: float) -> 
 # ── Dataset assembly (features x labels, leakage-free per round) ──────────
 
 
+@dataclass(frozen=True)
+class ProductionDatasetRequest:
+    skater_games: pd.DataFrame
+    players: pd.DataFrame
+    team_games: pd.DataFrame
+    series: pd.DataFrame
+    config: SkaterProductionConfig | None = None
+
+
 def build_production_dataset(
-    skater_games: pd.DataFrame,
-    players: pd.DataFrame,
-    team_games: pd.DataFrame,
-    series: pd.DataFrame,
-    *,
-    config: SkaterProductionConfig | None = None,
+    request: ProductionDatasetRequest,
 ) -> pd.DataFrame:
     """Assemble one training row per skater-round: as-of features + observed label.
 
@@ -225,18 +229,18 @@ def build_production_dataset(
     per-game production. Skaters without a feature row (no regular-season sample)
     are dropped here and handled as cold cases at projection time.
     """
-    config = config or SkaterProductionConfig()
+    config = request.config or SkaterProductionConfig()
     feature_config = config.feature_config or SkaterFeatureConfig(min_games=config.min_games)
-    starts = playoff_round_starts(team_games, series)
-    labels = skater_round_production(skater_games, series)
+    starts = playoff_round_starts(request.team_games, request.series)
+    labels = skater_round_production(request.skater_games, request.series)
 
     frames: list[pd.DataFrame] = []
     for season_id, round_dates in starts.items():
         for rnd, start in round_dates.items():
             feats = build_skater_features(
-                skater_games,
-                players,
-                team_games,
+                request.skater_games,
+                request.players,
+                request.team_games,
                 SkaterFeatureRequest(
                     season_id=season_id,
                     as_of_date=start,
@@ -773,7 +777,9 @@ def train_skater_production_model(
     carried on the returned :class:`SkaterProductionResult` -- nothing is hidden.
     """
     config = config or SkaterProductionConfig()
-    dataset = build_production_dataset(skater_games, players, team_games, series, config=config)
+    dataset = build_production_dataset(
+        ProductionDatasetRequest(skater_games, players, team_games, series, config)
+    )
     if dataset.empty:
         raise ValueError("no skater-round rows available to train the production model")
 

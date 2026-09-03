@@ -88,6 +88,7 @@ from draft_oracle.models.projections import (
     DEFAULT_HORIZON,
     DEFAULT_N_SIMS,
     PROJECTION_VERSION,
+    SkaterRoundRequest,
     _row_seed,
     project_skater_combined,
     project_skater_round,
@@ -411,8 +412,7 @@ def _build_skater_rows(
             )
         else:
             projection = project_skater_round(
-                ppg,
-                length_probs,
+                SkaterRoundRequest(ppg, length_probs),
                 seed=_row_seed(config.seed, season_id, playoff_round, player_id),
                 n_sims=config.n_sims,
                 horizon=config.horizon,

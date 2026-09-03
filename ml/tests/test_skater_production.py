@@ -18,6 +18,7 @@ import pytest
 from draft_oracle.models import (
     LABEL_COLUMN,
     PREDICTOR_COLUMNS,
+    ProductionDatasetRequest,
     build_production_dataset,
     credibility_weight,
     fit_priors,
@@ -369,7 +370,7 @@ def test_assign_rounds_excludes_2020_qualifying_and_round_robin() -> None:
 
 def test_build_dataset_has_features_labels_and_no_leakage_columns() -> None:
     sk, tg, pl, series = _synthetic_archive(seasons=[20172018, 20182019], seed=5)
-    data = build_production_dataset(sk, pl, tg, series)
+    data = build_production_dataset(ProductionDatasetRequest(sk, pl, tg, series))
     assert not data.empty
     assert LABEL_COLUMN in data.columns
     assert "season_end_year" in data.columns
@@ -419,7 +420,7 @@ def test_project_flags_low_confidence_and_blends() -> None:
     seasons = [20162017, 20172018, 20182019, 20192020, 20202021]
     sk, tg, pl, series = _synthetic_archive(seasons=seasons, seed=4)
     result = train_skater_production_model(sk, pl, tg, series)
-    data = build_production_dataset(sk, pl, tg, series)
+    data = build_production_dataset(ProductionDatasetRequest(sk, pl, tg, series))
     projected = result.model.project(data)
     assert "projected_points_per_game" in projected.columns
     assert "low_confidence" in projected.columns
