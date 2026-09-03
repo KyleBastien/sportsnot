@@ -22,6 +22,18 @@ from draft_oracle.cli._project_defaults import (
     Strategy,
 )
 
+NormalizedDirOption = Annotated[
+    Path,
+    typer.Option(help="Directory holding normalized Parquet tables."),
+]
+ReportArtifactDirOption = Annotated[
+    Path,
+    typer.Option(help="Output directory for the report + manifest."),
+]
+TrainingSeedOption = Annotated[int, typer.Option(help="Deterministic training seed.")]
+ProjectionSeedOption = Annotated[int, typer.Option(help="Deterministic training/MC seed.")]
+DeterministicSeedOption = Annotated[int, typer.Option(help="Deterministic seed.")]
+
 
 def _yes_no(value: bool) -> str:
     return "yes" if value else "no"
@@ -35,18 +47,19 @@ def _echo_held_out_seasons(test_years: Iterable[object]) -> None:
     typer.echo(f"  held-out seasons: {list(test_years)}")
 
 
+def _echo_metrics(metric: str, *named_values: tuple[str, float]) -> None:
+    rendered = " / ".join(f"{name} {value:.4f}" for name, value in named_values)
+    typer.echo(f"  {metric}: {rendered}")
+
+
 def train_game_win(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_MODEL_ARTIFACT_DIR,
+    normalized_dir: NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: ReportArtifactDirOption = DEFAULT_MODEL_ARTIFACT_DIR,
     no_odds: Annotated[
         bool,
         typer.Option("--no-odds", help="Train stat-only (skip the market features)."),
     ] = False,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+    seed: TrainingSeedOption = 20260827,
 ) -> None:
     """Train the per-game win model; write the evaluation report + manifest."""
     from draft_oracle.models.game_win import GameWinConfig, train_game_win_from_normalized
@@ -59,25 +72,23 @@ def train_game_win(
     )
     typer.echo(f"Per-game win model -> {artifact_dir}")
     _echo_chosen_model(result.chosen_model_type)
-    typer.echo(
-        f"  test Brier: market+stats {result.test_brier_market:.4f} / "
-        f"stats-only {result.test_brier_stats_only:.4f}"
+    _echo_metrics(
+        "test Brier",
+        ("market+stats", result.test_brier_market),
+        ("stats-only", result.test_brier_stats_only),
     )
-    typer.echo(
-        f"  baselines: coin-flip {result.test_brier_coin_flip:.4f} / "
-        f"higher-points {result.test_brier_higher_points:.4f}"
+    _echo_metrics(
+        "baselines",
+        ("coin-flip", result.test_brier_coin_flip),
+        ("higher-points", result.test_brier_higher_points),
     )
     typer.echo(f"  beats both baselines: {_yes_no(result.beats_both_baselines)}")
 
 
 def train_shutout(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_SHUTOUT_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+    normalized_dir: NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: ReportArtifactDirOption = DEFAULT_SHUTOUT_ARTIFACT_DIR,
+    seed: TrainingSeedOption = 20260827,
 ) -> None:
     """Train the shutout-probability model; write the evaluation report + manifest."""
     from draft_oracle.models.shutout import ShutoutConfig, train_shutout_from_normalized
@@ -89,9 +100,10 @@ def train_shutout(
     )
     typer.echo(f"Shutout model -> {artifact_dir}")
     _echo_chosen_model(result.chosen_model_type)
-    typer.echo(
-        f"  test Brier: model {result.test_brier_model:.4f} / "
-        f"base-rate {result.test_brier_base_rate:.4f}"
+    _echo_metrics(
+        "test Brier",
+        ("model", result.test_brier_model),
+        ("base-rate", result.test_brier_base_rate),
     )
     typer.echo(
         f"  calibration: observed {result.test_observed_rate:.4f} / "
@@ -102,13 +114,9 @@ def train_shutout(
 
 
 def train_skater_production(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_SKATER_PRODUCTION_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+    normalized_dir: NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: ReportArtifactDirOption = DEFAULT_SKATER_PRODUCTION_ARTIFACT_DIR,
+    seed: TrainingSeedOption = 20260827,
 ) -> None:
     """Train the skater per-game production model; write the report + manifest."""
     from draft_oracle.models.skater_production import (
@@ -123,27 +131,25 @@ def train_skater_production(
     )
     typer.echo(f"Skater production model -> {artifact_dir}")
     _echo_chosen_model(result.chosen_model_type)
-    typer.echo(
-        f"  test MAE: model {result.test_mae_model:.4f} / "
-        f"reg-ppg {result.test_mae_baseline_reg:.4f} / "
-        f"mean {result.test_mae_baseline_mean:.4f}"
+    _echo_metrics(
+        "test MAE",
+        ("model", result.test_mae_model),
+        ("reg-ppg", result.test_mae_baseline_reg),
+        ("mean", result.test_mae_baseline_mean),
     )
-    typer.echo(
-        f"  test Spearman: model {result.test_spearman_model:.4f} / "
-        f"reg-ppg {result.test_spearman_baseline_reg:.4f}"
+    _echo_metrics(
+        "test Spearman",
+        ("model", result.test_spearman_model),
+        ("reg-ppg", result.test_spearman_baseline_reg),
     )
     typer.echo(f"  beats reg-ppg baseline: {_yes_no(result.beats_reg_baseline)}")
     typer.echo(f"  cold cases (test): {result.n_cold_cases_test}")
 
 
 def train_return_time(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_RETURN_TIME_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+    normalized_dir: NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: ReportArtifactDirOption = DEFAULT_RETURN_TIME_ARTIFACT_DIR,
+    seed: TrainingSeedOption = 20260827,
 ) -> None:
     """Calibrate the injury return-time model on archive absence spells."""
     from draft_oracle.models.returns import ReturnTimeConfig, train_return_time_from_normalized
@@ -164,13 +170,9 @@ def train_return_time(
 
 
 def eval_series_sim(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_SERIES_SIM_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+    normalized_dir: NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: ReportArtifactDirOption = DEFAULT_SERIES_SIM_ARTIFACT_DIR,
+    seed: TrainingSeedOption = 20260827,
 ) -> None:
     """Calibrate the best-of-7 series simulator; write the report + manifest."""
     from draft_oracle.models.series_sim import SeriesSimConfig, evaluate_series_sim_from_normalized
@@ -183,20 +185,18 @@ def eval_series_sim(
     typer.echo(f"Series simulator -> {artifact_dir}")
     _echo_held_out_seasons(result.test_years)
     typer.echo(f"  series scored: {result.n_series_scored} (skipped {result.n_series_skipped})")
-    typer.echo(
-        f"  series-winner Brier: model {result.brier_series:.4f} / "
-        f"higher-seed {result.brier_higher_seed:.4f} / coin {result.brier_coin_flip:.4f}"
+    _echo_metrics(
+        "series-winner Brier",
+        ("model", result.brier_series),
+        ("higher-seed", result.brier_higher_seed),
+        ("coin", result.brier_coin_flip),
     )
 
 
 def project_skaters(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_PROJECTION_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training/MC seed.")] = 20260827,
+    normalized_dir: NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: ReportArtifactDirOption = DEFAULT_PROJECTION_ARTIFACT_DIR,
+    seed: ProjectionSeedOption = 20260827,
 ) -> None:
     """Evaluate skater round-point projections with uncertainty; write report + manifest."""
     from draft_oracle.models.projections import (
@@ -214,27 +214,25 @@ def project_skaters(
     typer.echo(
         f"  skater-rounds projected: {result.n_projected} (skipped {result.n_skipped_no_series})"
     )
-    typer.echo(
-        f"  test MAE: model {result.test_mae_model:.4f} / "
-        f"reg-ppg {result.test_mae_baseline_reg:.4f} / "
-        f"prev-round {result.test_mae_baseline_prev:.4f}"
+    _echo_metrics(
+        "test MAE",
+        ("model", result.test_mae_model),
+        ("reg-ppg", result.test_mae_baseline_reg),
+        ("prev-round", result.test_mae_baseline_prev),
     )
-    typer.echo(
-        f"  test Spearman: model {result.test_spearman_model:.4f} / "
-        f"reg-ppg {result.test_spearman_baseline_reg:.4f} / "
-        f"prev-round {result.test_spearman_baseline_prev:.4f}"
+    _echo_metrics(
+        "test Spearman",
+        ("model", result.test_spearman_model),
+        ("reg-ppg", result.test_spearman_baseline_reg),
+        ("prev-round", result.test_spearman_baseline_prev),
     )
     typer.echo(f"  beats both baselines: {_yes_no(result.beats_both_baselines)}")
 
 
 def train_opponents(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Output directory for the report + manifest.")
-    ] = DEFAULT_OPPONENT_ARTIFACT_DIR,
-    seed: Annotated[int, typer.Option(help="Deterministic training seed.")] = 20260827,
+    normalized_dir: NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
+    artifact_dir: ReportArtifactDirOption = DEFAULT_OPPONENT_ARTIFACT_DIR,
+    seed: TrainingSeedOption = 20260827,
 ) -> None:
     """Fit the league-history opponent model; write the validation report + manifest."""
     from draft_oracle.optimize.opponents import (
@@ -274,14 +272,12 @@ def train_opponents(
 
 
 def compare_strategies_cmd(
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
+    normalized_dir: NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
     managers: Annotated[int, typer.Option(help="League size for the simulated drafts.")] = 4,
     n_drafts: Annotated[int, typer.Option(help="Seeded simulated drafts (>=200).")] = 200,
     rollouts: Annotated[int, typer.Option(help="Rollouts per recommendation.")] = 40,
     max_candidates: Annotated[int, typer.Option(help="Candidates rolled out.")] = 6,
-    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
+    seed: DeterministicSeedOption = 20260827,
 ) -> None:
     """Run the committed multi-step vs. greedy-VOR vs. one-step comparison (US-021)."""
     from draft_oracle.optimize.recommend import (
@@ -306,9 +302,7 @@ def backtest(
     seasons: Annotated[
         list[int], typer.Option("--seasons", help="Playoff end years to replay, e.g. 2022.")
     ],
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
+    normalized_dir: NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
     backtest_root: Annotated[
         Path, typer.Option(help="Root directory for the written backtest run.")
     ] = DEFAULT_BACKTEST_ROOT,
@@ -328,7 +322,7 @@ def backtest(
             help="Oracle policies to seat (oracle/greedy_vor/one_step/random_legal).",
         ),
     ] = None,
-    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
+    seed: DeterministicSeedOption = 20260827,
 ) -> None:
     """Replay historical playoff rounds end-to-end and score against actuals (US-025).
 

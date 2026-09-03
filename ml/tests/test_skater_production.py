@@ -168,7 +168,10 @@ def _synthetic_archive(
                     if day > 27:
                         day = 1
                         month = 12 if month == 11 else 11
-                    _emit_team_game(tg_rows, gid, date, season_id, 2, home, away)
+                    _emit_team_game(
+                        tg_rows,
+                        _EmitTeamGameInput(gid, date, season_id, 2, home, away),
+                    )
                     for team, opp in ((home, away), (away, home)):
                         for p, (t, rate, _pos) in players.items():
                             if t != team:
@@ -186,7 +189,10 @@ def _synthetic_archive(
             gid += 1
             date = f"{year + 1}-04-{20 + gnum:02d}"
             home, away = ("AAA", "DDD") if gnum % 2 == 0 else ("DDD", "AAA")
-            _emit_team_game(tg_rows, gid, date, season_id, 3, home, away)
+            _emit_team_game(
+                tg_rows,
+                _EmitTeamGameInput(gid, date, season_id, 3, home, away),
+            )
             for team, opp in (("AAA", "DDD"), ("DDD", "AAA")):
                 for p, (t, rate, _pos) in players.items():
                     if t != team:
@@ -228,6 +234,17 @@ class _SkaterRowInput:
     goals: int
     assists: int
 
+
+@dataclass(frozen=True)
+class _EmitTeamGameInput:
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    home: str
+    away: str
+
+
 def _skater_row(spec: _SkaterRowInput) -> dict[str, object]:
     _team, _rate, pos = spec.meta
     return {
@@ -263,22 +280,14 @@ def _skater_row(spec: _SkaterRowInput) -> dict[str, object]:
     }
 
 
-def _emit_team_game(
-    rows: list[dict[str, object]],
-    game_id: int,
-    game_date: str,
-    season_id: int,
-    game_type_id: int,
-    home: str,
-    away: str,
-) -> None:
-    for team, opp, is_home in ((home, away, True), (away, home, False)):
+def _emit_team_game(rows: list[dict[str, object]], spec: _EmitTeamGameInput) -> None:
+    for team, opp, is_home in ((spec.home, spec.away, True), (spec.away, spec.home, False)):
         rows.append(
             {
-                "season_id": season_id,
-                "game_type_id": game_type_id,
-                "game_id": game_id,
-                "game_date": game_date,
+                "season_id": spec.season_id,
+                "game_type_id": spec.game_type_id,
+                "game_id": spec.game_id,
+                "game_date": spec.game_date,
                 "team_id": TEAMS.index(team) + 1,
                 "team_abbrev": team,
                 "team_full_name": team,
@@ -406,7 +415,7 @@ def test_fit_priors_falls_back_specific_to_global() -> None:
 def test_project_cold_returns_prior_and_low_confidence() -> None:
     seasons = [20162017, 20172018, 20182019, 20192020, 20202021]
     sk, tg, pl, series = _synthetic_archive(seasons=seasons, seed=9)
-    result = train_skater_production_model(sk, pl, tg, series)
+    result = train_skater_production_model(ProductionDatasetRequest(sk, pl, tg, series))
     proj, low_conf = result.model.project_cold("F", "AAA")
     assert low_conf is True
     assert proj > 0.0
@@ -419,7 +428,7 @@ def test_project_cold_returns_prior_and_low_confidence() -> None:
 def test_project_flags_low_confidence_and_blends() -> None:
     seasons = [20162017, 20172018, 20182019, 20192020, 20202021]
     sk, tg, pl, series = _synthetic_archive(seasons=seasons, seed=4)
-    result = train_skater_production_model(sk, pl, tg, series)
+    result = train_skater_production_model(ProductionDatasetRequest(sk, pl, tg, series))
     data = build_production_dataset(ProductionDatasetRequest(sk, pl, tg, series))
     projected = result.model.project(data)
     assert "projected_points_per_game" in projected.columns
@@ -439,7 +448,7 @@ def test_project_flags_low_confidence_and_blends() -> None:
 def test_train_reports_temporal_split_and_metrics() -> None:
     seasons = [20152016, 20162017, 20172018, 20182019, 20192020, 20202021]
     sk, tg, pl, series = _synthetic_archive(seasons=seasons, seed=7)
-    result = train_skater_production_model(sk, pl, tg, series)
+    result = train_skater_production_model(ProductionDatasetRequest(sk, pl, tg, series))
     assert result.chosen_model_type in {"poisson", "lightgbm"}
     # Two held-out seasons, one validation season by default.
     assert result.split.test_years == (2020, 2021)
@@ -455,7 +464,7 @@ def test_train_reports_temporal_split_and_metrics() -> None:
 def test_train_manifest_and_report_render() -> None:
     seasons = [20152016, 20162017, 20172018, 20182019, 20192020, 20202021]
     sk, tg, pl, series = _synthetic_archive(seasons=seasons, seed=2)
-    result = train_skater_production_model(sk, pl, tg, series)
+    result = train_skater_production_model(ProductionDatasetRequest(sk, pl, tg, series))
     manifest = result.manifest()
     assert manifest["model_version"] == "skater-production-v1"
     assert manifest["seed"] == result.config.seed
@@ -472,5 +481,5 @@ def test_train_beats_mean_baseline_on_signal() -> None:
     # actuals better than predicting a constant mean (MAE).
     seasons = [20152016, 20162017, 20172018, 20182019, 20192020, 20202021]
     sk, tg, pl, series = _synthetic_archive(seasons=seasons, seed=1, n_reg=60)
-    result = train_skater_production_model(sk, pl, tg, series)
+    result = train_skater_production_model(ProductionDatasetRequest(sk, pl, tg, series))
     assert result.test_mae_model <= result.test_mae_baseline_mean + 1e-9

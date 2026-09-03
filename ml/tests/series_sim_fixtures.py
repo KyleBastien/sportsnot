@@ -54,6 +54,18 @@ class _OverlapRowInput:
     game_type_id: int = 3
 
 
+@dataclass(frozen=True)
+class _OverlapGameInput:
+    game_id: str
+    game_date: str
+    home: str
+    home_id: int
+    away: str
+    away_id: int
+    hg: int
+    ag: int
+
+
 def _team_row(spec: _TeamRowInput) -> dict[str, object]:
     won = spec.gf > spec.ga
     return {
@@ -186,14 +198,17 @@ def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFr
 def _real_team_games(season_label: str | None = None) -> pd.DataFrame:
     archive_dir = Path("data/raw/nhl-archive")
     paths = _archive_paths(archive_dir, season_label)
-    frames = [normalize_team_games(pd.read_csv(path)) for path in paths]
-    return pd.concat(frames, ignore_index=True)
+    return pd.concat(_archive_frames(paths), ignore_index=True)
 
 
 def _archive_paths(archive_dir: Path, season_label: str | None) -> list[Path]:
     if season_label is not None:
         return [archive_dir / f"team-games-{season_label}.csv.gz"]
     return sorted(archive_dir.glob("team-games-*.csv.gz"))
+
+
+def _archive_frames(paths: list[Path]) -> list[pd.DataFrame]:
+    return [normalize_team_games(pd.read_csv(path)) for path in paths]
 
 
 def _overlap_row(spec: _OverlapRowInput) -> dict[str, object]:
@@ -216,17 +231,31 @@ def _overlap_row(spec: _OverlapRowInput) -> dict[str, object]:
 
 
 def _overlap_game(
-    *,
-    game_id: str,
-    game_date: str,
-    home: str,
-    home_id: int,
-    away: str,
-    away_id: int,
-    hg: int,
-    ag: int,
+    spec: _OverlapGameInput,
 ) -> list[dict[str, object]]:
     return [
-        _overlap_row(_OverlapRowInput(game_id, game_date, home, home_id, away, hg, ag, True)),
-        _overlap_row(_OverlapRowInput(game_id, game_date, away, away_id, home, ag, hg, False)),
+        _overlap_row(
+            _OverlapRowInput(
+                spec.game_id,
+                spec.game_date,
+                spec.home,
+                spec.home_id,
+                spec.away,
+                spec.hg,
+                spec.ag,
+                True,
+            )
+        ),
+        _overlap_row(
+            _OverlapRowInput(
+                spec.game_id,
+                spec.game_date,
+                spec.away,
+                spec.away_id,
+                spec.home,
+                spec.ag,
+                spec.hg,
+                False,
+            )
+        ),
     ]

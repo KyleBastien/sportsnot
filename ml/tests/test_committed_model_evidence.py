@@ -68,31 +68,47 @@ def _assert_manifest_matches_evidence_pass(
     manifest_path: Path, expected_git_sha: str
 ) -> None:
     manifest = _manifest_file(manifest_path)
-    git_sha = str(manifest["git_sha"])
-    assert GIT_SHA_PATTERN.fullmatch(git_sha), (
-        f"{manifest_path.name} carries malformed git_sha {git_sha!r}"
-    )
+    git_sha = _assert_git_sha(manifest, manifest_path.name)
     assert git_sha == expected_git_sha, (
         f"{manifest_path.name} git_sha {git_sha} does not match committed evidence "
         f"pass {expected_git_sha}"
     )
-    assert manifest["git_dirty"] is False, (
-        f"{manifest_path.name} must carry git_dirty=false"
-    )
+    _assert_clean_git_provenance(manifest, manifest_path.name)
 
 
 def _values_for_key(value: object, key: str) -> list[object]:
     if isinstance(value, Mapping):
-        found = [item for item_key, item in value.items() if item_key == key]
-        for item in value.values():
-            found.extend(_values_for_key(item, key))
-        return found
+        return _values_for_key_in_mapping(value, key)
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        found = []
-        for item in value:
-            found.extend(_values_for_key(item, key))
-        return found
+        return _values_for_key_in_sequence(value, key)
     return []
+
+
+def _values_for_key_in_mapping(value: Mapping[object, object], key: str) -> list[object]:
+    found = [item for item_key, item in value.items() if item_key == key]
+    for item in value.values():
+        found.extend(_values_for_key(item, key))
+    return found
+
+
+def _values_for_key_in_sequence(value: Sequence[object], key: str) -> list[object]:
+    found: list[object] = []
+    for item in value:
+        found.extend(_values_for_key(item, key))
+    return found
+
+
+def _assert_git_sha(manifest: Mapping[str, object], manifest_name: str) -> str:
+    git_sha = str(manifest["git_sha"])
+    assert GIT_SHA_PATTERN.fullmatch(git_sha), (
+        f"{manifest_name} carries malformed git_sha {git_sha!r}"
+    )
+    return git_sha
+
+
+def _assert_clean_git_provenance(manifest: Mapping[str, object], manifest_name: str) -> None:
+    _assert_git_sha(manifest, manifest_name)
+    assert manifest["git_dirty"] is False, f"{manifest_name} must carry git_dirty=false"
 
 
 @pytest.mark.parametrize("manifest_path", ALL_EVIDENCE_MANIFESTS)
@@ -135,8 +151,7 @@ def test_committed_model_evidence_has_clean_provenance_and_seed(
     manifest = _manifest(artifact)
 
     assert (artifact / "report.md").is_file()
-    assert re.fullmatch(r"[0-9a-f]{40}", manifest["git_sha"])
-    assert manifest["git_dirty"] is False
+    _assert_clean_git_provenance(manifest, f"{artifact_name}/manifest.json")
     seeds = _values_for_key(manifest, "seed")
     assert seeds
     assert set(seeds) == {EXPECTED_SEED}
@@ -150,8 +165,7 @@ def test_committed_backtest_evidence_has_clean_provenance_and_version(
     manifest = _manifest(artifact)
 
     assert (artifact / "report.md").is_file()
-    assert re.fullmatch(r"[0-9a-f]{40}", manifest["git_sha"])
-    assert manifest["git_dirty"] is False
+    _assert_clean_git_provenance(manifest, f"{artifact_name}/manifest.json")
     assert manifest["package_version"] == "0.1.0"
     assert manifest["config"]["seed"] == EXPECTED_SEED
     assert manifest["leakage_ok"] is True

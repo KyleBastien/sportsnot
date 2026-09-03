@@ -25,13 +25,18 @@ from draft_oracle.models import (
     simulate_series,
     simulate_series_monte_carlo,
 )
-from draft_oracle.models.series_sim import _pivot_all_games, reconstruct_series_matchups
+from draft_oracle.models.series_sim import (
+    SeriesMonteCarloRequest,
+    _pivot_all_games,
+    reconstruct_series_matchups,
+)
 from draft_oracle.rules import goalie_series_points
 from tests.series_sim_fixtures import (
     TEAMS,
     _game_rows,
     _GameRowsInput,
     _overlap_game,
+    _OverlapGameInput,
     _real_team_games,
     _synthetic_league,
 )
@@ -140,7 +145,14 @@ def test_goalie_points_zero_for_the_series_loser_with_no_wins() -> None:
 def test_monte_carlo_matches_exact_enumeration() -> None:
     exact = simulate_series(0.63, 0.47, shutout_prob_a=0.2, shutout_prob_b=0.1)
     mc = simulate_series_monte_carlo(
-        0.63, 0.47, shutout_prob_a=0.2, shutout_prob_b=0.1, n_sims=40000, seed=7
+        SeriesMonteCarloRequest(
+            p_a_home=0.63,
+            p_a_away=0.47,
+            shutout_prob_a=0.2,
+            shutout_prob_b=0.1,
+            n_sims=40000,
+            seed=7,
+        )
     )
     assert mc.p_a_win_series == pytest.approx(exact.p_a_win_series, abs=0.02)
     assert mc.e_games == pytest.approx(exact.e_games, abs=0.05)
@@ -148,8 +160,9 @@ def test_monte_carlo_matches_exact_enumeration() -> None:
 
 
 def test_monte_carlo_is_deterministic_under_seed() -> None:
-    a = simulate_series_monte_carlo(0.6, 0.5, n_sims=5000, seed=123)
-    b = simulate_series_monte_carlo(0.6, 0.5, n_sims=5000, seed=123)
+    request = SeriesMonteCarloRequest(0.6, 0.5, n_sims=5000, seed=123)
+    a = simulate_series_monte_carlo(request)
+    b = simulate_series_monte_carlo(request)
     assert a == b
 
 
@@ -247,18 +260,42 @@ def test_reconstruct_freezes_at_round_cutoff_not_matchup_first_game() -> None:
     # E's round-1 series (digit 1) overlaps the round-2 window; E wins all three.
     for i, date in enumerate(("2022-05-01", "2022-05-02", "2022-05-03")):
         rows += _overlap_game(
-            game_id=f"202103011{i + 1}", game_date=date,
-            home="E", home_id=e_id, away="X", away_id=x_id, hg=3, ag=0,
+            _OverlapGameInput(
+                game_id=f"202103011{i + 1}",
+                game_date=date,
+                home="E",
+                home_id=e_id,
+                away="X",
+                away_id=x_id,
+                hg=3,
+                ag=0,
+            )
         )
     # Round-2 series P (G/H, digit 2) sets the round-2 cutoff at 05-01.
     rows += _overlap_game(
-        game_id="2021030211", game_date="2022-05-01",
-        home="G", home_id=g_id, away="H", away_id=h_id, hg=3, ag=1,
+        _OverlapGameInput(
+            game_id="2021030211",
+            game_date="2022-05-01",
+            home="G",
+            home_id=g_id,
+            away="H",
+            away_id=h_id,
+            hg=3,
+            ag=1,
+        )
     )
     # Round-2 series Q (E/F, digit 2) starts late, on 05-06.
     rows += _overlap_game(
-        game_id="2021030221", game_date="2022-05-06",
-        home="E", home_id=e_id, away="F", away_id=f_id, hg=2, ag=1,
+        _OverlapGameInput(
+            game_id="2021030221",
+            game_date="2022-05-06",
+            home="E",
+            home_id=e_id,
+            away="F",
+            away_id=f_id,
+            hg=2,
+            ag=1,
+        )
     )
     team_games = pd.DataFrame(rows)
     series = pd.DataFrame(

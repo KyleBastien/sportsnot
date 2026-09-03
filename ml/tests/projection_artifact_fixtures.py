@@ -2,33 +2,25 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import numpy as np
 import pandas as pd
 
 from draft_oracle.models.series_sim import HOME_ICE_PATTERN
 from draft_oracle.models.skater_production import SkaterProductionConfig
 from draft_oracle.projection_artifact import ProjectArtifactConfig
+from tests._fixture_rows import (
+    SkaterRowInput as _SkaterRowInput,
+)
+from tests._fixture_rows import (
+    draw_ga as _draw_ga,
+)
+from tests._fixture_rows import (
+    skater_row as _skater_row,
+)
 
 TEAMS = ["AAA", "BBB", "CCC", "DDD"]
 STRENGTH = {"AAA": 3.0, "BBB": 1.0, "CCC": -1.0, "DDD": -3.0}
 TEAM_RATE = {"AAA": 0.9, "BBB": 0.6, "CCC": 0.4, "DDD": 0.2}
-
-
-@dataclass(frozen=True)
-class _SkaterRowInput:
-    player_id: int
-    pos: str
-    game_id: int
-    game_date: str
-    season_id: int
-    game_type_id: int
-    team: str
-    opp: str
-    goals: int
-    assists: int
-
 
 def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, float, str]]]:
     players: dict[int, tuple[str, float, str]] = {}
@@ -51,41 +43,6 @@ def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, float, str]]]:
             )
             pid += 1
     return pd.DataFrame(rows), players
-
-
-def _skater_row(spec: _SkaterRowInput) -> dict[str, object]:
-    return {
-        "season_id": spec.season_id,
-        "game_type_id": spec.game_type_id,
-        "game_id": spec.game_id,
-        "game_date": spec.game_date,
-        "player_id": spec.player_id,
-        "player_name": f"{spec.team}-{spec.player_id}",
-        "position_code": "C" if spec.pos == "F" else "D",
-        "position": spec.pos,
-        "shoots_catches": "L",
-        "team_abbrev": spec.team,
-        "opponent_team_abbrev": spec.opp,
-        "home_road": "H",
-        "goals": spec.goals,
-        "assists": spec.assists,
-        "points": spec.goals + spec.assists,
-        "shots": spec.goals * 3 + 2,
-        "toi_seconds": 1000,
-        "pp_goals": 0,
-        "pp_points": 0,
-        "sh_goals": 0,
-        "sh_points": 0,
-        "ev_goals": spec.goals,
-        "ev_points": spec.goals + spec.assists,
-        "plus_minus": 0,
-        "penalty_minutes": 0,
-        "game_winning_goals": 0,
-        "ot_goals": 0,
-        "shooting_pct": 0.1,
-        "faceoff_win_pct": 0.5,
-    }
-
 
 def _team_rows(
     game_id: int,
@@ -122,11 +79,6 @@ def _team_rows(
             }
         )
     return rows
-
-
-def _draw_ga(rng: np.random.Generator, rate: float) -> tuple[int, int]:
-    return int(rng.poisson(max(rate * 0.5, 0.01))), int(rng.poisson(max(rate * 0.5, 0.01)))
-
 
 def _synthetic_archive(
     end_years: list[int], *, seed: int = 0, n_reg: int = 36

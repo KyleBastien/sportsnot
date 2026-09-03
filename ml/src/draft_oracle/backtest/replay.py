@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -80,10 +80,12 @@ from draft_oracle.backtest._replay_types import (
 from draft_oracle.optimize.recommend import build_pool_from_frames
 from draft_oracle.optimize.simulator import (
     DraftState,
+    OpponentModel,
 )
 from draft_oracle.projection_artifact import (
     DEFAULT_NORMALIZED_DIR,
     SNAPSHOTS_SUBDIR,
+    ProjectArtifactResult,
     _load_league_picks,
     _load_tables,
     _require_complete_snapshot,
@@ -146,6 +148,131 @@ DEFAULT_BACKTEST_ROOT = Path("artifacts/backtests")
 # ── Round / season / run orchestration ─────────────────────────────────────
 
 
+@dataclass(frozen=True)
+class _ReplayRoundSetup:
+    artifact: ProjectArtifactResult
+    projection_eval: ProjectionEval
+    season_id: int
+    scored_rounds: list[int]
+    series_evals: list[SeriesEval]
+
+
+def _prepare_round_setup(
+    tables: dict[str, pd.DataFrame],
+    *,
+    season: int,
+    playoff_round: int,
+    league_picks: pd.DataFrame | None,
+    injuries: pd.DataFrame | None,
+    odds: pd.DataFrame | None,
+    snapshot_id: str,
+    skater_actual: dict[tuple[int, int, int], int],
+    team_actual: dict[tuple[int, int, int], int],
+    config: BacktestConfig,
+    scored_rounds: Sequence[int] | None,
+) -> _ReplayRoundSetup:
+    scored = list(scored_rounds) if scored_rounds else [playoff_round]
+    artifact = build_projection_artifact(
+        tables["skater_games"],
+        tables["players"],
+        tables["team_games"],
+        tables["series"],
+        season=season,
+        playoff_round=playoff_round,
+        snapshot_id=snapshot_id,
+        injuries=injuries,
+        league_picks=league_picks,
+        config=replace(config.artifact_config(), slot_strategies=False),
+    )
+    season_id = _season_id_for(tables["series"], season)
+    round_series = _round_series(tables["series"], season, playoff_round)
+    projection_eval = _build_projection_eval(
+        artifact,
+        skater_actual,
+        team_actual,
+        season_id=season_id,
+        scored_rounds=scored,
+    )
+    series_evals = _build_series_evals(artifact, round_series, odds, season=season)
+    return _ReplayRoundSetup(
+        artifact=artifact,
+        projection_eval=projection_eval,
+        season_id=season_id,
+        scored_rounds=scored,
+        series_evals=series_evals,
+    )
+
+
+def _assert_replay_inputs_leakfree(
+    tables: dict[str, pd.DataFrame],
+    *,
+    season_id: int,
+    cutoff: str,
+    scored_rounds: Sequence[int],
+) -> None:
+    round_ids: set[int] = set()
+    for scored_round in scored_rounds:
+        round_ids |= round_game_ids(
+            tables["team_games"],
+            tables["series"],
+            season_id=season_id,
+            playoff_round=scored_round,
+        )
+    assert_round_inputs_leakfree(
+        RoundLeakageCheck(tables["team_games"], round_ids, cutoff, label="team")
+    )
+    assert_round_inputs_leakfree(
+        RoundLeakageCheck(
+            tables["skater_games"],
+            round_ids,
+            cutoff,
+            label="skater",
+            authoritative_dates=tables["team_games"],
+        )
+    )
+
+
+def _simulate_slot_results(
+    base_state: DraftState,
+    managers_list: list[str],
+    opponent_model: OpponentModel | dict[str, OpponentModel],
+    config: BacktestConfig,
+    score_context: ScoreContext,
+) -> list[SlotResult]:
+    slot_results: list[SlotResult] = []
+    for strategy in config.strategies:
+        for seat in range(1, config.managers + 1):
+            oracle = managers_list[seat - 1]
+            for draft_index in range(config.n_drafts):
+                draft_seed = config.seed + draft_index
+                final = _play_oracle_draft(
+                    base_state,
+                    oracle,
+                    strategy,
+                    opponent_model,
+                    config,
+                    draft_seed,
+                )
+                opponent_points = {
+                    manager: _score_active_roster(final, manager, score_context)
+                    for manager in managers_list
+                    if manager != oracle
+                }
+                oracle_points = _score_active_roster(final, oracle, score_context)
+                slot_results.append(
+                    SlotResult(
+                        strategy=strategy,
+                        seat=seat,
+                        oracle_manager=oracle,
+                        draft_index=draft_index,
+                        oracle_points=oracle_points,
+                        opponent_points=opponent_points,
+                        roster_keys=[asset.key for asset in final.rosters[oracle].all_assets()],
+                    )
+                )
+    return slot_results
+
+
 def replay_round(
     tables: dict[str, pd.DataFrame],
     *,
@@ -168,52 +295,33 @@ def replay_round(
     combined ``R3_4`` draft). The projection artifact folds the conditional next-round
     value in automatically when it is a combined event.
     """
-    scored = list(scored_rounds) if scored_rounds else [playoff_round]
-    result = build_projection_artifact(
-        tables["skater_games"],
-        tables["players"],
-        tables["team_games"],
-        tables["series"],
+    setup = _prepare_round_setup(
+        tables,
         season=season,
         playoff_round=playoff_round,
-        snapshot_id=snapshot_id,
-        injuries=injuries,
         league_picks=league_picks,
-        config=replace(config.artifact_config(), slot_strategies=False),
+        injuries=injuries,
+        odds=odds,
+        snapshot_id=snapshot_id,
+        skater_actual=skater_actual,
+        team_actual=team_actual,
+        config=config,
+        scored_rounds=scored_rounds,
     )
-    season_id = _season_id_for(tables["series"], season)
-    cutoff = result.as_of_cutoff
-
-    round_series = _round_series(tables["series"], season, playoff_round)
-    projection_eval = _build_projection_eval(
-        result, skater_actual, team_actual, season_id=season_id, scored_rounds=scored
-    )
-    series_evals = _build_series_evals(result, round_series, odds, season=season)
-
-    round_ids: set[int] = set()
-    for rnd in scored:
-        round_ids |= round_game_ids(
-            tables["team_games"], tables["series"], season_id=season_id, playoff_round=rnd
-        )
-    assert_round_inputs_leakfree(
-        RoundLeakageCheck(tables["team_games"], round_ids, cutoff, label="team")
-    )
-    assert_round_inputs_leakfree(
-        RoundLeakageCheck(
-            tables["skater_games"],
-            round_ids,
-            cutoff,
-            label="skater",
-            authoritative_dates=tables["team_games"],
-        )
+    cutoff = setup.artifact.as_of_cutoff
+    _assert_replay_inputs_leakfree(
+        tables,
+        season_id=setup.season_id,
+        cutoff=cutoff,
+        scored_rounds=setup.scored_rounds,
     )
 
     fitted = _fit_opponents_for_season(league_picks, season, config)
     managers_list, opponent_model, opponents_kind = _managers_and_opponents(fitted, config)
 
-    pool = build_pool_from_frames(result.skaters, result.teams, ir=config.ir)
-    warnings = list(result.warnings)
-    score_context = ScoreContext(skater_actual, team_actual, season_id, scored)
+    pool = build_pool_from_frames(setup.artifact.skaters, setup.artifact.teams, ir=config.ir)
+    warnings = list(setup.artifact.warnings)
+    score_context = ScoreContext(skater_actual, team_actual, setup.season_id, setup.scored_rounds)
 
     shortfall = _draft_shortfall(pool, config.managers, config.ir)
     if shortfall is not None:
@@ -223,70 +331,41 @@ def replay_round(
         )
         return RoundResult(
             season=season,
-            season_id=season_id,
+            season_id=setup.season_id,
             playoff_round=playoff_round,
             as_of_cutoff=cutoff,
             opponents_kind=opponents_kind,
-            eligible_team_abbrevs=list(result.manifest["eligible_team_abbrevs"]),
+            eligible_team_abbrevs=list(setup.artifact.manifest["eligible_team_abbrevs"]),
             leakage_ok=True,
-            scored_rounds=scored,
+            scored_rounds=setup.scored_rounds,
             slot_results=[],
             warnings=warnings,
-            projection_eval=projection_eval,
-            series_evals=series_evals,
+            projection_eval=setup.projection_eval,
+            series_evals=setup.series_evals,
         )
 
     base_state = DraftState.new(managers_list, pool, allow_ir=config.ir)
-
-    slot_results: list[SlotResult] = []
-    for strategy in config.strategies:
-        for seat in range(1, config.managers + 1):
-            oracle = managers_list[seat - 1]
-            for draft_index in range(config.n_drafts):
-                draft_seed = config.seed + draft_index
-                final = _play_oracle_draft(
-                    base_state, oracle, strategy, opponent_model, config, draft_seed
-                )
-                opponent_points = {
-                    manager: _score_active_roster(
-                        final,
-                        manager,
-                        score_context,
-                    )
-                    for manager in managers_list
-                    if manager != oracle
-                }
-                oracle_points = _score_active_roster(
-                    final,
-                    oracle,
-                    score_context,
-                )
-                roster_keys = [a.key for a in final.rosters[oracle].all_assets()]
-                slot_results.append(
-                    SlotResult(
-                        strategy=strategy,
-                        seat=seat,
-                        oracle_manager=oracle,
-                        draft_index=draft_index,
-                        oracle_points=oracle_points,
-                        opponent_points=opponent_points,
-                        roster_keys=roster_keys,
-                    )
-                )
+    slot_results = _simulate_slot_results(
+        base_state,
+        managers_list,
+        opponent_model,
+        config,
+        score_context,
+    )
 
     return RoundResult(
         season=season,
-        season_id=season_id,
+        season_id=setup.season_id,
         playoff_round=playoff_round,
         as_of_cutoff=cutoff,
         opponents_kind=opponents_kind,
-        eligible_team_abbrevs=list(result.manifest["eligible_team_abbrevs"]),
+        eligible_team_abbrevs=list(setup.artifact.manifest["eligible_team_abbrevs"]),
         leakage_ok=True,
-        scored_rounds=scored,
+        scored_rounds=setup.scored_rounds,
         slot_results=slot_results,
         warnings=warnings,
-        projection_eval=projection_eval,
-        series_evals=series_evals,
+        projection_eval=setup.projection_eval,
+        series_evals=setup.series_evals,
     )
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Hashable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import numpy as np
 import pandas as pd
@@ -31,7 +31,12 @@ from draft_oracle.models.skater_production import (
 from draft_oracle.rules import player_points
 
 if TYPE_CHECKING:
-    from draft_oracle.models.projections import RoundProjection, SkaterRoundRequest
+    from draft_oracle.models.projections import (
+        ProjectionEvaluationRequest,
+        ProjectionRuntime,
+        RoundProjection,
+        SkaterRoundRequest,
+    )
 
 
 class _ProjectionConfigLike(Protocol):
@@ -55,11 +60,25 @@ class _ProjectRound(Protocol):
     def __call__(
         self,
         request: SkaterRoundRequest,
-        *,
-        seed: int = ...,
-        n_sims: int = ...,
-        horizon: int = ...,
+        runtime: ProjectionRuntime | None = ...,
     ) -> RoundProjection: ...
+
+
+class _ProjectionEvaluationRequestLike(Protocol):
+    @property
+    def skater_games(self) -> pd.DataFrame: ...
+
+    @property
+    def players(self) -> pd.DataFrame: ...
+
+    @property
+    def team_games(self) -> pd.DataFrame: ...
+
+    @property
+    def series(self) -> pd.DataFrame: ...
+
+    @property
+    def config(self) -> _ProjectionConfigLike | None: ...
 
 
 @dataclass(frozen=True)
@@ -102,6 +121,26 @@ class _ProjectionModels:
 
 
 @dataclass(frozen=True)
+class _EvaluateProjectionModelRequest:
+    skater_games: pd.DataFrame
+    players: pd.DataFrame
+    team_games: pd.DataFrame
+    series: pd.DataFrame
+    config: _ProjectionConfigLike
+    project_round: _ProjectRound
+    baseline_reg_games: float
+
+
+@dataclass(frozen=True)
+class _ProjectionContextRequest:
+    skater_games: pd.DataFrame
+    players: pd.DataFrame
+    team_games: pd.DataFrame
+    series: pd.DataFrame
+    config: _ProjectionConfigLike
+
+
+@dataclass(frozen=True)
 class _ProjectionContext:
     config: _ProjectionConfigLike
     production_config: SkaterProductionConfig
@@ -121,6 +160,24 @@ class _ProjectionScores:
     actual: np.ndarray
     baseline_reg: np.ndarray
     baseline_prev: np.ndarray
+
+
+@dataclass(frozen=True)
+class _ProjectionScoresRequest:
+    skater_games: pd.DataFrame
+    players: pd.DataFrame
+    team_games: pd.DataFrame
+    series: pd.DataFrame
+    context: _ProjectionContext
+    project_round: _ProjectRound
+    baseline_reg_games: float
+
+
+@dataclass(frozen=True)
+class _ProjectionRequestOptions:
+    config: _ProjectionConfigLike | None
+    project_round: _ProjectRound | None
+    baseline_reg_games: float | None
 
 
 def _row_seed(base_seed: int, season_id: int, playoff_round: int, player_id: int) -> int:
@@ -188,53 +245,71 @@ def _previous_round_points(labels: pd.DataFrame) -> dict[tuple[int, int, int], f
 
 
 def evaluate_projection_model(
-    skater_games: pd.DataFrame,
-    players: pd.DataFrame,
-    team_games: pd.DataFrame,
-    series: pd.DataFrame,
-    *,
-    config: _ProjectionConfigLike,
-    project_round: _ProjectRound,
-    baseline_reg_games: float,
+    request: ProjectionEvaluationRequest | pd.DataFrame,
+    *legacy_args: object,
+    config: _ProjectionConfigLike | None = None,
+    project_round: _ProjectRound | None = None,
+    baseline_reg_games: float | None = None,
 ) -> ProjectionEvaluation:
-    context = _projection_context(skater_games, players, team_games, series, config)
+    resolved_request = _resolve_projection_request(
+        request,
+        legacy_args,
+        _ProjectionRequestOptions(
+            config=config,
+            project_round=project_round,
+            baseline_reg_games=baseline_reg_games,
+        ),
+    )
+    context = _projection_context(
+        _ProjectionContextRequest(
+            skater_games=resolved_request.skater_games,
+            players=resolved_request.players,
+            team_games=resolved_request.team_games,
+            series=resolved_request.series,
+            config=resolved_request.config,
+        )
+    )
     scores = _projection_scores(
-        skater_games,
-        players,
-        team_games,
-        series,
-        context,
-        project_round,
-        baseline_reg_games,
+        _ProjectionScoresRequest(
+            skater_games=resolved_request.skater_games,
+            players=resolved_request.players,
+            team_games=resolved_request.team_games,
+            series=resolved_request.series,
+            context=context,
+            project_round=resolved_request.project_round,
+            baseline_reg_games=resolved_request.baseline_reg_games,
+        )
     )
     return _projection_evaluation(context, scores)
 
 
 def _projection_context(
-    skater_games: pd.DataFrame,
-    players: pd.DataFrame,
-    team_games: pd.DataFrame,
-    series: pd.DataFrame,
-    config: _ProjectionConfigLike,
+    request: _ProjectionContextRequest,
 ) -> _ProjectionContext:
-    test_years = _projection_test_years(series, config.n_test_seasons)
-    train = _projection_training_frames(skater_games, team_games, series, set(test_years))
-    models = _train_projection_models(train, players, config)
-    matchups = reconstruct_series_matchups(team_games, series=series)
-    labels = skater_round_production(skater_games, series)
+    test_years = _projection_test_years(request.series, request.config.n_test_seasons)
+    train = _projection_training_frames(
+        request.skater_games,
+        request.team_games,
+        request.series,
+        set(test_years),
+    )
+    models = _train_projection_models(train, request.players, request.config)
+    matchups = reconstruct_series_matchups(request.team_games, series=request.series)
+    labels = skater_round_production(request.skater_games, request.series)
     return _ProjectionContext(
-        config=config,
-        production_config=config.production_config or SkaterProductionConfig(seed=config.seed),
+        config=request.config,
+        production_config=request.config.production_config
+        or SkaterProductionConfig(seed=request.config.seed),
         test_years=test_years,
         test_year_set=set(test_years),
         models=models,
         length_by_team=_series_length_by_team(
-            series,
+            request.series,
             matchups,
             _SeriesModels(win=models.win, shutout=models.shutout),
             set(test_years),
         ),
-        abbrev_to_id=_team_id_by_abbrev(team_games),
+        abbrev_to_id=_team_id_by_abbrev(request.team_games),
         previous_points=_previous_round_points(labels),
     )
 
@@ -275,11 +350,13 @@ def _train_projection_models(
 ) -> _ProjectionModels:
     prod_config = config.production_config or SkaterProductionConfig(seed=config.seed)
     prod_result = train_skater_production_model(
-        train.skater_games,
-        players,
-        train.team_games,
-        train.series,
-        config=prod_config,
+        ProductionDatasetRequest(
+            train.skater_games,
+            players,
+            train.team_games,
+            train.series,
+            prod_config,
+        )
     )
     win_model = train_game_win_model(
         train.team_games, odds=None, config=GameWinConfig(seed=config.seed)
@@ -295,33 +372,27 @@ def _train_projection_models(
 
 
 def _projection_scores(
-    skater_games: pd.DataFrame,
-    players: pd.DataFrame,
-    team_games: pd.DataFrame,
-    series: pd.DataFrame,
-    context: _ProjectionContext,
-    project_round: _ProjectRound,
-    baseline_reg_games: float,
+    request: _ProjectionScoresRequest,
 ) -> _ProjectionScores:
     dataset = build_production_dataset(
         ProductionDatasetRequest(
-            skater_games,
-            players,
-            team_games,
-            series,
-            context.production_config,
+            request.skater_games,
+            request.players,
+            request.team_games,
+            request.series,
+            request.context.production_config,
         )
     )
-    test = dataset.loc[dataset["season_end_year"].isin(context.test_year_set)].reset_index(
+    test = dataset.loc[dataset["season_end_year"].isin(request.context.test_year_set)].reset_index(
         drop=True
     )
     if test.empty:
         raise ValueError("no held-out skater-round rows available to project")
     rows, n_skipped = _projection_rows(
-        context.models.production.project(test),
-        context,
-        project_round,
-        baseline_reg_games,
+        request.context.models.production.project(test),
+        request.context,
+        request.project_round,
+        request.baseline_reg_games,
     )
     if not rows:
         raise ValueError("no skater-round could be projected (all series unsimulated)")
@@ -366,9 +437,7 @@ def _projection_row(
 
     projection = project_round(
         SkaterRoundRequest(float(rec["projected_points_per_game"]), length_probs),
-        seed=_row_seed(context.config.seed, season_id, rnd, player_id),
-        n_sims=context.config.n_sims,
-        horizon=context.config.horizon,
+        _projection_runtime(context, season_id, rnd, player_id),
     )
     baseline_reg = float(rec["points_per_game"]) * baseline_reg_games
     return {
@@ -382,6 +451,67 @@ def _projection_row(
         "p10": projection.p10,
         "p90": projection.p90,
     }
+
+
+def _resolve_projection_request(
+    request: ProjectionEvaluationRequest | pd.DataFrame,
+    legacy_args: tuple[object, ...],
+    options: _ProjectionRequestOptions,
+) -> _EvaluateProjectionModelRequest:
+    if options.project_round is None or options.baseline_reg_games is None:
+        raise TypeError("project_round and baseline_reg_games are required")
+    if _is_projection_request_like(request):
+        request_like = cast(_ProjectionEvaluationRequestLike, request)
+        if legacy_args:
+            raise TypeError("projection request calls do not accept extra positional arguments")
+        resolved_config = options.config or request_like.config
+        if resolved_config is None:
+            raise TypeError("projection request must provide config")
+        return _EvaluateProjectionModelRequest(
+            skater_games=request_like.skater_games,
+            players=request_like.players,
+            team_games=request_like.team_games,
+            series=request_like.series,
+            config=resolved_config,
+            project_round=options.project_round,
+            baseline_reg_games=options.baseline_reg_games,
+        )
+    if len(legacy_args) != 3 or options.config is None:
+        raise TypeError(
+            "legacy evaluate_projection_model calls require players, team_games, series, and config"
+        )
+    players, team_games, series = legacy_args
+    return _EvaluateProjectionModelRequest(
+        skater_games=cast(pd.DataFrame, request),
+        players=cast(pd.DataFrame, players),
+        team_games=cast(pd.DataFrame, team_games),
+        series=cast(pd.DataFrame, series),
+        config=options.config,
+        project_round=options.project_round,
+        baseline_reg_games=options.baseline_reg_games,
+    )
+
+
+def _is_projection_request_like(request: object) -> bool:
+    return all(
+        hasattr(request, attr)
+        for attr in ("skater_games", "players", "team_games", "series", "config")
+    )
+
+
+def _projection_runtime(
+    context: _ProjectionContext,
+    season_id: int,
+    playoff_round: int,
+    player_id: int,
+) -> ProjectionRuntime:
+    from draft_oracle.models.projections import ProjectionRuntime
+
+    return ProjectionRuntime(
+        seed=_row_seed(context.config.seed, season_id, playoff_round, player_id),
+        n_sims=context.config.n_sims,
+        horizon=context.config.horizon,
+    )
 
 
 def _score_projection_rows(

@@ -82,6 +82,7 @@ from draft_oracle.features.skater import (
 from draft_oracle.models.game_win import (
     GAME_WIN_MODEL_VERSION,
     GameWinConfig,
+    GameWinModel,
     train_game_win_model,
 )
 from draft_oracle.models.projections import (
@@ -107,11 +108,13 @@ from draft_oracle.models.series_sim import (
 from draft_oracle.models.shutout import (
     SHUTOUT_MODEL_VERSION,
     ShutoutConfig,
+    ShutoutModel,
     train_shutout_model,
 )
 from draft_oracle.models.skater_production import (
     SKATER_PRODUCTION_VERSION,
     SkaterProductionConfig,
+    SkaterProductionModel,
     playoff_round_cutoffs,
     train_skater_production_model,
 )
@@ -242,6 +245,37 @@ class _IrStashInput:
     train_sk: pd.DataFrame
     train_tg: pd.DataFrame
     config: ProjectArtifactConfig
+
+
+@dataclass(frozen=True)
+class _ProjectionRoundContext:
+    config: ProjectArtifactConfig
+    prod_config: SkaterProductionConfig
+    warnings: list[str]
+    round_series: pd.DataFrame
+    season_id: int
+    cutoff: str
+    train_tg: pd.DataFrame
+    train_sk: pd.DataFrame
+
+
+@dataclass(frozen=True)
+class _ProjectionModels:
+    win_model: GameWinModel
+    shutout_model: ShutoutModel
+    prod_model: SkaterProductionModel
+    matchups: dict[tuple[int, int, int], Any]
+
+
+@dataclass(frozen=True)
+class _ProjectionOutputs:
+    skaters: pd.DataFrame
+    teams: pd.DataFrame
+    cheatsheet: CheatSheet
+    ir_valuations: list[StashValuation]
+    slot_report: SlotStrategyReport | None
+    length_by_abbrev: dict[str, dict[int, float]]
+    combined_diagnostics: list[dict[str, Any]] | None
 
 
 def _injured_player_ids(injuries: pd.DataFrame | None) -> set[int]:
@@ -553,6 +587,178 @@ def _write_stash_columns(skaters: pd.DataFrame, valuations: list[StashValuation]
         )
 
 
+def _projection_round_context(
+    skater_games: pd.DataFrame,
+    team_games: pd.DataFrame,
+    series: pd.DataFrame,
+    *,
+    season: int,
+    playoff_round: int,
+    config: ProjectArtifactConfig,
+) -> _ProjectionRoundContext:
+    prod_config = config.production_config or SkaterProductionConfig(seed=config.seed)
+    warnings: list[str] = []
+    round_series = series.loc[
+        (series["year"].astype(int) == int(season))
+        & (series["playoff_round"].astype("Int64") == int(playoff_round))
+    ]
+    if round_series.empty:
+        raise ValueError(
+            f"no series found for season {season} round {playoff_round}; "
+            "run ingest/normalize so the bracket is available"
+        )
+    season_id = _resolve_season_id(round_series, season)
+    starts = playoff_round_cutoffs(team_games, series)
+    cutoff = starts.get(season_id, {}).get(int(playoff_round))
+    if cutoff is None:
+        raise ValueError(
+            f"cannot derive the round-start cutoff for season {season} round {playoff_round}; "
+            "the previous round has no games in the archive yet"
+        )
+    cutoff_ts = pd.Timestamp(cutoff)
+    tg = team_games.copy()
+    tg["game_date"] = pd.to_datetime(tg["game_date"])
+    sk = skater_games.copy()
+    sk["game_date"] = pd.to_datetime(sk["game_date"])
+    train_tg = tg.loc[tg["game_date"] < cutoff_ts]
+    train_sk = sk.loc[sk["game_date"] < cutoff_ts]
+    if train_tg.empty or train_sk.empty:
+        raise ValueError("no games available before the round start to train on")
+    return _ProjectionRoundContext(
+        config=config,
+        prod_config=prod_config,
+        warnings=warnings,
+        round_series=round_series,
+        season_id=season_id,
+        cutoff=cutoff,
+        train_tg=train_tg,
+        train_sk=train_sk,
+    )
+
+
+def _train_projection_models(
+    context: _ProjectionRoundContext,
+    players: pd.DataFrame,
+    team_games: pd.DataFrame,
+    series: pd.DataFrame,
+) -> _ProjectionModels:
+    return _ProjectionModels(
+        win_model=train_game_win_model(
+            context.train_tg,
+            odds=None,
+            config=GameWinConfig(seed=context.config.seed),
+        ).model,
+        shutout_model=train_shutout_model(
+            context.train_tg,
+            config=ShutoutConfig(seed=context.config.seed),
+        ).model,
+        prod_model=train_skater_production_model(
+            context.train_sk,
+            players,
+            context.train_tg,
+            series,
+            config=context.prod_config,
+        ).model,
+        matchups=reconstruct_series_matchups(team_games, series=series),
+    )
+
+
+def _projection_outputs(
+    skater_games: pd.DataFrame,
+    players: pd.DataFrame,
+    team_games: pd.DataFrame,
+    injuries: pd.DataFrame | None,
+    league_picks: pd.DataFrame | None,
+    *,
+    season: int,
+    playoff_round: int,
+    context: _ProjectionRoundContext,
+    models: _ProjectionModels,
+) -> _ProjectionOutputs:
+    team_rows, length_by_abbrev = _build_team_rows(
+        context.round_series,
+        models.matchups,
+        models.win_model,
+        models.shutout_model,
+        int(season),
+        int(playoff_round),
+        context.warnings,
+    )
+    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None = None
+    combined_diagnostics: list[dict[str, Any]] | None = None
+    if context.config.combine_final_rounds and int(playoff_round) == _COMBINED_DRAFT_ROUND:
+        combined = _apply_combined_valuation(
+            CombinedValuationInput(
+                team_rows,
+                context.round_series,
+                models.matchups,
+                models.win_model,
+                models.shutout_model,
+                int(season),
+                context.warnings,
+            )
+        )
+        if combined is not None:
+            combined_by_abbrev, combined_diagnostics = combined
+            if context.config.ir:
+                context.warnings.append(
+                    "combined R3+R4 valuation covers active-roster projections only; "
+                    "IR-stash values remain single-round (R3)"
+                )
+    injured_ids = _injured_player_ids(injuries)
+    feats = build_skater_features(
+        skater_games,
+        players,
+        team_games,
+        SkaterFeatureRequest(
+            season_id=context.season_id,
+            as_of_date=context.cutoff,
+            playoff_round=int(playoff_round),
+        ),
+    )
+    eligible_feats = feats.loc[feats["team_abbrev"].isin(length_by_abbrev)]
+    skater_rows: list[dict[str, Any]] = []
+    if not eligible_feats.empty:
+        projected = models.prod_model.project(eligible_feats)
+        skater_rows = _build_skater_rows(
+            projected,
+            length_by_abbrev,
+            injured_ids,
+            season_id=context.season_id,
+            playoff_round=int(playoff_round),
+            config=context.config,
+            combined_by_abbrev=combined_by_abbrev,
+        )
+    skaters = _finalize_skaters(skater_rows)
+    teams = _finalize_teams(team_rows)
+    cheatsheet = build_cheatsheet(skaters, teams, config=context.config.vor_config)
+    if combined_diagnostics is not None:
+        cheatsheet.note = _COMBINED_CHEATSHEET_NOTE
+    ir_valuations = _apply_ir_stash(
+        _IrStashInput(
+            skaters,
+            cheatsheet,
+            injuries,
+            length_by_abbrev,
+            context.train_sk,
+            context.train_tg,
+            context.config,
+        )
+    )
+    slot_report = _build_slot_report(
+        SlotReportInput(skaters, teams, league_picks, context.warnings, context.config)
+    )
+    return _ProjectionOutputs(
+        skaters=skaters,
+        teams=teams,
+        cheatsheet=cheatsheet,
+        ir_valuations=ir_valuations,
+        slot_report=slot_report,
+        length_by_abbrev=length_by_abbrev,
+        combined_diagnostics=combined_diagnostics,
+    )
+
+
 def build_projection_artifact(
     skater_games: pd.DataFrame,
     players: pd.DataFrame,
@@ -576,109 +782,25 @@ def build_projection_artifact(
     the round start; every stochastic step is seeded for byte-identical reruns.
     """
     config = config or ProjectArtifactConfig()
-    prod_config = config.production_config or SkaterProductionConfig(seed=config.seed)
-    warnings: list[str] = []
-
-    round_series = series.loc[
-        (series["year"].astype(int) == int(season))
-        & (series["playoff_round"].astype("Int64") == int(playoff_round))
-    ]
-    if round_series.empty:
-        raise ValueError(
-            f"no series found for season {season} round {playoff_round}; "
-            "run ingest/normalize so the bracket is available"
-        )
-    season_id = _resolve_season_id(round_series, season)
-
-    starts = playoff_round_cutoffs(team_games, series)
-    cutoff = starts.get(season_id, {}).get(int(playoff_round))
-    if cutoff is None:
-        raise ValueError(
-            f"cannot derive the round-start cutoff for season {season} round {playoff_round}; "
-            "the previous round has no games in the archive yet"
-        )
-    cutoff_ts = pd.Timestamp(cutoff)
-
-    tg = team_games.copy()
-    tg["game_date"] = pd.to_datetime(tg["game_date"])
-    sk = skater_games.copy()
-    sk["game_date"] = pd.to_datetime(sk["game_date"])
-    train_tg = tg.loc[tg["game_date"] < cutoff_ts]
-    train_sk = sk.loc[sk["game_date"] < cutoff_ts]
-    if train_tg.empty or train_sk.empty:
-        raise ValueError("no games available before the round start to train on")
-
-    win_model = train_game_win_model(
-        train_tg, odds=None, config=GameWinConfig(seed=config.seed)
-    ).model
-    shutout_model = train_shutout_model(train_tg, config=ShutoutConfig(seed=config.seed)).model
-    prod_model = train_skater_production_model(
-        train_sk, players, train_tg, series, config=prod_config
-    ).model
-
-    matchups = reconstruct_series_matchups(team_games, series=series)
-    team_rows, length_by_abbrev = _build_team_rows(
-        round_series, matchups, win_model, shutout_model, int(season), int(playoff_round), warnings
+    context = _projection_round_context(
+        skater_games,
+        team_games,
+        series,
+        season=season,
+        playoff_round=playoff_round,
+        config=config,
     )
-
-    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None = None
-    combined_diagnostics: list[dict[str, Any]] | None = None
-    if config.combine_final_rounds and int(playoff_round) == _COMBINED_DRAFT_ROUND:
-        combined = _apply_combined_valuation(
-            CombinedValuationInput(
-                team_rows,
-                round_series,
-                matchups,
-                win_model,
-                shutout_model,
-                int(season),
-                warnings,
-            )
-        )
-        if combined is not None:
-            combined_by_abbrev, combined_diagnostics = combined
-            if config.ir:
-                warnings.append(
-                    "combined R3+R4 valuation covers active-roster projections only; "
-                    "IR-stash values remain single-round (R3)"
-                )
-
-    injured_ids = _injured_player_ids(injuries)
-    feats = build_skater_features(
+    models = _train_projection_models(context, players, team_games, series)
+    outputs = _projection_outputs(
         skater_games,
         players,
         team_games,
-        SkaterFeatureRequest(
-            season_id=season_id,
-            as_of_date=cutoff,
-            playoff_round=int(playoff_round),
-        ),
-    )
-    eligible_feats = feats.loc[feats["team_abbrev"].isin(length_by_abbrev)]
-    skater_rows: list[dict[str, Any]] = []
-    if not eligible_feats.empty:
-        projected = prod_model.project(eligible_feats)
-        skater_rows = _build_skater_rows(
-            projected,
-            length_by_abbrev,
-            injured_ids,
-            season_id=season_id,
-            playoff_round=int(playoff_round),
-            config=config,
-            combined_by_abbrev=combined_by_abbrev,
-        )
-
-    skaters = _finalize_skaters(skater_rows)
-    teams = _finalize_teams(team_rows)
-    cheatsheet = build_cheatsheet(skaters, teams, config=config.vor_config)
-    if combined_diagnostics is not None:
-        cheatsheet.note = _COMBINED_CHEATSHEET_NOTE
-    ir_valuations = _apply_ir_stash(
-        _IrStashInput(skaters, cheatsheet, injuries, length_by_abbrev, train_sk, train_tg, config)
-    )
-
-    slot_report = _build_slot_report(
-        SlotReportInput(skaters, teams, league_picks, warnings, config)
+        injuries,
+        league_picks,
+        season=season,
+        playoff_round=playoff_round,
+        context=context,
+        models=models,
     )
 
     manifest = add_git_provenance(
@@ -688,7 +810,7 @@ def build_projection_artifact(
             "season": int(season),
             "playoff_round": int(playoff_round),
             "snapshot_id": snapshot_id,
-            "as_of_cutoff": cutoff,
+            "as_of_cutoff": context.cutoff,
             "feature_version": FEATURE_SET_VERSION,
             "model_versions": {
                 "game_win": GAME_WIN_MODEL_VERSION,
@@ -718,44 +840,50 @@ def build_projection_artifact(
                 "numpy": np.__version__,
             },
             "generated_at": generated_at or datetime.now(UTC).isoformat(),
-            "scarcity": cheatsheet.summary(),
+            "scarcity": outputs.cheatsheet.summary(),
             "counts": {
-                "eligible_series": int(len(teams) // 2),
-                "eligible_teams": len(teams),
-                "skaters_projected": len(skaters),
-                "skaters_injured": int(skaters["injured"].sum()) if not skaters.empty else 0,
+                "eligible_series": int(len(outputs.teams) // 2),
+                "eligible_teams": len(outputs.teams),
+                "skaters_projected": len(outputs.skaters),
+                "skaters_injured": (
+                    int(outputs.skaters["injured"].sum()) if not outputs.skaters.empty else 0
+                ),
             },
-            "eligible_team_abbrevs": sorted(length_by_abbrev),
+            "eligible_team_abbrevs": sorted(outputs.length_by_abbrev),
             "ir_stash": {
                 "enabled": config.ir,
-                "candidates": len(ir_valuations),
-                "stash_verdicts": sum(1 for v in ir_valuations if v.verdict == "stash"),
+                "candidates": len(outputs.ir_valuations),
+                "stash_verdicts": sum(
+                    1 for valuation in outputs.ir_valuations if valuation.verdict == "stash"
+                ),
             },
-            "slot_strategies": slot_report.summary() if slot_report is not None else None,
+            "slot_strategies": (
+                outputs.slot_report.summary() if outputs.slot_report is not None else None
+            ),
             "combined_event": (
                 {
                     "draft_event": "R3_4",
                     "draft_round": _COMBINED_DRAFT_ROUND,
                     "scored_rounds": list(_COMBINED_SCORED_ROUNDS),
-                    "teams": combined_diagnostics,
+                    "teams": outputs.combined_diagnostics,
                 }
-                if combined_diagnostics is not None
+                if outputs.combined_diagnostics is not None
                 else None
             ),
-            "warnings": warnings,
+            "warnings": context.warnings,
         }
     )
 
     return ProjectArtifactResult(
         season=int(season),
         playoff_round=int(playoff_round),
-        as_of_cutoff=cutoff,
-        skaters=skaters,
-        teams=teams,
-        cheatsheet=cheatsheet,
+        as_of_cutoff=context.cutoff,
+        skaters=outputs.skaters,
+        teams=outputs.teams,
+        cheatsheet=outputs.cheatsheet,
         manifest=manifest,
-        warnings=warnings,
-        slot_strategies=slot_report,
+        warnings=context.warnings,
+        slot_strategies=outputs.slot_report,
     )
 
 

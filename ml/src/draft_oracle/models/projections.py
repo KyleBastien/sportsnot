@@ -69,8 +69,11 @@ from draft_oracle.provenance import add_git_provenance
 __all__ = [
     "BASELINE_REG_GAMES",
     "PROJECTION_VERSION",
+    "CombinedRoundRequest",
     "ProjectionConfig",
+    "ProjectionEvaluationRequest",
     "ProjectionResult",
+    "ProjectionRuntime",
     "RoundProjection",
     "RoundSimulationInput",
     "SeasonMetrics",
@@ -235,12 +238,57 @@ class SkaterRoundRequest:
     availability: float = 1.0
 
 
+@dataclass(frozen=True)
+class ProjectionRuntime:
+    seed: int = 20260827
+    n_sims: int = DEFAULT_N_SIMS
+    horizon: int = DEFAULT_HORIZON
+
+
+def _resolve_projection_runtime(
+    runtime: ProjectionRuntime | None,
+    legacy_kwargs: dict[str, object],
+) -> ProjectionRuntime:
+    if runtime is not None and legacy_kwargs:
+        raise TypeError("pass runtime or seed/n_sims/horizon kwargs, not both")
+    if runtime is not None:
+        return runtime
+    defaults = ProjectionRuntime()
+    unexpected = set(legacy_kwargs) - {"seed", "n_sims", "horizon"}
+    if unexpected:
+        names = ", ".join(sorted(unexpected))
+        raise TypeError(f"unexpected project_skater_round kwargs: {names}")
+    return ProjectionRuntime(
+        seed=_int_kwarg(legacy_kwargs, "seed", defaults.seed),
+        n_sims=_int_kwarg(legacy_kwargs, "n_sims", defaults.n_sims),
+        horizon=_int_kwarg(legacy_kwargs, "horizon", defaults.horizon),
+    )
+
+
+def _int_kwarg(legacy_kwargs: dict[str, object], key: str, default: int) -> int:
+    value = legacy_kwargs.get(key, default)
+    if not isinstance(value, int):
+        raise TypeError(f"{key} must be an int")
+    return value
+
+
+def _float_kwarg(legacy_kwargs: dict[str, object], key: str, default: float) -> float:
+    value = legacy_kwargs.get(key, default)
+    if not isinstance(value, int | float):
+        raise TypeError(f"{key} must be numeric")
+    return float(value)
+
+
+def _float_value(value: object, name: str) -> float:
+    if not isinstance(value, int | float):
+        raise TypeError(f"{name} must be numeric")
+    return float(value)
+
+
 def project_skater_round(
     request: SkaterRoundRequest,
-    *,
-    seed: int = 20260827,
-    n_sims: int = DEFAULT_N_SIMS,
-    horizon: int = DEFAULT_HORIZON,
+    runtime: ProjectionRuntime | None = None,
+    **legacy_kwargs: object,
 ) -> RoundProjection:
     """Project one skater's round fantasy points with p10/p50/p90 quantiles.
 
@@ -249,19 +297,20 @@ def project_skater_round(
     ``seed``. ``availability_curve`` (US-015 per-game probabilities) takes precedence
     over the scalar ``availability`` multiplier.
     """
+    resolved_runtime = _resolve_projection_runtime(runtime, legacy_kwargs)
     avail_per_game = _availability_per_game(
         request.availability_curve,
         request.availability,
-        horizon,
+        resolved_runtime.horizon,
     )
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(resolved_runtime.seed)
     samples = simulate_round_points(
         rng,
         RoundSimulationInput(
             pts_per_game=request.pts_per_game,
             length_probs=request.length_probs,
             avail_per_game=avail_per_game,
-            n_sims=n_sims,
+            n_sims=resolved_runtime.n_sims,
         ),
     )
     expected_games = _expected_games(request.length_probs, avail_per_game)
@@ -279,17 +328,75 @@ def project_skater_round(
     )
 
 
+@dataclass(frozen=True)
+class CombinedRoundRequest:
+    pts_per_game: float
+    length_probs_first: dict[int, float]
+    p_advance: float
+    length_probs_second: dict[int, float]
+    availability_curve: list[float] | tuple[float, ...] | None = None
+    availability: float = 1.0
+
+
+def _resolve_combined_round_request(
+    request: CombinedRoundRequest | float,
+    first_or_runtime: dict[int, float] | ProjectionRuntime | None,
+    legacy_args: tuple[object, ...],
+    legacy_kwargs: dict[str, object],
+) -> tuple[CombinedRoundRequest, ProjectionRuntime]:
+    if isinstance(request, CombinedRoundRequest):
+        runtime = _resolve_projection_runtime(
+            first_or_runtime if isinstance(first_or_runtime, ProjectionRuntime) else None,
+            legacy_kwargs,
+        )
+        if legacy_args:
+            raise TypeError("combined request calls do not accept extra positional arguments")
+        if first_or_runtime is not None and not isinstance(first_or_runtime, ProjectionRuntime):
+            raise TypeError(
+                "combined request calls accept only ProjectionRuntime as second argument"
+            )
+        return request, runtime
+
+    if not isinstance(first_or_runtime, dict) or len(legacy_args) != 2:
+        raise TypeError(
+            "legacy project_skater_combined calls require first/second length probs and p_advance"
+        )
+
+    unexpected = set(legacy_kwargs) - {
+        "availability_curve",
+        "availability",
+        "seed",
+        "n_sims",
+        "horizon",
+    }
+    if unexpected:
+        names = ", ".join(sorted(unexpected))
+        raise TypeError(f"unexpected project_skater_combined kwargs: {names}")
+
+    request_data = CombinedRoundRequest(
+        pts_per_game=float(request),
+        length_probs_first=first_or_runtime,
+        p_advance=_float_value(legacy_args[0], "p_advance"),
+        length_probs_second=cast(dict[int, float], legacy_args[1]),
+        availability_curve=cast(
+            list[float] | tuple[float, ...] | None,
+            legacy_kwargs.get("availability_curve"),
+        ),
+        availability=_float_kwarg(legacy_kwargs, "availability", 1.0),
+    )
+    runtime_kwargs = {
+        key: value
+        for key, value in legacy_kwargs.items()
+        if key in {"seed", "n_sims", "horizon"}
+    }
+    return request_data, _resolve_projection_runtime(None, runtime_kwargs)
+
+
 def project_skater_combined(
-    pts_per_game: float,
-    length_probs_first: dict[int, float],
-    p_advance: float,
-    length_probs_second: dict[int, float],
-    *,
-    availability_curve: list[float] | tuple[float, ...] | None = None,
-    availability: float = 1.0,
-    seed: int = 20260827,
-    n_sims: int = DEFAULT_N_SIMS,
-    horizon: int = DEFAULT_HORIZON,
+    request: CombinedRoundRequest | float,
+    first_or_runtime: dict[int, float] | ProjectionRuntime | None = None,
+    *legacy_args: object,
+    **legacy_kwargs: object,
 ) -> RoundProjection:
     """Project a skater's fantasy points across two back-to-back series (a combined draft).
 
@@ -302,20 +409,30 @@ def project_skater_combined(
     exactly to :func:`project_skater_round` when ``p_advance == 0``. Deterministic given
     ``seed``.
     """
-    rate = max(float(pts_per_game), 0.0)
-    p_adv = min(max(float(p_advance), 0.0), 1.0)
-    span = 2 * int(horizon)
-    avail_per_game = _availability_per_game(availability_curve, availability, span)
-    rng = np.random.default_rng(seed)
+    resolved_request, runtime = _resolve_combined_round_request(
+        request,
+        first_or_runtime,
+        legacy_args,
+        legacy_kwargs,
+    )
+    rate = max(float(resolved_request.pts_per_game), 0.0)
+    p_adv = min(max(float(resolved_request.p_advance), 0.0), 1.0)
+    span = 2 * int(runtime.horizon)
+    avail_per_game = _availability_per_game(
+        resolved_request.availability_curve,
+        resolved_request.availability,
+        span,
+    )
+    rng = np.random.default_rng(runtime.seed)
 
-    first = normalize_length_probs(length_probs_first)
-    second = normalize_length_probs(length_probs_second)
+    first = normalize_length_probs(resolved_request.length_probs_first)
+    second = normalize_length_probs(resolved_request.length_probs_second)
     lengths_first = np.asarray(list(first.keys()), dtype=int)
     weights_first = np.asarray(list(first.values()), dtype=float)
     lengths_second = np.asarray(list(second.keys()), dtype=int)
     weights_second = np.asarray(list(second.values()), dtype=float)
 
-    n = int(n_sims)
+    n = int(runtime.n_sims)
     len_first = rng.choice(lengths_first, size=n, p=weights_first)
     len_second = rng.choice(lengths_second, size=n, p=weights_second)
     advanced = rng.random(n) < p_adv
@@ -332,13 +449,17 @@ def project_skater_combined(
     points_draw = rng.poisson(rate, size=(n, span)).astype(float)
     samples = (points_draw * played).sum(axis=1)
 
-    avail_first = avail_per_game[:horizon]
-    expected_games = _expected_games(length_probs_first, avail_first) + p_adv * _expected_games(
-        length_probs_second, avail_first
+    avail_first = avail_per_game[: runtime.horizon]
+    expected_games = _expected_games(
+        resolved_request.length_probs_first,
+        avail_first,
+    ) + p_adv * _expected_games(
+        resolved_request.length_probs_second,
+        avail_first,
     )
-    e_length = expected_series_length(length_probs_first) + p_adv * expected_series_length(
-        length_probs_second
-    )
+    e_length = expected_series_length(
+        resolved_request.length_probs_first
+    ) + p_adv * expected_series_length(resolved_request.length_probs_second)
     multiplier = expected_games / e_length if e_length > 0 else 1.0
     p10, p50, p90 = (float(np.quantile(samples, q)) for q in (0.10, 0.50, 0.90))
     return RoundProjection(
@@ -374,6 +495,38 @@ class ProjectionConfig:
     n_sims: int = DEFAULT_N_SIMS
     horizon: int = DEFAULT_HORIZON
     production_config: SkaterProductionConfig | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class ProjectionEvaluationRequest:
+    skater_games: pd.DataFrame
+    players: pd.DataFrame
+    team_games: pd.DataFrame
+    series: pd.DataFrame
+    config: ProjectionConfig | None = None
+
+
+def _resolve_projection_evaluation_request(
+    request: ProjectionEvaluationRequest | pd.DataFrame,
+    legacy_args: tuple[object, ...],
+    config: ProjectionConfig | None,
+) -> ProjectionEvaluationRequest:
+    if isinstance(request, ProjectionEvaluationRequest):
+        if legacy_args or config is not None:
+            raise TypeError("pass ProjectionEvaluationRequest or legacy dataframes, not both")
+        return request
+    if len(legacy_args) != 3:
+        raise TypeError(
+            "legacy evaluate_skater_projections calls require players, team_games, and series"
+        )
+    players, team_games, series = legacy_args
+    return ProjectionEvaluationRequest(
+        skater_games=request,
+        players=cast(pd.DataFrame, players),
+        team_games=cast(pd.DataFrame, team_games),
+        series=cast(pd.DataFrame, series),
+        config=config,
+    )
 
 
 @dataclass
@@ -515,11 +668,8 @@ class ProjectionResult:
 
 
 def evaluate_skater_projections(
-    skater_games: pd.DataFrame,
-    players: pd.DataFrame,
-    team_games: pd.DataFrame,
-    series: pd.DataFrame,
-    *,
+    request: ProjectionEvaluationRequest | pd.DataFrame,
+    *legacy_args: object,
     config: ProjectionConfig | None = None,
 ) -> ProjectionResult:
     """Compose the sub-models and evaluate round projections on held-out seasons.
@@ -531,13 +681,16 @@ def evaluate_skater_projections(
     totals against actual round fantasy points and the two fixed baselines. Every
     reported number is carried on the returned :class:`ProjectionResult`.
     """
-    resolved_config = config or ProjectionConfig()
+    resolved_request = _resolve_projection_evaluation_request(request, legacy_args, config)
+    resolved_config = resolved_request.config or ProjectionConfig()
     evaluation = evaluate_projection_model(
-        skater_games,
-        players,
-        team_games,
-        series,
-        config=resolved_config,
+        ProjectionEvaluationRequest(
+            skater_games=resolved_request.skater_games,
+            players=resolved_request.players,
+            team_games=resolved_request.team_games,
+            series=resolved_request.series,
+            config=resolved_config,
+        ),
         project_round=project_skater_round,
         baseline_reg_games=BASELINE_REG_GAMES,
     )
@@ -592,7 +745,9 @@ def evaluate_skater_projections_from_normalized(
     team_games = pd.read_parquet(normalized_dir / "team_games.parquet")
     series = pd.read_parquet(normalized_dir / "series.parquet")
 
-    result = evaluate_skater_projections(skater_games, players, team_games, series, config=config)
+    result = evaluate_skater_projections(
+        ProjectionEvaluationRequest(skater_games, players, team_games, series, config)
+    )
     manifest = add_git_provenance(result.manifest())
 
     artifact_dir.mkdir(parents=True, exist_ok=True)

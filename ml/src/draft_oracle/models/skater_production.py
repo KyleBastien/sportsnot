@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -264,6 +264,29 @@ def build_production_dataset(
     data["season_end_year"] = (data["season_id"] % 10000).astype(int)
     data["is_defense"] = (data["position"] == "D").astype(float)
     return data
+
+
+def _resolve_production_training_request(
+    request: ProductionDatasetRequest | pd.DataFrame,
+    legacy_args: tuple[object, ...],
+    config: SkaterProductionConfig | None,
+) -> ProductionDatasetRequest:
+    if isinstance(request, ProductionDatasetRequest):
+        if legacy_args or config is not None:
+            raise TypeError("pass ProductionDatasetRequest or legacy dataframes, not both")
+        return request
+    if len(legacy_args) != 3:
+        raise TypeError(
+            "legacy train_skater_production_model calls require players, team_games, and series"
+        )
+    players, team_games, series = legacy_args
+    return ProductionDatasetRequest(
+        skater_games=request,
+        players=cast(pd.DataFrame, players),
+        team_games=cast(pd.DataFrame, team_games),
+        series=cast(pd.DataFrame, series),
+        config=config,
+    )
 
 
 # ── Position+team priors (fit on training rows only) ─────────────────────
@@ -760,11 +783,8 @@ def _per_season_metrics(
 
 
 def train_skater_production_model(
-    skater_games: pd.DataFrame,
-    players: pd.DataFrame,
-    team_games: pd.DataFrame,
-    series: pd.DataFrame,
-    *,
+    request: ProductionDatasetRequest | pd.DataFrame,
+    *legacy_args: object,
     config: SkaterProductionConfig | None = None,
 ) -> SkaterProductionResult:
     """Train, select, and evaluate the skater per-game production model end-to-end.
@@ -776,27 +796,34 @@ def train_skater_production_model(
     shipped model on all seasons with all-data priors. Every reported number is
     carried on the returned :class:`SkaterProductionResult` -- nothing is hidden.
     """
-    config = config or SkaterProductionConfig()
+    training_request = _resolve_production_training_request(request, legacy_args, config)
+    resolved_config = training_request.config or SkaterProductionConfig()
     dataset = build_production_dataset(
-        ProductionDatasetRequest(skater_games, players, team_games, series, config)
+        ProductionDatasetRequest(
+            training_request.skater_games,
+            training_request.players,
+            training_request.team_games,
+            training_request.series,
+            resolved_config,
+        )
     )
     if dataset.empty:
         raise ValueError("no skater-round rows available to train the production model")
 
-    labels = skater_round_production(skater_games, series)
+    labels = skater_round_production(training_request.skater_games, training_request.series)
 
-    frames = _split_production_dataset(dataset, config)
-    val_mae = _validation_mae_by_model(frames.train, frames.val, config.seed)
+    frames = _split_production_dataset(dataset, resolved_config)
+    val_mae = _validation_mae_by_model(frames.train, frames.val, resolved_config.seed)
     chosen = min(val_mae, key=lambda k: val_mae[k])
 
-    eval_model = _fit_skater_model(chosen, frames.train_val, config)
+    eval_model = _fit_skater_model(chosen, frames.train_val, resolved_config)
     evaluation = _evaluate_production_model(eval_model, frames)
     cold_cases = _count_cold_cases(labels, dataset, frames.split.test_years)
-    model = _fit_skater_model(chosen, dataset, config)
+    model = _fit_skater_model(chosen, dataset, resolved_config)
 
     return SkaterProductionResult(
         model=model,
-        config=config,
+        config=resolved_config,
         split=frames.split,
         chosen_model_type=chosen,
         val_mae_by_model=val_mae,
@@ -837,7 +864,9 @@ def train_skater_production_from_normalized(
     team_games = pd.read_parquet(normalized_dir / "team_games.parquet")
     series = pd.read_parquet(normalized_dir / "series.parquet")
 
-    result = train_skater_production_model(skater_games, players, team_games, series, config=config)
+    result = train_skater_production_model(
+        ProductionDatasetRequest(skater_games, players, team_games, series, config)
+    )
     manifest = add_git_provenance(result.manifest())
 
     artifact_dir.mkdir(parents=True, exist_ok=True)

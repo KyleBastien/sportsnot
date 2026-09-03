@@ -20,6 +20,78 @@ from draft_oracle.cli._project_defaults import (
 if TYPE_CHECKING:
     from draft_oracle.optimize.opponents import FittedLeagueOpponents
     from draft_oracle.optimize.simulator import DraftAsset, DraftState, OpponentModel
+    from draft_oracle.projection_artifact import ProjectArtifactConfig, ProjectArtifactResult
+
+
+def _maybe_refresh_normalized_archive(
+    *,
+    no_refresh: bool,
+    snapshot: str,
+    archive_dir: Path,
+    normalized_dir: Path,
+) -> None:
+    if no_refresh or snapshot:
+        return
+    from draft_oracle.ingest.normalize import normalize_archive
+
+    normalize_archive(archive_dir=archive_dir, out_dir=normalized_dir)
+
+
+def _project_config(
+    *,
+    seed: int,
+    managers: int,
+    ir: bool,
+    no_refresh: bool,
+    slot_strategies: bool,
+    slot_rollouts: int,
+) -> ProjectArtifactConfig:
+    from draft_oracle.optimize.slot_strategies import SlotStrategyConfig
+    from draft_oracle.projection_artifact import ProjectArtifactConfig
+
+    return ProjectArtifactConfig(
+        seed=seed,
+        managers=managers,
+        ir=ir,
+        no_refresh=no_refresh,
+        slot_strategies=slot_strategies,
+        slot_strategy_config=SlotStrategyConfig(seed=seed, rollouts=slot_rollouts),
+    )
+
+
+def _slot_summary_label(slots: Mapping[str, object]) -> str:
+    configured = slots.get("opponent_label")
+    if isinstance(configured, str):
+        return configured
+    return "fitted" if bool(slots.get("fitted_opponents", False)) else "greedy"
+
+
+def _echo_project_summary(result: ProjectArtifactResult, out_dir: Path) -> None:
+    counts = result.manifest["counts"]
+    scarcity = result.manifest["scarcity"]
+    typer.echo(f"Projection artifact -> {out_dir}")
+    typer.echo(
+        f"  season {result.season} round {result.playoff_round} (as of {result.as_of_cutoff})"
+    )
+    typer.echo(
+        f"  eligible: {counts['eligible_teams']} teams / "
+        f"{counts['skaters_projected']} skaters ({counts['skaters_injured']} injured)"
+    )
+    repl = scarcity["replacement_level"]
+    typer.echo(
+        f"  VOR: {scarcity['managers']} managers, IR {'on' if scarcity['ir'] else 'off'}; "
+        f"replacement F {repl['F']:.2f} / D {repl['D']:.2f} / G {repl['G']:.2f}"
+    )
+    typer.echo(f"  snapshot id: {result.manifest['snapshot_id']}")
+    slots = result.manifest.get("slot_strategies")
+    if slots:
+        typer.echo(
+            f"  slot strategies: {len(slots['slots'])} slots"
+            f" ({_slot_summary_label(slots)} opponents);"
+            f" best slot {slots['best_slot']}"
+        )
+    for warning in result.warnings:
+        typer.echo(f"  warning: {warning}")
 
 
 def project(
@@ -67,59 +139,30 @@ def project(
     run_manifest.json under artifacts_root/<season>-r<round>/. Eliminated teams are
     excluded automatically.
     """
-    from draft_oracle.ingest.normalize import normalize_archive
-    from draft_oracle.optimize.slot_strategies import SlotStrategyConfig
-    from draft_oracle.projection_artifact import (
-        ProjectArtifactConfig,
-        build_projection_artifact_from_normalized,
-    )
+    from draft_oracle.projection_artifact import build_projection_artifact_from_normalized
 
-    if not no_refresh and not snapshot:
-        normalize_archive(archive_dir=archive_dir, out_dir=normalized_dir)
+    _maybe_refresh_normalized_archive(
+        no_refresh=no_refresh,
+        snapshot=snapshot,
+        archive_dir=archive_dir,
+        normalized_dir=normalized_dir,
+    )
     result, out_dir = build_projection_artifact_from_normalized(
         season=season,
         playoff_round=playoff_round,
         normalized_dir=normalized_dir,
         artifacts_root=artifacts_root,
         snapshot=snapshot or None,
-        config=ProjectArtifactConfig(
+        config=_project_config(
             seed=seed,
             managers=managers,
             ir=ir,
             no_refresh=no_refresh,
             slot_strategies=slot_strategies,
-            slot_strategy_config=SlotStrategyConfig(seed=seed, rollouts=slot_rollouts),
+            slot_rollouts=slot_rollouts,
         ),
     )
-    counts = result.manifest["counts"]
-    scarcity = result.manifest["scarcity"]
-    typer.echo(f"Projection artifact -> {out_dir}")
-    typer.echo(
-        f"  season {result.season} round {result.playoff_round} (as of {result.as_of_cutoff})"
-    )
-    typer.echo(
-        f"  eligible: {counts['eligible_teams']} teams / "
-        f"{counts['skaters_projected']} skaters ({counts['skaters_injured']} injured)"
-    )
-    repl = scarcity["replacement_level"]
-    typer.echo(
-        f"  VOR: {scarcity['managers']} managers, IR {'on' if scarcity['ir'] else 'off'}; "
-        f"replacement F {repl['F']:.2f} / D {repl['D']:.2f} / G {repl['G']:.2f}"
-    )
-    typer.echo(f"  snapshot id: {result.manifest['snapshot_id']}")
-    slots = result.manifest.get("slot_strategies")
-    if slots:
-        opp_label = slots.get(
-            "opponent_label",
-            "fitted" if slots["fitted_opponents"] else "greedy",
-        )
-        typer.echo(
-            f"  slot strategies: {len(slots['slots'])} slots"
-            f" ({opp_label} opponents);"
-            f" best slot {slots['best_slot']}"
-        )
-    for warning in result.warnings:
-        typer.echo(f"  warning: {warning}")
+    _echo_project_summary(result, out_dir)
 
 
 def recommend(

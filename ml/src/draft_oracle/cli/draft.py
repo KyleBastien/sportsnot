@@ -430,26 +430,33 @@ class DraftSession:
 
     def roster(self, manager_token: str | None = None) -> ActionResult:
         """A manager's current roster (defaults to the owner's)."""
-        if manager_token is None:
-            manager = self.owner
-        else:
-            resolved = resolve_manager(self.managers, manager_token)
-            if resolved is None:
-                return ActionResult(False, f"unknown manager {manager_token!r}")
-            manager = resolved
+        manager, error = self._resolve_roster_manager(manager_token)
+        if error is not None:
+            return ActionResult(False, error)
+        assert manager is not None
         roster = self.state.rosters[manager]
-        capacity = self.state.capacity
-        marker = " (you)" if manager == self.owner else ""
-        lines = [f"Roster - {manager}{marker}"]
+        lines = [self._roster_header(manager)]
         for label, bucket, limit in (
-            ("F", roster.forwards, capacity.forwards),
-            ("D", roster.defense, capacity.defense),
-            ("G", roster.goalies, capacity.goalies),
+            ("F", roster.forwards, self.state.capacity.forwards),
+            ("D", roster.defense, self.state.capacity.defense),
+            ("G", roster.goalies, self.state.capacity.goalies),
         ):
-            lines.append(f"  {label} ({len(bucket)}/{limit}):")
-            for asset in bucket:
-                lines.append(f"    {asset.name[:22]:22} {asset.team_abbrev:4} {_value(asset):6.2f}")
+            lines.extend(_roster_bucket_lines(label, bucket, limit))
         return ActionResult(True, "roster", lines)
+
+    def _resolve_roster_manager(
+        self, manager_token: str | None
+    ) -> tuple[str | None, str | None]:
+        if manager_token is None:
+            return self.owner, None
+        manager = resolve_manager(self.managers, manager_token)
+        if manager is None:
+            return None, f"unknown manager {manager_token!r}"
+        return manager, None
+
+    def _roster_header(self, manager: str) -> str:
+        marker = " (you)" if manager == self.owner else ""
+        return f"Roster - {manager}{marker}"
 
     def build_opponent_model(self) -> OpponentModel | Mapping[str, OpponentModel]:
         """The opponent policy the recommender rolls out: fitted per-manager or greedy.
@@ -554,6 +561,13 @@ class DraftSession:
 
 def _value(asset: DraftAsset) -> float:
     return float(asset.projection if asset.projection is not None else asset.rank_value)
+
+
+def _roster_bucket_lines(label: str, bucket: list[DraftAsset], limit: int) -> list[str]:
+    lines = [f"  {label} ({len(bucket)}/{limit}):"]
+    for asset in bucket:
+        lines.append(f"    {asset.name[:22]:22} {asset.team_abbrev:4} {_value(asset):6.2f}")
+    return lines
 
 
 # ── Interactive loop + Typer command ──────────────────────────────────────
@@ -701,6 +715,63 @@ def _dispatch(session: DraftSession, parsed: ParsedCommand) -> ActionResult:
     return ActionResult(False, f"unknown command {parsed.name!r}")
 
 
+def _resume_session_path(resume: Path, session: Path | None) -> Path:
+    if session is not None and session.exists() and not _same_path(resume, session):
+        raise typer.BadParameter(
+            f"session log already exists at {session} and differs from resumed log "
+            f"{resume}; omit --session to resume in place or choose a new path"
+        )
+    return session or resume
+
+
+def _new_session_path(session: Path | None) -> Path:
+    session_path = session or Path("draft-session.json")
+    if session_path.exists():
+        raise typer.BadParameter(
+            f"session log already exists at {session_path}; use --resume {session_path} "
+            "or choose a different --session path"
+        )
+    return session_path
+
+
+def _validate_draft_slot(slot: int, manager_count: int) -> None:
+    if not 1 <= slot <= manager_count:
+        raise typer.BadParameter(f"slot must be in 1..{manager_count}")
+
+
+def _new_draft_session(
+    artifact: Path,
+    managers: str,
+    *,
+    slot: int,
+    ir: bool,
+    eliminated: str,
+    temperature: float,
+    seed: int,
+    rollouts: int,
+    opponents: str,
+    opponent_artifact: Path,
+) -> DraftSession:
+    manager_ids = parse_managers(managers)
+    manager_count = len(manager_ids)
+    _validate_draft_slot(slot, manager_count)
+    eliminated_teams = [token for token in eliminated.split(",") if token.strip()]
+    opponents_kind = resolve_opponents_kind(opponents, opponent_artifact)
+    return DraftSession.from_artifact(
+        artifact,
+        manager_count=manager_count,
+        slot=slot,
+        ir=ir,
+        eliminated=eliminated_teams,
+        temperature=temperature,
+        seed=seed,
+        rollouts=rollouts,
+        managers=manager_ids,
+        opponents=opponents_kind,
+        opponent_artifact_dir=opponent_artifact,
+    )
+
+
 def draft(
     artifact: Annotated[
         Path | None,
@@ -755,41 +826,23 @@ def draft(
     to their real seat.
     """
     if resume is not None:
-        if session is not None and session.exists() and not _same_path(resume, session):
-            raise typer.BadParameter(
-                f"session log already exists at {session} and differs from resumed log "
-                f"{resume}; omit --session to resume in place or choose a new path"
-            )
-        loaded = DraftSession.resume(resume)
-        session_path = session or resume
-        _run_loop(loaded, session_path)
+        session_path = _resume_session_path(resume, session)
+        _run_loop(DraftSession.resume(resume), session_path)
         return
     if artifact is None:
         raise typer.BadParameter("provide --artifact <dir> (or --resume <session.json>)")
-    manager_ids = parse_managers(managers)
-    manager_count = len(manager_ids)
-    if not 1 <= slot <= manager_count:
-        raise typer.BadParameter(f"slot must be in 1..{manager_count}")
-    session_path = session or Path("draft-session.json")
-    if session_path.exists():
-        raise typer.BadParameter(
-            f"session log already exists at {session_path}; use --resume {session_path} "
-            "or choose a different --session path"
-        )
-    eliminated_teams = [token for token in eliminated.split(",") if token.strip()]
-    opponents_kind = resolve_opponents_kind(opponents, opponent_artifact)
-    new_session = DraftSession.from_artifact(
+    session_path = _new_session_path(session)
+    new_session = _new_draft_session(
         artifact,
-        manager_count=manager_count,
+        managers,
         slot=slot,
         ir=ir,
-        eliminated=eliminated_teams,
+        eliminated=eliminated,
         temperature=temperature,
         seed=seed,
         rollouts=rollouts,
-        managers=manager_ids,
-        opponents=opponents_kind,
-        opponent_artifact_dir=opponent_artifact,
+        opponents=opponents,
+        opponent_artifact=opponent_artifact,
     )
     _run_loop(new_session, session_path)
 

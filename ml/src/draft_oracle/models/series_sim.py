@@ -77,6 +77,7 @@ __all__ = [
     "WINS_NEEDED",
     "LengthBin",
     "SeriesCalibrationBin",
+    "SeriesMonteCarloRequest",
     "SeriesOutcome",
     "SeriesSimConfig",
     "SeriesSimResult",
@@ -156,6 +157,30 @@ class SeriesOutcome:
     e_goalie_points_b: float
 
 
+@dataclass(frozen=True)
+class SeriesMonteCarloRequest:
+    p_a_home: float
+    p_a_away: float
+    shutout_prob_a: float = 0.0
+    shutout_prob_b: float = 0.0
+    n_sims: int = 20000
+    seed: int = 20260827
+
+
+def _series_float_kwarg(legacy_kwargs: dict[str, object], key: str, default: float) -> float:
+    value = legacy_kwargs.get(key, default)
+    if not isinstance(value, int | float):
+        raise TypeError(f"{key} must be numeric")
+    return float(value)
+
+
+def _series_int_kwarg(legacy_kwargs: dict[str, object], key: str, default: int) -> int:
+    value = legacy_kwargs.get(key, default)
+    if not isinstance(value, int):
+        raise TypeError(f"{key} must be an int")
+    return value
+
+
 def _enumerate_paths(per_game: Sequence[float]) -> list[tuple[float, str, int, int]]:
     """Exhaustively enumerate every series path and its probability.
 
@@ -227,14 +252,35 @@ def simulate_series(
     )
 
 
+def _resolve_series_monte_carlo_request(
+    request: SeriesMonteCarloRequest | float,
+    p_a_away: float | None,
+    legacy_kwargs: dict[str, object],
+) -> SeriesMonteCarloRequest:
+    if isinstance(request, SeriesMonteCarloRequest):
+        if p_a_away is not None or legacy_kwargs:
+            raise TypeError("SeriesMonteCarloRequest calls do not accept extra arguments")
+        return request
+    if p_a_away is None:
+        raise TypeError("legacy simulate_series_monte_carlo calls require p_a_away")
+    unexpected = set(legacy_kwargs) - {"shutout_prob_a", "shutout_prob_b", "n_sims", "seed"}
+    if unexpected:
+        names = ", ".join(sorted(unexpected))
+        raise TypeError(f"unexpected simulate_series_monte_carlo kwargs: {names}")
+    return SeriesMonteCarloRequest(
+        p_a_home=float(request),
+        p_a_away=float(p_a_away),
+        shutout_prob_a=_series_float_kwarg(legacy_kwargs, "shutout_prob_a", 0.0),
+        shutout_prob_b=_series_float_kwarg(legacy_kwargs, "shutout_prob_b", 0.0),
+        n_sims=_series_int_kwarg(legacy_kwargs, "n_sims", 20000),
+        seed=_series_int_kwarg(legacy_kwargs, "seed", 20260827),
+    )
+
+
 def simulate_series_monte_carlo(
-    p_a_home: float,
-    p_a_away: float,
-    *,
-    shutout_prob_a: float = 0.0,
-    shutout_prob_b: float = 0.0,
-    n_sims: int = 20000,
-    seed: int = 20260827,
+    request: SeriesMonteCarloRequest | float,
+    p_a_away: float | None = None,
+    **legacy_kwargs: object,
 ) -> SeriesOutcome:
     """Seeded Monte-Carlo estimate of :func:`simulate_series` (cross-check only).
 
@@ -242,9 +288,10 @@ def simulate_series_monte_carlo(
     this exists to validate the enumeration and to honor the "deterministic under a
     fixed seed" contract for any stochastic component (SPEC section 3).
     """
-    rng = np.random.default_rng(seed)
-    p_home = min(max(float(p_a_home), 0.0), 1.0)
-    p_away = min(max(float(p_a_away), 0.0), 1.0)
+    resolved = _resolve_series_monte_carlo_request(request, p_a_away, legacy_kwargs)
+    rng = np.random.default_rng(resolved.seed)
+    p_home = min(max(float(resolved.p_a_home), 0.0), 1.0)
+    p_away = min(max(float(resolved.p_a_away), 0.0), 1.0)
     per_game = game_win_probs(p_home, p_away)
 
     length_counts: dict[int, int] = dict.fromkeys(_SERIES_LENGTHS, 0)
@@ -253,7 +300,7 @@ def simulate_series_monte_carlo(
     total_wins_b = 0
     total_games = 0
 
-    for _ in range(int(n_sims)):
+    for _ in range(int(resolved.n_sims)):
         wins_a = 0
         wins_b = 0
         game_index = 0
@@ -271,7 +318,7 @@ def simulate_series_monte_carlo(
         if wins_a == WINS_NEEDED:
             a_series_wins += 1
 
-    n = float(n_sims)
+    n = float(resolved.n_sims)
     p_a = a_series_wins / n
     e_wins_a = total_wins_a / n
     e_wins_b = total_wins_b / n
@@ -282,8 +329,8 @@ def simulate_series_monte_carlo(
         e_games=total_games / n,
         e_wins_a=e_wins_a,
         e_wins_b=e_wins_b,
-        e_goalie_points_a=expected_goalie_points(e_wins_a, shutout_prob_a),
-        e_goalie_points_b=expected_goalie_points(e_wins_b, shutout_prob_b),
+        e_goalie_points_a=expected_goalie_points(e_wins_a, resolved.shutout_prob_a),
+        e_goalie_points_b=expected_goalie_points(e_wins_b, resolved.shutout_prob_b),
     )
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Hashable, Mapping, Sequence
 from typing import Any
 
 import pandas as pd
@@ -98,18 +98,13 @@ def _build_series_evals(
     }
     evals: list[SeriesEval] = []
     for row in round_series.to_dict("records"):
-        top_raw = row.get("top_seed_team_id")
-        bottom_raw = row.get("bottom_seed_team_id")
-        winner_raw = row.get("winning_team_id")
-        missing_ids = any(pd.isna(value) for value in (top_raw, bottom_raw, winner_raw))
-        if missing_ids:
+        ids = _series_ids(row)
+        if ids is None:
             continue
-        assert top_raw is not None and bottom_raw is not None and winner_raw is not None
-        top_id = int(top_raw)
-        bottom_id = int(bottom_raw)
+        top_id, bottom_id, winner_id = ids
         if top_id not in stat_by_team:
             continue
-        top_won = 1 if int(winner_raw) == top_id else 0
+        top_won = 1 if winner_id == top_id else 0
         evals.append(
             SeriesEval(
                 top_id=top_id,
@@ -122,3 +117,17 @@ def _build_series_evals(
             )
         )
     return evals
+
+
+def _series_ids(row: Mapping[Hashable, Any]) -> tuple[int, int, int] | None:
+    """Typed team ids for one series row, or ``None`` when the row is incomplete."""
+    top_raw = row.get("top_seed_team_id")
+    bottom_raw = row.get("bottom_seed_team_id")
+    winner_raw = row.get("winning_team_id")
+    missing_top = pd.isna(top_raw)
+    missing_bottom = pd.isna(bottom_raw)
+    missing_winner = pd.isna(winner_raw)
+    if missing_top or missing_bottom or missing_winner:
+        return None
+    assert top_raw is not None and bottom_raw is not None and winner_raw is not None
+    return int(top_raw), int(bottom_raw), int(winner_raw)
