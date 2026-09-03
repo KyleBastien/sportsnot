@@ -8,6 +8,7 @@ status normalization, override merge precedence, and source-failure fallback.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import httpx
@@ -212,15 +213,7 @@ def test_client_fetches_and_caches(tmp_path: Path) -> None:
         assert request.url.path.endswith("/injuries")
         return httpx.Response(200, json=_load_feed())
 
-    client = EspnInjuriesClient(
-        cache_dir=tmp_path / "cache",
-        delay=0.0,
-        retry_backoff=0.0,
-        runtime=EspnInjuriesClientRuntime(
-            client=httpx.Client(transport=httpx.MockTransport(handler)),
-            sleep=_noop_sleep,
-        ),
-    )
+    client = _client(tmp_path, handler)
     first = client.injuries()
     assert len(first.injuries) == 2
     client.injuries()  # served from cache
@@ -232,16 +225,7 @@ def test_client_raises_loudly_on_persistent_failure(tmp_path: Path) -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(503, json={"error": "unavailable"})
 
-    client = EspnInjuriesClient(
-        cache_dir=tmp_path / "cache",
-        delay=0.0,
-        retry_backoff=0.0,
-        max_attempts=2,
-        runtime=EspnInjuriesClientRuntime(
-            client=httpx.Client(transport=httpx.MockTransport(handler)),
-            sleep=_noop_sleep,
-        ),
-    )
+    client = _client(tmp_path, handler, max_attempts=2)
     with client, pytest.raises(NHLApiError):
         client.injuries()
 
@@ -249,35 +233,36 @@ def test_client_raises_loudly_on_persistent_failure(tmp_path: Path) -> None:
 # ── build_injuries_table: end-to-end + graceful degradation ──────────────
 
 
-def _live_client(tmp_path: Path) -> EspnInjuriesClient:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json=_load_feed())
-
+def _client(
+    tmp_path: Path,
+    handler: Callable[[httpx.Request], httpx.Response],
+    *,
+    max_attempts: int = 5,
+) -> EspnInjuriesClient:
     return EspnInjuriesClient(
         cache_dir=tmp_path / "cache",
         delay=0.0,
         retry_backoff=0.0,
+        max_attempts=max_attempts,
         runtime=EspnInjuriesClientRuntime(
             client=httpx.Client(transport=httpx.MockTransport(handler)),
             sleep=_noop_sleep,
         ),
     )
+
+
+def _live_client(tmp_path: Path) -> EspnInjuriesClient:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_load_feed())
+
+    return _client(tmp_path, handler)
 
 
 def _failing_client(tmp_path: Path) -> EspnInjuriesClient:
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(500, json={"error": "boom"})
 
-    return EspnInjuriesClient(
-        cache_dir=tmp_path / "cache",
-        delay=0.0,
-        retry_backoff=0.0,
-        max_attempts=2,
-        runtime=EspnInjuriesClientRuntime(
-            client=httpx.Client(transport=httpx.MockTransport(handler)),
-            sleep=_noop_sleep,
-        ),
-    )
+    return _client(tmp_path, handler, max_attempts=2)
 
 
 def test_build_writes_table_and_merges_overrides(tmp_path: Path) -> None:
