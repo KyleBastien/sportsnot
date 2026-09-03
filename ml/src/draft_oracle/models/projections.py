@@ -345,17 +345,12 @@ def _resolve_combined_round_request(
     legacy_kwargs: dict[str, object],
 ) -> tuple[CombinedRoundRequest, ProjectionRuntime]:
     if isinstance(request, CombinedRoundRequest):
-        runtime = _resolve_projection_runtime(
-            first_or_runtime if isinstance(first_or_runtime, ProjectionRuntime) else None,
+        return _resolve_combined_request_data(
+            request,
+            first_or_runtime,
+            legacy_args,
             legacy_kwargs,
         )
-        if legacy_args:
-            raise TypeError("combined request calls do not accept extra positional arguments")
-        if first_or_runtime is not None and not isinstance(first_or_runtime, ProjectionRuntime):
-            raise TypeError(
-                "combined request calls accept only ProjectionRuntime as second argument"
-            )
-        return request, runtime
 
     if not isinstance(first_or_runtime, dict) or len(legacy_args) != 2:
         raise TypeError(
@@ -390,6 +385,27 @@ def _resolve_combined_round_request(
         if key in {"seed", "n_sims", "horizon"}
     }
     return request_data, _resolve_projection_runtime(None, runtime_kwargs)
+
+
+def _resolve_combined_request_data(
+    request: CombinedRoundRequest,
+    first_or_runtime: dict[int, float] | ProjectionRuntime | None,
+    legacy_args: tuple[object, ...],
+    legacy_kwargs: dict[str, object],
+) -> tuple[CombinedRoundRequest, ProjectionRuntime]:
+    runtime = _resolve_projection_runtime(
+        first_or_runtime if isinstance(first_or_runtime, ProjectionRuntime) else None,
+        legacy_kwargs,
+    )
+    if legacy_args:
+        raise TypeError("combined request calls do not accept extra positional arguments")
+    wrong_runtime = (
+        first_or_runtime is not None
+        and not isinstance(first_or_runtime, ProjectionRuntime)
+    )
+    if wrong_runtime:
+        raise TypeError("combined request calls accept only ProjectionRuntime as second argument")
+    return request, runtime
 
 
 def project_skater_combined(

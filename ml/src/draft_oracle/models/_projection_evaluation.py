@@ -461,21 +461,7 @@ def _resolve_projection_request(
     if options.project_round is None or options.baseline_reg_games is None:
         raise TypeError("project_round and baseline_reg_games are required")
     if _is_projection_request_like(request):
-        request_like = cast(_ProjectionEvaluationRequestLike, request)
-        if legacy_args:
-            raise TypeError("projection request calls do not accept extra positional arguments")
-        resolved_config = options.config or request_like.config
-        if resolved_config is None:
-            raise TypeError("projection request must provide config")
-        return _EvaluateProjectionModelRequest(
-            skater_games=request_like.skater_games,
-            players=request_like.players,
-            team_games=request_like.team_games,
-            series=request_like.series,
-            config=resolved_config,
-            project_round=options.project_round,
-            baseline_reg_games=options.baseline_reg_games,
-        )
+        return _request_projection_eval(request, legacy_args, options)
     if len(legacy_args) != 3 or options.config is None:
         raise TypeError(
             "legacy evaluate_projection_model calls require players, team_games, series, and config"
@@ -487,6 +473,29 @@ def _resolve_projection_request(
         team_games=cast(pd.DataFrame, team_games),
         series=cast(pd.DataFrame, series),
         config=options.config,
+        project_round=options.project_round,
+        baseline_reg_games=options.baseline_reg_games,
+    )
+
+
+def _request_projection_eval(
+    request: ProjectionEvaluationRequest | pd.DataFrame,
+    legacy_args: tuple[object, ...],
+    options: _ProjectionRequestOptions,
+) -> _EvaluateProjectionModelRequest:
+    request_like = cast(_ProjectionEvaluationRequestLike, request)
+    if legacy_args:
+        raise TypeError("projection request calls do not accept extra positional arguments")
+    resolved_config = options.config or request_like.config
+    if resolved_config is None:
+        raise TypeError("projection request must provide config")
+    assert options.project_round is not None and options.baseline_reg_games is not None
+    return _EvaluateProjectionModelRequest(
+        skater_games=request_like.skater_games,
+        players=request_like.players,
+        team_games=request_like.team_games,
+        series=request_like.series,
+        config=resolved_config,
         project_round=options.project_round,
         baseline_reg_games=options.baseline_reg_games,
     )
