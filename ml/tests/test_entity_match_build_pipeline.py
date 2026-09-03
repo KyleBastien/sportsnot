@@ -18,21 +18,8 @@ from tests.test_entity_match import _write_manager_aliases
 
 def _write_normalized(normalized_dir: Path) -> None:
     normalized_dir.mkdir(parents=True, exist_ok=True)
-    players = pd.DataFrame(
-        [
-            {"player_id": 8478402, "player_name": "Connor McDavid", "position": "F"},
-            {"player_id": 8477934, "player_name": "Leon Draisaitl", "position": "F"},
-            {"player_id": 8477956, "player_name": "David Pastrnak", "position": "F"},
-            {"player_id": 8477932, "player_name": "Aaron Ekblad", "position": "D"},
-        ]
-    )
+    players, teams = _normalized_lookup_tables()
     players.to_parquet(normalized_dir / "players.parquet", index=False)
-    teams = pd.DataFrame(
-        [
-            {"team_id": 13, "team_abbrev": "FLA", "team_full_name": "Florida Panthers"},
-            {"team_id": 22, "team_abbrev": "EDM", "team_full_name": "Edmonton Oilers"},
-        ]
-    )
     teams.to_parquet(normalized_dir / "teams.parquet", index=False)
     pd.DataFrame(
         columns=[
@@ -44,6 +31,24 @@ def _write_normalized(normalized_dir: Path) -> None:
             "assists",
         ]
     ).to_parquet(normalized_dir / "skater_games.parquet", index=False)
+
+
+def _normalized_lookup_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
+    players = pd.DataFrame(
+        [
+            {"player_id": 8478402, "player_name": "Connor McDavid", "position": "F"},
+            {"player_id": 8477934, "player_name": "Leon Draisaitl", "position": "F"},
+            {"player_id": 8477956, "player_name": "David Pastrnak", "position": "F"},
+            {"player_id": 8477932, "player_name": "Aaron Ekblad", "position": "D"},
+        ]
+    )
+    teams = pd.DataFrame(
+        [
+            {"team_id": 13, "team_abbrev": "FLA", "team_full_name": "Florida Panthers"},
+            {"team_id": 22, "team_abbrev": "EDM", "team_full_name": "Edmonton Oilers"},
+        ]
+    )
+    return players, teams
 
 
 def _write_playoff_points(
