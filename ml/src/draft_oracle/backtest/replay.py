@@ -272,6 +272,57 @@ def _simulate_slot_results(
     return slot_results
 
 
+def _skipped_round_result(
+    *,
+    season: int,
+    playoff_round: int,
+    setup: _ReplayRoundSetup,
+    cutoff: str,
+    opponents_kind: str,
+    warnings: list[str],
+) -> RoundResult:
+    return RoundResult(
+        season=season,
+        season_id=setup.season_id,
+        playoff_round=playoff_round,
+        as_of_cutoff=cutoff,
+        opponents_kind=opponents_kind,
+        eligible_team_abbrevs=list(setup.artifact.manifest["eligible_team_abbrevs"]),
+        leakage_ok=True,
+        scored_rounds=setup.scored_rounds,
+        slot_results=[],
+        warnings=warnings,
+        projection_eval=setup.projection_eval,
+        series_evals=setup.series_evals,
+    )
+
+
+def _completed_round_result(
+    *,
+    season: int,
+    playoff_round: int,
+    setup: _ReplayRoundSetup,
+    cutoff: str,
+    opponents_kind: str,
+    warnings: list[str],
+    slot_results: list[SlotResult],
+) -> RoundResult:
+    return RoundResult(
+        season=season,
+        season_id=setup.season_id,
+        playoff_round=playoff_round,
+        as_of_cutoff=cutoff,
+        opponents_kind=opponents_kind,
+        eligible_team_abbrevs=list(setup.artifact.manifest["eligible_team_abbrevs"]),
+        leakage_ok=True,
+        scored_rounds=setup.scored_rounds,
+        slot_results=slot_results,
+        warnings=warnings,
+        projection_eval=setup.projection_eval,
+        series_evals=setup.series_evals,
+    )
+
+
 def replay_round(
     tables: dict[str, pd.DataFrame],
     *,
@@ -328,19 +379,13 @@ def replay_round(
             f"round skipped: pool cannot fill a {config.managers}-manager draft "
             f"({shortfall}); late rounds have too few eligible teams"
         )
-        return RoundResult(
+        return _skipped_round_result(
             season=season,
-            season_id=setup.season_id,
             playoff_round=playoff_round,
-            as_of_cutoff=cutoff,
+            setup=setup,
+            cutoff=cutoff,
             opponents_kind=opponents_kind,
-            eligible_team_abbrevs=list(setup.artifact.manifest["eligible_team_abbrevs"]),
-            leakage_ok=True,
-            scored_rounds=setup.scored_rounds,
-            slot_results=[],
             warnings=warnings,
-            projection_eval=setup.projection_eval,
-            series_evals=setup.series_evals,
         )
 
     base_state = DraftState.new(managers_list, pool, allow_ir=config.ir)
@@ -352,19 +397,14 @@ def replay_round(
         score_context,
     )
 
-    return RoundResult(
+    return _completed_round_result(
         season=season,
-        season_id=setup.season_id,
         playoff_round=playoff_round,
-        as_of_cutoff=cutoff,
+        setup=setup,
+        cutoff=cutoff,
         opponents_kind=opponents_kind,
-        eligible_team_abbrevs=list(setup.artifact.manifest["eligible_team_abbrevs"]),
-        leakage_ok=True,
-        scored_rounds=setup.scored_rounds,
-        slot_results=slot_results,
         warnings=warnings,
-        projection_eval=setup.projection_eval,
-        series_evals=setup.series_evals,
+        slot_results=slot_results,
     )
 
 
