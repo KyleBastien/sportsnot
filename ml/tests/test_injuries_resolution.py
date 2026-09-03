@@ -11,7 +11,9 @@ from draft_oracle.ingest.entity_match import build_player_index
 from draft_oracle.ingest.injuries import (
     STATUS_DAY_TO_DAY,
     EspnInjuriesClient,
+    EspnInjuriesClientRuntime,
     EspnInjuriesResponse,
+    EspnPlayerIdRequest,
     InjuryOverride,
     apply_overrides,
     build_injuries_table,
@@ -106,10 +108,18 @@ def test_resolve_espn_player_id_maps_disjoint_id_ranges() -> None:
         for rec in players.to_dict("records")
     }
     # Carlo: exact name, unique -> NHL id (not the ESPN 3904175).
-    carlo = resolve_espn_player_id("Brandon Carlo", "BOS", "D", index, team_by_id)
+    carlo = resolve_espn_player_id(
+        EspnPlayerIdRequest("Brandon Carlo", "BOS", "D"),
+        index,
+        team_by_id,
+    )
     assert carlo.player_id == 8478443
     # Same-name collision disambiguated by team -> the CAR forward, not NYI D.
-    aho = resolve_espn_player_id("Sebastian Aho", "CAR", "C", index, team_by_id)
+    aho = resolve_espn_player_id(
+        EspnPlayerIdRequest("Sebastian Aho", "CAR", "C"),
+        index,
+        team_by_id,
+    )
     assert aho.player_id == 8478427
     assert aho.method == "team"
 
@@ -121,9 +131,17 @@ def test_resolve_espn_player_id_goalie_and_unresolved_are_not_guessed() -> None:
         int(rec["player_id"]): rec["current_team_abbrev"]
         for rec in players.to_dict("records")
     }
-    goalie = resolve_espn_player_id("Somebody", "BOS", "G", index, team_by_id)
+    goalie = resolve_espn_player_id(
+        EspnPlayerIdRequest("Somebody", "BOS", "G"),
+        index,
+        team_by_id,
+    )
     assert goalie.player_id is None and goalie.method == "goalie"
-    unknown = resolve_espn_player_id("Nobody Here", "BOS", "F", index, team_by_id)
+    unknown = resolve_espn_player_id(
+        EspnPlayerIdRequest("Nobody Here", "BOS", "F"),
+        index,
+        team_by_id,
+    )
     assert unknown.player_id is None and unknown.method == "unresolved"
 
 
@@ -208,8 +226,10 @@ def test_build_reports_unresolved_and_maps_with_players(tmp_path: Path) -> None:
         cache_dir=tmp_path / "cache",
         delay=0.0,
         retry_backoff=0.0,
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
-        sleep=_noop_sleep,
+        runtime=EspnInjuriesClientRuntime(
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            sleep=_noop_sleep,
+        ),
     )
     result = build_injuries_table(
         client=client, overrides_path=tmp_path / "none.yaml", out_dir=out_dir

@@ -20,6 +20,7 @@ from draft_oracle.ingest.injuries import (
     STATUS_IR,
     STATUS_OUT,
     EspnInjuriesClient,
+    EspnInjuriesClientRuntime,
     EspnInjuriesResponse,
     InjuryOverride,
     apply_overrides,
@@ -215,8 +216,10 @@ def test_client_fetches_and_caches(tmp_path: Path) -> None:
         cache_dir=tmp_path / "cache",
         delay=0.0,
         retry_backoff=0.0,
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
-        sleep=_noop_sleep,
+        runtime=EspnInjuriesClientRuntime(
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            sleep=_noop_sleep,
+        ),
     )
     first = client.injuries()
     assert len(first.injuries) == 2
@@ -234,8 +237,10 @@ def test_client_raises_loudly_on_persistent_failure(tmp_path: Path) -> None:
         delay=0.0,
         retry_backoff=0.0,
         max_attempts=2,
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
-        sleep=_noop_sleep,
+        runtime=EspnInjuriesClientRuntime(
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            sleep=_noop_sleep,
+        ),
     )
     with client, pytest.raises(NHLApiError):
         client.injuries()
@@ -252,8 +257,10 @@ def _live_client(tmp_path: Path) -> EspnInjuriesClient:
         cache_dir=tmp_path / "cache",
         delay=0.0,
         retry_backoff=0.0,
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
-        sleep=_noop_sleep,
+        runtime=EspnInjuriesClientRuntime(
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            sleep=_noop_sleep,
+        ),
     )
 
 
@@ -266,8 +273,10 @@ def _failing_client(tmp_path: Path) -> EspnInjuriesClient:
         delay=0.0,
         retry_backoff=0.0,
         max_attempts=2,
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
-        sleep=_noop_sleep,
+        runtime=EspnInjuriesClientRuntime(
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            sleep=_noop_sleep,
+        ),
     )
 
 

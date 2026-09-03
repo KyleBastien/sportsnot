@@ -206,6 +206,13 @@ class _SheetPickInput:
 
 
 @dataclass(frozen=True)
+class SheetTabRequest:
+    rows: list[list[str]]
+    season: int
+    event: str
+
+
+@dataclass(frozen=True)
 class _SheetPointFields:
     status: str | None
     note: str | None
@@ -296,29 +303,31 @@ def _append_block_row(
 # ── Sheet tab parsing ────────────────────────────────────────────────────
 
 
-def parse_sheet_tab(rows: list[list[str]], season: int, event: str) -> list[dict[str, object]]:
+def parse_sheet_tab(request: SheetTabRequest) -> list[dict[str, object]]:
     """Parse one committed round tab into raw pick rows.
 
     Fails loudly (``ValueError``) if the header, block count, or slot labels do not match
     the documented layout.
     """
-    header = rows[0] if rows else []
+    header = request.rows[0] if request.rows else []
     if _cell(header, 1).strip() != "Position" or _cell(header, 2).strip() != "Player":
-        raise ValueError(f"{season} {event}: unexpected header row {header[:4]!r}")
+        raise ValueError(f"{request.season} {request.event}: unexpected header row {header[:4]!r}")
 
-    scored = season != 2026
-    order = detect_draft_order(rows)
-    blocks = _split_blocks(rows)
+    scored = request.season != 2026
+    order = detect_draft_order(request.rows)
+    blocks = _split_blocks(request.rows)
     managers = [manager for manager, _ in blocks]
     if set(managers) != LEAGUE_MANAGERS or len(managers) != 4:
-        raise ValueError(f"{season} {event}: expected 4 manager blocks, got {managers}")
+        raise ValueError(
+            f"{request.season} {request.event}: expected 4 manager blocks, got {managers}"
+        )
 
     picks: list[dict[str, object]] = []
     for manager, block_rows in blocks:
         context = _BlockParseContext(
             manager=manager,
-            season=season,
-            event=event,
+            season=request.season,
+            event=request.event,
             scored=scored,
             order=order,
         )
@@ -709,7 +718,7 @@ def _parse_sheet_file(
     path = league_dir / name
     if not path.exists():
         raise FileNotFoundError(f"expected committed snapshot missing: {path}")
-    return parse_sheet_tab(read_csv_rows(path), season, event)
+    return parse_sheet_tab(SheetTabRequest(read_csv_rows(path), season, event))
 
 
 def _tab_report(name: str, season: int, event: str, records: list[dict[str, object]]) -> TabReport:

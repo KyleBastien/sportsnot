@@ -15,6 +15,7 @@ import pytest
 from draft_oracle.ingest.league_drafts import (
     DEFAULT_LEAGUE_DRAFTS_DIR,
     LeagueDraftsResult,
+    SheetTabRequest,
     _read_dict_rows,
     build_champions,
     build_league_drafts,
@@ -100,7 +101,7 @@ _TAB_EXPECTATIONS = [
 @pytest.mark.parametrize("expected", _TAB_EXPECTATIONS)
 def test_tab_counts(expected: _TabExpectation) -> None:
     rows = read_csv_rows(LEAGUE_DIR / expected.file)
-    records = parse_sheet_tab(rows, expected.season, expected.event)
+    records = parse_sheet_tab(SheetTabRequest(rows, expected.season, expected.event))
     assert len(records) == expected.picks
     assert sum(1 for r in records if r["status"] is not None) == expected.flags
     assert sum(1 for r in records if r["points_excluded"]) == expected.excluded
@@ -315,7 +316,7 @@ def test_missing_app_export_reported(tmp_path: Path) -> None:
 def test_bad_header_raises() -> None:
     rows = [["", "Wrong", "Header"], ["Ben", "Forward 1", "X", "Y", "1"]]
     with pytest.raises(ValueError, match="unexpected header"):
-        parse_sheet_tab(rows, 2025, "R1")
+        parse_sheet_tab(SheetTabRequest(rows, 2025, "R1"))
 
 
 def test_unknown_slot_label_raises() -> None:
@@ -324,7 +325,7 @@ def test_unknown_slot_label_raises() -> None:
         ["Ben", "Bench 1", "Nobody", "Team", "0"],
     ]
     with pytest.raises(ValueError):
-        parse_sheet_tab(rows, 2025, "R1")
+        parse_sheet_tab(SheetTabRequest(rows, 2025, "R1"))
 
 
 def test_wrong_block_count_raises() -> None:
@@ -334,7 +335,7 @@ def test_wrong_block_count_raises() -> None:
         ["", "Total", "", "", "1"],
     ]
     with pytest.raises(ValueError, match="4 manager blocks"):
-        parse_sheet_tab(rows, 2025, "R1")
+        parse_sheet_tab(SheetTabRequest(rows, 2025, "R1"))
 
 
 # ── Parquet output ───────────────────────────────────────────────────────

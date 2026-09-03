@@ -46,6 +46,12 @@ class EspnInjuriesClientConfig:
     timeout: float = DEFAULT_TIMEOUT
 
 
+@dataclass(frozen=True)
+class EspnInjuriesClientRuntime:
+    client: httpx.Client | None = None
+    sleep: Callable[[float], None] = time.sleep
+
+
 class EspnInjuriesClient:
     """Cached, polite client for ESPN's public NHL injury JSON (SPEC §5).
 
@@ -60,11 +66,11 @@ class EspnInjuriesClient:
         cache_dir: Path | str = DEFAULT_INJURIES_CACHE_DIR,
         *,
         config: EspnInjuriesClientConfig | None = None,
-        client: httpx.Client | None = None,
-        sleep: Callable[[float], None] = time.sleep,
+        runtime: EspnInjuriesClientRuntime | None = None,
         **legacy: object,
     ) -> None:
         config = _injuries_client_config(config, legacy)
+        runtime = runtime or EspnInjuriesClientRuntime()
         if config.max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
         self.base = config.base.rstrip("/")
@@ -73,9 +79,11 @@ class EspnInjuriesClient:
         self.max_attempts = config.max_attempts
         self.retry_backoff = config.retry_backoff
         self._cache = ResponseCache(Path(cache_dir))
-        self._sleep = sleep
-        self._owns_client = client is None
-        self._client = client if client is not None else httpx.Client(timeout=config.timeout)
+        self._sleep = runtime.sleep
+        self._owns_client = runtime.client is None
+        self._client = (
+            runtime.client if runtime.client is not None else httpx.Client(timeout=config.timeout)
+        )
 
     def close(self) -> None:
         if self._owns_client:

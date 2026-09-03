@@ -273,10 +273,15 @@ class _PlayerResolverContext:
     team_by_id: Mapping[int, Any]
 
 
+@dataclass(frozen=True)
+class EspnPlayerIdRequest:
+    name: str | None
+    team_abbrev: str | None
+    position: str | None
+
+
 def resolve_espn_player_id(
-    name: str | None,
-    team_abbrev: str | None,
-    position: str | None,
+    request: EspnPlayerIdRequest,
     resolver: _PlayerResolverContext | PlayerIndex,
     *legacy_team_by_id: Mapping[int, Any],
 ) -> PlayerIdResolution:
@@ -290,15 +295,15 @@ def resolve_espn_player_id(
     ``team_abbrev``); anything left ambiguous is ``method='unresolved'`` and is
     NEVER guessed (SPEC §7 honesty rule).
     """
-    fantasy_pos = _fantasy_position(position)
+    fantasy_pos = _fantasy_position(request.position)
     if fantasy_pos is None:
         return PlayerIdResolution(None, "goalie")
     resolver = _coerce_player_resolver(resolver, legacy_team_by_id)
-    norm = normalize_name(name)
+    norm = normalize_name(request.name)
     context = _PlayerResolutionContext(
         index=resolver.index,
         fantasy_pos=fantasy_pos,
-        team_key=_team_abbrev_key(team_abbrev),
+        team_key=_team_abbrev_key(request.team_abbrev),
         team_by_id=resolver.team_by_id,
     )
 
@@ -307,7 +312,7 @@ def resolve_espn_player_id(
         resolved = _disambiguate_player_id(exact, "exact", context)
         return resolved if resolved is not None else PlayerIdResolution(None, "unresolved")
 
-    last = last_name_key(name)
+    last = last_name_key(request.name)
     last_hits = context.index.by_last.get(last, []) if last else []
     if last_hits:
         resolved = _disambiguate_player_id(last_hits, "lastname", context)
@@ -379,9 +384,11 @@ def resolve_player_ids(
     unresolved: list[int] = []
     for rec in df.to_dict("records"):
         result = resolve_espn_player_id(
-            _as_str(rec["player_name"]),
-            _as_str(rec["team_abbrev"]),
-            _as_str(rec["position"]),
+            EspnPlayerIdRequest(
+                _as_str(rec["player_name"]),
+                _as_str(rec["team_abbrev"]),
+                _as_str(rec["position"]),
+            ),
             resolver,
         )
         resolved_ids.append(_resolved_player_id(rec, result))
@@ -636,6 +643,7 @@ def _reorder(df: pd.DataFrame) -> pd.DataFrame:
 
 EspnInjuriesClient = _injuries_build_module.EspnInjuriesClient
 EspnInjuriesClientConfig = _injuries_build_module.EspnInjuriesClientConfig
+EspnInjuriesClientRuntime = _injuries_build_module.EspnInjuriesClientRuntime
 InjuryBuildOptions = _injuries_build_module.InjuryBuildOptions
 InjuriesResult = _injuries_build_module.InjuriesResult
 _load_players = _injuries_build_module._load_players
