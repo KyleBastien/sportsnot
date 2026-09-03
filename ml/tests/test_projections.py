@@ -32,6 +32,7 @@ from draft_oracle.models import (
 from draft_oracle.models.projections import (
     CombinedRoundRequest,
     ProjectionEvaluationRequest,
+    ProjectionResult,
     ProjectionRuntime,
     SkaterRoundRequest,
     project_skater_combined,
@@ -438,7 +439,10 @@ def test_evaluate_skater_projections_runs_end_to_end() -> None:
     result = evaluate_skater_projections(
         ProjectionEvaluationRequest(sk, players, tg, series, _PROJECTION_CONFIG)
     )
+    _assert_projection_shape(result)
 
+
+def _assert_projection_shape(result: ProjectionResult) -> None:
     assert result.test_years == (2022, 2023)
     assert result.n_projected > 0
     assert len(result.per_season) == 2
