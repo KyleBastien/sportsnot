@@ -38,6 +38,7 @@ from draft_oracle.features.leakage import as_of, assert_no_leakage, to_cutoff
 __all__ = [
     "FEATURE_COLUMNS",
     "FEATURE_SET_VERSION",
+    "RoundFeatureMatrixRequest",
     "SkaterFeatureConfig",
     "SkaterFeatureRequest",
     "age_years",
@@ -101,6 +102,13 @@ class SkaterFeatureRequest:
     season_id: int
     as_of_date: str | pd.Timestamp
     playoff_round: int | None = None
+    config: SkaterFeatureConfig | None = None
+
+
+@dataclass(frozen=True)
+class RoundFeatureMatrixRequest:
+    season_id: int
+    round_start_dates: dict[int, str]
     config: SkaterFeatureConfig | None = None
 
 
@@ -423,10 +431,7 @@ def build_round_feature_matrix(
     skater_games: pd.DataFrame,
     players: pd.DataFrame,
     team_games: pd.DataFrame,
-    *,
-    season_id: int,
-    round_start_dates: dict[int, str],
-    config: SkaterFeatureConfig | None = None,
+    request: RoundFeatureMatrixRequest,
 ) -> pd.DataFrame:
     """Stack per-round skater features for one season.
 
@@ -440,13 +445,13 @@ def build_round_feature_matrix(
             players,
             team_games,
             SkaterFeatureRequest(
-                season_id=season_id,
+                season_id=request.season_id,
                 as_of_date=start,
                 playoff_round=rnd,
-                config=config,
+                config=request.config,
             ),
         )
-        for rnd, start in sorted(round_start_dates.items())
+        for rnd, start in sorted(request.round_start_dates.items())
     ]
     if not frames:
         return pd.DataFrame(columns=list(FEATURE_COLUMNS))

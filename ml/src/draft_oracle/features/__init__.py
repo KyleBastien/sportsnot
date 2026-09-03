@@ -19,6 +19,7 @@ from draft_oracle.features.leakage import (
 from draft_oracle.features.skater import (
     FEATURE_COLUMNS,
     FEATURE_SET_VERSION,
+    RoundFeatureMatrixRequest,
     SkaterFeatureConfig,
     SkaterFeatureRequest,
     age_years,
@@ -37,6 +38,7 @@ __all__ = [
     "FEATURE_SET_VERSION",
     "EloConfig",
     "LeakageError",
+    "RoundFeatureMatrixRequest",
     "SkaterFeatureConfig",
     "SkaterFeatureRequest",
     "age_years",

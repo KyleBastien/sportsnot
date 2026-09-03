@@ -18,6 +18,7 @@ from draft_oracle.features import (
     FEATURE_COLUMNS,
     FEATURE_SET_VERSION,
     LeakageError,
+    RoundFeatureMatrixRequest,
     SkaterFeatureConfig,
     SkaterFeatureRequest,
     age_years,
@@ -365,8 +366,10 @@ def test_last_n_window_reflects_prior_playoff_games() -> None:
         games,
         _players(),
         _team_games(),
-        season_id=SEASON,
-        round_start_dates={1: ROUND1_START, 2: ROUND2_START},
+        RoundFeatureMatrixRequest(
+            season_id=SEASON,
+            round_start_dates={1: ROUND1_START, 2: ROUND2_START},
+        ),
     )
     r1 = stacked.loc[(stacked["player_id"] == 100) & (stacked["playoff_round"] == 1)].iloc[0]
     r2 = stacked.loc[(stacked["player_id"] == 100) & (stacked["playoff_round"] == 2)].iloc[0]
@@ -381,8 +384,10 @@ def test_build_round_feature_matrix_stacks_rounds() -> None:
         _skater_games(),
         _players(),
         _team_games(),
-        season_id=SEASON,
-        round_start_dates={1: ROUND1_START, 2: ROUND2_START},
+        RoundFeatureMatrixRequest(
+            season_id=SEASON,
+            round_start_dates={1: ROUND1_START, 2: ROUND2_START},
+        ),
     )
     assert set(stacked["playoff_round"]) == {1, 2}
     assert not stacked.empty

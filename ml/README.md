@@ -426,14 +426,25 @@ skater per playoff round, computed **as of the round start** so no feature ever
 reads a game the model is about to project.
 
 ```python
-from draft_oracle.features import build_round_feature_matrix, write_feature_matrix
+from draft_oracle.features import (
+    RoundFeatureMatrixRequest,
+    build_round_feature_matrix,
+    write_feature_matrix,
+)
 
 matrix = build_round_feature_matrix(
     skater_games,
     players,
     team_games,
-    season_id=20232024,
-    round_start_dates={1: "2024-04-20", 2: "2024-05-05", 3: "2024-06-01", 4: "2024-06-08"},
+    RoundFeatureMatrixRequest(
+        season_id=20232024,
+        round_start_dates={
+            1: "2024-04-20",
+            2: "2024-05-05",
+            3: "2024-06-01",
+            4: "2024-06-08",
+        },
+    ),
 )
 write_feature_matrix(matrix)  # -> data/features/skater-v1/skater_features.parquet
 ```
