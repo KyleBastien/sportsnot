@@ -274,6 +274,38 @@ def _build_evaluations(
     return evaluations
 
 
+def _require_on_clock(state: DraftState, owner: str) -> None:
+    """Reject a recommendation request when ``owner`` is not on the clock."""
+    if state.is_complete:
+        raise ValueError("draft is complete; nothing to recommend")
+    if state.current_manager != owner:
+        raise ValueError(
+            f"owner {owner!r} is not on the clock (current: {state.current_manager!r})"
+        )
+
+
+def _rank_candidates(
+    ctx: _RecommendCtx,
+    candidates: list[_Candidate],
+    replacement: Mapping[str, float],
+) -> tuple[list[tuple[_Candidate, float]], float]:
+    """Roll out each candidate and rank by expected value, VOR, then key ascending."""
+    expecteds = _expected_values(
+        ctx.state,
+        ctx.owner,
+        [c.asset for c in candidates],
+        ctx.opponent_model,
+        replacement,
+        ctx.cfg,
+    )
+    ranked = sorted(
+        zip(candidates, expecteds, strict=True),
+        key=lambda pair: (-pair[1], -pair[0].vor, pair[0].asset.key),
+    )
+    second_best = ranked[1][1] if len(ranked) > 1 else ranked[0][1]
+    return ranked, second_best
+
+
 def recommend_pick(
     state: DraftState,
     owner: str,
@@ -292,32 +324,18 @@ def recommend_pick(
     need). Deterministic given ``(state, config)``.
     """
     cfg = config or RecommendConfig()
-    if state.is_complete:
-        raise ValueError("draft is complete; nothing to recommend")
-    if state.current_manager != owner:
-        raise ValueError(
-            f"owner {owner!r} is not on the clock (current: {state.current_manager!r})"
-        )
+    _require_on_clock(state, owner)
     n_managers = managers if managers is not None else len(state.rosters)
     replacement = replacement_levels(state, n_managers)
     candidates = _prune_candidates(state, owner, replacement, cfg.max_candidates)
     if not candidates:
         raise ValueError(f"owner {owner!r} has no legal pick")
 
-    expecteds = _expected_values(
-        state, owner, [c.asset for c in candidates], opponent_model, replacement, cfg
-    )
-    ranked = sorted(
-        zip(candidates, expecteds, strict=True),
-        key=lambda pair: (-pair[1], -pair[0].vor, pair[0].asset.key),
-    )
-    second_best = ranked[1][1] if len(ranked) > 1 else ranked[0][1]
-
+    ctx = _RecommendCtx(state, owner, opponent_model, cfg)
+    ranked, second_best = _rank_candidates(ctx, candidates, replacement)
     # Survival is a display-only explanation, so estimate it just for the surfaced
     # top-N rather than every rolled-out candidate (keeps the <10s budget).
-    evaluations = _build_evaluations(
-        _RecommendCtx(state, owner, opponent_model, cfg), ranked, second_best
-    )
+    evaluations = _build_evaluations(ctx, ranked, second_best)
 
     return Recommendation(
         owner=owner,

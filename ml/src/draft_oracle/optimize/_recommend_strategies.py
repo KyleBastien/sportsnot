@@ -248,6 +248,31 @@ def _score_draft(ctx: _CompareCtx, decision: DraftState, seed: int) -> dict[str,
     return scores
 
 
+@dataclass(frozen=True)
+class _CompareRun:
+    """The base draft plus the sweep knobs for one strategy-comparison run."""
+
+    base: DraftState
+    prefix: int
+    n_drafts: int
+    seed: int
+
+
+def _accumulate_scores(ctx: _CompareCtx, run: _CompareRun) -> tuple[dict[str, float], int]:
+    """Sum each strategy's owner value over every draft that reaches the decision slot."""
+    totals = {"greedy_vor": 0.0, "one_step": 0.0, "multi_step": 0.0}
+    counted = 0
+    for draft in range(run.n_drafts):
+        draft_seed = run.seed + draft
+        decision = _play_to_decision(ctx, run.base, run.prefix, draft_seed)
+        if decision is None:
+            continue
+        counted += 1
+        for strategy, value in _score_draft(ctx, decision, draft_seed).items():
+            totals[strategy] += value
+    return totals, counted
+
+
 @dataclass
 class StrategyComparison:
     """Average final owner-roster projection for each drafting strategy."""
@@ -358,16 +383,7 @@ def compare_strategies(
     replacement = replacement_levels(base, managers)
     prefix = decision_prefix if decision_prefix is not None else base.capacity.total // 3
     ctx = _CompareCtx(owner, opponent_model, replacement, cfg, managers)
-    totals = {"greedy_vor": 0.0, "one_step": 0.0, "multi_step": 0.0}
-    counted = 0
-    for draft in range(n_drafts):
-        draft_seed = seed + draft
-        decision = _play_to_decision(ctx, base, prefix, draft_seed)
-        if decision is None:
-            continue
-        counted += 1
-        for strategy, value in _score_draft(ctx, decision, draft_seed).items():
-            totals[strategy] += value
+    totals, counted = _accumulate_scores(ctx, _CompareRun(base, prefix, n_drafts, seed))
     if counted == 0:
         raise ValueError("no draft reached the decision slot; lower decision_prefix")
     means = {k: v / counted for k, v in totals.items()}

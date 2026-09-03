@@ -80,20 +80,12 @@ def greedy_vor_pick(
     legal = state.legal_assets(manager)
     if not legal:
         raise ValueError(f"manager {manager!r} has no legal asset to draft")
-    best = legal[0]
-    best_vor = asset_value(best) - replacement[best.position]
-    best_value = asset_value(best)
-    for asset in legal[1:]:
+
+    def _rank_key(asset: DraftAsset) -> tuple[float, float, str]:
         value = asset_value(asset)
-        vor = value - replacement[asset.position]
-        if vor > best_vor or (
-            vor == best_vor
-            and (value > best_value or (value == best_value and asset.key < best.key))
-        ):
-            best = asset
-            best_vor = vor
-            best_value = value
-    return best
+        return (-(value - replacement[asset.position]), -value, asset.key)
+
+    return min(legal, key=_rank_key)
 
 
 @dataclass(frozen=True)
