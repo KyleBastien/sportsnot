@@ -309,19 +309,35 @@ def parse_sheet_tab(request: SheetTabRequest) -> list[dict[str, object]]:
     Fails loudly (``ValueError``) if the header, block count, or slot labels do not match
     the documented layout.
     """
-    header = request.rows[0] if request.rows else []
-    if _cell(header, 1).strip() != "Position" or _cell(header, 2).strip() != "Player":
-        raise ValueError(f"{request.season} {request.event}: unexpected header row {header[:4]!r}")
-
+    _require_sheet_header(request)
     scored = request.season != 2026
     order = detect_draft_order(request.rows)
+    blocks = _validated_blocks(request)
+    return _parsed_sheet_blocks(blocks, request, scored, order)
+
+
+def _require_sheet_header(request: SheetTabRequest) -> None:
+    header = request.rows[0] if request.rows else []
+    if _cell(header, 1).strip() != 'Position' or _cell(header, 2).strip() != 'Player':
+        raise ValueError(f"{request.season} {request.event}: unexpected header row {header[:4]!r}")
+
+
+def _validated_blocks(request: SheetTabRequest) -> list[tuple[str, list[list[str]]]]:
     blocks = _split_blocks(request.rows)
     managers = [manager for manager, _ in blocks]
     if set(managers) != LEAGUE_MANAGERS or len(managers) != 4:
         raise ValueError(
             f"{request.season} {request.event}: expected 4 manager blocks, got {managers}"
         )
+    return blocks
 
+
+def _parsed_sheet_blocks(
+    blocks: list[tuple[str, list[list[str]]]],
+    request: SheetTabRequest,
+    scored: bool,
+    order: dict[str, int] | None,
+) -> list[dict[str, object]]:
     picks: list[dict[str, object]] = []
     for manager, block_rows in blocks:
         context = _BlockParseContext(

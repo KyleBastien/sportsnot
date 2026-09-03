@@ -139,19 +139,12 @@ def _ratio(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
-def resolve_asset(pool: list[DraftAsset], query: str, *, limit: int = 5) -> AssetResolution:
-    """Resolve a fuzzy ``query`` to a single pool asset (pure, deterministic).
-
-    Resolution order: exact (case-insensitive) name, then substring, then a
-    SequenceMatcher fuzzy pass. A match is only accepted when it is unique or
-    clears the runner-up by :data:`_FUZZY_MARGIN`; otherwise the candidates are
-    returned as ``ambiguous`` so the caller can ask again. Ties break by name
-    then key so the same query always resolves the same way.
-    """
-    normalized = query.strip().lower()
-    if not normalized:
-        return AssetResolution(None, [], "empty query")
-
+def _named_asset_matches(
+    pool: list[DraftAsset],
+    normalized: str,
+    *,
+    limit: int,
+) -> AssetResolution | None:
     exact = [asset for asset in pool if asset.name.lower() == normalized]
     if len(exact) == 1:
         return AssetResolution(exact[0], exact, "")
@@ -161,7 +154,16 @@ def resolve_asset(pool: list[DraftAsset], query: str, *, limit: int = 5) -> Asse
     substrings = [asset for asset in pool if normalized in asset.name.lower()]
     if len(substrings) == 1:
         return AssetResolution(substrings[0], substrings, "")
+    return None
 
+
+def _fuzzy_asset_resolution(
+    pool: list[DraftAsset],
+    normalized: str,
+    *,
+    limit: int,
+) -> AssetResolution:
+    substrings = [asset for asset in pool if normalized in asset.name.lower()]
     candidates = substrings if substrings else list(pool)
     scored = sorted(
         candidates,
@@ -179,6 +181,24 @@ def resolve_asset(pool: list[DraftAsset], query: str, *, limit: int = 5) -> Asse
         if top_score - second_score < _FUZZY_MARGIN:
             return AssetResolution(None, scored[:limit], "ambiguous")
     return AssetResolution(top, scored[:limit], "")
+
+
+def resolve_asset(pool: list[DraftAsset], query: str, *, limit: int = 5) -> AssetResolution:
+    """Resolve a fuzzy ``query`` to a single pool asset (pure, deterministic).
+
+    Resolution order: exact (case-insensitive) name, then substring, then a
+    SequenceMatcher fuzzy pass. A match is only accepted when it is unique or
+    clears the runner-up by :data:`_FUZZY_MARGIN`; otherwise the candidates are
+    returned as ``ambiguous`` so the caller can ask again. Ties break by name
+    then key so the same query always resolves the same way.
+    """
+    normalized = query.strip().lower()
+    if not normalized:
+        return AssetResolution(None, [], "empty query")
+    named = _named_asset_matches(pool, normalized, limit=limit)
+    if named is not None:
+        return named
+    return _fuzzy_asset_resolution(pool, normalized, limit=limit)
 
 
 # ── Session engine ────────────────────────────────────────────────────────
