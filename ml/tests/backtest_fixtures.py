@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 
@@ -25,6 +27,20 @@ SERIES_RESULT = [
     ("top", 2, 1),
 ]
 HOME_PATTERN = ["top", "top", "bottom", "bottom", "top", "top"]
+
+
+@dataclass(frozen=True)
+class _SkaterRowInput:
+    player_id: int
+    pos: str
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    team: str
+    opp: str
+    goals: int
+    assists: int
 
 
 def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
@@ -52,42 +68,31 @@ def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
     return pd.DataFrame(rows), players
 
 
-def _skater_row(
-    player_id: int,
-    pos: str,
-    game_id: int,
-    game_date: str,
-    season_id: int,
-    game_type_id: int,
-    team: str,
-    opp: str,
-    goals: int,
-    assists: int,
-) -> dict[str, object]:
+def _skater_row(spec: _SkaterRowInput) -> dict[str, object]:
     return {
-        "season_id": season_id,
-        "game_type_id": game_type_id,
-        "game_id": game_id,
-        "game_date": game_date,
-        "player_id": player_id,
-        "player_name": f"{team}-{player_id}",
-        "position_code": "C" if pos == "F" else "D",
-        "position": pos,
+        "season_id": spec.season_id,
+        "game_type_id": spec.game_type_id,
+        "game_id": spec.game_id,
+        "game_date": spec.game_date,
+        "player_id": spec.player_id,
+        "player_name": f"{spec.team}-{spec.player_id}",
+        "position_code": "C" if spec.pos == "F" else "D",
+        "position": spec.pos,
         "shoots_catches": "L",
-        "team_abbrev": team,
-        "opponent_team_abbrev": opp,
+        "team_abbrev": spec.team,
+        "opponent_team_abbrev": spec.opp,
         "home_road": "H",
-        "goals": goals,
-        "assists": assists,
-        "points": goals + assists,
-        "shots": goals * 3 + 2,
+        "goals": spec.goals,
+        "assists": spec.assists,
+        "points": spec.goals + spec.assists,
+        "shots": spec.goals * 3 + 2,
         "toi_seconds": 1000,
         "pp_goals": 0,
         "pp_points": 0,
         "sh_goals": 0,
         "sh_points": 0,
-        "ev_goals": goals,
-        "ev_points": goals + assists,
+        "ev_goals": spec.goals,
+        "ev_points": spec.goals + spec.assists,
         "plus_minus": 0,
         "penalty_minutes": 0,
         "game_winning_goals": 0,
@@ -194,7 +199,20 @@ def _synthetic_archive(
                                 continue
                             g, a = _draw_ga(rng, rate)
                             sk_rows.append(
-                                _skater_row(p, pos, gid, date, season_id, 2, team, opp, g, a)
+                                _skater_row(
+                                    _SkaterRowInput(
+                                        p,
+                                        pos,
+                                        gid,
+                                        date,
+                                        season_id,
+                                        2,
+                                        team,
+                                        opp,
+                                        g,
+                                        a,
+                                    )
+                                )
                             )
 
         for letter_idx, (top, bottom) in enumerate(SERIES_PAIRS):
@@ -212,7 +230,20 @@ def _synthetic_archive(
                             continue
                         g, a = _draw_ga(rng, rate)
                         sk_rows.append(
-                            _skater_row(p, pos, gid, date, season_id, 3, team, opp, g, a)
+                            _skater_row(
+                                _SkaterRowInput(
+                                    p,
+                                    pos,
+                                    gid,
+                                    date,
+                                    season_id,
+                                    3,
+                                    team,
+                                    opp,
+                                    g,
+                                    a,
+                                )
+                            )
                         )
             series_rows.append(
                 {
@@ -240,8 +271,14 @@ def _synthetic_archive(
     )
 
 
+def _archive_tables(
+    seed: int,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    return _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=seed)
+
+
 def _tables(seed: int = 1) -> dict[str, pd.DataFrame]:
-    sk, tg, players, series = _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=seed)
+    sk, tg, players, series = _archive_tables(seed)
     return {"skater_games": sk, "players": players, "team_games": tg, "series": series}
 
 
@@ -344,7 +381,20 @@ def _four_round_archive(
                                 continue
                             g, a = _draw_ga(rng, rate)
                             sk_rows.append(
-                                _skater_row(p, pos, gid, date, season_id, 2, team, opp, g, a)
+                                _skater_row(
+                                    _SkaterRowInput(
+                                        p,
+                                        pos,
+                                        gid,
+                                        date,
+                                        season_id,
+                                        2,
+                                        team,
+                                        opp,
+                                        g,
+                                        a,
+                                    )
+                                )
                             )
 
         rounds = [1, 2, 3, 4] if end_year == FOUR_ROUND_TARGET else [1]
@@ -370,7 +420,20 @@ def _four_round_archive(
                                 continue
                             g, a = _draw_ga(rng, rate)
                             sk_rows.append(
-                                _skater_row(p, pos, gid, date, season_id, 3, team, opp, g, a)
+                                _skater_row(
+                                    _SkaterRowInput(
+                                        p,
+                                        pos,
+                                        gid,
+                                        date,
+                                        season_id,
+                                        3,
+                                        team,
+                                        opp,
+                                        g,
+                                        a,
+                                    )
+                                )
                             )
                 series_rows.append(
                     {

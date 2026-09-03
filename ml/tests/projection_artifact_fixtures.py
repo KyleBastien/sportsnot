@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 
@@ -12,6 +14,20 @@ from draft_oracle.projection_artifact import ProjectArtifactConfig
 TEAMS = ["AAA", "BBB", "CCC", "DDD"]
 STRENGTH = {"AAA": 3.0, "BBB": 1.0, "CCC": -1.0, "DDD": -3.0}
 TEAM_RATE = {"AAA": 0.9, "BBB": 0.6, "CCC": 0.4, "DDD": 0.2}
+
+
+@dataclass(frozen=True)
+class _SkaterRowInput:
+    player_id: int
+    pos: str
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    team: str
+    opp: str
+    goals: int
+    assists: int
 
 
 def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, float, str]]]:
@@ -37,42 +53,31 @@ def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, float, str]]]:
     return pd.DataFrame(rows), players
 
 
-def _skater_row(
-    player_id: int,
-    pos: str,
-    game_id: int,
-    game_date: str,
-    season_id: int,
-    game_type_id: int,
-    team: str,
-    opp: str,
-    goals: int,
-    assists: int,
-) -> dict[str, object]:
+def _skater_row(spec: _SkaterRowInput) -> dict[str, object]:
     return {
-        "season_id": season_id,
-        "game_type_id": game_type_id,
-        "game_id": game_id,
-        "game_date": game_date,
-        "player_id": player_id,
-        "player_name": f"{team}-{player_id}",
-        "position_code": "C" if pos == "F" else "D",
-        "position": pos,
+        "season_id": spec.season_id,
+        "game_type_id": spec.game_type_id,
+        "game_id": spec.game_id,
+        "game_date": spec.game_date,
+        "player_id": spec.player_id,
+        "player_name": f"{spec.team}-{spec.player_id}",
+        "position_code": "C" if spec.pos == "F" else "D",
+        "position": spec.pos,
         "shoots_catches": "L",
-        "team_abbrev": team,
-        "opponent_team_abbrev": opp,
+        "team_abbrev": spec.team,
+        "opponent_team_abbrev": spec.opp,
         "home_road": "H",
-        "goals": goals,
-        "assists": assists,
-        "points": goals + assists,
-        "shots": goals * 3 + 2,
+        "goals": spec.goals,
+        "assists": spec.assists,
+        "points": spec.goals + spec.assists,
+        "shots": spec.goals * 3 + 2,
         "toi_seconds": 1000,
         "pp_goals": 0,
         "pp_points": 0,
         "sh_goals": 0,
         "sh_points": 0,
-        "ev_goals": goals,
-        "ev_points": goals + assists,
+        "ev_goals": spec.goals,
+        "ev_points": spec.goals + spec.assists,
         "plus_minus": 0,
         "penalty_minutes": 0,
         "game_winning_goals": 0,
@@ -154,7 +159,20 @@ def _synthetic_archive(
                                 continue
                             g, a = _draw_ga(rng, rate)
                             sk_rows.append(
-                                _skater_row(p, pos, gid, date, season_id, 2, team, opp, g, a)
+                                _skater_row(
+                                    _SkaterRowInput(
+                                        p,
+                                        pos,
+                                        gid,
+                                        date,
+                                        season_id,
+                                        2,
+                                        team,
+                                        opp,
+                                        g,
+                                        a,
+                                    )
+                                )
                             )
 
         top, bottom = "AAA", "DDD"
@@ -178,7 +196,22 @@ def _synthetic_archive(
                     if t != team:
                         continue
                     g, a = _draw_ga(rng, rate)
-                    sk_rows.append(_skater_row(p, pos, gid, date, season_id, 3, team, opp, g, a))
+                    sk_rows.append(
+                        _skater_row(
+                            _SkaterRowInput(
+                                p,
+                                pos,
+                                gid,
+                                date,
+                                season_id,
+                                3,
+                                team,
+                                opp,
+                                g,
+                                a,
+                            )
+                        )
+                    )
         series_rows.append(
             {
                 "year": end_year,
@@ -205,13 +238,20 @@ def _synthetic_archive(
     )
 
 
+def _production_config() -> SkaterProductionConfig:
+    return SkaterProductionConfig(
+        seed=20260827,
+        n_val_seasons=1,
+        n_test_seasons=1,
+        min_confident_games=5,
+    )
+
+
 def _config() -> ProjectArtifactConfig:
     return ProjectArtifactConfig(
         seed=20260827,
         n_sims=300,
-        production_config=SkaterProductionConfig(
-            seed=20260827, n_val_seasons=1, n_test_seasons=1, min_confident_games=5
-        ),
+        production_config=_production_config(),
     )
 
 
@@ -245,7 +285,11 @@ def _round1_series_games(
                 if t != team:
                     continue
                 g, a = _draw_ga(rng, rate)
-                sk_rows.append(_skater_row(p, pos, gid, date, season_id, 3, team, opp, g, a))
+                sk_rows.append(
+                    _skater_row(
+                        _SkaterRowInput(p, pos, gid, date, season_id, 3, team, opp, g, a)
+                    )
+                )
     return tg_rows, sk_rows, gid
 
 
@@ -286,7 +330,20 @@ def _pre_round_archive(
                                 continue
                             g, a = _draw_ga(rng, rate)
                             sk_rows.append(
-                                _skater_row(p, pos, gid, date, season_id, 2, team, opp, g, a)
+                                _skater_row(
+                                    _SkaterRowInput(
+                                        p,
+                                        pos,
+                                        gid,
+                                        date,
+                                        season_id,
+                                        2,
+                                        team,
+                                        opp,
+                                        g,
+                                        a,
+                                    )
+                                )
                             )
 
         for top, bottom in (("AAA", "DDD"), ("BBB", "CCC")):

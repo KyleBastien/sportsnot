@@ -41,6 +41,19 @@ class _GameRowsInput:
     away_goals: int
 
 
+@dataclass(frozen=True)
+class _OverlapRowInput:
+    game_id: str
+    game_date: str
+    team: str
+    team_id: int
+    opp: str
+    gf: int
+    ga: int
+    is_home: bool
+    game_type_id: int = 3
+
+
 def _team_row(spec: _TeamRowInput) -> dict[str, object]:
     won = spec.gf > spec.ga
     return {
@@ -173,10 +186,8 @@ def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFr
 def _real_team_games(season_label: str | None = None) -> pd.DataFrame:
     archive_dir = Path("data/raw/nhl-archive")
     paths = _archive_paths(archive_dir, season_label)
-    return pd.concat(
-        [normalize_team_games(pd.read_csv(path)) for path in paths],
-        ignore_index=True,
-    )
+    frames = [normalize_team_games(pd.read_csv(path)) for path in paths]
+    return pd.concat(frames, ignore_index=True)
 
 
 def _archive_paths(archive_dir: Path, season_label: str | None) -> list[Path]:
@@ -185,30 +196,19 @@ def _archive_paths(archive_dir: Path, season_label: str | None) -> list[Path]:
     return sorted(archive_dir.glob("team-games-*.csv.gz"))
 
 
-def _overlap_row(
-    *,
-    game_id: str,
-    game_date: str,
-    team: str,
-    team_id: int,
-    opp: str,
-    gf: int,
-    ga: int,
-    is_home: bool,
-    game_type_id: int = 3,
-) -> dict[str, object]:
-    won = gf > ga
+def _overlap_row(spec: _OverlapRowInput) -> dict[str, object]:
+    won = spec.gf > spec.ga
     return {
         "season_id": 20212022,
-        "game_type_id": game_type_id,
-        "game_id": game_id,
-        "game_date": game_date,
-        "team_id": team_id,
-        "team_abbrev": team,
-        "opponent_team_abbrev": opp,
-        "home_road": "H" if is_home else "R",
-        "goals_for": gf,
-        "goals_against": ga,
+        "game_type_id": spec.game_type_id,
+        "game_id": spec.game_id,
+        "game_date": spec.game_date,
+        "team_id": spec.team_id,
+        "team_abbrev": spec.team,
+        "opponent_team_abbrev": spec.opp,
+        "home_road": "H" if spec.is_home else "R",
+        "goals_for": spec.gf,
+        "goals_against": spec.ga,
         "shots_against": SHOTS,
         "points": 2 if won else 0,
         "win": won,
@@ -227,13 +227,6 @@ def _overlap_game(
     ag: int,
 ) -> list[dict[str, object]]:
     return [
-        _overlap_row(
-            game_id=game_id, game_date=game_date, team=home, team_id=home_id,
-            opp=away, gf=hg, ga=ag, is_home=True,
-        ),
-        _overlap_row(
-            game_id=game_id, game_date=game_date, team=away, team_id=away_id,
-            opp=home, gf=ag, ga=hg, is_home=False,
-        ),
+        _overlap_row(_OverlapRowInput(game_id, game_date, home, home_id, away, hg, ag, True)),
+        _overlap_row(_OverlapRowInput(game_id, game_date, away, away_id, home, ag, hg, False)),
     ]
-
