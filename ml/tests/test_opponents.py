@@ -15,6 +15,7 @@ import json
 import random
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import pandas as pd
 import pytest
@@ -167,14 +168,22 @@ def _affinity_league(seasons: tuple[int, ...]) -> pd.DataFrame:
     return _frame(rows)
 
 
-def _skater(key: str, position: str, rank: float, team_id: int, player_id: int) -> DraftAsset:
+@dataclass(frozen=True)
+class _AssetIds:
+    team_id: int
+    player_id: int
+
+
+def _skater(
+    key: str, position: Literal["F", "D", "G"], rank: float, ids: _AssetIds
+) -> DraftAsset:
     return DraftAsset(
         key=key,
         name=key,
-        position=position,  # type: ignore[arg-type]
+        position=position,
         rank_value=rank,
-        player_id=player_id,
-        team_id=team_id,
+        player_id=ids.player_id,
+        team_id=ids.team_id,
     )
 
 
@@ -254,8 +263,8 @@ def _state(assets: list[DraftAsset], managers: list[str], *, allow_ir: bool = Fa
 
 def test_fitted_model_prefers_its_managers_favourite_team() -> None:
     assets = [
-        _skater("P1", "F", 5.0, team_id=1, player_id=1),
-        _skater("P2", "F", 5.0, team_id=2, player_id=2),
+        _skater("P1", "F", 5.0, _AssetIds(1, 1)),
+        _skater("P2", "F", 5.0, _AssetIds(2, 2)),
     ]
     state = _state(assets, ["home"])
     model = FittedOpponentModel(
@@ -269,8 +278,8 @@ def test_fitted_model_prefers_its_managers_favourite_team() -> None:
 
 def test_fitted_model_is_deterministic_at_zero_temperature() -> None:
     assets = [
-        _skater("P1", "F", 9.0, team_id=1, player_id=1),
-        _skater("P2", "F", 3.0, team_id=1, player_id=2),
+        _skater("P1", "F", 9.0, _AssetIds(1, 1)),
+        _skater("P2", "F", 3.0, _AssetIds(1, 2)),
     ]
     model = FittedOpponentModel(
         coefficients=Coefficients(rank=1.0, affinity=0.0),
@@ -295,11 +304,11 @@ def test_fitted_model_drops_into_run_draft_and_validates() -> None:
     pid = 1
     rank = 100.0
     for _ in range(10):
-        assets.append(_skater(f"F{pid}", "F", rank, team_id=1 + (pid % 4), player_id=pid))
+        assets.append(_skater(f"F{pid}", "F", rank, _AssetIds(1 + (pid % 4), pid)))
         pid += 1
         rank -= 1.0
     for _ in range(6):
-        assets.append(_skater(f"D{pid}", "D", rank, team_id=1 + (pid % 4), player_id=pid))
+        assets.append(_skater(f"D{pid}", "D", rank, _AssetIds(1 + (pid % 4), pid)))
         pid += 1
         rank -= 1.0
     assets.append(DraftAsset(key="G7", name="G7", position="G", rank_value=5.0, team_id=7))
@@ -315,9 +324,9 @@ def test_fitted_model_drops_into_run_draft_and_validates() -> None:
 
 def test_fitted_model_works_in_survival_probability() -> None:
     assets = [
-        _skater("P1", "F", 9.0, team_id=1, player_id=1),
-        _skater("P2", "F", 8.0, team_id=1, player_id=2),
-        _skater("P3", "F", 7.0, team_id=1, player_id=3),
+        _skater("P1", "F", 9.0, _AssetIds(1, 1)),
+        _skater("P2", "F", 8.0, _AssetIds(1, 2)),
+        _skater("P3", "F", 7.0, _AssetIds(1, 3)),
     ]
     state = _state(assets, ["a", "b"])
     model = FittedOpponentModel(

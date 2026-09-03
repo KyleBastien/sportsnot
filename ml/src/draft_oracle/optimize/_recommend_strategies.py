@@ -406,6 +406,53 @@ def _league_managers(fitted: FittedLeagueOpponents, limit: int) -> list[str]:
     return [manager for manager, _ in ranked[:limit]]
 
 
+def _recommend_compare_config(
+    *, rollouts: int, max_candidates: int, seed: int
+) -> RecommendConfig:
+    return RecommendConfig(
+        rollouts=rollouts,
+        max_candidates=max_candidates,
+        compute_survival=False,
+        seed=seed,
+    )
+
+
+def _require_comparison_managers(
+    fitted: FittedLeagueOpponents, managers: int
+) -> tuple[list[str], str]:
+    managers_list = _league_managers(fitted, managers)
+    if len(managers_list) < 2:
+        raise ValueError("need at least two league managers to run the comparison")
+    return managers_list, managers_list[0]
+
+
+def _write_comparison_artifact(
+    artifact_dir: Path,
+    fitted_comparison: StrategyComparison,
+    run_comparison: StrategyComparison,
+) -> None:
+    lines = ["# Multi-step pick recommendation comparison", ""]
+    lines += fitted_comparison.report_lines()
+    lines += [""]
+    lines += run_comparison.report_lines()
+    manifest = add_git_provenance(
+        {
+            "balanced_fitted": fitted_comparison.manifest(),
+            "positional_run": run_comparison.manifest(),
+        }
+    )
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    (artifact_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (artifact_dir / "manifest.json").write_text(
+        json.dumps(
+            manifest,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def evaluate_recommendation_strategies_from_normalized(
     *,
     normalized_dir: Path,
@@ -441,17 +488,9 @@ def evaluate_recommendation_strategies_from_normalized(
 
     picks = pd.read_parquet(normalized_dir / "league_draft_picks.parquet")
     fitted = fit_opponent_models(picks, OpponentFitConfig(temperature=opponent_temperature))
-    managers_list = _league_managers(fitted, managers)
-    if len(managers_list) < 2:
-        raise ValueError("need at least two league managers to run the comparison")
-    owner = managers_list[0]
+    managers_list, owner = _require_comparison_managers(fitted, managers)
     pool = build_synthetic_pool(len(managers_list), allow_ir=allow_ir, seed=seed)
-    cfg = RecommendConfig(
-        rollouts=rollouts,
-        max_candidates=max_candidates,
-        compute_survival=False,
-        seed=seed,
-    )
+    cfg = _recommend_compare_config(rollouts=rollouts, max_candidates=max_candidates, seed=seed)
 
     fitted_comparison = compare_strategies(
         pool,
@@ -479,24 +518,5 @@ def evaluate_recommendation_strategies_from_normalized(
         scenario="positional-run opponents (forward run)",
     )
 
-    lines = ["# Multi-step pick recommendation comparison", ""]
-    lines += fitted_comparison.report_lines()
-    lines += [""]
-    lines += run_comparison.report_lines()
-    manifest = add_git_provenance(
-        {
-            "balanced_fitted": fitted_comparison.manifest(),
-            "positional_run": run_comparison.manifest(),
-        }
-    )
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    (artifact_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    (artifact_dir / "manifest.json").write_text(
-        json.dumps(
-            manifest,
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    _write_comparison_artifact(artifact_dir, fitted_comparison, run_comparison)
     return fitted_comparison

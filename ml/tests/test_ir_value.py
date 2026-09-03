@@ -19,6 +19,7 @@ import pytest
 from draft_oracle.optimize.ir_value import (
     StashInput,
     _StashSimulationInput,
+    _StashValueRequest,
     build_stash_valuations,
     healthy_alternative_value,
     render_ir_section,
@@ -81,10 +82,7 @@ def test_never_available_stash_ev_equals_baseline() -> None:
     # An all-zero availability curve means the stash never plays -> keep the starter.
     curve = [0.0] * 7
     stash_ev, stash_value, activation = value_stash(
-        pts_per_game=2.0,
-        length_probs=_LENGTH_7,
-        availability_curve=curve,
-        active_baseline=3.0,
+        _StashValueRequest(2.0, _LENGTH_7, curve, 3.0),
         seed=1,
         n_sims=2000,
     )
@@ -98,10 +96,7 @@ def test_healthy_high_scorer_beats_a_weak_baseline() -> None:
     # activated.
     curve = [1.0] * 7
     stash_ev, stash_value, activation = value_stash(
-        pts_per_game=1.5,
-        length_probs=_LENGTH_7,
-        availability_curve=curve,
-        active_baseline=1.0,
+        _StashValueRequest(1.5, _LENGTH_7, curve, 1.0),
         seed=7,
         n_sims=4000,
     )
@@ -112,18 +107,12 @@ def test_healthy_high_scorer_beats_a_weak_baseline() -> None:
 
 def test_value_stash_is_deterministic_given_seed() -> None:
     first = value_stash(
-        pts_per_game=1.0,
-        length_probs=_LENGTH_7,
-        availability_curve=[0.5] * 7,
-        active_baseline=2.0,
+        _StashValueRequest(1.0, _LENGTH_7, [0.5] * 7, 2.0),
         seed=42,
         n_sims=1500,
     )
     second = value_stash(
-        pts_per_game=1.0,
-        length_probs=_LENGTH_7,
-        availability_curve=[0.5] * 7,
-        active_baseline=2.0,
+        _StashValueRequest(1.0, _LENGTH_7, [0.5] * 7, 2.0),
         seed=42,
         n_sims=1500,
     )
@@ -147,18 +136,12 @@ def test_earlier_return_is_worth_at_least_as_much() -> None:
     early = [1.0] * 7
     late = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]
     _ev_e, value_early, _a = value_stash(
-        pts_per_game=1.2,
-        length_probs=_LENGTH_7,
-        availability_curve=early,
-        active_baseline=2.0,
+        _StashValueRequest(1.2, _LENGTH_7, early, 2.0),
         seed=3,
         n_sims=6000,
     )
     _ev_l, value_late, _b = value_stash(
-        pts_per_game=1.2,
-        length_probs=_LENGTH_7,
-        availability_curve=late,
-        active_baseline=2.0,
+        _StashValueRequest(1.2, _LENGTH_7, late, 2.0),
         seed=3,
         n_sims=6000,
     )

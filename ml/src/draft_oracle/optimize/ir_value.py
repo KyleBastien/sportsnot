@@ -79,6 +79,14 @@ class _StashSimulationInput:
     availability_curve: Sequence[float] | None
 
 
+@dataclass(frozen=True)
+class _StashValueRequest:
+    pts_per_game: float
+    length_probs: Mapping[int, float]
+    availability_curve: Sequence[float] | None
+    active_baseline: float
+
+
 def retroactive_swap_points(ir_points: float, active_points: float) -> float:
     """Points an IR slot pair yields after an *optimal* retroactive activation.
 
@@ -145,10 +153,7 @@ def simulate_stash_samples(
 
 
 def value_stash(
-    pts_per_game: float,
-    length_probs: Mapping[int, float],
-    availability_curve: Sequence[float] | None,
-    active_baseline: float,
+    request: _StashValueRequest,
     *,
     seed: int,
     n_sims: int = DEFAULT_STASH_N_SIMS,
@@ -166,11 +171,15 @@ def value_stash(
     rng = np.random.default_rng(seed)
     samples = simulate_stash_samples(
         rng,
-        _StashSimulationInput(pts_per_game, length_probs, availability_curve),
+        _StashSimulationInput(
+            request.pts_per_game,
+            request.length_probs,
+            request.availability_curve,
+        ),
         n_sims=n_sims,
         horizon=horizon,
     )
-    baseline = float(active_baseline)
+    baseline = float(request.active_baseline)
     swapped = np.maximum(samples, baseline)
     stash_ev = float(np.mean(swapped))
     stash_value = stash_ev - baseline
@@ -197,10 +206,7 @@ def healthy_alternative_value(
     e_len = expected_series_length(dict(length_probs))
     ppg = float(active_baseline) / e_len if e_len > 0 else 0.0
     _stash_ev, stash_value, _prob = value_stash(
-        ppg,
-        length_probs,
-        None,
-        active_baseline,
+        _StashValueRequest(ppg, length_probs, None, active_baseline),
         seed=seed,
         n_sims=n_sims,
         horizon=horizon,
@@ -267,10 +273,12 @@ def build_stash_valuations(
         baseline = float(replacement_by_position.get(item.position, 0.0))
         player_seed = seed + int(item.player_id)
         stash_ev, stash_value, activation_prob = value_stash(
-            item.pts_per_game,
-            item.length_probs,
-            item.availability_curve,
-            baseline,
+            _StashValueRequest(
+                item.pts_per_game,
+                item.length_probs,
+                item.availability_curve,
+                baseline,
+            ),
             seed=player_seed,
             n_sims=n_sims,
             horizon=horizon,
