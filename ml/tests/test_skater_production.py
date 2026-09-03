@@ -176,8 +176,8 @@ def _synthetic_archive(
                         for p, (t, rate, _pos) in players.items():
                             if t != team:
                                 continue
-                            g = _draw_count(rng, rate)
-                            a = _draw_count(rng, rate)
+                            g = int(rng.poisson(max(rate * 0.5, 0.01)))
+                            a = int(rng.poisson(max(rate * 0.5, 0.01)))
                             sk_rows.append(
                                 _skater_row(
                                     _SkaterRowInput(
@@ -198,8 +198,8 @@ def _synthetic_archive(
                 for p, (t, rate, _pos) in players.items():
                     if t != team:
                         continue
-                    g = _draw_count(rng, rate)
-                    a = _draw_count(rng, rate)
+                    g = int(rng.poisson(max(rate * 0.5, 0.01)))
+                    a = int(rng.poisson(max(rate * 0.5, 0.01)))
                     sk_rows.append(
                         _skater_row(
                             _SkaterRowInput(
@@ -213,10 +213,6 @@ def _synthetic_archive(
     players_df = pd.DataFrame(player_rows)
     series = _series_rows(seasons)
     return skater_games, team_games, players_df, series
-
-
-def _draw_count(rng: np.random.Generator, rate: float) -> int:
-    return int(rng.poisson(max(rate * 0.5, 0.01)))
 
 
 @dataclass(frozen=True)

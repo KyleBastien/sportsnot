@@ -214,6 +214,15 @@ class _SourceFetchResult:
     warnings: list[str]
 
 
+@dataclass(frozen=True)
+class _InjuriesResultInput:
+    options: InjuryBuildOptions
+    source: pd.DataFrame
+    merged: pd.DataFrame
+    fetched: _SourceFetchResult
+    warnings: list[str]
+
+
 def build_injuries_table(
     options: InjuryBuildOptions | None = None,
     *,
@@ -241,7 +250,7 @@ def build_injuries_table(
     source = _source_or_last_known(fetched.source, out_path, warnings)
     merged = _apply_configured_overrides(source, options.overrides_path)
     _write_injuries_table(merged, options.out_dir, out_path)
-    return _injuries_result(options, source, merged, fetched, warnings)
+    return _injuries_result(_InjuriesResultInput(options, source, merged, fetched, warnings))
 
 
 def _resolve_build_players(
@@ -290,23 +299,21 @@ def _write_injuries_table(merged: pd.DataFrame, out_dir: Path, out_path: Path) -
     merged.to_parquet(out_path, index=False)
 
 
-def _injuries_result(
-    options: InjuryBuildOptions,
-    source: pd.DataFrame,
-    merged: pd.DataFrame,
-    fetched: _SourceFetchResult,
-    warnings: list[str],
-) -> InjuriesResult:
-    source_rows = _source_row_count(source)
-    override_rows = int((merged["source"] == SOURCE_OVERRIDE).sum()) if not merged.empty else 0
+def _injuries_result(request: _InjuriesResultInput) -> InjuriesResult:
+    source_rows = _source_row_count(request.source)
+    override_rows = (
+        int((request.merged["source"] == SOURCE_OVERRIDE).sum())
+        if not request.merged.empty
+        else 0
+    )
     return InjuriesResult(
-        out_dir=options.out_dir,
+        out_dir=request.options.out_dir,
         source_rows=source_rows,
         override_rows=override_rows,
-        total_rows=len(merged),
-        degraded=fetched.degraded,
-        unresolved_player_ids=fetched.unresolved,
-        warnings=warnings,
+        total_rows=len(request.merged),
+        degraded=request.fetched.degraded,
+        unresolved_player_ids=request.fetched.unresolved,
+        warnings=request.warnings,
     )
 
 

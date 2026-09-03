@@ -435,11 +435,7 @@ _PROJECTION_CONFIG = ProjectionConfig(
 
 def test_evaluate_skater_projections_runs_end_to_end() -> None:
     end_years = [2018, 2019, 2020, 2021, 2022, 2023]
-    sk, tg, players, series = _synthetic_archive(end_years, seed=1)
-    result = evaluate_skater_projections(
-        ProjectionEvaluationRequest(sk, players, tg, series, _PROJECTION_CONFIG)
-    )
-    _assert_projection_shape(result)
+    _assert_projection_shape(_evaluate_projection_result(end_years, seed=1))
 
 
 def _assert_projection_shape(result: ProjectionResult) -> None:
@@ -449,6 +445,13 @@ def _assert_projection_shape(result: ProjectionResult) -> None:
     assert not np.isnan(result.test_mae_model)
     # Uncertainty band is ordered on the held-out means.
     assert result.mean_p10 <= result.mean_p90
+
+
+def _evaluate_projection_result(end_years: list[int], *, seed: int) -> ProjectionResult:
+    sk, tg, players, series = _synthetic_archive(end_years, seed=seed)
+    return evaluate_skater_projections(
+        ProjectionEvaluationRequest(sk, players, tg, series, _PROJECTION_CONFIG)
+    )
 
 
 def test_evaluate_skater_projections_report_and_manifest_are_consistent() -> None:
