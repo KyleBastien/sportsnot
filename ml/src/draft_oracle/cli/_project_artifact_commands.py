@@ -19,6 +19,7 @@ from draft_oracle.cli._project_defaults import (
 
 if TYPE_CHECKING:
     from draft_oracle.optimize.opponents import FittedLeagueOpponents
+    from draft_oracle.optimize.recommend import Recommendation
     from draft_oracle.optimize.simulator import DraftAsset, DraftState, OpponentModel
     from draft_oracle.projection_artifact import ProjectArtifactConfig, ProjectArtifactResult
 
@@ -202,16 +203,41 @@ def recommend(
     passing real names to ``--managers`` attaches each manager's fitted model to their
     real seat.
     """
+    inputs = _recommend_inputs(
+        artifact_dir=artifact_dir,
+        managers=managers,
+        seat=seat,
+        ir=ir,
+        temperature=temperature,
+        opponents=opponents,
+        opponent_artifact=opponent_artifact,
+    )
+    result = _recommendation_result(inputs, rollouts=rollouts, depth=depth, seed=seed)
+    _echo_recommendation(result, inputs.label)
+
+
+@dataclass(frozen=True)
+class _RecommendInputs:
+    setup: _RecommendSetup
+    label: str
+
+
+def _recommend_inputs(
+    *,
+    artifact_dir: Path,
+    managers: str,
+    seat: int,
+    ir: bool,
+    temperature: float,
+    opponents: str,
+    opponent_artifact: Path,
+) -> _RecommendInputs:
     from draft_oracle.cli.draft import (
         opponent_label,
         parse_managers,
         resolve_opponents_kind,
     )
-    from draft_oracle.optimize.recommend import (
-        RecommendConfig,
-        build_pool_from_projection_artifact,
-        recommend_pick,
-    )
+    from draft_oracle.optimize.recommend import build_pool_from_projection_artifact
 
     manager_ids = parse_managers(managers)
     _validate_seat(seat, len(manager_ids))
@@ -226,16 +252,36 @@ def recommend(
         opponent_artifact=opponent_artifact,
         temperature=temperature,
     )
+    return _RecommendInputs(
+        setup=setup,
+        label=opponent_label(opponents_kind, setup.fitted, manager_ids),
+    )
+
+
+def _recommendation_result(
+    inputs: _RecommendInputs,
+    *,
+    rollouts: int,
+    depth: int,
+    seed: int,
+) -> Recommendation:
+    from draft_oracle.optimize.recommend import RecommendConfig, recommend_pick
+
+    setup = inputs.setup
     _advance_to_owner(setup.state, setup.owner, setup.opponent_model, seed)
     config = RecommendConfig(rollouts=rollouts, depth=depth or None, seed=seed)
-    result = recommend_pick(
+    return recommend_pick(
         setup.state,
         setup.owner,
         setup.opponent_model,
         config=config,
     )
-    label = opponent_label(opponents_kind, setup.fitted, manager_ids)
-    typer.echo(f"Recommendation for {setup.owner} (pick #{setup.state.pick_index + 1}, {label}):")
+
+
+def _echo_recommendation(result: Recommendation, label: str) -> None:
+    typer.echo(
+        f"Recommendation for {result.owner} (pick #{result.pick_index + 1}, {label}):"
+    )
     for line in result.report_lines():
         typer.echo(line)
 
