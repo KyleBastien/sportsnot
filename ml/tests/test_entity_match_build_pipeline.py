@@ -99,7 +99,12 @@ def _league_pick(**kw: object) -> dict[str, object]:
 
 
 def _write_league_picks(normalized_dir: Path) -> None:
-    rows = [
+    rows = _league_pick_rows()
+    pd.DataFrame(rows).to_parquet(normalized_dir / "league_picks.parquet", index=False)
+
+
+def _league_pick_rows() -> list[dict[str, object]]:
+    return [
         _league_pick(),  # exact skater
         _league_pick(
             player_or_team_name="David Pastrank",
@@ -126,7 +131,6 @@ def _write_league_picks(normalized_dir: Path) -> None:
             team_name="Oilers",
         ),
     ]
-    pd.DataFrame(rows).to_parquet(normalized_dir / "league_picks.parquet", index=False)
 
 
 def _prepare_match_inputs(
