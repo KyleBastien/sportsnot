@@ -18,6 +18,7 @@ import pytest
 
 from draft_oracle.optimize.ir_value import (
     StashInput,
+    _BuildStashRequest,
     _HealthyAlternativeRequest,
     _StashSimulationInput,
     _StashValueRequest,
@@ -195,7 +196,11 @@ def test_build_valuations_verdicts_and_ordering() -> None:
         _StashCase(2, "F", 0.1, [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0], name="Scrub")
     )
     replacement = {"F": 1.2, "D": 0.8}
-    vals = build_stash_valuations([scrub, star], replacement, seed=11, n_sims=6000)
+    vals = build_stash_valuations(
+        _BuildStashRequest([scrub, star], replacement),
+        seed=11,
+        n_sims=6000,
+    )
 
     by_id = {v.player_id: v for v in vals}
     assert by_id[1].verdict == "stash"
@@ -208,7 +213,11 @@ def test_build_valuations_verdicts_and_ordering() -> None:
 
 def test_defense_swaps_defense_baseline() -> None:
     d = _input(_StashCase(9, "D", 1.0, [1.0] * 7))
-    vals = build_stash_valuations([d], {"F": 5.0, "D": 0.5}, seed=1, n_sims=1000)
+    vals = build_stash_valuations(
+        _BuildStashRequest([d], {"F": 5.0, "D": 0.5}),
+        seed=1,
+        n_sims=1000,
+    )
     assert vals[0].active_baseline == pytest.approx(0.5)
 
 
@@ -221,7 +230,11 @@ def test_render_ir_section_empty_is_blank() -> None:
 
 def test_render_ir_section_is_ascii_with_verdict() -> None:
     star = _input(_StashCase(1, "F", 1.6, [1.0] * 7, name="Star"))
-    vals = build_stash_valuations([star], {"F": 1.0, "D": 1.0}, seed=1, n_sims=1000)
+    vals = build_stash_valuations(
+        _BuildStashRequest([star], {"F": 1.0, "D": 1.0}),
+        seed=1,
+        n_sims=1000,
+    )
     lines = render_ir_section(vals)
     text = "\n".join(lines)
     assert "IR stash candidates" in text
@@ -266,7 +279,11 @@ def test_reprice_pool_preserves_length_and_identity() -> None:
 def test_no_return_stash_is_worthless_to_the_optimizer() -> None:
     # A stash that never plays has zero stash value -> the optimizer prices it at ~0.
     hurt = _input(_StashCase(1, "F", 3.0, [0.0] * 7))
-    vals = build_stash_valuations([hurt], {"F": 4.0, "D": 4.0}, seed=1, n_sims=1000)
+    vals = build_stash_valuations(
+        _BuildStashRequest([hurt], {"F": 4.0, "D": 4.0}),
+        seed=1,
+        n_sims=1000,
+    )
     assert math.isclose(vals[0].stash_value, 0.0, abs_tol=1e-9)
     repriced = reprice_pool_for_ir([_asset(1, "F", 12.0)], {1: vals[0].stash_value})
     assert repriced[0].projection == pytest.approx(0.0)

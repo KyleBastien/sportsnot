@@ -93,6 +93,12 @@ class _HealthyAlternativeRequest:
     length_probs: Mapping[int, float]
 
 
+@dataclass(frozen=True)
+class _BuildStashRequest:
+    inputs: Sequence[StashInput]
+    replacement_by_position: Mapping[str, float]
+
+
 def retroactive_swap_points(ir_points: float, active_points: float) -> float:
     """Points an IR slot pair yields after an *optimal* retroactive activation.
 
@@ -258,8 +264,7 @@ class StashValuation:
 
 
 def build_stash_valuations(
-    inputs: Sequence[StashInput],
-    replacement_by_position: Mapping[str, float],
+    request: _BuildStashRequest,
     *,
     seed: int = 20260827,
     n_sims: int = DEFAULT_STASH_N_SIMS,
@@ -274,8 +279,8 @@ def build_stash_valuations(
     ``avoid``. Deterministic given ``seed``: each player's RNG is offset by its id.
     """
     valuations: list[StashValuation] = []
-    for item in inputs:
-        baseline = float(replacement_by_position.get(item.position, 0.0))
+    for item in request.inputs:
+        baseline = float(request.replacement_by_position.get(item.position, 0.0))
         player_seed = seed + int(item.player_id)
         stash_ev, stash_value, activation_prob = value_stash(
             _StashValueRequest(

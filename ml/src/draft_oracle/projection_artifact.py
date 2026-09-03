@@ -117,6 +117,7 @@ from draft_oracle.models.skater_production import (
 from draft_oracle.optimize.ir_value import (
     StashInput,
     StashValuation,
+    _BuildStashRequest,
     build_stash_valuations,
     render_ir_section,
 )
@@ -480,11 +481,13 @@ def _apply_ir_stash(request: _IrStashInput) -> list[StashValuation]:
         model,
     )
     valuations = build_stash_valuations(
-        inputs,
-        {
-            "F": request.cheatsheet.replacement_forward,
-            "D": request.cheatsheet.replacement_defense,
-        },
+        _BuildStashRequest(
+            inputs,
+            {
+                "F": request.cheatsheet.replacement_forward,
+                "D": request.cheatsheet.replacement_defense,
+            },
+        ),
         seed=config.seed,
         n_sims=config.n_sims,
         horizon=config.horizon,
