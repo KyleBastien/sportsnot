@@ -416,15 +416,6 @@ def _synthetic_archive(
     )
 
 
-def _projection_config() -> ProjectionConfig:
-    return ProjectionConfig(
-        seed=20260827,
-        n_test_seasons=2,
-        n_sims=300,
-        production_config=_production_config(),
-    )
-
-
 def _production_config() -> SkaterProductionConfig:
     return SkaterProductionConfig(
         seed=20260827,
@@ -434,11 +425,19 @@ def _production_config() -> SkaterProductionConfig:
     )
 
 
+_PROJECTION_CONFIG = ProjectionConfig(
+    seed=20260827,
+    n_test_seasons=2,
+    n_sims=300,
+    production_config=_production_config(),
+)
+
+
 def test_evaluate_skater_projections_runs_end_to_end() -> None:
     end_years = [2018, 2019, 2020, 2021, 2022, 2023]
     sk, tg, players, series = _synthetic_archive(end_years, seed=1)
     result = evaluate_skater_projections(
-        ProjectionEvaluationRequest(sk, players, tg, series, _projection_config())
+        ProjectionEvaluationRequest(sk, players, tg, series, _PROJECTION_CONFIG)
     )
 
     assert result.test_years == (2022, 2023)
@@ -453,7 +452,7 @@ def test_evaluate_skater_projections_report_and_manifest_are_consistent() -> Non
     end_years = [2018, 2019, 2020, 2021, 2022, 2023]
     sk, tg, players, series = _synthetic_archive(end_years, seed=2)
     result = evaluate_skater_projections(
-        ProjectionEvaluationRequest(sk, players, tg, series, _projection_config())
+        ProjectionEvaluationRequest(sk, players, tg, series, _PROJECTION_CONFIG)
     )
 
     report = "\n".join(result.report_lines())
@@ -477,7 +476,7 @@ def test_evaluate_skater_projections_report_and_manifest_are_consistent() -> Non
 def test_evaluate_skater_projections_is_reproducible() -> None:
     end_years = [2018, 2019, 2020, 2021, 2022, 2023]
     sk, tg, players, series = _synthetic_archive(end_years, seed=3)
-    cfg = _projection_config()
+    cfg = _PROJECTION_CONFIG
     request = ProjectionEvaluationRequest(sk, players, tg, series, cfg)
     a = evaluate_skater_projections(request)
     b = evaluate_skater_projections(request)
@@ -489,5 +488,5 @@ def test_evaluate_skater_projections_requires_enough_seasons() -> None:
     sk, tg, players, series = _synthetic_archive([2022, 2023], seed=4)
     with pytest.raises(ValueError, match="not enough seasons"):
         evaluate_skater_projections(
-            ProjectionEvaluationRequest(sk, players, tg, series, _projection_config())
+            ProjectionEvaluationRequest(sk, players, tg, series, _PROJECTION_CONFIG)
         )
