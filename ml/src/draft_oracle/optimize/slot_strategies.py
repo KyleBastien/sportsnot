@@ -235,14 +235,59 @@ def _simulate_gap_taken(
     return frozenset(taken)
 
 
+@dataclass(frozen=True)
+class _SlotCtx:
+    """Fixed inputs for one owner's contingency planning at a slot."""
+
+    owner: str
+    opponents: OpponentModel | Mapping[str, OpponentModel]
+    replacement: Mapping[str, float]
+    config: SlotStrategyConfig
+
+
+def _gap_outcomes(
+    ctx: _SlotCtx, after: DraftState, target_keys: frozenset[str], branch_seed: int
+) -> Counter[frozenset[str]]:
+    """Cluster ``contingency_rollouts`` gap playouts by which targets opponents took."""
+    outcomes: Counter[frozenset[str]] = Counter()
+    for j in range(ctx.config.contingency_rollouts):
+        rng = random.Random(branch_seed + j)
+        outcomes[_simulate_gap_taken(after, ctx.owner, ctx.opponents, target_keys, rng)] += 1
+    return outcomes
+
+
+def _branch_condition(gone: list[str]) -> str:
+    """Human-readable branch label for the surviving/lost targets."""
+    if not gone:
+        return "if your targets hold"
+    return "if " + ", ".join(gone) + " gone"
+
+
+def _build_branches(
+    ctx: _SlotCtx,
+    after: DraftState,
+    targets: list[DraftAsset],
+    outcomes: Counter[frozenset[str]],
+) -> list[Contingency]:
+    """Surface the most-likely board states, each with the owner's best pick there."""
+    total = sum(outcomes.values())
+    branches: list[Contingency] = []
+    for taken, count in outcomes.most_common(ctx.config.contingency_branches):
+        branch = after.copy()
+        for key in taken:
+            branch.available.pop(key, None)
+        if not branch.legal_assets(ctx.owner):
+            continue
+        best = greedy_vor_pick(branch, ctx.owner, ctx.replacement)
+        gone = [t.name for t in targets if t.key in taken]
+        team = f" {best.team_abbrev}" if best.team_abbrev else ""
+        recommendation = f"take {best.name} ({best.position}{team})"
+        branches.append(Contingency(count / total, _branch_condition(gone), recommendation))
+    return branches
+
+
 def _branch_contingencies(
-    state: DraftState,
-    owner: str,
-    recommended: DraftAsset,
-    opponents: OpponentModel | Mapping[str, OpponentModel],
-    replacement: Mapping[str, float],
-    config: SlotStrategyConfig,
-    branch_seed: int,
+    ctx: _SlotCtx, state: DraftState, recommended: DraftAsset, branch_seed: int
 ) -> list[Contingency]:
     """Contingency plans for the owner's next turn, from gap-rollout board states.
 
@@ -253,37 +298,18 @@ def _branch_contingencies(
     """
     after = state.copy()
     after.apply_pick(recommended)
-    roster = after.rosters[owner]
+    roster = after.rosters[ctx.owner]
     if roster.count("F") + roster.count("D") + roster.count("G") >= after.capacity.total:
         return []
-    gap = after.picks_until_next(owner)
+    gap = after.picks_until_next(ctx.owner)
     if not gap:
         return []
-    targets = _top_targets(after, owner, replacement, config.contingency_targets)
+    targets = _top_targets(after, ctx.owner, ctx.replacement, ctx.config.contingency_targets)
     if not targets:
         return []
     target_keys = frozenset(t.key for t in targets)
-
-    outcomes: Counter[frozenset[str]] = Counter()
-    for j in range(config.contingency_rollouts):
-        rng = random.Random(branch_seed + j)
-        outcomes[_simulate_gap_taken(after, owner, opponents, target_keys, rng)] += 1
-    total = sum(outcomes.values())
-
-    branches: list[Contingency] = []
-    for taken, count in outcomes.most_common(config.contingency_branches):
-        branch = after.copy()
-        for key in taken:
-            branch.available.pop(key, None)
-        if not branch.legal_assets(owner):
-            continue
-        best = greedy_vor_pick(branch, owner, replacement)
-        gone = [t.name for t in targets if t.key in taken]
-        condition = "if " + ", ".join(gone) + " gone" if gone else "if your targets hold"
-        team = f" {best.team_abbrev}" if best.team_abbrev else ""
-        recommendation = f"take {best.name} ({best.position}{team})"
-        branches.append(Contingency(count / total, condition, recommendation))
-    return branches
+    outcomes = _gap_outcomes(ctx, after, target_keys, branch_seed)
+    return _build_branches(ctx, after, targets, outcomes)
 
 
 def _plan_slot(
@@ -334,13 +360,10 @@ def _plan_slot(
         if turn_index < config.contingency_turns:
             replacement = replacement_levels(state, managers)
             contingencies = _branch_contingencies(
+                _SlotCtx(owner, opponents, replacement, config),
                 state,
-                owner,
                 recommended_eval.asset,
-                opponents,
-                replacement,
-                config,
-                branch_seed=config.seed * 104729 + slot * 1009 + turn_index,
+                config.seed * 104729 + slot * 1009 + turn_index,
             )
         pick_number = state.pick_index + 1
         turns.append(
