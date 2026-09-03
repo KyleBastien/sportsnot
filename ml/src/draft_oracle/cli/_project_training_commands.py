@@ -282,16 +282,19 @@ def compare_strategies_cmd(
     """Run the committed multi-step vs. greedy-VOR vs. one-step comparison (US-021)."""
     from draft_oracle.optimize.recommend import (
         DEFAULT_RECOMMEND_ARTIFACT_DIR,
+        RecommendationEvaluationRequest,
         evaluate_recommendation_strategies_from_normalized,
     )
 
     result = evaluate_recommendation_strategies_from_normalized(
-        normalized_dir=normalized_dir,
-        managers=managers,
-        n_drafts=n_drafts,
-        rollouts=rollouts,
-        max_candidates=max_candidates,
-        seed=seed,
+        RecommendationEvaluationRequest(
+            normalized_dir=normalized_dir,
+            managers=managers,
+            n_drafts=n_drafts,
+            rollouts=rollouts,
+            max_candidates=max_candidates,
+            seed=seed,
+        )
     )
     typer.echo(f"Strategy comparison -> {DEFAULT_RECOMMEND_ARTIFACT_DIR}")
     for line in result.report_lines():

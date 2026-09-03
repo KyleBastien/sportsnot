@@ -194,6 +194,20 @@ class CompareStrategiesRequest:
     scenario: str = 'balanced fitted opponents'
 
 
+@dataclass(frozen=True)
+class RecommendationEvaluationRequest:
+    normalized_dir: Path
+    artifact_dir: Path = DEFAULT_RECOMMEND_ARTIFACT_DIR
+    managers: int = 4
+    n_drafts: int = 200
+    rollouts: int = 40
+    max_candidates: int = 6
+    allow_ir: bool = False
+    opponent_temperature: float = 0.75
+    run_bonus: float = 12.0
+    seed: int = 20260827
+
+
 def _decision_pick(ctx: _CompareCtx, state: DraftState, strategy: _Strategy) -> DraftAsset:
     """The single pick ``strategy`` makes for the owner at the current slot."""
     if strategy == "greedy_vor":
@@ -463,17 +477,7 @@ def _write_comparison_artifact(
 
 
 def evaluate_recommendation_strategies_from_normalized(
-    *,
-    normalized_dir: Path,
-    artifact_dir: Path = DEFAULT_RECOMMEND_ARTIFACT_DIR,
-    managers: int = 4,
-    n_drafts: int = 200,
-    rollouts: int = 40,
-    max_candidates: int = 6,
-    allow_ir: bool = False,
-    opponent_temperature: float = 0.75,
-    run_bonus: float = 12.0,
-    seed: int = 20260827,
+    request: RecommendationEvaluationRequest,
 ) -> StrategyComparison:
     """Fit league opponents, run both comparison scenarios, and commit report + manifest.
 
@@ -495,11 +499,18 @@ def evaluate_recommendation_strategies_from_normalized(
     """
     import pandas as pd
 
-    picks = pd.read_parquet(normalized_dir / "league_draft_picks.parquet")
-    fitted = fit_opponent_models(picks, OpponentFitConfig(temperature=opponent_temperature))
-    managers_list, owner = _require_comparison_managers(fitted, managers)
-    pool = build_synthetic_pool(len(managers_list), allow_ir=allow_ir, seed=seed)
-    cfg = _recommend_compare_config(rollouts=rollouts, max_candidates=max_candidates, seed=seed)
+    picks = pd.read_parquet(request.normalized_dir / "league_draft_picks.parquet")
+    fitted = fit_opponent_models(
+        picks,
+        OpponentFitConfig(temperature=request.opponent_temperature),
+    )
+    managers_list, owner = _require_comparison_managers(fitted, request.managers)
+    pool = build_synthetic_pool(len(managers_list), allow_ir=request.allow_ir, seed=request.seed)
+    cfg = _recommend_compare_config(
+        rollouts=request.rollouts,
+        max_candidates=request.max_candidates,
+        seed=request.seed,
+    )
 
     fitted_comparison = compare_strategies(
         CompareStrategiesRequest(
@@ -507,29 +518,29 @@ def evaluate_recommendation_strategies_from_normalized(
             managers_list,
             owner,
             fitted.as_mapping(managers_list),
-            allow_ir=allow_ir,
+            allow_ir=request.allow_ir,
             config=cfg,
-            n_drafts=n_drafts,
-            seed=seed,
+            n_drafts=request.n_drafts,
+            seed=request.seed,
             opponent_kind='fitted-league',
             scenario='balanced fitted opponents',
         )
     )
-    run_opponent = _PositionRunOpponent(favored="F", bonus=run_bonus)
+    run_opponent = _PositionRunOpponent(favored="F", bonus=request.run_bonus)
     run_comparison = compare_strategies(
         CompareStrategiesRequest(
             pool,
             managers_list,
             owner,
             run_opponent,
-            allow_ir=allow_ir,
+            allow_ir=request.allow_ir,
             config=cfg,
-            n_drafts=n_drafts,
-            seed=seed,
+            n_drafts=request.n_drafts,
+            seed=request.seed,
             opponent_kind='positional-run',
             scenario='positional-run opponents (forward run)',
         )
     )
 
-    _write_comparison_artifact(artifact_dir, fitted_comparison, run_comparison)
+    _write_comparison_artifact(request.artifact_dir, fitted_comparison, run_comparison)
     return fitted_comparison

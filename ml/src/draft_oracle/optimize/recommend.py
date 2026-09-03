@@ -80,6 +80,7 @@ from draft_oracle.optimize._recommend_kernels import (
 )
 from draft_oracle.optimize._recommend_strategies import (
     DEFAULT_RECOMMEND_ARTIFACT_DIR,
+    RecommendationEvaluationRequest,
     StrategyComparison,
     build_synthetic_pool,
     compare_strategies,
@@ -104,6 +105,7 @@ __all__ = [
     "PickEvaluation",
     "RecommendConfig",
     "Recommendation",
+    "RecommendationEvaluationRequest",
     "StrategyComparison",
     "asset_value",
     "build_pool_from_frames",
