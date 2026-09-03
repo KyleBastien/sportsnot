@@ -10,7 +10,9 @@ network, no committed data (SPEC section 7).
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import pandas as pd
 import pytest
@@ -43,17 +45,23 @@ from draft_oracle.optimize.simulator import (
 )
 
 
+@dataclass(frozen=True)
+class _AssetIds:
+    team_id: int
+    player_id: int
+
+
 def _skater(
-    key: str, position: str, projection: float, *, team_id: int, player_id: int
+    key: str, position: Literal["F", "D", "G"], projection: float, ids: _AssetIds
 ) -> DraftAsset:
     return DraftAsset(
         key=key,
         name=key,
-        position=position,  # type: ignore[arg-type]
+        position=position,
         rank_value=projection,
-        player_id=player_id,
-        team_id=team_id,
-        team_abbrev=f"T{team_id}",
+        player_id=ids.player_id,
+        team_id=ids.team_id,
+        team_abbrev=f"T{ids.team_id}",
         projection=projection,
     )
 
@@ -75,9 +83,9 @@ def _pool(managers: int, allow_ir: bool, *, surplus: int = 6) -> list[DraftAsset
     cap = roster_capacity(allow_ir)
     pool: list[DraftAsset] = []
     for i in range(cap.forwards * managers + surplus):
-        pool.append(_skater(f"F{i}", "F", 30.0 - i, team_id=1 + (i % 8), player_id=1000 + i))
+        pool.append(_skater(f"F{i}", "F", 30.0 - i, _AssetIds(1 + (i % 8), 1000 + i)))
     for i in range(cap.defense * managers + surplus):
-        pool.append(_skater(f"D{i}", "D", 20.0 - i, team_id=1 + (i % 8), player_id=2000 + i))
+        pool.append(_skater(f"D{i}", "D", 20.0 - i, _AssetIds(1 + (i % 8), 2000 + i)))
     for i in range(cap.goalies * managers + surplus):
         pool.append(_team(100 + i, 25.0 - 2.0 * i))
     return pool
@@ -87,7 +95,7 @@ def _pool(managers: int, allow_ir: bool, *, surplus: int = 6) -> list[DraftAsset
 
 
 def test_asset_value_prefers_projection() -> None:
-    asset = _skater("F0", "F", 12.5, team_id=1, player_id=1)
+    asset = _skater("F0", "F", 12.5, _AssetIds(1, 1))
     assert asset_value(asset) == 12.5
 
 
@@ -409,9 +417,9 @@ def test_fast_path_raises_on_dry_pool_like_object_path() -> None:
     managers = [f"m{i}" for i in range(3)]
     pool: list[DraftAsset] = []
     for i in range(20):
-        pool.append(_skater(f"F{i}", "F", 30.0 - i, team_id=1 + (i % 4), player_id=1000 + i))
+        pool.append(_skater(f"F{i}", "F", 30.0 - i, _AssetIds(1 + (i % 4), 1000 + i)))
     for i in range(12):
-        pool.append(_skater(f"D{i}", "D", 20.0 - i, team_id=1 + (i % 4), player_id=2000 + i))
+        pool.append(_skater(f"D{i}", "D", 20.0 - i, _AssetIds(1 + (i % 4), 2000 + i)))
     for i in range(2):  # 3 managers each need 1 goalie; only 2 exist -> one runs dry
         pool.append(_team(100 + i, 25.0 - 2.0 * i))
     state = DraftState.new(managers, pool, allow_ir=False)
@@ -524,9 +532,13 @@ def test_full_depth_12_manager_recommendation_completes() -> None:
     managers = [f"m{i}" for i in range(12)]
     pool: list[DraftAsset] = []
     for i in range(200):
-        pool.append(_skater(f"F{i}", "F", 30.0 - 0.1 * i, team_id=1 + (i % 16), player_id=1000 + i))
+        pool.append(
+            _skater(f"F{i}", "F", 30.0 - 0.1 * i, _AssetIds(1 + (i % 16), 1000 + i))
+        )
     for i in range(120):
-        pool.append(_skater(f"D{i}", "D", 20.0 - 0.1 * i, team_id=1 + (i % 16), player_id=2000 + i))
+        pool.append(
+            _skater(f"D{i}", "D", 20.0 - 0.1 * i, _AssetIds(1 + (i % 16), 2000 + i))
+        )
     for i in range(16):
         pool.append(_team(100 + i, 25.0 - i))
     state = DraftState.new(managers, pool, allow_ir=True)

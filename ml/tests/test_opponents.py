@@ -75,6 +75,16 @@ class _PickCase:
     pick_number: int | None = None
 
 
+@dataclass(frozen=True)
+class _ManagerEventCase:
+    season: int
+    event: str
+    manager: str
+    slot: int
+    team: int
+    pid: int
+
+
 def _pick(case: _PickCase) -> dict[str, object]:
     return {
         "season": case.season,
@@ -99,15 +109,40 @@ def _frame(rows: list[dict[str, object]]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=_PICK_COLUMNS)
 
 
-def _manager_event_picks(
-    season: int, event: str, manager: str, slot: int, team: int, pid: int
-) -> tuple[list[dict[str, object]], int]:
+def _manager_event_picks(case: _ManagerEventCase) -> tuple[list[dict[str, object]], int]:
     """One manager's picks for one event: 3 F + 1 D, all from their own team."""
     picks: list[dict[str, object]] = []
+    pid = case.pid
     for _ in range(3):
-        picks.append(_pick(_PickCase(season, event, manager, slot, "F", pid, team, float(pid % 7))))
+        picks.append(
+            _pick(
+                _PickCase(
+                    case.season,
+                    case.event,
+                    case.manager,
+                    case.slot,
+                    "F",
+                    pid,
+                    case.team,
+                    float(pid % 7),
+                )
+            )
+        )
         pid += 1
-    picks.append(_pick(_PickCase(season, event, manager, slot, "D", pid, team, float(pid % 5))))
+    picks.append(
+        _pick(
+            _PickCase(
+                case.season,
+                case.event,
+                case.manager,
+                case.slot,
+                "D",
+                pid,
+                case.team,
+                float(pid % 5),
+            )
+        )
+    )
     pid += 1
     return picks, pid
 
@@ -125,7 +160,9 @@ def _affinity_league(seasons: tuple[int, ...]) -> pd.DataFrame:
     for season in seasons:
         for event in ("R1", "R2"):
             for slot, (manager, team) in enumerate(seats, start=1):
-                picks, pid = _manager_event_picks(season, event, manager, slot, team, pid)
+                picks, pid = _manager_event_picks(
+                    _ManagerEventCase(season, event, manager, slot, team, pid)
+                )
                 rows.extend(picks)
     return _frame(rows)
 
