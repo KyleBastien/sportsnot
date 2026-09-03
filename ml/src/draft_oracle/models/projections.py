@@ -44,6 +44,10 @@ import numpy as np
 import pandas as pd
 
 from draft_oracle.models._projection_evaluation import (
+    _EvaluateProjectionModelRequest,
+    evaluate_projection_model,
+)
+from draft_oracle.models._projection_evaluation import (
     _previous_round_points as _previous_round_points,
 )
 from draft_oracle.models._projection_evaluation import (
@@ -54,9 +58,6 @@ from draft_oracle.models._projection_evaluation import (
 )
 from draft_oracle.models._projection_evaluation import (
     _team_id_by_abbrev as _team_id_by_abbrev,
-)
-from draft_oracle.models._projection_evaluation import (
-    evaluate_projection_model,
 )
 from draft_oracle.models.series_sim import (
     series_length_labels,
@@ -700,15 +701,15 @@ def evaluate_skater_projections(
     resolved_request = _resolve_projection_evaluation_request(request, legacy_args, config)
     resolved_config = resolved_request.config or ProjectionConfig()
     evaluation = evaluate_projection_model(
-        ProjectionEvaluationRequest(
+        _EvaluateProjectionModelRequest(
             skater_games=resolved_request.skater_games,
             players=resolved_request.players,
             team_games=resolved_request.team_games,
             series=resolved_request.series,
             config=resolved_config,
-        ),
-        project_round=project_skater_round,
-        baseline_reg_games=BASELINE_REG_GAMES,
+            project_round=project_skater_round,
+            baseline_reg_games=BASELINE_REG_GAMES,
+        )
     )
     per_season = [
         SeasonMetrics(

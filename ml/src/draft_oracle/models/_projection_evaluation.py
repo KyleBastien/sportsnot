@@ -245,39 +245,26 @@ def _previous_round_points(labels: pd.DataFrame) -> dict[tuple[int, int, int], f
 
 
 def evaluate_projection_model(
-    request: ProjectionEvaluationRequest | pd.DataFrame,
-    *legacy_args: object,
-    config: _ProjectionConfigLike | None = None,
-    project_round: _ProjectRound | None = None,
-    baseline_reg_games: float | None = None,
+    request: _EvaluateProjectionModelRequest,
 ) -> ProjectionEvaluation:
-    resolved_request = _resolve_projection_request(
-        request,
-        legacy_args,
-        _ProjectionRequestOptions(
-            config=config,
-            project_round=project_round,
-            baseline_reg_games=baseline_reg_games,
-        ),
-    )
     context = _projection_context(
         _ProjectionContextRequest(
-            skater_games=resolved_request.skater_games,
-            players=resolved_request.players,
-            team_games=resolved_request.team_games,
-            series=resolved_request.series,
-            config=resolved_request.config,
+            skater_games=request.skater_games,
+            players=request.players,
+            team_games=request.team_games,
+            series=request.series,
+            config=request.config,
         )
     )
     scores = _projection_scores(
         _ProjectionScoresRequest(
-            skater_games=resolved_request.skater_games,
-            players=resolved_request.players,
-            team_games=resolved_request.team_games,
-            series=resolved_request.series,
+            skater_games=request.skater_games,
+            players=request.players,
+            team_games=request.team_games,
+            series=request.series,
             context=context,
-            project_round=resolved_request.project_round,
-            baseline_reg_games=resolved_request.baseline_reg_games,
+            project_round=request.project_round,
+            baseline_reg_games=request.baseline_reg_games,
         )
     )
     return _projection_evaluation(context, scores)
