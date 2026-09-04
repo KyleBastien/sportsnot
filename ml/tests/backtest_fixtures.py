@@ -567,12 +567,6 @@ def _four_round_archive(
     )
 
 
-def _four_round_config() -> BacktestConfig:
-    # Smaller sims/rollouts than _config: this fixture replays three events across a
-    # sixteen-team archive, and the assertions are structural, not statistical.
-    return _FOUR_ROUND_CONFIG
-
-
 _ARCHIVE_TABLES = _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=1)
 _FOUR_ROUND_ARCHIVE = _four_round_archive()
 _FOUR_ROUND_TABLES = {

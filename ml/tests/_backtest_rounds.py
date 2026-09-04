@@ -29,15 +29,15 @@ from draft_oracle.models.skater_production import (
 from draft_oracle.projection_artifact import ProjectArtifactConfig, build_projection_artifact
 from tests._backtest_shared import _config, _config_ir, _tables
 from tests.backtest_fixtures import (
+    _FOUR_ROUND_CONFIG,
     _FOUR_ROUND_TABLES,
     FOUR_ROUND_TARGET,
-    _four_round_config,
 )
 
 
 def test_run_backtest_replays_rounds_2_and_combined_r3_r4() -> None:
     tables = _FOUR_ROUND_TABLES
-    result = run_backtest(tables, [FOUR_ROUND_TARGET], config=_four_round_config())
+    result = run_backtest(tables, [FOUR_ROUND_TARGET], config=_FOUR_ROUND_CONFIG)
     by_round = {r.playoff_round: r for r in result.rounds}
     assert sorted(by_round) == [1, 2, 3]
 
@@ -62,7 +62,7 @@ def test_run_backtest_replays_rounds_2_and_combined_r3_r4() -> None:
 
 def test_combined_r3_r4_roster_scoring_uses_both_rounds() -> None:
     tables = _FOUR_ROUND_TABLES
-    result = run_backtest(tables, [FOUR_ROUND_TARGET], config=_four_round_config())
+    result = run_backtest(tables, [FOUR_ROUND_TARGET], config=_FOUR_ROUND_CONFIG)
     combined = next(rnd for rnd in result.rounds if rnd.playoff_round == 3)
     seat_one = next(slot for slot in combined.slot_results if slot.seat == 1)
     season_id = (FOUR_ROUND_TARGET - 1) * 10000 + FOUR_ROUND_TARGET
@@ -127,7 +127,7 @@ def test_build_projection_artifact_combined_event_folds_r3_and_r4() -> None:
 
 def test_replay_round_two_scores_only_round_two() -> None:
     tables = _FOUR_ROUND_TABLES
-    config = _four_round_config()
+    config = _FOUR_ROUND_CONFIG
     skater_actual = skater_actual_points(tables['skater_games'], tables['series'])
     team_actual = team_actual_goalie_points(tables['team_games'], tables['series'])
     rnd = replay_round(

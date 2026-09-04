@@ -32,6 +32,19 @@ class _RoundOneSeriesInput:
     team_ids: Mapping[str, int]
 
 
+@dataclass(frozen=True)
+class _RoundOneTeamRowRequest:
+    season_id: int
+    game_id: int
+    game_date: str
+    team_id: int
+    team: str
+    opp: str
+    goals_for: int
+    goals_against: int
+    is_home: bool
+
+
 def _round1_series_games(
     series: _RoundOneSeriesInput,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], int]:
@@ -49,26 +62,30 @@ def _round1_series_games(
         team_rows.extend(
             [
                 _team_row(
-                    season_id=series.season_id,
-                    game_id=gid,
-                    game_date=game_date,
-                    team_id=series.team_ids[host],
-                    team=host,
-                    opp=visitor,
-                    goals_for=home_goals,
-                    goals_against=away_goals,
-                    is_home=True,
+                    _RoundOneTeamRowRequest(
+                        series.season_id,
+                        gid,
+                        game_date,
+                        series.team_ids[host],
+                        host,
+                        visitor,
+                        home_goals,
+                        away_goals,
+                        True,
+                    )
                 ),
                 _team_row(
-                    season_id=series.season_id,
-                    game_id=gid,
-                    game_date=game_date,
-                    team_id=series.team_ids[visitor],
-                    team=visitor,
-                    opp=host,
-                    goals_for=away_goals,
-                    goals_against=home_goals,
-                    is_home=False,
+                    _RoundOneTeamRowRequest(
+                        series.season_id,
+                        gid,
+                        game_date,
+                        series.team_ids[visitor],
+                        visitor,
+                        host,
+                        away_goals,
+                        home_goals,
+                        False,
+                    )
                 ),
             ]
         )
@@ -76,34 +93,23 @@ def _round1_series_games(
     return team_rows, skater_rows, gid
 
 
-def _team_row(
-    *,
-    season_id: int,
-    game_id: int,
-    game_date: str,
-    team_id: int,
-    team: str,
-    opp: str,
-    goals_for: int,
-    goals_against: int,
-    is_home: bool,
-) -> dict[str, object]:
-    won = goals_for > goals_against
+def _team_row(request: _RoundOneTeamRowRequest) -> dict[str, object]:
+    won = request.goals_for > request.goals_against
     return {
-        "season_id": season_id,
+        "season_id": request.season_id,
         "game_type_id": 3,
-        "game_id": game_id,
-        "game_date": game_date,
-        "team_id": team_id,
-        "team_abbrev": team,
-        "opponent_team_abbrev": opp,
-        "home_road": "H" if is_home else "R",
-        "goals_for": goals_for,
-        "goals_against": goals_against,
+        "game_id": request.game_id,
+        "game_date": request.game_date,
+        "team_id": request.team_id,
+        "team_abbrev": request.team,
+        "opponent_team_abbrev": request.opp,
+        "home_road": "H" if request.is_home else "R",
+        "goals_for": request.goals_for,
+        "goals_against": request.goals_against,
         "shots_against": 30,
         "points": 2 if won else 0,
         "win": won,
-        "shutout_win": won and goals_against == 0,
+        "shutout_win": won and request.goals_against == 0,
     }
 
 

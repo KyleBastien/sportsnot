@@ -277,6 +277,19 @@ class _BuiltProjectionArtifact:
     manifest: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class _SkaterProjectionRowsRequest:
+    skater_games: pd.DataFrame
+    players: pd.DataFrame
+    team_games: pd.DataFrame
+    injuries: pd.DataFrame | None
+    playoff_round: int
+    context: _ProjectionRoundContext
+    models: _ProjectionModels
+    length_by_abbrev: dict[str, dict[int, float]]
+    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None
+
+
 def _injured_player_ids(injuries: pd.DataFrame | None) -> set[int]:
     """Skater player ids currently out/IR/day-to-day (goalies excluded here)."""
     if injuries is None or injuries.empty:
@@ -425,15 +438,17 @@ def _projection_outputs(request: _ProjectionOutputsRequest) -> _ProjectionOutput
         request.playoff_round,
     )
     skater_rows = _skater_projection_rows(
-        request.skater_games,
-        request.players,
-        request.team_games,
-        request.injuries,
-        request.playoff_round,
-        request.context,
-        request.models,
-        team_projection.length_by_abbrev,
-        team_projection.combined_by_abbrev,
+        _SkaterProjectionRowsRequest(
+            request.skater_games,
+            request.players,
+            request.team_games,
+            request.injuries,
+            request.playoff_round,
+            request.context,
+            request.models,
+            team_projection.length_by_abbrev,
+            team_projection.combined_by_abbrev,
+        )
     )
     skaters = _finalize_skaters(skater_rows)
     teams = _finalize_teams(team_projection.team_rows)
@@ -515,41 +530,31 @@ def _team_projection_rows(
     )
 
 
-def _skater_projection_rows(
-    skater_games: pd.DataFrame,
-    players: pd.DataFrame,
-    team_games: pd.DataFrame,
-    injuries: pd.DataFrame | None,
-    playoff_round: int,
-    context: _ProjectionRoundContext,
-    models: _ProjectionModels,
-    length_by_abbrev: dict[str, dict[int, float]],
-    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None,
-) -> list[dict[str, Any]]:
-    injured_ids = _injured_player_ids(injuries)
+def _skater_projection_rows(request: _SkaterProjectionRowsRequest) -> list[dict[str, Any]]:
+    injured_ids = _injured_player_ids(request.injuries)
     feats = build_skater_features(
-        skater_games,
-        players,
-        team_games,
+        request.skater_games,
+        request.players,
+        request.team_games,
         SkaterFeatureRequest(
-            season_id=context.season_id,
-            as_of_date=context.cutoff,
-            playoff_round=int(playoff_round),
+            season_id=request.context.season_id,
+            as_of_date=request.context.cutoff,
+            playoff_round=int(request.playoff_round),
         ),
     )
-    eligible_feats = feats.loc[feats["team_abbrev"].isin(length_by_abbrev)]
+    eligible_feats = feats.loc[feats["team_abbrev"].isin(request.length_by_abbrev)]
     if eligible_feats.empty:
         return []
-    projected = models.prod_model.project(eligible_feats)
+    projected = request.models.prod_model.project(eligible_feats)
     return _build_skater_rows(
         _BuildSkaterRowsRequest(
             projected=projected,
-            length_by_abbrev=length_by_abbrev,
+            length_by_abbrev=request.length_by_abbrev,
             injured_ids=injured_ids,
-            season_id=context.season_id,
-            playoff_round=int(playoff_round),
-            config=context.config,
-            combined_by_abbrev=combined_by_abbrev,
+            season_id=request.context.season_id,
+            playoff_round=int(request.playoff_round),
+            config=request.context.config,
+            combined_by_abbrev=request.combined_by_abbrev,
         )
     )
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -102,31 +101,34 @@ def _team_row(spec: _TeamRowInput) -> dict[str, object]:
 
 
 def _game_rows(game: _GameRowsInput) -> list[dict[str, object]]:
-    return _row_pair(
-        _TeamRowInput(
-            game.season_id,
-            game.game_type_id,
-            game.game_id,
-            game.game_date,
-            game.home,
-            game.away,
-            game.home_goals,
-            game.away_goals,
-            True,
+    return [
+        _team_row(
+            _TeamRowInput(
+                game.season_id,
+                game.game_type_id,
+                game.game_id,
+                game.game_date,
+                game.home,
+                game.away,
+                game.home_goals,
+                game.away_goals,
+                True,
+            )
         ),
-        _TeamRowInput(
-            game.season_id,
-            game.game_type_id,
-            game.game_id,
-            game.game_date,
-            game.away,
-            game.home,
-            game.away_goals,
-            game.home_goals,
-            False,
+        _team_row(
+            _TeamRowInput(
+                game.season_id,
+                game.game_type_id,
+                game.game_id,
+                game.game_date,
+                game.away,
+                game.home,
+                game.away_goals,
+                game.home_goals,
+                False,
+            )
         ),
-        _team_row,
-    )
+    ]
 
 
 def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -218,11 +220,3 @@ _ARCHIVE_TEAM_GAMES_2020_21 = pd.concat(
     [normalize_team_games(pd.read_csv(path)) for path in _ARCHIVE_PATHS_2020_21],
     ignore_index=True,
 )
-
-
-def _row_pair[T](
-    first: T,
-    second: T,
-    builder: Callable[[T], dict[str, object]],
-) -> list[dict[str, object]]:
-    return [builder(first), builder(second)]
