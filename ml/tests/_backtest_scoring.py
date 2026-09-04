@@ -158,9 +158,14 @@ def _league_event_row(
     return row
 
 
-def test_real_2026_league_comparisons_never_pool_leagues() -> None:
-    normalized = Path('data/normalized')
-    _require_real_backtest_tables(normalized)
+def _real_league_score_context(
+    normalized: Path,
+) -> tuple[
+    pd.DataFrame,
+    pd.DataFrame,
+    dict[tuple[int, int, int], int],
+    dict[tuple[int, int, int], int],
+]:
     league_picks = pd.read_parquet(normalized / 'league_draft_picks.parquet')
     series = pd.read_parquet(normalized / 'series.parquet')
     skater_actual = skater_actual_points(
@@ -171,6 +176,13 @@ def test_real_2026_league_comparisons_never_pool_leagues() -> None:
         pd.read_parquet(normalized / 'team_games.parquet'),
         series,
     )
+    return league_picks, series, skater_actual, team_actual
+
+
+def test_real_2026_league_comparisons_never_pool_leagues() -> None:
+    normalized = Path('data/normalized')
+    _require_real_backtest_tables(normalized)
+    league_picks, _series, skater_actual, team_actual = _real_league_score_context(normalized)
     rnd = RoundResult(
         season=2026,
         season_id=20252026,
@@ -213,16 +225,7 @@ def test_real_2026_league_comparisons_never_pool_leagues() -> None:
 def test_real_2024_levi_r3_4_roster_scores_corrected_64_points() -> None:
     normalized = Path('data/normalized')
     _require_real_backtest_tables(normalized)
-    league_picks = pd.read_parquet(normalized / 'league_draft_picks.parquet')
-    series = pd.read_parquet(normalized / 'series.parquet')
-    skater_actual = skater_actual_points(
-        pd.read_parquet(normalized / 'skater_games.parquet'),
-        series,
-    )
-    team_actual = team_actual_goalie_points(
-        pd.read_parquet(normalized / 'team_games.parquet'),
-        series,
-    )
+    league_picks, _series, skater_actual, team_actual = _real_league_score_context(normalized)
     roster = league_picks.loc[
         (league_picks['season'] == 2024)
         & (league_picks['league_name'] == 'The Gemmell Cup')

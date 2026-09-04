@@ -26,6 +26,34 @@ from tests.odds_consolidation_helpers import (
 )
 
 
+def _kaggle_frame(
+    *,
+    game_id: int,
+    date_text: str,
+    season: int,
+    home: str = "Toronto Maple Leafs",
+    away: str = "Boston Bruins",
+    price: int = -175,
+) -> pd.DataFrame:
+    from draft_oracle.ingest.odds import _favorite_rows_from_games, _finalize
+
+    return _finalize(
+        _favorite_rows_from_games(
+        pd.DataFrame(
+            _kaggle_pair(
+                game_id=game_id,
+                date=date_text,
+                season=season,
+                home=home,
+                away=away,
+                price=price,
+            )
+        ),
+        source=SOURCE_KAGGLE,
+        )
+    )
+
+
 def test_consolidate_prefers_sbr_and_cross_validates(tmp_path: Path) -> None:
     # Same game from SBR (two-sided) and Kaggle (favorite-only, UTC +1 day).
     sbr = parse_sbr_workbook_from_rows(
@@ -97,23 +125,7 @@ def test_consolidate_empty_frame() -> None:
 
 def test_consolidate_snaps_utc_date_to_local() -> None:
     """A Kaggle UTC calendar date is snapped to the archive local date (M-2)."""
-    from draft_oracle.ingest.odds import _favorite_rows_from_games, _finalize
-
-    kaggle = _finalize(
-        _favorite_rows_from_games(
-            pd.DataFrame(
-                _kaggle_pair(
-                    game_id=1,
-                    date="2024-05-02 02:00:00+00:00",
-                    season=2024,
-                    home="Toronto Maple Leafs",
-                    away="Boston Bruins",
-                    price=-175,
-                )
-            ),
-            source=SOURCE_KAGGLE,
-        )
-    )
+    kaggle = _kaggle_frame(game_id=1, date_text="2024-05-02 02:00:00+00:00", season=2024)
     home_id = resolve_team_id("Toronto Maple Leafs")
     away_id = resolve_team_id("Boston Bruins")
     assert home_id is not None and away_id is not None
@@ -127,23 +139,7 @@ def test_consolidate_snaps_utc_date_to_local() -> None:
 
 def test_consolidate_keeps_exact_local_date_untouched() -> None:
     """A row already on a local date is not moved (single convention, no churn)."""
-    from draft_oracle.ingest.odds import _favorite_rows_from_games, _finalize
-
-    kaggle = _finalize(
-        _favorite_rows_from_games(
-            pd.DataFrame(
-                _kaggle_pair(
-                    game_id=1,
-                    date="2024-05-01 18:00:00+00:00",
-                    season=2024,
-                    home="Toronto Maple Leafs",
-                    away="Boston Bruins",
-                    price=-175,
-                )
-            ),
-            source=SOURCE_KAGGLE,
-        )
-    )
+    kaggle = _kaggle_frame(game_id=1, date_text="2024-05-01 18:00:00+00:00", season=2024)
     home_id = resolve_team_id("Toronto Maple Leafs")
     away_id = resolve_team_id("Boston Bruins")
     assert home_id is not None and away_id is not None
@@ -154,23 +150,7 @@ def test_consolidate_keeps_exact_local_date_untouched() -> None:
 
 def test_consolidate_no_snap_when_no_archive_match() -> None:
     """No nearby archive game (>1 day) leaves the source date untouched."""
-    from draft_oracle.ingest.odds import _favorite_rows_from_games, _finalize
-
-    kaggle = _finalize(
-        _favorite_rows_from_games(
-            pd.DataFrame(
-                _kaggle_pair(
-                    game_id=1,
-                    date="2024-05-02 02:00:00+00:00",
-                    season=2024,
-                    home="Toronto Maple Leafs",
-                    away="Boston Bruins",
-                    price=-175,
-                )
-            ),
-            source=SOURCE_KAGGLE,
-        )
-    )
+    kaggle = _kaggle_frame(game_id=1, date_text="2024-05-02 02:00:00+00:00", season=2024)
     home_id = resolve_team_id("Toronto Maple Leafs")
     away_id = resolve_team_id("Boston Bruins")
     assert home_id is not None and away_id is not None
