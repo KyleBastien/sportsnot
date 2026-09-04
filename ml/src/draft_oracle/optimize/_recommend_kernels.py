@@ -418,45 +418,16 @@ class _GreedyExpectedRequest:
 
 
 @dataclass(frozen=True)
-class _LegacyGreedyExpectedArgs:
-    owner: str
-    candidate_assets: Sequence[DraftAsset]
-    gmodel: GreedyOpponentModel
-    replacement: Mapping[str, float]
-    cfg: RecommendConfig
-
-
-@dataclass(frozen=True)
-class _AdvanceGreedyRolloutRequest:
+class _AdvanceRolloutRequest:
     arr: _RolloutArrays
     cfg: RecommendConfig
-    gmodel: GreedyOpponentModel
     batch: _CandidateRollout
-    rng: np.random.Generator
-
-
-@dataclass(frozen=True)
-class _GreedyRolloutChoiceRequest:
-    arr: _RolloutArrays
-    cfg: RecommendConfig
-    gmodel: GreedyOpponentModel
-    batch: _CandidateRollout
-    rng: np.random.Generator
-    manager_idx: int
+    choose_opponent: Callable[[_Turn, int], np.ndarray]
 
 
 @dataclass(frozen=True)
 class _FittedExpectedRequest:
     state: DraftState
-    owner: str
-    candidate_assets: Sequence[DraftAsset]
-    models: Mapping[str, FittedOpponentModel]
-    replacement: Mapping[str, float]
-    cfg: RecommendConfig
-
-
-@dataclass(frozen=True)
-class _LegacyFittedExpectedArgs:
     owner: str
     candidate_assets: Sequence[DraftAsset]
     models: Mapping[str, FittedOpponentModel]
@@ -479,33 +450,16 @@ def _resolve_greedy_expected_request(
 ) -> _GreedyExpectedRequest:
     if isinstance(state, _GreedyExpectedRequest):
         return state
-    request = _legacy_greedy_expected_request(legacy)
-    if request is None:
+    request = _legacy_expected_args(legacy)
+    if request is None or not isinstance(request.model_like, GreedyOpponentModel):
         raise TypeError(_LEGACY_GREEDY_EXPECTED_ERROR)
     return _GreedyExpectedRequest(
         state,
         request.owner,
         request.candidate_assets,
-        request.gmodel,
+        request.model_like,
         request.replacement,
         request.cfg,
-    )
-
-
-def _legacy_greedy_expected_request(
-    legacy: tuple[object, ...],
-) -> _LegacyGreedyExpectedArgs | None:
-    resolved = _legacy_expected_args(legacy)
-    if resolved is None:
-        return None
-    if not isinstance(resolved.model_like, GreedyOpponentModel):
-        return None
-    return _LegacyGreedyExpectedArgs(
-        owner=resolved.owner,
-        candidate_assets=resolved.candidate_assets,
-        gmodel=resolved.model_like,
-        replacement=resolved.replacement,
-        cfg=resolved.cfg,
     )
 
 
@@ -518,32 +472,25 @@ def _candidate_rollout(
     return _CandidateRollout(alive, counts, owner_total, owner_taken)
 
 
-def _advance_greedy_rollout(request: _AdvanceGreedyRolloutRequest) -> None:
+def _advance_rollout(request: _AdvanceRolloutRequest) -> None:
     rows = np.arange(request.batch.alive.shape[0])
     for k in range(1, request.arr.last_owner_k + 1):
         manager_idx = request.arr.rem_m[k]
-        choice = _greedy_rollout_choice(
-            _GreedyRolloutChoiceRequest(
+        turn = _turn_state(request.arr, request.batch, manager_idx)
+        if manager_idx == request.arr.owner_idx:
+            choice = _owner_rollout_choice(
                 request.arr,
                 request.cfg,
-                request.gmodel,
                 request.batch,
-                request.rng,
-                manager_idx,
+                turn.legal,
             )
-        )
-        if choice is None:
-            break
+            if choice is None:
+                break
+        else:
+            _require_legal_rows(turn.legal, request.arr.mgr_ids[manager_idx])
+            choice = request.choose_opponent(turn, manager_idx)
         request.batch.alive[rows, choice] = False
         request.batch.counts[rows, manager_idx, request.arr.posc[choice]] += 1
-
-
-def _greedy_rollout_choice(request: _GreedyRolloutChoiceRequest) -> np.ndarray | None:
-    turn = _turn_state(request.arr, request.batch, request.manager_idx)
-    if request.manager_idx == request.arr.owner_idx:
-        return _owner_rollout_choice(request.arr, request.cfg, request.batch, turn.legal)
-    _require_legal_rows(turn.legal, request.arr.mgr_ids[request.manager_idx])
-    return _greedy_opponent_choice(request.arr, request.gmodel, turn, request.rng)
 
 
 def _greedy_owner_total(
@@ -555,8 +502,18 @@ def _greedy_owner_total(
     # comparison; the seed does not depend on the candidate).
     rng = np.random.default_rng(request.cfg.seed * _ROLLOUT_SALT)
     batch = _candidate_rollout(arr, asset, request.cfg.rollouts)
-    _advance_greedy_rollout(
-        _AdvanceGreedyRolloutRequest(arr, request.cfg, request.gmodel, batch, rng)
+    _advance_rollout(
+        _AdvanceRolloutRequest(
+            arr,
+            request.cfg,
+            batch,
+            lambda turn, _manager_idx: _greedy_opponent_choice(
+                arr,
+                request.gmodel,
+                turn,
+                rng,
+            ),
+        )
     )
     return batch.owner_total
 
@@ -668,33 +625,16 @@ def _resolve_fitted_expected_request(
 ) -> _FittedExpectedRequest:
     if isinstance(state, _FittedExpectedRequest):
         return state
-    request = _legacy_fitted_expected_request(legacy)
-    if request is None:
+    request = _legacy_expected_args(legacy)
+    if request is None or not isinstance(request.model_like, Mapping):
         raise TypeError(_LEGACY_FITTED_EXPECTED_ERROR)
     return _FittedExpectedRequest(
         state,
         request.owner,
         request.candidate_assets,
-        request.models,
+        request.model_like,
         request.replacement,
         request.cfg,
-    )
-
-
-def _legacy_fitted_expected_request(
-    legacy: tuple[object, ...],
-) -> _LegacyFittedExpectedArgs | None:
-    resolved = _legacy_expected_args(legacy)
-    if resolved is None:
-        return None
-    if not isinstance(resolved.model_like, Mapping):
-        return None
-    return _LegacyFittedExpectedArgs(
-        owner=resolved.owner,
-        candidate_assets=resolved.candidate_assets,
-        models=resolved.model_like,
-        replacement=resolved.replacement,
-        cfg=resolved.cfg,
     )
 
 
@@ -723,62 +663,27 @@ def _legacy_expected_args(
     return _LegacyExpectedArgs(owner, candidate_assets, model_like, replacement, cfg)
 
 
-def _advance_fitted_rollout(
-    arr: _RolloutArrays,
-    params: _FittedParams,
-    cfg: RecommendConfig,
-    alive: np.ndarray,
-    counts: np.ndarray,
-    owner_total: np.ndarray,
-    owner_taken: int,
-    rows: np.ndarray,
-) -> tuple[np.ndarray, int]:
-    for k in range(1, arr.last_owner_k + 1):
-        mgr_i = arr.rem_m[k]
-        cnt_m = counts[:, mgr_i, :]
-        legal = alive & (cnt_m < arr.limits)[:, arr.posc]
-        if mgr_i == arr.owner_idx:
-            step = _owner_step(
-                _OwnerStepRequest(
-                    arr,
-                    cfg,
-                    _CandidateRollout(alive, counts, owner_total, owner_taken),
-                    legal,
-                )
-            )
-            owner_total, owner_taken = step.owner_total, step.owner_taken
-            if step.done:
-                break
-            assert step.choice is not None
-            choice = step.choice
-        else:
-            _require_legal_rows(legal, arr.mgr_ids[mgr_i])
-            choice = _fitted_opponent_choice(arr, params, _Turn(cnt_m, legal), mgr_i)
-        alive[rows, choice] = False
-        counts[rows, mgr_i, arr.posc[choice]] += 1
-    return owner_total, owner_taken
-
-
 def _fitted_owner_total(
     arr: _RolloutArrays,
     params: _FittedParams,
     request: _FittedExpectedRequest,
     asset: DraftAsset,
 ) -> np.ndarray:
-    rollouts = request.cfg.rollouts
-    rows = np.arange(rollouts)
-    alive, counts, owner_total, owner_taken = _init_candidate_rollout(arr, asset, rollouts)
-    owner_total, _owner_taken = _advance_fitted_rollout(
-        arr,
-        params,
-        request.cfg,
-        alive,
-        counts,
-        owner_total,
-        owner_taken,
-        rows,
+    batch = _candidate_rollout(arr, asset, request.cfg.rollouts)
+    _advance_rollout(
+        _AdvanceRolloutRequest(
+            arr,
+            request.cfg,
+            batch,
+            lambda turn, manager_idx: _fitted_opponent_choice(
+                arr,
+                params,
+                turn,
+                manager_idx,
+            ),
+        )
     )
-    return owner_total
+    return batch.owner_total
 
 
 def _candidate_expected_means(

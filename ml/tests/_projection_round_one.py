@@ -55,8 +55,11 @@ def _round1_series_games(
         gid += 1
         host = series.top if HOME_ICE_PATTERN[offset] == "A" else series.bottom
         visitor = series.bottom if host == series.top else series.top
+        winner_team = series.top if winner == "top" else series.bottom
         home_goals, away_goals = (
-            (winning_goals, losing_goals) if winner == host else (losing_goals, winning_goals)
+            (winning_goals, losing_goals)
+            if winner_team == host
+            else (losing_goals, winning_goals)
         )
         game_date = f"{series.end_year}-04-{20 + offset:02d}"
         team_rows.extend(
