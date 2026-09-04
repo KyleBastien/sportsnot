@@ -245,41 +245,48 @@ class _EmitTeamGameInput:
     away: str
 
 
+def _team_game_row(
+    spec: _EmitTeamGameInput,
+    *,
+    team: str,
+    opp: str,
+    is_home: bool,
+) -> dict[str, object]:
+    return {
+        "season_id": spec.season_id,
+        "game_type_id": spec.game_type_id,
+        "game_id": spec.game_id,
+        "game_date": spec.game_date,
+        "team_id": TEAMS.index(team) + 1,
+        "team_abbrev": team,
+        "team_full_name": team,
+        "opponent_team_abbrev": opp,
+        "home_road": "H" if is_home else "R",
+        "goals_for": 3,
+        "goals_against": 2,
+        "wins": 1,
+        "losses": 0,
+        "ot_losses": 0,
+        "regulation_and_ot_wins": 1,
+        "wins_in_regulation": 1,
+        "wins_in_shootout": 0,
+        "points": 2,
+        "shots_for": 30,
+        "shots_against": 28,
+        "faceoff_win_pct": 0.5,
+        "power_play_pct": 0.2,
+        "power_play_net_pct": 0.2,
+        "penalty_kill_pct": 0.8,
+        "penalty_kill_net_pct": 0.8,
+        "team_shutouts": 0,
+        "win": True,
+        "shutout_win": False,
+    }
+
 
 def _emit_team_game(rows: list[dict[str, object]], spec: _EmitTeamGameInput) -> None:
     for team, opp, is_home in ((spec.home, spec.away, True), (spec.away, spec.home, False)):
-        rows.append(
-            {
-                "season_id": spec.season_id,
-                "game_type_id": spec.game_type_id,
-                "game_id": spec.game_id,
-                "game_date": spec.game_date,
-                "team_id": TEAMS.index(team) + 1,
-                "team_abbrev": team,
-                "team_full_name": team,
-                "opponent_team_abbrev": opp,
-                "home_road": "H" if is_home else "R",
-                "goals_for": 3,
-                "goals_against": 2,
-                "wins": 1,
-                "losses": 0,
-                "ot_losses": 0,
-                "regulation_and_ot_wins": 1,
-                "wins_in_regulation": 1,
-                "wins_in_shootout": 0,
-                "points": 2,
-                "shots_for": 30,
-                "shots_against": 28,
-                "faceoff_win_pct": 0.5,
-                "power_play_pct": 0.2,
-                "power_play_net_pct": 0.2,
-                "penalty_kill_pct": 0.8,
-                "penalty_kill_net_pct": 0.8,
-                "team_shutouts": 0,
-                "win": True,
-                "shutout_win": False,
-            }
-        )
+        rows.append(_team_game_row(spec, team=team, opp=opp, is_home=is_home))
 
 
 # ── Round reconstruction ───────────────────────────────────────────────────

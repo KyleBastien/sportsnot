@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
@@ -26,14 +27,18 @@ from tests.odds_consolidation_helpers import (
 )
 
 
+@dataclass(frozen=True)
+class _KaggleFrameInput:
+    game_id: int
+    date_text: str
+    season: int
+    home: str = "Toronto Maple Leafs"
+    away: str = "Boston Bruins"
+    price: int = -175
+
+
 def _kaggle_frame(
-    *,
-    game_id: int,
-    date_text: str,
-    season: int,
-    home: str = "Toronto Maple Leafs",
-    away: str = "Boston Bruins",
-    price: int = -175,
+    spec: _KaggleFrameInput,
 ) -> pd.DataFrame:
     from draft_oracle.ingest.odds import _favorite_rows_from_games, _finalize
 
@@ -41,12 +46,12 @@ def _kaggle_frame(
         _favorite_rows_from_games(
         pd.DataFrame(
             _kaggle_pair(
-                game_id=game_id,
-                date=date_text,
-                season=season,
-                home=home,
-                away=away,
-                price=price,
+                game_id=spec.game_id,
+                date=spec.date_text,
+                season=spec.season,
+                home=spec.home,
+                away=spec.away,
+                price=spec.price,
             )
         ),
         source=SOURCE_KAGGLE,
@@ -125,7 +130,7 @@ def test_consolidate_empty_frame() -> None:
 
 def test_consolidate_snaps_utc_date_to_local() -> None:
     """A Kaggle UTC calendar date is snapped to the archive local date (M-2)."""
-    kaggle = _kaggle_frame(game_id=1, date_text="2024-05-02 02:00:00+00:00", season=2024)
+    kaggle = _kaggle_frame(_KaggleFrameInput(1, "2024-05-02 02:00:00+00:00", 2024))
     home_id = resolve_team_id("Toronto Maple Leafs")
     away_id = resolve_team_id("Boston Bruins")
     assert home_id is not None and away_id is not None
@@ -139,7 +144,7 @@ def test_consolidate_snaps_utc_date_to_local() -> None:
 
 def test_consolidate_keeps_exact_local_date_untouched() -> None:
     """A row already on a local date is not moved (single convention, no churn)."""
-    kaggle = _kaggle_frame(game_id=1, date_text="2024-05-01 18:00:00+00:00", season=2024)
+    kaggle = _kaggle_frame(_KaggleFrameInput(1, "2024-05-01 18:00:00+00:00", 2024))
     home_id = resolve_team_id("Toronto Maple Leafs")
     away_id = resolve_team_id("Boston Bruins")
     assert home_id is not None and away_id is not None
@@ -150,7 +155,7 @@ def test_consolidate_keeps_exact_local_date_untouched() -> None:
 
 def test_consolidate_no_snap_when_no_archive_match() -> None:
     """No nearby archive game (>1 day) leaves the source date untouched."""
-    kaggle = _kaggle_frame(game_id=1, date_text="2024-05-02 02:00:00+00:00", season=2024)
+    kaggle = _kaggle_frame(_KaggleFrameInput(1, "2024-05-02 02:00:00+00:00", 2024))
     home_id = resolve_team_id("Toronto Maple Leafs")
     away_id = resolve_team_id("Boston Bruins")
     assert home_id is not None and away_id is not None
