@@ -266,9 +266,19 @@ class _RoundOneGameInput:
     series: _RoundOneSeriesInput
 
 
+def _round1_game_input(
+    spec: _RoundOneSeriesInput,
+    offset: int,
+    winner: str,
+    wg: int,
+    lg: int,
+) -> _RoundOneGameInput:
+    return _RoundOneGameInput(winner, wg, lg, offset, spec.gid_start + offset + 1, spec)
+
+
 def _round1_game_inputs(spec: _RoundOneSeriesInput) -> list[_RoundOneGameInput]:
     return [
-        _RoundOneGameInput(winner, wg, lg, offset, spec.gid_start + offset + 1, spec)
+        _round1_game_input(spec, offset, winner, wg, lg)
         for offset, (winner, wg, lg) in enumerate(_ROUND_ONE_RESULTS)
     ]
 

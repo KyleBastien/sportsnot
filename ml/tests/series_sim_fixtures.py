@@ -236,9 +236,12 @@ _ARCHIVE_PATHS = sorted(_ARCHIVE_DIR.glob("team-games-*.csv.gz"))
 _ARCHIVE_PATHS_2020_21 = [_ARCHIVE_DIR / "team-games-2020-21.csv.gz"]
 
 
+def _archive_paths_for(season_label: str | None) -> list[Path]:
+    return _ARCHIVE_PATHS_2020_21 if season_label == "2020-21" else _ARCHIVE_PATHS
+
+
 def _archive_frames(season_label: str | None) -> list[pd.DataFrame]:
-    paths = _ARCHIVE_PATHS_2020_21 if season_label == "2020-21" else _ARCHIVE_PATHS
-    return [normalize_team_games(pd.read_csv(path)) for path in paths]
+    return [normalize_team_games(pd.read_csv(path)) for path in _archive_paths_for(season_label)]
 
 
 _ARCHIVE_TEAM_GAMES = pd.concat(_archive_frames(None), ignore_index=True)
