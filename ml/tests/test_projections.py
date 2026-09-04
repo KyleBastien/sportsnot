@@ -202,6 +202,31 @@ _PLAYOFF_SERIES_RESULTS = [
 ]
 
 
+@dataclass(frozen=True)
+class _AppendSkaterRowsRequest:
+    rows: list[dict[str, object]]
+    players: dict[int, tuple[str, float, str]]
+    rng: np.random.Generator
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    team: str
+    opp: str
+
+
+@dataclass(frozen=True)
+class _RegularSeasonRequest:
+    sk_rows: list[dict[str, object]]
+    tg_rows: list[dict[str, object]]
+    players: dict[int, tuple[str, float, str]]
+    rng: np.random.Generator
+    end_year: int
+    season_id: int
+    n_reg: int
+    gid_start: int
+
+
 def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, float, str]]]:
     players: dict[int, tuple[str, float, str]] = {}
     rows: list[dict[str, object]] = []
@@ -225,33 +250,22 @@ def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, float, str]]]:
     return pd.DataFrame(rows), players
 
 
-def _append_skater_rows(
-    rows: list[dict[str, object]],
-    players: dict[int, tuple[str, float, str]],
-    rng: np.random.Generator,
-    *,
-    game_id: int,
-    game_date: str,
-    season_id: int,
-    game_type_id: int,
-    team: str,
-    opp: str,
-) -> None:
-    for player_id, (player_team, rate, pos) in players.items():
-        if player_team != team:
+def _append_skater_rows(request: _AppendSkaterRowsRequest) -> None:
+    for player_id, (player_team, rate, pos) in request.players.items():
+        if player_team != request.team:
             continue
-        goals, assists = _draw_ga(rng, rate)
-        rows.append(
+        goals, assists = _draw_ga(request.rng, rate)
+        request.rows.append(
             _skater_row(
                 _SkaterRowInput(
                     player_id,
                     pos,
-                    game_id,
-                    game_date,
-                    season_id,
-                    game_type_id,
-                    team,
-                    opp,
+                    request.game_id,
+                    request.game_date,
+                    request.season_id,
+                    request.game_type_id,
+                    request.team,
+                    request.opp,
                     goals,
                     assists,
                 )
@@ -353,45 +367,37 @@ def _draw_ga(rng: np.random.Generator, rate: float) -> tuple[int, int]:
     return goals, assists
 
 
-def _emit_regular_season(
-    sk_rows: list[dict[str, object]],
-    tg_rows: list[dict[str, object]],
-    players: dict[int, tuple[str, float, str]],
-    rng: np.random.Generator,
-    *,
-    end_year: int,
-    season_id: int,
-    n_reg: int,
-    gid_start: int,
-) -> int:
-    gid = gid_start
+def _emit_regular_season(request: _RegularSeasonRequest) -> int:
+    gid = request.gid_start
     day, month = 1, 11
-    for _ in range(n_reg // (len(TEAMS) - 1)):
+    for _ in range(request.n_reg // (len(TEAMS) - 1)):
         for i, home in enumerate(TEAMS):
             for away in TEAMS[i + 1 :]:
                 gid += 1
-                date = f"{end_year - 1}-{month:02d}-{day:02d}"
+                date = f"{request.end_year - 1}-{month:02d}-{day:02d}"
                 day += 1
                 if day > 27:
                     day, month = 1, (12 if month == 11 else 11)
                 home_win = STRENGTH[home] + 0.3 >= STRENGTH[away]
                 hg, ag = (3, 1) if home_win else (1, 3)
-                tg_rows.extend(
+                request.tg_rows.extend(
                     _team_rows(
-                        _TeamRowsInput(gid, date, season_id, 2, home, away, hg, ag)
+                        _TeamRowsInput(gid, date, request.season_id, 2, home, away, hg, ag)
                     )
                 )
                 for team, opp in ((home, away), (away, home)):
                     _append_skater_rows(
-                        sk_rows,
-                        players,
-                        rng,
-                        game_id=gid,
-                        game_date=date,
-                        season_id=season_id,
-                        game_type_id=2,
-                        team=team,
-                        opp=opp,
+                        _AppendSkaterRowsRequest(
+                            rows=request.sk_rows,
+                            players=request.players,
+                            rng=request.rng,
+                            game_id=gid,
+                            game_date=date,
+                            season_id=request.season_id,
+                            game_type_id=2,
+                            team=team,
+                            opp=opp,
+                        )
                     )
     return gid
 
@@ -425,15 +431,17 @@ def _emit_playoff_series(
         )
         for team, opp in (("AAA", "DDD"), ("DDD", "AAA")):
             _append_skater_rows(
-                sk_rows,
-                players,
-                rng,
-                game_id=gid,
-                game_date=date,
-                season_id=season_id,
-                game_type_id=3,
-                team=team,
-                opp=opp,
+                _AppendSkaterRowsRequest(
+                    rows=sk_rows,
+                    players=players,
+                    rng=rng,
+                    game_id=gid,
+                    game_date=date,
+                    season_id=season_id,
+                    game_type_id=3,
+                    team=team,
+                    opp=opp,
+                )
             )
     return gid
 
@@ -452,14 +460,16 @@ def _synthetic_archive(
     for end_year in end_years:
         season_id = (end_year - 1) * 10000 + end_year
         gid = _emit_regular_season(
-            sk_rows,
-            tg_rows,
-            players,
-            rng,
-            end_year=end_year,
-            season_id=season_id,
-            n_reg=n_reg,
-            gid_start=gid,
+            _RegularSeasonRequest(
+                sk_rows=sk_rows,
+                tg_rows=tg_rows,
+                players=players,
+                rng=rng,
+                end_year=end_year,
+                season_id=season_id,
+                n_reg=n_reg,
+                gid_start=gid,
+            )
         )
         gid = _emit_playoff_series(
             sk_rows,
