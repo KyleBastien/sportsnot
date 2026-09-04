@@ -452,6 +452,25 @@ class _GreedyRolloutChoiceRequest:
     manager_idx: int
 
 
+@dataclass(frozen=True)
+class _FittedExpectedRequest:
+    state: DraftState
+    owner: str
+    candidate_assets: Sequence[DraftAsset]
+    models: Mapping[str, FittedOpponentModel]
+    replacement: Mapping[str, float]
+    cfg: RecommendConfig
+
+
+@dataclass(frozen=True)
+class _LegacyFittedExpectedArgs:
+    owner: str
+    candidate_assets: Sequence[DraftAsset]
+    models: Mapping[str, FittedOpponentModel]
+    replacement: Mapping[str, float]
+    cfg: RecommendConfig
+
+
 def _resolve_greedy_expected_request(
     state: DraftState | _GreedyExpectedRequest,
     *legacy: object,
@@ -613,12 +632,8 @@ def _build_fitted_params(
 
 
 def _vectorized_fitted_expected(
-    state: DraftState,
-    owner: str,
-    candidate_assets: Sequence[DraftAsset],
-    models: Mapping[str, FittedOpponentModel],
-    replacement: Mapping[str, float],
-    cfg: RecommendConfig,
+    state: DraftState | _FittedExpectedRequest,
+    *legacy: object,
 ) -> list[float]:
     """Batched expected owner value against deterministic per-manager fitted opponents.
 
@@ -630,17 +645,18 @@ def _vectorized_fitted_expected(
     lockstep. This keeps the fitted recommend under the 10s budget at ``rollouts>=500``
     without falling back to the per-pick Python object rollout.
     """
-    arr = _build_rollout_arrays(state, owner, replacement)
-    params = _build_fitted_params(models, arr)
-    rollouts = cfg.rollouts
+    request = _resolve_fitted_expected_request(state, legacy)
+    arr = _build_rollout_arrays(request.state, request.owner, request.replacement)
+    params = _build_fitted_params(request.models, arr)
+    rollouts = request.cfg.rollouts
     rows = np.arange(rollouts)
     means: list[float] = []
-    for asset in candidate_assets:
+    for asset in request.candidate_assets:
         alive, counts, owner_total, owner_taken = _init_candidate_rollout(arr, asset, rollouts)
         owner_total, owner_taken = _advance_fitted_rollout(
             arr,
             params,
-            cfg,
+            request.cfg,
             alive,
             counts,
             owner_total,
@@ -652,6 +668,53 @@ def _vectorized_fitted_expected(
         # owner's already-drafted roster value.
         means.append(float(owner_total.mean()) + arr.base_owner_value)
     return means
+
+
+def _resolve_fitted_expected_request(
+    state: DraftState | _FittedExpectedRequest,
+    legacy: tuple[object, ...],
+) -> _FittedExpectedRequest:
+    if isinstance(state, _FittedExpectedRequest):
+        return state
+    request = _legacy_fitted_expected_request(legacy)
+    if request is None:
+        raise TypeError(
+            "legacy fitted expected calls require owner, candidates, models, "
+            "replacement, and config"
+        )
+    return _FittedExpectedRequest(
+        state,
+        request.owner,
+        request.candidate_assets,
+        request.models,
+        request.replacement,
+        request.cfg,
+    )
+
+
+def _legacy_fitted_expected_request(
+    legacy: tuple[object, ...],
+) -> _LegacyFittedExpectedArgs | None:
+    if len(legacy) != 5:
+        return None
+    owner, candidate_assets, models, replacement, cfg = legacy
+    if not isinstance(owner, str):
+        return None
+    if not isinstance(candidate_assets, Sequence):
+        return None
+    if not isinstance(models, Mapping):
+        return None
+    if not isinstance(replacement, Mapping):
+        return None
+    if not isinstance(cfg, RecommendConfig):
+        return None
+    return _LegacyFittedExpectedArgs(
+        owner=owner,
+        candidate_assets=candidate_assets,
+        models=models,
+        replacement=replacement,
+        cfg=cfg,
+    )
 
 
 def _advance_fitted_rollout(
@@ -741,7 +804,14 @@ def _expected_values(
     fitted_models = _fitted_zero_temp_models(opponent_model, state)
     if fitted_models is not None:
         return _vectorized_fitted_expected(
-            state, owner, candidate_assets, fitted_models, replacement, cfg
+            _FittedExpectedRequest(
+                state,
+                owner,
+                candidate_assets,
+                fitted_models,
+                replacement,
+                cfg,
+            )
         )
     return [
         _expected_value(state, owner, asset, opponent_model, replacement, cfg)

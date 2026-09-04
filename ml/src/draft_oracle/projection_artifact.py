@@ -270,6 +270,13 @@ class _ProjectionOutputsRequest:
     models: _ProjectionModels
 
 
+@dataclass(frozen=True)
+class _BuiltProjectionArtifact:
+    context: _ProjectionRoundContext
+    outputs: _ProjectionOutputs
+    manifest: dict[str, Any]
+
+
 def _injured_player_ids(injuries: pd.DataFrame | None) -> set[int]:
     """Skater player ids currently out/IR/day-to-day (goalies excluded here)."""
     if injuries is None or injuries.empty:
@@ -569,7 +576,48 @@ def build_projection_artifact(
     teams are excluded automatically. Sub-models train only on games strictly before
     the round start; every stochastic step is seeded for byte-identical reruns.
     """
-    config = config or ProjectArtifactConfig()
+    built = _build_projection_artifact_data(
+        skater_games=skater_games,
+        players=players,
+        team_games=team_games,
+        series=series,
+        season=season,
+        playoff_round=playoff_round,
+        snapshot_id=snapshot_id,
+        injuries=injuries,
+        league_picks=league_picks,
+        config=config or ProjectArtifactConfig(),
+        git_sha=git_sha,
+        generated_at=generated_at,
+    )
+    return ProjectArtifactResult(
+        season=int(season),
+        playoff_round=int(playoff_round),
+        as_of_cutoff=built.context.cutoff,
+        skaters=built.outputs.skaters,
+        teams=built.outputs.teams,
+        cheatsheet=built.outputs.cheatsheet,
+        manifest=built.manifest,
+        warnings=built.context.warnings,
+        slot_strategies=built.outputs.slot_report,
+    )
+
+
+def _build_projection_artifact_data(
+    *,
+    skater_games: pd.DataFrame,
+    players: pd.DataFrame,
+    team_games: pd.DataFrame,
+    series: pd.DataFrame,
+    season: int,
+    playoff_round: int,
+    snapshot_id: str,
+    injuries: pd.DataFrame | None,
+    league_picks: pd.DataFrame | None,
+    config: ProjectArtifactConfig,
+    git_sha: str | None,
+    generated_at: str | None,
+) -> _BuiltProjectionArtifact:
     context = _projection_round_context(
         _ProjectionRoundContextRequest(
             skater_games=skater_games,
@@ -594,7 +642,6 @@ def build_projection_artifact(
             models=models,
         )
     )
-
     manifest = _projection_manifest(
         ProjectionManifestInput(
             artifact_version=LIVE_PROJECTION_VERSION,
@@ -608,18 +655,7 @@ def build_projection_artifact(
             generated_at=generated_at,
         )
     )
-
-    return ProjectArtifactResult(
-        season=int(season),
-        playoff_round=int(playoff_round),
-        as_of_cutoff=context.cutoff,
-        skaters=outputs.skaters,
-        teams=outputs.teams,
-        cheatsheet=outputs.cheatsheet,
-        manifest=manifest,
-        warnings=context.warnings,
-        slot_strategies=outputs.slot_report,
-    )
+    return _BuiltProjectionArtifact(context, outputs, manifest)
 
 
 def _finalize_skaters(rows: list[dict[str, Any]]) -> pd.DataFrame:

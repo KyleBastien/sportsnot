@@ -11,6 +11,9 @@ import pandas as pd
 
 from draft_oracle.ingest.normalize import normalize_team_games
 from draft_oracle.models import HOME_ICE_PATTERN
+from tests._series_sim_overlap import _overlap_game, _OverlapGameInput
+
+__all__ = ["_OverlapGameInput", "_overlap_game"]
 
 TEAMS = ["AAA", "BBB", "CCC", "DDD"]
 STRENGTH = {"AAA": 3.0, "BBB": 1.0, "CCC": -1.0, "DDD": -3.0}
@@ -41,31 +44,6 @@ class _GameRowsInput:
     away: str
     home_goals: int
     away_goals: int
-
-
-@dataclass(frozen=True)
-class _OverlapRowInput:
-    game_id: str
-    game_date: str
-    team: str
-    team_id: int
-    opp: str
-    gf: int
-    ga: int
-    is_home: bool
-    game_type_id: int = 3
-
-
-@dataclass(frozen=True)
-class _OverlapGameInput:
-    game_id: str
-    game_date: str
-    home: str
-    home_id: int
-    away: str
-    away_id: int
-    hg: int
-    ag: int
 
 
 @dataclass(frozen=True)
@@ -240,53 +218,6 @@ _ARCHIVE_TEAM_GAMES_2020_21 = pd.concat(
     [normalize_team_games(pd.read_csv(path)) for path in _ARCHIVE_PATHS_2020_21],
     ignore_index=True,
 )
-
-
-def _overlap_game(spec: _OverlapGameInput) -> list[dict[str, object]]:
-    return [_overlap_scored_row(row) for row in _overlap_rows(spec)]
-
-
-def _overlap_rows(spec: _OverlapGameInput) -> tuple[_OverlapRowInput, _OverlapRowInput]:
-    return (
-        _OverlapRowInput(
-            spec.game_id,
-            spec.game_date,
-            spec.home,
-            spec.home_id,
-            spec.away,
-            spec.hg,
-            spec.ag,
-            True,
-        ),
-        _OverlapRowInput(
-            spec.game_id,
-            spec.game_date,
-            spec.away,
-            spec.away_id,
-            spec.home,
-            spec.ag,
-            spec.hg,
-            False,
-        ),
-    )
-
-
-def _overlap_scored_row(game: _OverlapRowInput) -> dict[str, object]:
-    return _scored_row(
-        _ScoredRowInput(
-            20212022,
-            game.game_type_id,
-            game.game_id,
-            game.game_date,
-            game.team_id,
-            game.team,
-            game.opp,
-            game.gf,
-            game.ga,
-            game.is_home,
-            False,
-        )
-    )
 
 
 def _row_pair[T](

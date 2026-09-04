@@ -567,17 +567,6 @@ def _four_round_archive(
     )
 
 
-def _four_round_project_config() -> ProjectArtifactConfig:
-    return ProjectArtifactConfig(
-        seed=20260827,
-        n_sims=60,
-        slot_strategies=False,
-        production_config=SkaterProductionConfig(
-            seed=20260827, n_val_seasons=1, n_test_seasons=1, min_confident_games=5
-        ),
-    )
-
-
 def _four_round_config() -> BacktestConfig:
     # Smaller sims/rollouts than _config: this fixture replays three events across a
     # sixteen-team archive, and the assertions are structural, not statistical.
@@ -592,6 +581,14 @@ _FOUR_ROUND_TABLES = {
     "team_games": _FOUR_ROUND_ARCHIVE[1],
     "series": _FOUR_ROUND_ARCHIVE[3],
 }
+_FOUR_ROUND_PROJECT_CONFIG = ProjectArtifactConfig(
+    seed=20260827,
+    n_sims=60,
+    slot_strategies=False,
+    production_config=SkaterProductionConfig(
+        seed=20260827, n_val_seasons=1, n_test_seasons=1, min_confident_games=5
+    ),
+)
 _FOUR_ROUND_CONFIG = BacktestConfig(
     seed=20260827,
     managers=4,
@@ -599,7 +596,7 @@ _FOUR_ROUND_CONFIG = BacktestConfig(
     rollouts=4,
     max_candidates=5,
     strategies=("oracle",),
-    project_config=_four_round_project_config(),
+    project_config=_FOUR_ROUND_PROJECT_CONFIG,
 )
 
 

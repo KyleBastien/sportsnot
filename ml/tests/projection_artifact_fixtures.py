@@ -19,6 +19,7 @@ from tests._fixture_rows import (
 from tests._fixture_rows import (
     skater_row as _skater_row,
 )
+from tests._projection_round_one import _round1_series_games, _RoundOneSeriesInput
 
 TEAMS = ["AAA", "BBB", "CCC", "DDD"]
 STRENGTH = {"AAA": 3.0, "BBB": 1.0, "CCC": -1.0, "DDD": -3.0}
@@ -238,129 +239,6 @@ _PROJECT_ARTIFACT_CONFIG = ProjectArtifactConfig(
 )
 
 _ARCHIVE = _synthetic_archive([2018, 2019, 2020, 2021, 2022], seed=1)
-_ROUND_ONE_RESULTS = [
-    ("top", 3, 0),
-    ("top", 4, 2),
-    ("bottom", 3, 1),
-    ("bottom", 2, 1),
-    ("top", 3, 2),
-    ("top", 2, 1),
-]
-
-
-@dataclass(frozen=True)
-class _RoundOneSeriesInput:
-    gid_start: int
-    top: str
-    bottom: str
-    end_year: int
-    season_id: int
-    rng: np.random.Generator
-    players: dict[int, tuple[str, float, str]]
-
-
-@dataclass(frozen=True)
-class _RoundOneGameInput:
-    winner: str
-    wg: int
-    lg: int
-    offset: int
-    gid: int
-    series: _RoundOneSeriesInput
-
-
-@dataclass(frozen=True)
-class _RoundOneGameSpec:
-    offset: int
-    winner: str
-    wg: int
-    lg: int
-
-
-_ROUND_ONE_GAME_SPECS = [
-    _RoundOneGameSpec(offset, winner, wg, lg)
-    for offset, (winner, wg, lg) in enumerate(_ROUND_ONE_RESULTS)
-]
-
-
-def _round1_game_input(
-    series: _RoundOneSeriesInput,
-    game: _RoundOneGameSpec,
-) -> _RoundOneGameInput:
-    return _RoundOneGameInput(
-        game.winner, game.wg, game.lg, game.offset, _round1_gid(series, game), series
-    )
-
-
-def _round1_gid(series: _RoundOneSeriesInput, game: _RoundOneGameSpec) -> int:
-    return series.gid_start + game.offset + 1
-
-
-def _round1_game_inputs(spec: _RoundOneSeriesInput) -> list[_RoundOneGameInput]:
-    return [_round1_game_input(spec, game) for game in _ROUND_ONE_GAME_SPECS]
-
-
-def _round1_series_games(
-    spec: _RoundOneSeriesInput,
-) -> tuple[list[dict[str, object]], list[dict[str, object]], int]:
-    """Emit a completed best-of-7 round-1 series (top wins 4-2) + its skater rows."""
-    rounds = [_round1_game_rows(game) for game in _round1_game_inputs(spec)]
-    tg_rows = [row for game_rows, _skater_rows in rounds for row in game_rows]
-    sk_rows = [row for _game_rows, skater_rows in rounds for row in skater_rows]
-    return tg_rows, sk_rows, spec.gid_start + len(_ROUND_ONE_RESULTS)
-
-
-def _round1_game_rows(
-    spec: _RoundOneGameInput,
-) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    host = spec.series.top if HOME_ICE_PATTERN[spec.offset] == "A" else spec.series.bottom
-    visitor = spec.series.bottom if host == spec.series.top else spec.series.top
-    hg, ag = (spec.wg, spec.lg) if spec.winner == host else (spec.lg, spec.wg)
-    date = f"{spec.series.end_year}-04-{20 + spec.offset:02d}"
-    game_rows = _team_rows(
-        _TeamRowsInput(
-            game_id=spec.gid,
-            game_date=date,
-            season_id=spec.series.season_id,
-            game_type_id=3,
-            home=host,
-            away=visitor,
-            home_goals=hg,
-            away_goals=ag,
-        )
-    )
-    skater_rows = _round1_game_skaters(spec.series, spec.gid, date)
-    return game_rows, skater_rows
-
-
-def _round1_game_skaters(
-    series: _RoundOneSeriesInput,
-    gid: int,
-    date: str,
-) -> list[dict[str, object]]:
-    rows: list[dict[str, object]] = []
-    for team, opp in ((series.top, series.bottom), (series.bottom, series.top)):
-        for p, (t, rate, pos) in series.players.items():
-            if t != team:
-                continue
-            g, a = _draw_ga(series.rng, rate)
-            rows.append(
-                _skater_row(
-                    _SkaterRowInput(
-                        p,
-                        pos,
-                        gid,
-                        date,
-                        series.season_id,
-                        3,
-                        team,
-                        opp,
-                        g,
-                        a,
-                    )
-                )
-            )
-    return rows
 
 
 def _pre_round_archive(
@@ -431,7 +309,16 @@ def _pre_round_archive(
 
         for top, bottom in (("AAA", "DDD"), ("BBB", "CCC")):
             new_tg, new_sk, gid = _round1_series_games(
-                _RoundOneSeriesInput(gid, top, bottom, end_year, season_id, rng, players)
+                _RoundOneSeriesInput(
+                    gid_start=gid,
+                    top=top,
+                    bottom=bottom,
+                    end_year=end_year,
+                    season_id=season_id,
+                    rng=rng,
+                    players=players,
+                    team_ids={team: TEAMS.index(team) + 1 for team in TEAMS},
+                )
             )
             tg_rows.extend(new_tg)
             sk_rows.extend(new_sk)
