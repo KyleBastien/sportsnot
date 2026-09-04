@@ -708,8 +708,7 @@ def _candidate_expected_means(
 
 
 def _expected_value(
-    request: DraftState | _ExpectedValueRequest,
-    *legacy: object,
+    request: _ExpectedValueRequest,
 ) -> float:
     """Mean final owner-roster value if ``asset`` is taken now (seeded rollouts).
 
@@ -718,53 +717,19 @@ def _expected_value(
     the candidate comparison and slashes the variance of their differences so a modest
     rollout count still ranks picks correctly.
     """
-    resolved = _resolve_expected_value_request(request, *legacy)
     total = 0.0
     query = _RolloutInput(
-        resolved.state,
-        resolved.owner,
-        resolved.asset,
-        resolved.opponent_model,
-        resolved.replacement,
-        resolved.cfg.depth,
+        request.state,
+        request.owner,
+        request.asset,
+        request.opponent_model,
+        request.replacement,
+        request.cfg.depth,
     )
-    for rollout in range(resolved.cfg.rollouts):
-        rng = random.Random(resolved.cfg.seed * _ROLLOUT_SALT + rollout)
+    for rollout in range(request.cfg.rollouts):
+        rng = random.Random(request.cfg.seed * _ROLLOUT_SALT + rollout)
         total += _rollout_owner_value(query, rng)
-    return total / resolved.cfg.rollouts
-
-
-def _resolve_expected_value_request(
-    request: DraftState | _ExpectedValueRequest,
-    *legacy: object,
-) -> _ExpectedValueRequest:
-    if isinstance(request, _ExpectedValueRequest):
-        return request
-    if len(legacy) != 5:
-        raise TypeError(
-            "legacy expected value calls require owner, asset/model, replacement, and config"
-        )
-    owner, asset, opponent_model, replacement, cfg = legacy
-    if not isinstance(owner, str):
-        raise TypeError("legacy expected value calls require string owner")
-    if not isinstance(asset, DraftAsset):
-        raise TypeError(
-            "legacy expected value calls require DraftAsset as third positional argument"
-        )
-    if not isinstance(opponent_model, (OpponentModel, Mapping)):
-        raise TypeError("legacy expected value calls require opponent model or mapping")
-    if not isinstance(replacement, Mapping):
-        raise TypeError("legacy expected value calls require replacement mapping")
-    if not isinstance(cfg, RecommendConfig):
-        raise TypeError("legacy expected value calls require RecommendConfig")
-    return _ExpectedValueRequest(
-        request,
-        owner,
-        asset,
-        opponent_model,
-        replacement,
-        cfg,
-    )
+    return total / request.cfg.rollouts
 
 
 def _expected_values(

@@ -70,6 +70,9 @@ from draft_oracle.optimize._recommend_kernels import (
     choose_pick,
 )
 from draft_oracle.optimize._recommend_kernels import (
+    _ExpectedValueRequest as _ExpectedValueRequest,
+)
+from draft_oracle.optimize._recommend_kernels import (
     _fitted_zero_temp_models as _fitted_zero_temp_models,
 )
 from draft_oracle.optimize._recommend_kernels import (
