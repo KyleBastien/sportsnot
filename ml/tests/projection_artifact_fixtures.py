@@ -266,19 +266,31 @@ class _RoundOneGameInput:
     series: _RoundOneSeriesInput
 
 
+@dataclass(frozen=True)
+class _RoundOneGameSpec:
+    offset: int
+    winner: str
+    wg: int
+    lg: int
+
+
 def _round1_game_input(
-    spec: _RoundOneSeriesInput,
-    offset: int,
-    winner: str,
-    wg: int,
-    lg: int,
+    series: _RoundOneSeriesInput,
+    spec: _RoundOneGameSpec,
 ) -> _RoundOneGameInput:
-    return _RoundOneGameInput(winner, wg, lg, offset, spec.gid_start + offset + 1, spec)
+    return _RoundOneGameInput(
+        spec.winner,
+        spec.wg,
+        spec.lg,
+        spec.offset,
+        series.gid_start + spec.offset + 1,
+        series,
+    )
 
 
 def _round1_game_inputs(spec: _RoundOneSeriesInput) -> list[_RoundOneGameInput]:
     return [
-        _round1_game_input(spec, offset, winner, wg, lg)
+        _round1_game_input(spec, _RoundOneGameSpec(offset, winner, wg, lg))
         for offset, (winner, wg, lg) in enumerate(_ROUND_ONE_RESULTS)
     ]
 

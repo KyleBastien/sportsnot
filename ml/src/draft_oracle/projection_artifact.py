@@ -260,30 +260,20 @@ def _projection_round_context(
 ) -> _ProjectionRoundContext:
     prod_config = config.production_config or SkaterProductionConfig(seed=config.seed)
     warnings: list[str] = []
-    round_series = series.loc[
-        (series["year"].astype(int) == int(season))
-        & (series["playoff_round"].astype("Int64") == int(playoff_round))
-    ]
+    round_series = _round_series_for_context(series, season, playoff_round)
     if round_series.empty:
         raise ValueError(
             f"no series found for season {season} round {playoff_round}; "
             "run ingest/normalize so the bracket is available"
         )
     season_id = _resolve_season_id(round_series, season)
-    starts = playoff_round_cutoffs(team_games, series)
-    cutoff = starts.get(season_id, {}).get(int(playoff_round))
+    cutoff = _round_cutoff(team_games, series, season_id, playoff_round)
     if cutoff is None:
         raise ValueError(
             f"cannot derive the round-start cutoff for season {season} round {playoff_round}; "
             "the previous round has no games in the archive yet"
         )
-    cutoff_ts = pd.Timestamp(cutoff)
-    tg = team_games.copy()
-    tg["game_date"] = pd.to_datetime(tg["game_date"])
-    sk = skater_games.copy()
-    sk["game_date"] = pd.to_datetime(sk["game_date"])
-    train_tg = tg.loc[tg["game_date"] < cutoff_ts]
-    train_sk = sk.loc[sk["game_date"] < cutoff_ts]
+    train_tg, train_sk = _training_frames(skater_games, team_games, cutoff)
     if train_tg.empty or train_sk.empty:
         raise ValueError("no games available before the round start to train on")
     return _ProjectionRoundContext(
@@ -296,6 +286,40 @@ def _projection_round_context(
         train_tg=train_tg,
         train_sk=train_sk,
     )
+
+
+def _round_series_for_context(
+    series: pd.DataFrame,
+    season: int,
+    playoff_round: int,
+) -> pd.DataFrame:
+    return series.loc[
+        (series["year"].astype(int) == int(season))
+        & (series["playoff_round"].astype("Int64") == int(playoff_round))
+    ]
+
+
+def _round_cutoff(
+    team_games: pd.DataFrame,
+    series: pd.DataFrame,
+    season_id: int,
+    playoff_round: int,
+) -> str | None:
+    starts = playoff_round_cutoffs(team_games, series)
+    return starts.get(season_id, {}).get(int(playoff_round))
+
+
+def _training_frames(
+    skater_games: pd.DataFrame,
+    team_games: pd.DataFrame,
+    cutoff: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    cutoff_ts = pd.Timestamp(cutoff)
+    tg = team_games.copy()
+    tg["game_date"] = pd.to_datetime(tg["game_date"])
+    sk = skater_games.copy()
+    sk["game_date"] = pd.to_datetime(sk["game_date"])
+    return tg.loc[tg["game_date"] < cutoff_ts], sk.loc[sk["game_date"] < cutoff_ts]
 
 
 def _train_projection_models(
