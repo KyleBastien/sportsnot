@@ -265,6 +265,25 @@ class _PreRoundSeasonRequest:
     gid_start: int
 
 
+@dataclass(frozen=True)
+class _PreRoundArchiveRequest:
+    end_years: list[int]
+    seed: int
+
+
+@dataclass(frozen=True)
+class _PreRoundGameRequest:
+    sk_rows: list[dict[str, object]]
+    tg_rows: list[dict[str, object]]
+    players: dict[int, tuple[str, float, str]]
+    rng: np.random.Generator
+    gid: int
+    date: str
+    season_id: int
+    home: str
+    away: str
+
+
 def _pre_round_archive(
     end_years: list[int], *, seed: int = 3
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -274,15 +293,16 @@ def _pre_round_archive(
     BBB-over-CCC, and (target-season only) a round-2 AAA-vs-BBB series row with zero
     games -- the genuine pre-round decision point (CODE_REVIEW M-1).
     """
-    rng = np.random.default_rng(seed)
+    request = _PreRoundArchiveRequest(end_years, seed)
+    rng = np.random.default_rng(request.seed)
     players_df, players = _players()
     sk_rows: list[dict[str, object]] = []
     tg_rows: list[dict[str, object]] = []
     series_rows: list[dict[str, object]] = []
     gid = 7_000_000
-    target = end_years[-1]
+    target = request.end_years[-1]
 
-    for end_year in end_years:
+    for end_year in request.end_years:
         gid = _append_pre_round_season(
             _PreRoundSeasonRequest(
                 sk_rows,
@@ -357,60 +377,51 @@ def _append_pre_round_regular_season(
                 if day > 27:
                     day, month = 1, (12 if month == 11 else 11)
                 _append_pre_round_game(
-                    request.sk_rows,
-                    request.tg_rows,
-                    request.players,
-                    request.rng,
-                    gid=gid,
-                    date=date,
-                    season_id=season_id,
-                    home=home,
-                    away=away,
+                    _PreRoundGameRequest(
+                        request.sk_rows,
+                        request.tg_rows,
+                        request.players,
+                        request.rng,
+                        gid,
+                        date,
+                        season_id,
+                        home,
+                        away,
+                    )
                 )
     return season_id, gid
 
 
-def _append_pre_round_game(
-    sk_rows: list[dict[str, object]],
-    tg_rows: list[dict[str, object]],
-    players: dict[int, tuple[str, float, str]],
-    rng: np.random.Generator,
-    *,
-    gid: int,
-    date: str,
-    season_id: int,
-    home: str,
-    away: str,
-) -> None:
-    home_win = STRENGTH[home] + 0.3 >= STRENGTH[away]
+def _append_pre_round_game(request: _PreRoundGameRequest) -> None:
+    home_win = STRENGTH[request.home] + 0.3 >= STRENGTH[request.away]
     hg, ag = (3, 1) if home_win else (1, 3)
-    tg_rows.extend(
+    request.tg_rows.extend(
         _team_rows(
             _TeamRowsInput(
-                game_id=gid,
-                game_date=date,
-                season_id=season_id,
+                game_id=request.gid,
+                game_date=request.date,
+                season_id=request.season_id,
                 game_type_id=2,
-                home=home,
-                away=away,
+                home=request.home,
+                away=request.away,
                 home_goals=hg,
                 away_goals=ag,
             )
         )
     )
-    for team, opp in ((home, away), (away, home)):
-        for player_id, (player_team, rate, pos) in players.items():
+    for team, opp in ((request.home, request.away), (request.away, request.home)):
+        for player_id, (player_team, rate, pos) in request.players.items():
             if player_team != team:
                 continue
-            goals, assists = _draw_ga(rng, rate)
-            sk_rows.append(
+            goals, assists = _draw_ga(request.rng, rate)
+            request.sk_rows.append(
                 _skater_row(
                     _SkaterRowInput(
                         player_id,
                         pos,
-                        gid,
-                        date,
-                        season_id,
+                        request.gid,
+                        request.date,
+                        request.season_id,
                         2,
                         team,
                         opp,

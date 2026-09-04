@@ -195,22 +195,10 @@ def _append_backtest_skater_rows(
 
 
 def _emit_regular_season_games(request: _ArchiveBuildRequest) -> int:
-    gid = request.gid_start
-    day, month = 1, 10
-    for _ in range(request.reg_cycles):
-        for i, home in enumerate(TEAMS):
-            for away in TEAMS[i + 1 :]:
-                gid += 1
-                date = f"{request.end_year - 1}-{month:02d}-{day:02d}"
-                day += 1
-                if day > 27:
-                    day = 1
-                    month = 11 if month == 10 else (12 if month == 11 else 10)
-                _append_regular_season_game(
-                    request,
-                    _RegularSeasonGameSpec(gid, date, home, away),
-                )
-    return gid
+    games = _regular_season_schedule(request)
+    for game in games:
+        _append_regular_season_game(request, game)
+    return games[-1].game_id if games else request.gid_start
 
 
 @dataclass(frozen=True)
@@ -219,6 +207,29 @@ class _RegularSeasonGameSpec:
     game_date: str
     home: str
     away: str
+
+
+def _regular_season_schedule(request: _ArchiveBuildRequest) -> list[_RegularSeasonGameSpec]:
+    gid = request.gid_start
+    day, month = 1, 10
+    games: list[_RegularSeasonGameSpec] = []
+    for _ in range(request.reg_cycles):
+        for i, home in enumerate(TEAMS):
+            for away in TEAMS[i + 1 :]:
+                gid += 1
+                games.append(
+                    _RegularSeasonGameSpec(
+                        gid,
+                        f"{request.end_year - 1}-{month:02d}-{day:02d}",
+                        home,
+                        away,
+                    )
+                )
+                day += 1
+                if day > 27:
+                    day = 1
+                    month = 11 if month == 10 else (12 if month == 11 else 10)
+    return games
 
 
 def _append_regular_season_game(

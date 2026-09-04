@@ -464,6 +464,15 @@ class _LegacyFittedExpectedArgs:
     cfg: RecommendConfig
 
 
+@dataclass(frozen=True)
+class _LegacyExpectedArgs:
+    owner: str
+    candidate_assets: Sequence[DraftAsset]
+    model_like: object
+    replacement: Mapping[str, float]
+    cfg: RecommendConfig
+
+
 def _resolve_greedy_expected_request(
     state: DraftState | _GreedyExpectedRequest,
     *legacy: object,
@@ -489,15 +498,14 @@ def _legacy_greedy_expected_request(
     resolved = _legacy_expected_args(legacy)
     if resolved is None:
         return None
-    owner, candidate_assets, gmodel, replacement, cfg = resolved
-    if not isinstance(gmodel, GreedyOpponentModel):
+    if not isinstance(resolved.model_like, GreedyOpponentModel):
         return None
     return _LegacyGreedyExpectedArgs(
-        owner=owner,
-        candidate_assets=candidate_assets,
-        gmodel=gmodel,
-        replacement=replacement,
-        cfg=cfg,
+        owner=resolved.owner,
+        candidate_assets=resolved.candidate_assets,
+        gmodel=resolved.model_like,
+        replacement=resolved.replacement,
+        cfg=resolved.cfg,
     )
 
 
@@ -679,15 +687,14 @@ def _legacy_fitted_expected_request(
     resolved = _legacy_expected_args(legacy)
     if resolved is None:
         return None
-    owner, candidate_assets, models, replacement, cfg = resolved
-    if not isinstance(models, Mapping):
+    if not isinstance(resolved.model_like, Mapping):
         return None
     return _LegacyFittedExpectedArgs(
-        owner=owner,
-        candidate_assets=candidate_assets,
-        models=models,
-        replacement=replacement,
-        cfg=cfg,
+        owner=resolved.owner,
+        candidate_assets=resolved.candidate_assets,
+        models=resolved.model_like,
+        replacement=resolved.replacement,
+        cfg=resolved.cfg,
     )
 
 
@@ -701,7 +708,7 @@ _LEGACY_FITTED_EXPECTED_ERROR = (
 
 def _legacy_expected_args(
     legacy: tuple[object, ...],
-) -> tuple[str, Sequence[DraftAsset], object, Mapping[str, float], RecommendConfig] | None:
+) -> _LegacyExpectedArgs | None:
     if len(legacy) != 5:
         return None
     owner, candidate_assets, model_like, replacement, cfg = legacy
@@ -713,7 +720,7 @@ def _legacy_expected_args(
         return None
     if not isinstance(cfg, RecommendConfig):
         return None
-    return owner, candidate_assets, model_like, replacement, cfg
+    return _LegacyExpectedArgs(owner, candidate_assets, model_like, replacement, cfg)
 
 
 def _advance_fitted_rollout(
