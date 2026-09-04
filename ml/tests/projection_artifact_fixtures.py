@@ -235,10 +235,6 @@ _PROJECT_ARTIFACT_CONFIG = ProjectArtifactConfig(
 )
 
 
-def _config() -> ProjectArtifactConfig:
-    return _PROJECT_ARTIFACT_CONFIG
-
-
 def _archive() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return _synthetic_archive([2018, 2019, 2020, 2021, 2022], seed=1)
 

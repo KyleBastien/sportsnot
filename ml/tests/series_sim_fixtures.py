@@ -86,31 +86,23 @@ def _team_row(spec: _TeamRowInput) -> dict[str, object]:
 
 
 def _game_rows(game: _GameRowsInput) -> list[dict[str, object]]:
+    def _side(team: str, gf: int, ga: int, is_home: bool) -> dict[str, object]:
+        return _team_row(
+            _TeamRowInput(
+                game.season_id,
+                game.game_type_id,
+                game.game_id,
+                game.game_date,
+                team,
+                gf,
+                ga,
+                is_home,
+            )
+        )
+
     return [
-        _team_row(
-            _TeamRowInput(
-                game.season_id,
-                game.game_type_id,
-                game.game_id,
-                game.game_date,
-                game.home,
-                game.home_goals,
-                game.away_goals,
-                True,
-            )
-        ),
-        _team_row(
-            _TeamRowInput(
-                game.season_id,
-                game.game_type_id,
-                game.game_id,
-                game.game_date,
-                game.away,
-                game.away_goals,
-                game.home_goals,
-                False,
-            )
-        ),
+        _side(game.home, game.home_goals, game.away_goals, True),
+        _side(game.away, game.away_goals, game.home_goals, False),
     ]
 
 
@@ -196,19 +188,18 @@ def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFr
 
 
 def _real_team_games(season_label: str | None = None) -> pd.DataFrame:
+    return pd.concat(_archive_frames(season_label), ignore_index=True)
+
+
+def _archive_paths(season_label: str | None) -> list[Path]:
     archive_dir = Path("data/raw/nhl-archive")
-    paths = _archive_paths(archive_dir, season_label)
-    return pd.concat(_archive_frames(paths), ignore_index=True)
-
-
-def _archive_paths(archive_dir: Path, season_label: str | None) -> list[Path]:
     if season_label is not None:
         return [archive_dir / f"team-games-{season_label}.csv.gz"]
     return sorted(archive_dir.glob("team-games-*.csv.gz"))
 
 
-def _archive_frames(paths: list[Path]) -> list[pd.DataFrame]:
-    return [normalize_team_games(pd.read_csv(path)) for path in paths]
+def _archive_frames(season_label: str | None) -> list[pd.DataFrame]:
+    return [normalize_team_games(pd.read_csv(path)) for path in _archive_paths(season_label)]
 
 
 def _overlap_row(spec: _OverlapRowInput) -> dict[str, object]:

@@ -35,8 +35,8 @@ from draft_oracle.projection_artifact import (
     write_projection_artifact,
 )
 from tests.projection_artifact_fixtures import (
+    _PROJECT_ARTIFACT_CONFIG,
     _archive,
-    _config,
     _pre_round_archive,
 )
 
@@ -46,7 +46,14 @@ from tests.projection_artifact_fixtures import (
 def test_build_projection_artifact_shapes_and_columns() -> None:
     sk, tg, players, series = _archive()
     result = build_projection_artifact(
-        sk, players, tg, series, season=2022, playoff_round=1, snapshot_id="snap", config=_config()
+        sk,
+        players,
+        tg,
+        series,
+        season=2022,
+        playoff_round=1,
+        snapshot_id="snap",
+        config=_PROJECT_ARTIFACT_CONFIG,
     )
     assert list(result.skaters.columns) == list(SKATER_COLUMNS)
     assert list(result.teams.columns) == list(TEAM_COLUMNS)
@@ -85,7 +92,14 @@ def test_combined_cheatsheet_note_documents_team_column_contract() -> None:
 def test_round_one_has_no_combined_event() -> None:
     sk, tg, players, series = _archive()
     result = build_projection_artifact(
-        sk, players, tg, series, season=2022, playoff_round=1, snapshot_id="snap", config=_config()
+        sk,
+        players,
+        tg,
+        series,
+        season=2022,
+        playoff_round=1,
+        snapshot_id="snap",
+        config=_PROJECT_ARTIFACT_CONFIG,
     )
     # Combined R3+R4 valuation only applies to the round-3 draft event.
     assert result.manifest["combined_event"] is None
@@ -94,7 +108,14 @@ def test_round_one_has_no_combined_event() -> None:
 def test_ineligible_teams_and_players_are_excluded() -> None:
     sk, tg, players, series = _archive()
     result = build_projection_artifact(
-        sk, players, tg, series, season=2022, playoff_round=1, snapshot_id="snap", config=_config()
+        sk,
+        players,
+        tg,
+        series,
+        season=2022,
+        playoff_round=1,
+        snapshot_id="snap",
+        config=_PROJECT_ARTIFACT_CONFIG,
     )
     # BBB and CCC are not in the round-1 bracket -> excluded from both tables.
     assert "BBB" not in set(result.teams["team_abbrev"])
@@ -107,7 +128,14 @@ def test_ineligible_teams_and_players_are_excluded() -> None:
 def test_series_win_probabilities_are_complementary() -> None:
     sk, tg, players, series = _archive()
     result = build_projection_artifact(
-        sk, players, tg, series, season=2022, playoff_round=1, snapshot_id="snap", config=_config()
+        sk,
+        players,
+        tg,
+        series,
+        season=2022,
+        playoff_round=1,
+        snapshot_id="snap",
+        config=_PROJECT_ARTIFACT_CONFIG,
     )
     probs = result.teams.set_index("team_abbrev")["p_series_win"]
     assert probs["AAA"] + probs["DDD"] == pytest.approx(1.0)
@@ -137,7 +165,7 @@ def test_injury_flag_is_set_from_injuries_table() -> None:
         playoff_round=1,
         snapshot_id="snap",
         injuries=injuries,
-        config=_config(),
+        config=_PROJECT_ARTIFACT_CONFIG,
     )
     flagged = result.skaters.set_index("player_id")["injured"]
     assert bool(flagged.loc[injured_pid]) is True
@@ -211,7 +239,14 @@ def test_missing_round_raises() -> None:
     sk, tg, players, series = _archive()
     with pytest.raises(ValueError, match="no series found"):
         build_projection_artifact(
-            sk, players, tg, series, season=2099, playoff_round=1, snapshot_id="x", config=_config()
+            sk,
+            players,
+            tg,
+            series,
+            season=2099,
+            playoff_round=1,
+            snapshot_id="x",
+            config=_PROJECT_ARTIFACT_CONFIG,
         )
 
 
@@ -224,7 +259,14 @@ def test_pre_round_artifact_builds_before_round_starts() -> None:
     # must derive from round-1's completion, not round-2's (absent) first game.
     sk, tg, players, series = _pre_round_archive([2018, 2019, 2020, 2021, 2022])
     result = build_projection_artifact(
-        sk, players, tg, series, season=2022, playoff_round=2, snapshot_id="snap", config=_config()
+        sk,
+        players,
+        tg,
+        series,
+        season=2022,
+        playoff_round=2,
+        snapshot_id="snap",
+        config=_PROJECT_ARTIFACT_CONFIG,
     )
     # Exactly the two round-2 bracket teams are eligible.
     assert set(result.teams["team_abbrev"]) == {"AAA", "BBB"}
@@ -244,7 +286,14 @@ def test_pre_round_cutoff_is_leak_safe() -> None:
     # belongs to round 1.
     sk, tg, players, series = _pre_round_archive([2018, 2019, 2020, 2021, 2022])
     result = build_projection_artifact(
-        sk, players, tg, series, season=2022, playoff_round=2, snapshot_id="snap", config=_config()
+        sk,
+        players,
+        tg,
+        series,
+        season=2022,
+        playoff_round=2,
+        snapshot_id="snap",
+        config=_PROJECT_ARTIFACT_CONFIG,
     )
     cutoff = pd.Timestamp(result.manifest["as_of_cutoff"])
     round1_dates = pd.to_datetime(
@@ -267,7 +316,7 @@ def test_manifest_records_versions_seeds_and_snapshot() -> None:
         season=2022,
         playoff_round=1,
         snapshot_id="snap-123",
-        config=_config(),
+        config=_PROJECT_ARTIFACT_CONFIG,
         git_sha="deadbeef",
         generated_at="2026-08-28T00:00:00+00:00",
     )
@@ -303,7 +352,7 @@ def test_reruns_are_byte_identical_parquet(tmp_path: Path) -> None:
             season=2022,
             playoff_round=1,
             snapshot_id="snap",
-            config=_config(),
+            config=_PROJECT_ARTIFACT_CONFIG,
             git_sha="sha",
             generated_at="2026-08-28T00:00:00+00:00",
         )
@@ -339,7 +388,7 @@ def test_from_normalized_writes_all_files(tmp_path: Path) -> None:
         playoff_round=1,
         normalized_dir=normalized,
         artifacts_root=tmp_path / "artifacts",
-        config=_config(),
+        config=_PROJECT_ARTIFACT_CONFIG,
     )
     assert out_dir.name == "2022-r1"
     for fname in (
@@ -407,7 +456,7 @@ def test_pinned_run_reads_frozen_inputs_not_live(
         normalized_dir=normalized,
         artifacts_root=tmp_path / "artifacts",
         snapshot="pin1",
-        config=_config(),
+        config=_PROJECT_ARTIFACT_CONFIG,
     )
 
     # Injuries came from the frozen snapshot (player 100), NOT the mutated live 999.
@@ -440,7 +489,7 @@ def test_pinned_run_on_incomplete_snapshot_fails_loudly(tmp_path: Path) -> None:
             normalized_dir=normalized,
             artifacts_root=tmp_path / "artifacts",
             snapshot="legacy",
-            config=_config(),
+            config=_PROJECT_ARTIFACT_CONFIG,
         )
 
 
@@ -460,7 +509,7 @@ def test_pinned_run_without_snapshot_manifest_fails_loudly(tmp_path: Path) -> No
             normalized_dir=normalized,
             artifacts_root=tmp_path / "artifacts",
             snapshot="bare",
-            config=_config(),
+            config=_PROJECT_ARTIFACT_CONFIG,
         )
 
 
@@ -469,7 +518,14 @@ def test_slot_strategies_skipped_when_pool_too_small() -> None:
     # cannot fill a 4-manager league -- the report is skipped gracefully, not crashed.
     sk, tg, players, series = _archive()
     result = build_projection_artifact(
-        sk, players, tg, series, season=2022, playoff_round=1, snapshot_id="snap", config=_config()
+        sk,
+        players,
+        tg,
+        series,
+        season=2022,
+        playoff_round=1,
+        snapshot_id="snap",
+        config=_PROJECT_ARTIFACT_CONFIG,
     )
     assert result.slot_strategies is None
     assert result.manifest["slot_strategies"] is None
