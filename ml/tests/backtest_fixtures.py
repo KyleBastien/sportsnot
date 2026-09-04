@@ -222,15 +222,17 @@ def _synthetic_archive(
         pd.DataFrame(series_rows),
     )
 
-
-def _archive_tables(
-    seed: int,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    return _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=seed)
+_ARCHIVE_TABLES = _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=1)
 
 
 def _tables(seed: int = 1) -> dict[str, pd.DataFrame]:
-    sk, tg, players, series = _archive_tables(seed)
+    if seed == 1:
+        sk, tg, players, series = _ARCHIVE_TABLES
+    else:
+        sk, tg, players, series = _synthetic_archive(
+            [2017, 2018, 2019, 2020, 2021, 2022],
+            seed=seed,
+        )
     return {"skater_games": sk, "players": players, "team_games": tg, "series": series}
 
 
