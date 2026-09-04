@@ -294,14 +294,16 @@ class _CandidateRollout:
     owner_taken: int
 
 
+@dataclass(frozen=True)
+class _OwnerStepRequest:
+    arr: _RolloutArrays
+    cfg: RecommendConfig
+    batch: _CandidateRollout
+    legal: np.ndarray
+
+
 def _owner_step(
-    arr: _RolloutArrays,
-    cfg: RecommendConfig,
-    alive: np.ndarray,
-    counts: np.ndarray,
-    owner_total: np.ndarray,
-    owner_taken: int,
-    legal: np.ndarray,
+    request: _OwnerStepRequest,
 ) -> _OwnerStep:
     """Advance the owner's greedy-VOR turn (or fill the tail once ``depth`` is hit).
 
@@ -309,26 +311,26 @@ def _owner_step(
     are filled greedily from the current pool and the rollout is done; otherwise the
     owner takes the best legal VOR asset.
     """
-    if cfg.depth is not None and owner_taken >= cfg.depth:
+    if request.cfg.depth is not None and request.batch.owner_taken >= request.cfg.depth:
         _vec_fill_owner(
             _OwnerFillRequest(
-                alive,
-                counts,
-                arr.owner_idx,
-                arr.val,
-                arr.vor_owner,
-                arr.posc,
-                arr.limits,
-                owner_total,
-                arr.cap_total - owner_taken,
+                request.batch.alive,
+                request.batch.counts,
+                request.arr.owner_idx,
+                request.arr.val,
+                request.arr.vor_owner,
+                request.arr.posc,
+                request.arr.limits,
+                request.batch.owner_total,
+                request.arr.cap_total - request.batch.owner_taken,
             )
         )
-        return _OwnerStep(True, None, owner_total, arr.cap_total)
-    _require_legal_rows(legal, arr.mgr_ids[arr.owner_idx])
-    scores = np.where(legal, arr.vor_owner[None, :], float("-inf"))
+        return _OwnerStep(True, None, request.batch.owner_total, request.arr.cap_total)
+    _require_legal_rows(request.legal, request.arr.mgr_ids[request.arr.owner_idx])
+    scores = np.where(request.legal, request.arr.vor_owner[None, :], float("-inf"))
     choice = np.argmax(scores, axis=1)
-    owner_total = owner_total + arr.val[choice]
-    return _OwnerStep(False, choice, owner_total, owner_taken + 1)
+    owner_total = request.batch.owner_total + request.arr.val[choice]
+    return _OwnerStep(False, choice, owner_total, request.batch.owner_taken + 1)
 
 
 @dataclass(frozen=True)
@@ -471,13 +473,7 @@ def _owner_rollout_choice(
     legal: np.ndarray,
 ) -> np.ndarray | None:
     step = _owner_step(
-        arr,
-        cfg,
-        batch.alive,
-        batch.counts,
-        batch.owner_total,
-        batch.owner_taken,
-        legal,
+        _OwnerStepRequest(arr, cfg, batch, legal)
     )
     batch.owner_total = step.owner_total
     batch.owner_taken = step.owner_taken
@@ -564,28 +560,57 @@ def _vectorized_fitted_expected(
     means: list[float] = []
     for asset in candidate_assets:
         alive, counts, owner_total, owner_taken = _init_candidate_rollout(arr, asset, rollouts)
-
-        for k in range(1, arr.last_owner_k + 1):
-            mgr_i = arr.rem_m[k]
-            cnt_m = counts[:, mgr_i, :]
-            legal = alive & (cnt_m < arr.limits)[:, arr.posc]
-            if mgr_i == arr.owner_idx:
-                step = _owner_step(arr, cfg, alive, counts, owner_total, owner_taken, legal)
-                owner_total, owner_taken = step.owner_total, step.owner_taken
-                if step.done:
-                    break
-                assert step.choice is not None
-                choice = step.choice
-            else:
-                _require_legal_rows(legal, arr.mgr_ids[mgr_i])
-                choice = _fitted_opponent_choice(arr, params, _Turn(cnt_m, legal), mgr_i)
-            alive[rows, choice] = False
-            counts[rows, mgr_i, arr.posc[choice]] += 1
+        owner_total, owner_taken = _advance_fitted_rollout(
+            arr,
+            params,
+            cfg,
+            alive,
+            counts,
+            owner_total,
+            owner_taken,
+            rows,
+        )
 
         # Same E[roster] definition as the greedy and object paths: include the
         # owner's already-drafted roster value.
         means.append(float(owner_total.mean()) + arr.base_owner_value)
     return means
+
+
+def _advance_fitted_rollout(
+    arr: _RolloutArrays,
+    params: _FittedParams,
+    cfg: RecommendConfig,
+    alive: np.ndarray,
+    counts: np.ndarray,
+    owner_total: np.ndarray,
+    owner_taken: int,
+    rows: np.ndarray,
+) -> tuple[np.ndarray, int]:
+    for k in range(1, arr.last_owner_k + 1):
+        mgr_i = arr.rem_m[k]
+        cnt_m = counts[:, mgr_i, :]
+        legal = alive & (cnt_m < arr.limits)[:, arr.posc]
+        if mgr_i == arr.owner_idx:
+            step = _owner_step(
+                _OwnerStepRequest(
+                    arr,
+                    cfg,
+                    _CandidateRollout(alive, counts, owner_total, owner_taken),
+                    legal,
+                )
+            )
+            owner_total, owner_taken = step.owner_total, step.owner_taken
+            if step.done:
+                break
+            assert step.choice is not None
+            choice = step.choice
+        else:
+            _require_legal_rows(legal, arr.mgr_ids[mgr_i])
+            choice = _fitted_opponent_choice(arr, params, _Turn(cnt_m, legal), mgr_i)
+        alive[rows, choice] = False
+        counts[rows, mgr_i, arr.posc[choice]] += 1
+    return owner_total, owner_taken
 
 
 def _expected_value(

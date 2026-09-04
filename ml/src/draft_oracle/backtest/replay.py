@@ -587,11 +587,13 @@ def run_backtest_from_normalized(
 
     resolved = _resolve_run_backtest_from_normalized_request(
         request,
-        seasons=cast("list[int] | None", legacy.get("seasons")),
-        normalized_dir=cast("Path", legacy.get("normalized_dir", DEFAULT_NORMALIZED_DIR)),
-        backtest_root=cast("Path", legacy.get("backtest_root", DEFAULT_BACKTEST_ROOT)),
-        snapshot=cast("str | None", legacy.get("snapshot")),
-        config=cast("BacktestConfig | None", legacy.get("config")),
+        _RunBacktestFromNormalizedOptions(
+            seasons=cast("list[int] | None", legacy.get("seasons")),
+            normalized_dir=cast("Path", legacy.get("normalized_dir", DEFAULT_NORMALIZED_DIR)),
+            backtest_root=cast("Path", legacy.get("backtest_root", DEFAULT_BACKTEST_ROOT)),
+            snapshot=cast("str | None", legacy.get("snapshot")),
+            config=cast("BacktestConfig | None", legacy.get("config")),
+        ),
     )
     source_dir = (
         resolved.normalized_dir / SNAPSHOTS_SUBDIR / resolved.snapshot
@@ -629,25 +631,29 @@ class _RunBacktestFromNormalizedRequest:
     config: BacktestConfig | None = None
 
 
+@dataclass(frozen=True)
+class _RunBacktestFromNormalizedOptions:
+    seasons: list[int] | None
+    normalized_dir: Path
+    backtest_root: Path
+    snapshot: str | None
+    config: BacktestConfig | None
+
+
 def _resolve_run_backtest_from_normalized_request(
     request: _RunBacktestFromNormalizedRequest | list[int] | None,
-    *,
-    seasons: list[int] | None,
-    normalized_dir: Path,
-    backtest_root: Path,
-    snapshot: str | None,
-    config: BacktestConfig | None,
+    options: _RunBacktestFromNormalizedOptions,
 ) -> _RunBacktestFromNormalizedRequest:
     if isinstance(request, _RunBacktestFromNormalizedRequest):
         return request
     if request is None:
-        request = seasons
+        request = options.seasons
     if request is None:
         raise ValueError("seasons must be provided")
     return _RunBacktestFromNormalizedRequest(
         seasons=request,
-        normalized_dir=normalized_dir,
-        backtest_root=backtest_root,
-        snapshot=snapshot,
-        config=config,
+        normalized_dir=options.normalized_dir,
+        backtest_root=options.backtest_root,
+        snapshot=options.snapshot,
+        config=options.config,
     )
