@@ -45,6 +45,15 @@ class _BuildTeamRowsRequest:
     warnings: list[str]
 
 
+@dataclass(frozen=True)
+class _MatchupSeriesRequest:
+    win_model: Any
+    shutout_model: Any
+    matchup: Any
+    top_id: int
+    bottom_id: int
+
+
 def _build_team_rows(
     request: _BuildTeamRowsRequest,
 ) -> tuple[list[dict[str, Any]], dict[str, dict[int, float]]]:
@@ -71,11 +80,13 @@ def _build_team_rows(
             continue
 
         outcome, shutout_top, shutout_bottom = _predict_matchup_series(
-            request.win_model,
-            request.shutout_model,
-            matchup,
-            top_id,
-            bottom_id,
+            _MatchupSeriesRequest(
+                request.win_model,
+                request.shutout_model,
+                matchup,
+                top_id,
+                bottom_id,
+            )
         )
         length_by_abbrev[top_abbrev] = dict(outcome.length_probs)
         length_by_abbrev[bottom_abbrev] = dict(outcome.length_probs)
@@ -163,20 +174,20 @@ class _TeamRowRequest:
 
 
 def _predict_matchup_series(
-    win_model: Any,
-    shutout_model: Any,
-    matchup: Any,
-    top_id: int,
-    bottom_id: int,
+    request: _MatchupSeriesRequest,
 ) -> tuple[Any, float, float]:
-    top_win = matchup.win_snapshots[top_id]
-    bottom_win = matchup.win_snapshots[bottom_id]
-    top_sho = matchup.shutout_snapshots[top_id]
-    bottom_sho = matchup.shutout_snapshots[bottom_id]
-    p_top_home = win_model.predict_matchup(top_win, bottom_win, is_playoff=True)
-    p_top_away = 1.0 - win_model.predict_matchup(bottom_win, top_win, is_playoff=True)
-    shutout_top = shutout_model.predict_matchup(top_sho, bottom_sho)
-    shutout_bottom = shutout_model.predict_matchup(bottom_sho, top_sho)
+    top_win = request.matchup.win_snapshots[request.top_id]
+    bottom_win = request.matchup.win_snapshots[request.bottom_id]
+    top_sho = request.matchup.shutout_snapshots[request.top_id]
+    bottom_sho = request.matchup.shutout_snapshots[request.bottom_id]
+    p_top_home = request.win_model.predict_matchup(top_win, bottom_win, is_playoff=True)
+    p_top_away = 1.0 - request.win_model.predict_matchup(
+        bottom_win,
+        top_win,
+        is_playoff=True,
+    )
+    shutout_top = request.shutout_model.predict_matchup(top_sho, bottom_sho)
+    shutout_bottom = request.shutout_model.predict_matchup(bottom_sho, top_sho)
     return (
         simulate_series(
             p_top_home,

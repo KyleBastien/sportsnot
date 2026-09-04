@@ -60,35 +60,40 @@ def _require_legal_rows(legal: np.ndarray, manager: str) -> None:
 
 
 def _vec_fill_owner(
-    alive: np.ndarray,
-    counts: np.ndarray,
-    owner_idx: int,
-    val: np.ndarray,
-    vor_owner: np.ndarray,
-    posc: np.ndarray,
-    limits: np.ndarray,
-    owner_total: np.ndarray,
-    remaining: int,
+    request: _OwnerFillRequest,
 ) -> None:
     """Vectorized greedy-VOR fill of the owner's remaining slots (opponents ignored)."""
-    rows = np.arange(alive.shape[0])
+    rows = np.arange(request.alive.shape[0])
     neg_inf = float("-inf")
-    for _ in range(remaining):
-        cap_ok = counts[:, owner_idx, :] < limits
-        legal = alive & cap_ok[:, posc]
+    for _ in range(request.remaining):
+        cap_ok = request.counts[:, request.owner_idx, :] < request.limits
+        legal = request.alive & cap_ok[:, request.posc]
         has_legal = legal.any(axis=1)
         if not has_legal.any():
             break
-        scores = np.where(legal, vor_owner[None, :], neg_inf)
+        scores = np.where(legal, request.vor_owner[None, :], neg_inf)
         choice = np.argmax(scores, axis=1)
         # Match the object path's ``_fill_owner_greedily``: a row with no legal asset
         # simply stops filling (the owner gets fewer picks) rather than the argmax
         # over all -inf silently drafting pool index 0.
         active = rows[has_legal]
         chosen = choice[has_legal]
-        owner_total[active] += val[chosen]
-        alive[active, chosen] = False
-        counts[active, owner_idx, posc[chosen]] += 1
+        request.owner_total[active] += request.val[chosen]
+        request.alive[active, chosen] = False
+        request.counts[active, request.owner_idx, request.posc[chosen]] += 1
+
+
+@dataclass(frozen=True)
+class _OwnerFillRequest:
+    alive: np.ndarray
+    counts: np.ndarray
+    owner_idx: int
+    val: np.ndarray
+    vor_owner: np.ndarray
+    posc: np.ndarray
+    limits: np.ndarray
+    owner_total: np.ndarray
+    remaining: int
 
 
 @dataclass(frozen=True)
@@ -306,15 +311,17 @@ def _owner_step(
     """
     if cfg.depth is not None and owner_taken >= cfg.depth:
         _vec_fill_owner(
-            alive,
-            counts,
-            arr.owner_idx,
-            arr.val,
-            arr.vor_owner,
-            arr.posc,
-            arr.limits,
-            owner_total,
-            arr.cap_total - owner_taken,
+            _OwnerFillRequest(
+                alive,
+                counts,
+                arr.owner_idx,
+                arr.val,
+                arr.vor_owner,
+                arr.posc,
+                arr.limits,
+                owner_total,
+                arr.cap_total - owner_taken,
+            )
         )
         return _OwnerStep(True, None, owner_total, arr.cap_total)
     _require_legal_rows(legal, arr.mgr_ids[arr.owner_idx])

@@ -204,23 +204,15 @@ def _membership_exclusions(
     return exclusions
 
 
-def _membership_for_season(
-    picks: pd.DataFrame,
-    season: int,
-    config: _OpponentEvalConfig,
-    *,
-    fit_models: Callable[[pd.DataFrame, Any], Any],
-    prepare_picks: Callable[[pd.DataFrame], pd.DataFrame],
-    event_keys: Callable[[pd.DataFrame], list[str]],
-) -> MembershipScore | None:
+def _membership_for_season(request: _MembershipSeasonRequest) -> MembershipScore | None:
     """Leave-one-season-out membership accuracy for ``season``."""
-    runtime = _MembershipEvalRuntime(fit_models, prepare_picks, event_keys)
-    train = _membership_training_frame(picks, season)
+    train = _membership_training_frame(request.picks, request.season)
     if train is None:
         return None
-    fitted = runtime.fit_models(train, config)
-    prepared = runtime.prepare_picks(picks.loc[picks["season"] == season])
-    greedy = GreedyOpponentModel(temperature=0.0, need_weight=config.need_weight)
+    runtime = request.runtime
+    fitted = runtime.fit_models(train, request.config)
+    prepared = runtime.prepare_picks(request.picks.loc[request.picks["season"] == request.season])
+    greedy = GreedyOpponentModel(temperature=0.0, need_weight=request.config.need_weight)
 
     events = 0
     picks_scored = 0
@@ -229,7 +221,7 @@ def _membership_for_season(
     fitted_total = 0
     greedy_total = 0
     for _, pool in prepared.groupby(runtime.event_keys(prepared), sort=True):
-        event_score = _membership_event_score(pool, fitted.as_mapping, greedy, config.seed)
+        event_score = _membership_event_score(pool, fitted.as_mapping, greedy, request.config.seed)
         if event_score is None:
             continue
         events += 1
@@ -241,7 +233,7 @@ def _membership_for_season(
     if events == 0 or fitted_total == 0:
         return None
     return MembershipScore(
-        season=season,
+        season=request.season,
         events=events,
         picks=picks_scored,
         fitted_accuracy=fitted_hits / fitted_total,
@@ -270,6 +262,14 @@ class _MembershipEvalRuntime:
     fit_models: Callable[[pd.DataFrame, Any], Any]
     prepare_picks: Callable[[pd.DataFrame], pd.DataFrame]
     event_keys: Callable[[pd.DataFrame], list[str]]
+
+
+@dataclass(frozen=True)
+class _MembershipSeasonRequest:
+    picks: pd.DataFrame
+    season: int
+    config: _OpponentEvalConfig
+    runtime: _MembershipEvalRuntime
 
 
 def _membership_event_score(

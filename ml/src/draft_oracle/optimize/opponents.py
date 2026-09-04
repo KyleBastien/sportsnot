@@ -90,6 +90,8 @@ from draft_oracle.optimize._opponent_eval import (
     OpponentEvalResult,
     PerPickScore,
     _membership_exclusions,
+    _MembershipEvalRuntime,
+    _MembershipSeasonRequest,
 )
 from draft_oracle.optimize._opponent_eval import (
     _membership_for_season as _eval_membership_for_season,
@@ -562,12 +564,16 @@ def _membership_for_season(
     config: OpponentFitConfig,
 ) -> MembershipScore | None:
     return _eval_membership_for_season(
-        picks,
-        season,
-        config,
-        fit_models=fit_opponent_models,
-        prepare_picks=_prepare_picks,
-        event_keys=event_keys,
+        _MembershipSeasonRequest(
+            picks=picks,
+            season=season,
+            config=config,
+            runtime=_MembershipEvalRuntime(
+                fit_models=fit_opponent_models,
+                prepare_picks=_prepare_picks,
+                event_keys=event_keys,
+            ),
+        )
     )
 
 

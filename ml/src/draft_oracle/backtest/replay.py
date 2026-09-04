@@ -571,12 +571,8 @@ def _load_odds(normalized_dir: Path) -> pd.DataFrame | None:
 
 
 def run_backtest_from_normalized(
-    *,
-    seasons: list[int],
-    normalized_dir: Path = DEFAULT_NORMALIZED_DIR,
-    backtest_root: Path = DEFAULT_BACKTEST_ROOT,
-    snapshot: str | None = None,
-    config: BacktestConfig | None = None,
+    request: _RunBacktestFromNormalizedRequest | list[int] | None = None,
+    **legacy: object,
 ) -> tuple[BacktestResult, Path]:
     """Load normalized tables, run the backtest, and persist it to disk.
 
@@ -589,24 +585,69 @@ def run_backtest_from_normalized(
     """
     from draft_oracle.backtest.report import write_report
 
-    source_dir = normalized_dir / SNAPSHOTS_SUBDIR / snapshot if snapshot else normalized_dir
-    if snapshot is not None:
+    resolved = _resolve_run_backtest_from_normalized_request(
+        request,
+        seasons=cast("list[int] | None", legacy.get("seasons")),
+        normalized_dir=cast("Path", legacy.get("normalized_dir", DEFAULT_NORMALIZED_DIR)),
+        backtest_root=cast("Path", legacy.get("backtest_root", DEFAULT_BACKTEST_ROOT)),
+        snapshot=cast("str | None", legacy.get("snapshot")),
+        config=cast("BacktestConfig | None", legacy.get("config")),
+    )
+    source_dir = (
+        resolved.normalized_dir / SNAPSHOTS_SUBDIR / resolved.snapshot
+        if resolved.snapshot
+        else resolved.normalized_dir
+    )
+    if resolved.snapshot is not None:
         _require_complete_snapshot(source_dir)
     tables = _load_tables(source_dir)
     league_picks = _load_league_picks(source_dir)
     odds = _load_odds(source_dir)
-    snapshot_id = _snapshot_id_for(source_dir, snapshot)
+    snapshot_id = _snapshot_id_for(source_dir, resolved.snapshot)
 
     # Historical rounds never receive the live injuries snapshot (CODE_REVIEW m-4);
     # run_backtest forces an empty injuries input for every replayed round.
     result = run_backtest(
         tables,
-        seasons,
+        resolved.seasons,
         league_picks=league_picks,
         odds=odds,
         snapshot_id=snapshot_id,
-        config=config,
+        config=resolved.config,
     )
-    out_dir = write_backtest(result, backtest_root)
+    out_dir = write_backtest(result, resolved.backtest_root)
     write_report(result, out_dir)
     return result, out_dir
+
+
+@dataclass(frozen=True)
+class _RunBacktestFromNormalizedRequest:
+    seasons: list[int]
+    normalized_dir: Path = DEFAULT_NORMALIZED_DIR
+    backtest_root: Path = DEFAULT_BACKTEST_ROOT
+    snapshot: str | None = None
+    config: BacktestConfig | None = None
+
+
+def _resolve_run_backtest_from_normalized_request(
+    request: _RunBacktestFromNormalizedRequest | list[int] | None,
+    *,
+    seasons: list[int] | None,
+    normalized_dir: Path,
+    backtest_root: Path,
+    snapshot: str | None,
+    config: BacktestConfig | None,
+) -> _RunBacktestFromNormalizedRequest:
+    if isinstance(request, _RunBacktestFromNormalizedRequest):
+        return request
+    if request is None:
+        request = seasons
+    if request is None:
+        raise ValueError("seasons must be provided")
+    return _RunBacktestFromNormalizedRequest(
+        seasons=request,
+        normalized_dir=normalized_dir,
+        backtest_root=backtest_root,
+        snapshot=snapshot,
+        config=config,
+    )

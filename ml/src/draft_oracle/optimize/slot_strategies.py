@@ -185,17 +185,15 @@ class _PlanSlotRequest:
 
 def _slot_ctx(
     state: DraftState,
+    request: _PlanSlotRequest,
     owner: str,
-    slot: int,
-    opponents: OpponentModel | Mapping[str, OpponentModel],
-    config: SlotStrategyConfig,
 ) -> _SlotCtx:
     return _SlotCtx(
         owner,
-        slot,
-        opponents,
+        request.slot,
+        request.opponents,
         replacement_levels(state, len(state.rosters)),
-        config,
+        request.config,
     )
 
 
@@ -317,7 +315,7 @@ def _owner_turn_plan(
     rec_config: RecommendConfig,
     turn_index: int,
 ) -> TurnPlan:
-    ctx = _slot_ctx(state, owner, request.slot, request.opponents, request.config)
+    ctx = _slot_ctx(state, request, owner)
     rec = recommend_pick(state, owner, request.opponents, config=rec_config)
     recommended_eval = rec.best
     return TurnPlan(
