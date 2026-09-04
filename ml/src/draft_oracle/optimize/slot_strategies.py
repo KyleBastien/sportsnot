@@ -166,6 +166,7 @@ class _SlotCtx:
     """Fixed inputs for one owner's contingency planning at a slot."""
 
     owner: str
+    slot: int
     opponents: OpponentModel | Mapping[str, OpponentModel]
     replacement: Mapping[str, float]
     config: SlotStrategyConfig
@@ -185,10 +186,17 @@ class _PlanSlotRequest:
 def _slot_ctx(
     state: DraftState,
     owner: str,
+    slot: int,
     opponents: OpponentModel | Mapping[str, OpponentModel],
     config: SlotStrategyConfig,
 ) -> _SlotCtx:
-    return _SlotCtx(owner, opponents, replacement_levels(state, len(state.rosters)), config)
+    return _SlotCtx(
+        owner,
+        slot,
+        opponents,
+        replacement_levels(state, len(state.rosters)),
+        config,
+    )
 
 
 def _gap_outcomes(
@@ -290,7 +298,6 @@ def _owner_contingencies(
     state: DraftState,
     recommended: DraftAsset,
     turn_index: int,
-    slot: int,
 ) -> list[Contingency]:
     if turn_index >= ctx.config.contingency_turns:
         return []
@@ -298,7 +305,7 @@ def _owner_contingencies(
         ctx,
         state,
         recommended,
-        ctx.config.seed * 104729 + slot * 1009 + turn_index,
+        ctx.config.seed * 104729 + ctx.slot * 1009 + turn_index,
     )
 
 
@@ -310,7 +317,7 @@ def _owner_turn_plan(
     rec_config: RecommendConfig,
     turn_index: int,
 ) -> TurnPlan:
-    ctx = _slot_ctx(state, owner, request.opponents, request.config)
+    ctx = _slot_ctx(state, owner, request.slot, request.opponents, request.config)
     rec = recommend_pick(state, owner, request.opponents, config=rec_config)
     recommended_eval = rec.best
     return TurnPlan(
@@ -327,7 +334,6 @@ def _owner_turn_plan(
             state,
             recommended_eval.asset,
             turn_index,
-            request.slot,
         ),
     )
 

@@ -578,6 +578,21 @@ class _NewDraftSessionRequest:
     opponent_artifact: Path
 
 
+@dataclass(frozen=True)
+class _StartDraftRequest:
+    artifact: Path
+    managers: str
+    slot: int
+    ir: bool
+    eliminated: str
+    temperature: float
+    seed: int
+    rollouts: int
+    opponents: str
+    opponent_artifact: Path
+    session: Path | None
+
+
 def _new_draft_session(request: _NewDraftSessionRequest) -> DraftSession:
     manager_ids = parse_managers(request.managers)
     manager_count = len(manager_ids)
@@ -606,32 +621,20 @@ def _resume_draft_session(resume: Path, session: Path | None) -> None:
     _run_loop(DraftSession.resume(resume), session_path)
 
 
-def _start_new_draft_session(
-    artifact: Path,
-    managers: str,
-    slot: int,
-    ir: bool,
-    eliminated: str,
-    temperature: float,
-    seed: int,
-    rollouts: int,
-    opponents: str,
-    opponent_artifact: Path,
-    session: Path | None,
-) -> None:
-    session_path = _new_session_path(session)
+def _start_new_draft_session(request: _StartDraftRequest) -> None:
+    session_path = _new_session_path(request.session)
     new_session = _new_draft_session(
         _NewDraftSessionRequest(
-            artifact=artifact,
-            managers=managers,
-            slot=slot,
-            ir=ir,
-            eliminated=eliminated,
-            temperature=temperature,
-            seed=seed,
-            rollouts=rollouts,
-            opponents=opponents,
-            opponent_artifact=opponent_artifact,
+            artifact=request.artifact,
+            managers=request.managers,
+            slot=request.slot,
+            ir=request.ir,
+            eliminated=request.eliminated,
+            temperature=request.temperature,
+            seed=request.seed,
+            rollouts=request.rollouts,
+            opponents=request.opponents,
+            opponent_artifact=request.opponent_artifact,
         )
     )
     _run_loop(new_session, session_path)
@@ -696,17 +699,19 @@ def draft(
     if artifact is None:
         raise typer.BadParameter("provide --artifact <dir> (or --resume <session.json>)")
     _start_new_draft_session(
-        artifact,
-        managers,
-        slot,
-        ir,
-        eliminated,
-        temperature,
-        seed,
-        rollouts,
-        opponents,
-        opponent_artifact,
-        session,
+        _StartDraftRequest(
+            artifact=artifact,
+            managers=managers,
+            slot=slot,
+            ir=ir,
+            eliminated=eliminated,
+            temperature=temperature,
+            seed=seed,
+            rollouts=rollouts,
+            opponents=opponents,
+            opponent_artifact=opponent_artifact,
+            session=session,
+        )
     )
 
 

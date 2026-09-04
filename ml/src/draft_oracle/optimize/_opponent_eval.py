@@ -214,11 +214,12 @@ def _membership_for_season(
     event_keys: Callable[[pd.DataFrame], list[str]],
 ) -> MembershipScore | None:
     """Leave-one-season-out membership accuracy for ``season``."""
+    runtime = _MembershipEvalRuntime(fit_models, prepare_picks, event_keys)
     train = _membership_training_frame(picks, season)
     if train is None:
         return None
-    fitted = fit_models(train, config)
-    prepared = prepare_picks(picks.loc[picks["season"] == season])
+    fitted = runtime.fit_models(train, config)
+    prepared = runtime.prepare_picks(picks.loc[picks["season"] == season])
     greedy = GreedyOpponentModel(temperature=0.0, need_weight=config.need_weight)
 
     events = 0
@@ -227,7 +228,7 @@ def _membership_for_season(
     greedy_hits = 0.0
     fitted_total = 0
     greedy_total = 0
-    for _, pool in prepared.groupby(event_keys(prepared), sort=True):
+    for _, pool in prepared.groupby(runtime.event_keys(prepared), sort=True):
         event_score = _membership_event_score(pool, fitted.as_mapping, greedy, config.seed)
         if event_score is None:
             continue
@@ -262,6 +263,13 @@ class _MembershipEventScore:
     greedy_hits: float
     fitted_total: int
     greedy_total: int
+
+
+@dataclass(frozen=True)
+class _MembershipEvalRuntime:
+    fit_models: Callable[[pd.DataFrame, Any], Any]
+    prepare_picks: Callable[[pd.DataFrame], pd.DataFrame]
+    event_keys: Callable[[pd.DataFrame], list[str]]
 
 
 def _membership_event_score(

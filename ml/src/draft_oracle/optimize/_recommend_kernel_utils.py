@@ -22,6 +22,21 @@ class _GreedyChoiceInputs:
     rng: np.random.Generator
 
 
+@dataclass(frozen=True)
+class _FittedChoiceInputs:
+    rank_val: np.ndarray
+    limits: np.ndarray
+    posc: np.ndarray
+    key_order: np.ndarray
+    coef_rank: np.ndarray
+    coef_aff: np.ndarray
+    aff_matrix: np.ndarray
+    need_weight: np.ndarray
+    cnt_m: np.ndarray
+    legal: np.ndarray
+    mgr_i: int
+
+
 def _rank_key_argmax(
     scores: np.ndarray,
     legal: np.ndarray,
@@ -80,28 +95,18 @@ def _greedy_opponent_choice(
 
 
 def _fitted_opponent_choice(
-    rank_val: np.ndarray,
-    limits: np.ndarray,
-    posc: np.ndarray,
-    key_order: np.ndarray,
-    coef_rank: np.ndarray,
-    coef_aff: np.ndarray,
-    aff_matrix: np.ndarray,
-    need_weight: np.ndarray,
-    cnt_m: np.ndarray,
-    legal: np.ndarray,
-    mgr_i: int,
+    request: _FittedChoiceInputs,
 ) -> np.ndarray:
     """Fitted opponent's deterministic per-rollout pick from utility model."""
-    pos_masks = [posc == position_index for position_index in range(3)]
-    urgency = (limits - cnt_m) / limits
-    rank_z = _fitted_rank_z(legal, rank_val, pos_masks)
+    pos_masks = [request.posc == position_index for position_index in range(3)]
+    urgency = (request.limits - request.cnt_m) / request.limits
+    rank_z = _fitted_rank_z(request.legal, request.rank_val, pos_masks)
     utility = (
-        coef_rank[mgr_i] * rank_z
-        + coef_aff[mgr_i] * aff_matrix[mgr_i][None, :]
-        + need_weight[mgr_i] * urgency[:, posc]
+        request.coef_rank[request.mgr_i] * rank_z
+        + request.coef_aff[request.mgr_i] * request.aff_matrix[request.mgr_i][None, :]
+        + request.need_weight[request.mgr_i] * urgency[:, request.posc]
     )
-    return _rank_key_argmax(utility, legal, rank_val, key_order)
+    return _rank_key_argmax(utility, request.legal, request.rank_val, request.key_order)
 
 
 def _affinity_row(pool: Sequence[Any], affinity: Mapping[int, float]) -> list[float]:

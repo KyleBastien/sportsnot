@@ -186,6 +186,14 @@ class _RunBacktestRequest:
 
 
 @dataclass(frozen=True)
+class _RunBacktestOptions:
+    league_picks: pd.DataFrame | None
+    odds: pd.DataFrame | None
+    snapshot_id: str
+    config: BacktestConfig | None
+
+
+@dataclass(frozen=True)
 class _SlotSimulationRequest:
     base_state: DraftState
     managers_list: list[str]
@@ -457,10 +465,12 @@ def run_backtest(
     request = _resolve_run_backtest_request(
         tables,
         seasons,
-        league_picks=cast("pd.DataFrame | None", legacy.get("league_picks")),
-        odds=cast("pd.DataFrame | None", legacy.get("odds")),
-        snapshot_id=cast("str", legacy.get("snapshot_id", "backtest")),
-        config=cast("BacktestConfig | None", legacy.get("config")),
+        _RunBacktestOptions(
+            league_picks=cast("pd.DataFrame | None", legacy.get("league_picks")),
+            odds=cast("pd.DataFrame | None", legacy.get("odds")),
+            snapshot_id=cast("str", legacy.get("snapshot_id", "backtest")),
+            config=cast("BacktestConfig | None", legacy.get("config")),
+        ),
     )
     cfg = request.config or BacktestConfig()
     if not request.seasons:
@@ -512,11 +522,7 @@ def run_backtest(
 def _resolve_run_backtest_request(
     tables: _RunBacktestRequest | dict[str, pd.DataFrame],
     seasons: list[int] | None,
-    *,
-    league_picks: pd.DataFrame | None,
-    odds: pd.DataFrame | None,
-    snapshot_id: str,
-    config: BacktestConfig | None,
+    options: _RunBacktestOptions,
 ) -> _RunBacktestRequest:
     if isinstance(tables, _RunBacktestRequest):
         return tables
@@ -525,10 +531,10 @@ def _resolve_run_backtest_request(
     return _RunBacktestRequest(
         tables=tables,
         seasons=seasons,
-        league_picks=league_picks,
-        odds=odds,
-        snapshot_id=snapshot_id,
-        config=config,
+        league_picks=options.league_picks,
+        odds=options.odds,
+        snapshot_id=options.snapshot_id,
+        config=options.config,
     )
 
 

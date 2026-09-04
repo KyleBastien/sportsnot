@@ -82,28 +82,32 @@ def _build_team_rows(
         team_rows.extend(
             [
                 _team_row(
-                    team_id=top_id,
-                    team_abbrev=top_abbrev,
-                    opponent_abbrev=bottom_abbrev,
-                    is_top_seed=True,
-                    playoff_round=request.playoff_round,
-                    p_series_win=outcome.p_a_win_series,
-                    e_wins=outcome.e_wins_a,
-                    e_games=outcome.e_games,
-                    e_goalie_points=outcome.e_goalie_points_a,
-                    e_shutout_wins=outcome.e_wins_a * float(shutout_top),
+                    _TeamRowRequest(
+                        top_id,
+                        top_abbrev,
+                        bottom_abbrev,
+                        True,
+                        request.playoff_round,
+                        outcome.p_a_win_series,
+                        outcome.e_wins_a,
+                        outcome.e_games,
+                        outcome.e_goalie_points_a,
+                        outcome.e_wins_a * float(shutout_top),
+                    )
                 ),
                 _team_row(
-                    team_id=bottom_id,
-                    team_abbrev=bottom_abbrev,
-                    opponent_abbrev=top_abbrev,
-                    is_top_seed=False,
-                    playoff_round=request.playoff_round,
-                    p_series_win=outcome.p_b_win_series,
-                    e_wins=outcome.e_wins_b,
-                    e_games=outcome.e_games,
-                    e_goalie_points=outcome.e_goalie_points_b,
-                    e_shutout_wins=outcome.e_wins_b * float(shutout_bottom),
+                    _TeamRowRequest(
+                        bottom_id,
+                        bottom_abbrev,
+                        top_abbrev,
+                        False,
+                        request.playoff_round,
+                        outcome.p_b_win_series,
+                        outcome.e_wins_b,
+                        outcome.e_games,
+                        outcome.e_goalie_points_b,
+                        outcome.e_wins_b * float(shutout_bottom),
+                    )
                 ),
             ]
         )
@@ -128,30 +132,34 @@ def _missing_matchup_snapshots(matchup: Any, top_id: int, bottom_id: int) -> boo
 
 
 def _team_row(
-    *,
-    team_id: int,
-    team_abbrev: str,
-    opponent_abbrev: str,
-    is_top_seed: bool,
-    playoff_round: int,
-    p_series_win: float,
-    e_wins: float,
-    e_games: float,
-    e_goalie_points: float,
-    e_shutout_wins: float,
+    request: _TeamRowRequest,
 ) -> dict[str, Any]:
     return {
-        "team_id": team_id,
-        "team_abbrev": team_abbrev,
-        "opponent_abbrev": opponent_abbrev,
-        "is_top_seed": is_top_seed,
-        "playoff_round": playoff_round,
-        "p_series_win": p_series_win,
-        "e_wins": e_wins,
-        "e_games": e_games,
-        "e_goalie_points": e_goalie_points,
-        "e_shutout_wins": e_shutout_wins,
+        "team_id": request.team_id,
+        "team_abbrev": request.team_abbrev,
+        "opponent_abbrev": request.opponent_abbrev,
+        "is_top_seed": request.is_top_seed,
+        "playoff_round": request.playoff_round,
+        "p_series_win": request.p_series_win,
+        "e_wins": request.e_wins,
+        "e_games": request.e_games,
+        "e_goalie_points": request.e_goalie_points,
+        "e_shutout_wins": request.e_shutout_wins,
     }
+
+
+@dataclass(frozen=True)
+class _TeamRowRequest:
+    team_id: int
+    team_abbrev: str
+    opponent_abbrev: str
+    is_top_seed: bool
+    playoff_round: int
+    p_series_win: float
+    e_wins: float
+    e_games: float
+    e_goalie_points: float
+    e_shutout_wins: float
 
 
 def _predict_matchup_series(

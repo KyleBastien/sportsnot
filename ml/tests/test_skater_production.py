@@ -238,33 +238,35 @@ def _emit_regular_season(request: _RegularSeasonRequest) -> int:
     return gid
 
 
-def _emit_playoff_series(
-    sk_rows: list[dict[str, object]],
-    tg_rows: list[dict[str, object]],
-    players: dict[int, tuple[str, float, str]],
-    rng: np.random.Generator,
-    *,
-    season_id: int,
-    end_year: int,
-    gid_start: int,
-) -> int:
-    gid = gid_start
+@dataclass(frozen=True)
+class _PlayoffSeriesRequest:
+    sk_rows: list[dict[str, object]]
+    tg_rows: list[dict[str, object]]
+    players: dict[int, tuple[str, float, str]]
+    rng: np.random.Generator
+    season_id: int
+    end_year: int
+    gid_start: int
+
+
+def _emit_playoff_series(request: _PlayoffSeriesRequest) -> int:
+    gid = request.gid_start
     for game_number, (home, away) in enumerate(_PLAYOFF_PAIRINGS):
         gid += 1
-        date = f"{end_year}-04-{20 + game_number:02d}"
+        date = f"{request.end_year}-04-{20 + game_number:02d}"
         _emit_team_game(
-            tg_rows,
-            _EmitTeamGameInput(gid, date, season_id, 3, home, away),
+            request.tg_rows,
+            _EmitTeamGameInput(gid, date, request.season_id, 3, home, away),
         )
         for team, opp in (("AAA", "DDD"), ("DDD", "AAA")):
             _append_skater_rows(
                 _AppendSkaterRowsRequest(
-                    rows=sk_rows,
-                    players=players,
-                    rng=rng,
+                    rows=request.sk_rows,
+                    players=request.players,
+                    rng=request.rng,
                     game_id=gid,
                     game_date=date,
-                    season_id=season_id,
+                    season_id=request.season_id,
                     game_type_id=3,
                     team=team,
                     opp=opp,
@@ -303,13 +305,15 @@ def _synthetic_archive(
             )
         )
         gid = _emit_playoff_series(
-            sk_rows,
-            tg_rows,
-            players,
-            rng,
-            season_id=season_id,
-            end_year=year + 1,
-            gid_start=gid,
+            _PlayoffSeriesRequest(
+                sk_rows=sk_rows,
+                tg_rows=tg_rows,
+                players=players,
+                rng=rng,
+                season_id=season_id,
+                end_year=year + 1,
+                gid_start=gid,
+            )
         )
 
     skater_games = pd.DataFrame(sk_rows)

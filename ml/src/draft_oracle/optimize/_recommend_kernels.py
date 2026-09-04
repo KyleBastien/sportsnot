@@ -29,6 +29,7 @@ from draft_oracle.optimize._recommend_core import (
 )
 from draft_oracle.optimize._recommend_kernel_utils import (
     _affinity_row,
+    _FittedChoiceInputs,
     _GreedyChoiceInputs,
 )
 from draft_oracle.optimize._recommend_kernel_utils import (
@@ -359,17 +360,19 @@ def _fitted_opponent_choice(
     mgr_i: int,
 ) -> np.ndarray:
     return _fitted_opponent_choice_impl(
-        arr.rank_val,
-        arr.limits,
-        arr.posc,
-        arr.key_order,
-        params.coef_rank,
-        params.coef_aff,
-        params.aff_matrix,
-        params.need_weight,
-        turn.cnt_m,
-        turn.legal,
-        mgr_i,
+        _FittedChoiceInputs(
+            arr.rank_val,
+            arr.limits,
+            arr.posc,
+            arr.key_order,
+            params.coef_rank,
+            params.coef_aff,
+            params.aff_matrix,
+            params.need_weight,
+            turn.cnt_m,
+            turn.legal,
+            mgr_i,
+        )
     )
 
 
