@@ -214,8 +214,8 @@ def _membership_for_season(
     event_keys: Callable[[pd.DataFrame], list[str]],
 ) -> MembershipScore | None:
     """Leave-one-season-out membership accuracy for ``season``."""
-    train = picks.loc[picks["season"] != season]
-    if train.empty:
+    train = _membership_training_frame(picks, season)
+    if train is None:
         return None
     fitted = fit_models(train, config)
     prepared = prepare_picks(picks.loc[picks["season"] == season])
@@ -228,24 +228,15 @@ def _membership_for_season(
     fitted_total = 0
     greedy_total = 0
     for _, pool in prepared.groupby(event_keys(prepared), sort=True):
-        managers = [str(manager) for manager in pool["manager"].unique()]
-        actual = _actual_rosters(pool)
-        fitted_models = fitted.as_mapping(managers)
-        greedy_models: dict[str, OpponentModel] = dict.fromkeys(managers, greedy)
-        fitted_pred = _simulate_membership(pool, fitted_models, config.seed)
-        greedy_pred = _simulate_membership(pool, greedy_models, config.seed)
-        if fitted_pred is None or greedy_pred is None:
-            continue
-        fitted_accuracy, fitted_count = _membership_accuracy(fitted_pred, actual)
-        greedy_accuracy, greedy_count = _membership_accuracy(greedy_pred, actual)
-        if fitted_count == 0:
+        event_score = _membership_event_score(pool, fitted.as_mapping, greedy, config.seed)
+        if event_score is None:
             continue
         events += 1
-        picks_scored += fitted_count
-        fitted_hits += fitted_accuracy * fitted_count
-        greedy_hits += greedy_accuracy * greedy_count
-        fitted_total += fitted_count
-        greedy_total += greedy_count
+        picks_scored += event_score.picks
+        fitted_hits += event_score.fitted_hits
+        greedy_hits += event_score.greedy_hits
+        fitted_total += event_score.fitted_total
+        greedy_total += event_score.greedy_total
     if events == 0 or fitted_total == 0:
         return None
     return MembershipScore(
@@ -254,6 +245,49 @@ def _membership_for_season(
         picks=picks_scored,
         fitted_accuracy=fitted_hits / fitted_total,
         greedy_accuracy=greedy_hits / greedy_total,
+    )
+
+
+def _membership_training_frame(picks: pd.DataFrame, season: int) -> pd.DataFrame | None:
+    train = picks.loc[picks["season"] != season]
+    if train.empty:
+        return None
+    return train
+
+
+@dataclass(frozen=True)
+class _MembershipEventScore:
+    picks: int
+    fitted_hits: float
+    greedy_hits: float
+    fitted_total: int
+    greedy_total: int
+
+
+def _membership_event_score(
+    pool: pd.DataFrame,
+    fitted_mapping: Callable[[list[str]], Mapping[str, OpponentModel]],
+    greedy: OpponentModel,
+    seed: int,
+) -> _MembershipEventScore | None:
+    managers = [str(manager) for manager in pool["manager"].unique()]
+    actual = _actual_rosters(pool)
+    fitted_models = fitted_mapping(managers)
+    greedy_models: dict[str, OpponentModel] = dict.fromkeys(managers, greedy)
+    fitted_pred = _simulate_membership(pool, fitted_models, seed)
+    greedy_pred = _simulate_membership(pool, greedy_models, seed)
+    if fitted_pred is None or greedy_pred is None:
+        return None
+    fitted_accuracy, fitted_count = _membership_accuracy(fitted_pred, actual)
+    greedy_accuracy, greedy_count = _membership_accuracy(greedy_pred, actual)
+    if fitted_count == 0:
+        return None
+    return _MembershipEventScore(
+        picks=fitted_count,
+        fitted_hits=fitted_accuracy * fitted_count,
+        greedy_hits=greedy_accuracy * greedy_count,
+        fitted_total=fitted_count,
+        greedy_total=greedy_count,
     )
 
 

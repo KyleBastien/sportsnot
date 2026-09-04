@@ -540,8 +540,7 @@ def _resolve_opponent_model_request(
     legacy: Mapping[str, object],
 ) -> OpponentModelConfigRequest:
     if isinstance(request, OpponentModelConfigRequest):
-        if legacy:
-            raise TypeError("OpponentModelConfigRequest calls do not accept extra keyword args")
+        _reject_opponent_request_kwargs(legacy)
         return request
     return OpponentModelConfigRequest(
         kind=request,
@@ -550,6 +549,11 @@ def _resolve_opponent_model_request(
         need_weight=cast("float", legacy.get("need_weight", 1.0)),
         temperature=cast("float", legacy.get("temperature", 0.0)),
     )
+
+
+def _reject_opponent_request_kwargs(legacy: Mapping[str, object]) -> None:
+    if legacy:
+        raise TypeError("OpponentModelConfigRequest calls do not accept extra keyword args")
 
 
 def _membership_for_season(

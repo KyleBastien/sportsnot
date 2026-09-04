@@ -234,14 +234,14 @@ def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFr
 _ARCHIVE_DIR = Path("data/raw/nhl-archive")
 _ARCHIVE_PATHS = sorted(_ARCHIVE_DIR.glob("team-games-*.csv.gz"))
 _ARCHIVE_PATHS_2020_21 = [_ARCHIVE_DIR / "team-games-2020-21.csv.gz"]
-
-
-def _archive_paths_for(season_label: str | None) -> list[Path]:
-    return _ARCHIVE_PATHS_2020_21 if season_label == "2020-21" else _ARCHIVE_PATHS
-
+_ARCHIVE_PATHS_BY_LABEL: dict[str, list[Path]] = {"2020-21": _ARCHIVE_PATHS_2020_21}
 
 def _archive_frames(season_label: str | None) -> list[pd.DataFrame]:
-    return [normalize_team_games(pd.read_csv(path)) for path in _archive_paths_for(season_label)]
+    paths = _ARCHIVE_PATHS if season_label is None else _ARCHIVE_PATHS_BY_LABEL.get(
+        season_label,
+        _ARCHIVE_PATHS,
+    )
+    return [normalize_team_games(pd.read_csv(path)) for path in paths]
 
 
 _ARCHIVE_TEAM_GAMES = pd.concat(_archive_frames(None), ignore_index=True)
