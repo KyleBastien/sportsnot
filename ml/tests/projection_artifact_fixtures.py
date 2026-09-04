@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 
@@ -44,28 +46,31 @@ def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, float, str]]]:
             pid += 1
     return pd.DataFrame(rows), players
 
-def _team_rows(
-    game_id: int,
-    game_date: str,
-    season_id: int,
-    game_type_id: int,
-    home: str,
-    away: str,
-    home_goals: int,
-    away_goals: int,
-) -> list[dict[str, object]]:
+@dataclass(frozen=True)
+class _TeamRowsInput:
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    home: str
+    away: str
+    home_goals: int
+    away_goals: int
+
+
+def _team_rows(spec: _TeamRowsInput) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for team, opp, gf, ga, is_home in (
-        (home, away, home_goals, away_goals, True),
-        (away, home, away_goals, home_goals, False),
+        (spec.home, spec.away, spec.home_goals, spec.away_goals, True),
+        (spec.away, spec.home, spec.away_goals, spec.home_goals, False),
     ):
         won = gf > ga
         rows.append(
             {
-                "season_id": season_id,
-                "game_type_id": game_type_id,
-                "game_id": game_id,
-                "game_date": game_date,
+                "season_id": spec.season_id,
+                "game_type_id": spec.game_type_id,
+                "game_id": spec.game_id,
+                "game_date": spec.game_date,
                 "team_id": TEAMS.index(team) + 1,
                 "team_abbrev": team,
                 "opponent_team_abbrev": opp,
@@ -104,7 +109,20 @@ def _synthetic_archive(
                         day, month = 1, (12 if month == 11 else 11)
                     home_win = STRENGTH[home] + 0.3 >= STRENGTH[away]
                     hg, ag = (3, 1) if home_win else (1, 3)
-                    tg_rows.extend(_team_rows(gid, date, season_id, 2, home, away, hg, ag))
+                    tg_rows.extend(
+                        _team_rows(
+                            _TeamRowsInput(
+                                game_id=gid,
+                                game_date=date,
+                                season_id=season_id,
+                                game_type_id=2,
+                                home=home,
+                                away=away,
+                                home_goals=hg,
+                                away_goals=ag,
+                            )
+                        )
+                    )
                     for team, opp in ((home, away), (away, home)):
                         for p, (t, rate, pos) in players.items():
                             if t != team:
@@ -142,7 +160,20 @@ def _synthetic_archive(
             visitor = bottom if host == top else top
             hg, ag = (wg, lg) if winner == host else (lg, wg)
             date = f"{end_year}-04-{20 + offset:02d}"
-            tg_rows.extend(_team_rows(gid, date, season_id, 3, host, visitor, hg, ag))
+            tg_rows.extend(
+                _team_rows(
+                    _TeamRowsInput(
+                        game_id=gid,
+                        game_date=date,
+                        season_id=season_id,
+                        game_type_id=3,
+                        home=host,
+                        away=visitor,
+                        home_goals=hg,
+                        away_goals=ag,
+                    )
+                )
+            )
             for team, opp in ((top, bottom), (bottom, top)):
                 for p, (t, rate, pos) in players.items():
                     if t != team:
@@ -190,20 +221,19 @@ def _synthetic_archive(
     )
 
 
-def _production_config() -> SkaterProductionConfig:
-    return SkaterProductionConfig(
-        seed=20260827,
-        n_val_seasons=1,
-        n_test_seasons=1,
-        min_confident_games=5,
-    )
+_PRODUCTION_CONFIG = SkaterProductionConfig(
+    seed=20260827,
+    n_val_seasons=1,
+    n_test_seasons=1,
+    min_confident_games=5,
+)
 
 
 def _config() -> ProjectArtifactConfig:
     return ProjectArtifactConfig(
         seed=20260827,
         n_sims=300,
-        production_config=_production_config(),
+        production_config=_PRODUCTION_CONFIG,
     )
 
 
@@ -231,7 +261,20 @@ def _round1_series_games(
         visitor = bottom if host == top else top
         hg, ag = (wg, lg) if winner == host else (lg, wg)
         date = f"{end_year}-04-{20 + offset:02d}"
-        tg_rows.extend(_team_rows(gid, date, season_id, 3, host, visitor, hg, ag))
+        tg_rows.extend(
+            _team_rows(
+                _TeamRowsInput(
+                    game_id=gid,
+                    game_date=date,
+                    season_id=season_id,
+                    game_type_id=3,
+                    home=host,
+                    away=visitor,
+                    home_goals=hg,
+                    away_goals=ag,
+                )
+            )
+        )
         for team, opp in ((top, bottom), (bottom, top)):
             for p, (t, rate, pos) in players.items():
                 if t != team:
@@ -275,7 +318,20 @@ def _pre_round_archive(
                         day, month = 1, (12 if month == 11 else 11)
                     home_win = STRENGTH[home] + 0.3 >= STRENGTH[away]
                     hg, ag = (3, 1) if home_win else (1, 3)
-                    tg_rows.extend(_team_rows(gid, date, season_id, 2, home, away, hg, ag))
+                    tg_rows.extend(
+                        _team_rows(
+                            _TeamRowsInput(
+                                game_id=gid,
+                                game_date=date,
+                                season_id=season_id,
+                                game_type_id=2,
+                                home=home,
+                                away=away,
+                                home_goals=hg,
+                                away_goals=ag,
+                            )
+                        )
+                    )
                     for team, opp in ((home, away), (away, home)):
                         for p, (t, rate, pos) in players.items():
                             if t != team:
