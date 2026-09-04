@@ -121,9 +121,7 @@ def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
 
 
 def _players16() -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
-    return _player_tables(
-        _PlayerPoolInput(TEAMS16, STRENGTH16, FORWARDS16, DEFENSE16, 1000)
-    )
+    return _player_tables(_PlayerPoolInput(TEAMS16, STRENGTH16, FORWARDS16, DEFENSE16, 1000))
 
 
 def _team_rows(spec: _TeamRowsInput) -> list[dict[str, object]]:
@@ -311,6 +309,7 @@ def _emit_series_games(
     )
     return gid
 
+
 def _synthetic_archive(
     end_years: list[int], *, seed: int = 0, reg_cycles: int = 2
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -361,6 +360,7 @@ def _synthetic_archive(
         players_df,
         pd.DataFrame(series_rows),
     )
+
 
 def _tables(seed: int = 1) -> dict[str, pd.DataFrame]:
     sk, tg, players, series = _archive_tables(seed)
@@ -570,14 +570,6 @@ def _four_round_archive(
 def _four_round_config() -> BacktestConfig:
     # Smaller sims/rollouts than _config: this fixture replays three events across a
     # sixteen-team archive, and the assertions are structural, not statistical.
-    project = ProjectArtifactConfig(
-        seed=20260827,
-        n_sims=60,
-        slot_strategies=False,
-        production_config=SkaterProductionConfig(
-            seed=20260827, n_val_seasons=1, n_test_seasons=1, min_confident_games=5
-        ),
-    )
     return BacktestConfig(
         seed=20260827,
         managers=4,
@@ -585,7 +577,18 @@ def _four_round_config() -> BacktestConfig:
         rollouts=4,
         max_candidates=5,
         strategies=("oracle",),
-        project_config=project,
+        project_config=_four_round_project_config(),
+    )
+
+
+def _four_round_project_config() -> ProjectArtifactConfig:
+    return ProjectArtifactConfig(
+        seed=20260827,
+        n_sims=60,
+        slot_strategies=False,
+        production_config=SkaterProductionConfig(
+            seed=20260827, n_val_seasons=1, n_test_seasons=1, min_confident_games=5
+        ),
     )
 
 

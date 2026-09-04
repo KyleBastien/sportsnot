@@ -24,6 +24,7 @@ TEAMS = ["AAA", "BBB", "CCC", "DDD"]
 STRENGTH = {"AAA": 3.0, "BBB": 1.0, "CCC": -1.0, "DDD": -3.0}
 TEAM_RATE = {"AAA": 0.9, "BBB": 0.6, "CCC": 0.4, "DDD": 0.2}
 
+
 def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, float, str]]]:
     players: dict[int, tuple[str, float, str]] = {}
     rows: list[dict[str, object]] = []
@@ -45,6 +46,7 @@ def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, float, str]]]:
             )
             pid += 1
     return pd.DataFrame(rows), players
+
 
 @dataclass(frozen=True)
 class _TeamRowsInput:
@@ -84,6 +86,7 @@ def _team_rows(spec: _TeamRowsInput) -> list[dict[str, object]]:
             }
         )
     return rows
+
 
 def _synthetic_archive(
     end_years: list[int], *, seed: int = 0, n_reg: int = 36
@@ -285,13 +288,12 @@ def _round1_game_input(
     game: _RoundOneGameSpec,
 ) -> _RoundOneGameInput:
     return _RoundOneGameInput(
-        winner=game.winner,
-        wg=game.wg,
-        lg=game.lg,
-        offset=game.offset,
-        gid=series.gid_start + game.offset + 1,
-        series=series,
+        game.winner, game.wg, game.lg, game.offset, _round1_gid(series, game), series
     )
+
+
+def _round1_gid(series: _RoundOneSeriesInput, game: _RoundOneGameSpec) -> int:
+    return series.gid_start + game.offset + 1
 
 
 def _round1_game_inputs(spec: _RoundOneSeriesInput) -> list[_RoundOneGameInput]:

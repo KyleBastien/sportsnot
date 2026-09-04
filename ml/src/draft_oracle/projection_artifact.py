@@ -221,6 +221,16 @@ class _ProjectionRoundInputs:
 
 
 @dataclass(frozen=True)
+class _ProjectionRoundContextRequest:
+    skater_games: pd.DataFrame
+    team_games: pd.DataFrame
+    series: pd.DataFrame
+    season: int
+    playoff_round: int
+    config: ProjectArtifactConfig
+
+
+@dataclass(frozen=True)
 class _ProjectionModels:
     win_model: GameWinModel
     shutout_model: ShutoutModel
@@ -265,21 +275,24 @@ def _resolve_season_id(round_series: pd.DataFrame, season: int) -> int:
     return season_ids.pop()
 
 
-def _projection_round_context(
-    skater_games: pd.DataFrame,
-    team_games: pd.DataFrame,
-    series: pd.DataFrame,
-    *,
-    season: int,
-    playoff_round: int,
-    config: ProjectArtifactConfig,
-) -> _ProjectionRoundContext:
-    prod_config = config.production_config or SkaterProductionConfig(seed=config.seed)
+def _projection_round_context(request: _ProjectionRoundContextRequest) -> _ProjectionRoundContext:
+    prod_config = request.config.production_config or SkaterProductionConfig(
+        seed=request.config.seed
+    )
     warnings: list[str] = []
-    round_inputs = _projection_round_inputs(team_games, series, season, playoff_round)
-    train_tg, train_sk = _require_training_frames(skater_games, team_games, round_inputs.cutoff)
+    round_inputs = _projection_round_inputs(
+        request.team_games,
+        request.series,
+        request.season,
+        request.playoff_round,
+    )
+    train_tg, train_sk = _require_training_frames(
+        request.skater_games,
+        request.team_games,
+        round_inputs.cutoff,
+    )
     return _ProjectionRoundContext(
-        config=config,
+        config=request.config,
         prod_config=prod_config,
         warnings=warnings,
         round_series=round_inputs.round_series,
@@ -545,12 +558,14 @@ def build_projection_artifact(
     """
     config = config or ProjectArtifactConfig()
     context = _projection_round_context(
-        skater_games,
-        team_games,
-        series,
-        season=season,
-        playoff_round=playoff_round,
-        config=config,
+        _ProjectionRoundContextRequest(
+            skater_games=skater_games,
+            team_games=team_games,
+            series=series,
+            season=season,
+            playoff_round=playoff_round,
+            config=config,
+        )
     )
     models = _train_projection_models(context, players, team_games, series)
     outputs = _projection_outputs(
@@ -594,9 +609,7 @@ def build_projection_artifact(
 
 def _finalize_skaters(rows: list[dict[str, Any]]) -> pd.DataFrame:
     """Deterministically ordered skater table with the fixed column layout."""
-    df = _finalized_frame(
-        rows, SKATER_COLUMNS, sort_columns=["expected_points", "player_id"]
-    )
+    df = _finalized_frame(rows, SKATER_COLUMNS, sort_columns=["expected_points", "player_id"])
     df["player_id"] = df["player_id"].astype("int64")
     df["injured"] = df["injured"].astype(bool)
     df["low_confidence"] = df["low_confidence"].astype(bool)

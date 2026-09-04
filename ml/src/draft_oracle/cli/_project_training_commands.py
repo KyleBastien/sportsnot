@@ -308,9 +308,7 @@ def _compare_strategies_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="compare-strategies",
         add_help=False,
-        description=(
-            "Run committed multi-step vs. greedy-VOR vs. one-step comparison (US-021)."
-        ),
+        description=("Run committed multi-step vs. greedy-VOR vs. one-step comparison (US-021)."),
     )
     parser.add_argument(
         "--normalized-dir",
@@ -412,6 +410,34 @@ def _backtest_parser() -> argparse.ArgumentParser:
         add_help=False,
         description="Replay historical playoff rounds end-to-end and score against actuals.",
     )
+    _add_backtest_base_arguments(parser)
+    _add_backtest_runtime_arguments(parser)
+    return parser
+
+
+def _parse_backtest_request(args: list[str]) -> _BacktestCommandRequest:
+    parser = _backtest_parser()
+    if any(arg in {"-h", "--help"} for arg in args):
+        typer.echo(parser.format_help().rstrip())
+        raise typer.Exit()
+    namespace, extras = parser.parse_known_args(args)
+    if extras:
+        raise typer.BadParameter(f"unknown backtest args: {' '.join(extras)}")
+    return _BacktestCommandRequest(
+        seasons=namespace.seasons,
+        normalized_dir=namespace.normalized_dir,
+        backtest_root=namespace.backtest_root,
+        snapshot=namespace.snapshot,
+        managers=namespace.managers,
+        ir=namespace.ir,
+        n_drafts=namespace.n_drafts,
+        rollouts=namespace.rollouts,
+        strategies=namespace.strategies,
+        seed=namespace.seed,
+    )
+
+
+def _add_backtest_base_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--seasons",
         dest="seasons",
@@ -444,6 +470,9 @@ def _backtest_parser() -> argparse.ArgumentParser:
         default=4,
         help="League size (2-12).",
     )
+
+
+def _add_backtest_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--ir",
         dest="ir",
@@ -481,29 +510,6 @@ def _backtest_parser() -> argparse.ArgumentParser:
         default=20260827,
         help="Deterministic seed.",
     )
-    return parser
-
-
-def _parse_backtest_request(args: list[str]) -> _BacktestCommandRequest:
-    parser = _backtest_parser()
-    if any(arg in {"-h", "--help"} for arg in args):
-        typer.echo(parser.format_help().rstrip())
-        raise typer.Exit()
-    namespace, extras = parser.parse_known_args(args)
-    if extras:
-        raise typer.BadParameter(f"unknown backtest args: {' '.join(extras)}")
-    return _BacktestCommandRequest(
-        seasons=namespace.seasons,
-        normalized_dir=namespace.normalized_dir,
-        backtest_root=namespace.backtest_root,
-        snapshot=namespace.snapshot,
-        managers=namespace.managers,
-        ir=namespace.ir,
-        n_drafts=namespace.n_drafts,
-        rollouts=namespace.rollouts,
-        strategies=namespace.strategies,
-        seed=namespace.seed,
-    )
 
 
 def _run_backtest_command(request: _BacktestCommandRequest) -> None:
@@ -532,9 +538,7 @@ def _run_backtest_command(request: _BacktestCommandRequest) -> None:
     typer.echo(f"  report: {out_dir / 'report.md'}")
     typer.echo(f"  seasons: {', '.join(str(s) for s in result.seasons)}")
     typer.echo(f"  rounds replayed: {len(result.rounds)}")
-    typer.echo(
-        f"  strategies: {', '.join(config.strategies)}; drafts/slot: {request.n_drafts}"
-    )
+    typer.echo(f"  strategies: {', '.join(config.strategies)}; drafts/slot: {request.n_drafts}")
     for round_result in result.rounds:
         drafts = len(round_result.slot_results)
         typer.echo(

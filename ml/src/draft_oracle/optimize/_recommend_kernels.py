@@ -407,7 +407,9 @@ def _vectorized_greedy_expected(
         # comparison; the seed does not depend on the candidate).
         rng = np.random.default_rng(request.cfg.seed * _ROLLOUT_SALT)
         batch = _candidate_rollout(arr, asset, rollouts)
-        _advance_greedy_rollout(arr, request.cfg, request.gmodel, batch, rng)
+        _advance_greedy_rollout(
+            _AdvanceGreedyRolloutRequest(arr, request.cfg, request.gmodel, batch, rng)
+        )
         means.append(_mean_owner_value(batch.owner_total, arr.base_owner_value))
     return means
 
@@ -429,6 +431,15 @@ class _LegacyGreedyExpectedArgs:
     gmodel: GreedyOpponentModel
     replacement: Mapping[str, float]
     cfg: RecommendConfig
+
+
+@dataclass(frozen=True)
+class _AdvanceGreedyRolloutRequest:
+    arr: _RolloutArrays
+    cfg: RecommendConfig
+    gmodel: GreedyOpponentModel
+    batch: _CandidateRollout
+    rng: np.random.Generator
 
 
 def _resolve_greedy_expected_request(
@@ -486,21 +497,22 @@ def _candidate_rollout(
     return _CandidateRollout(alive, counts, owner_total, owner_taken)
 
 
-def _advance_greedy_rollout(
-    arr: _RolloutArrays,
-    cfg: RecommendConfig,
-    gmodel: GreedyOpponentModel,
-    batch: _CandidateRollout,
-    rng: np.random.Generator,
-) -> None:
-    rows = np.arange(batch.alive.shape[0])
-    for k in range(1, arr.last_owner_k + 1):
-        manager_idx = arr.rem_m[k]
-        choice = _greedy_rollout_choice(arr, cfg, gmodel, batch, rng, manager_idx)
+def _advance_greedy_rollout(request: _AdvanceGreedyRolloutRequest) -> None:
+    rows = np.arange(request.batch.alive.shape[0])
+    for k in range(1, request.arr.last_owner_k + 1):
+        manager_idx = request.arr.rem_m[k]
+        choice = _greedy_rollout_choice(
+            request.arr,
+            request.cfg,
+            request.gmodel,
+            request.batch,
+            request.rng,
+            manager_idx,
+        )
         if choice is None:
             break
-        batch.alive[rows, choice] = False
-        batch.counts[rows, manager_idx, arr.posc[choice]] += 1
+        request.batch.alive[rows, choice] = False
+        request.batch.counts[rows, manager_idx, request.arr.posc[choice]] += 1
 
 
 def _greedy_rollout_choice(
@@ -534,9 +546,7 @@ def _owner_rollout_choice(
     batch: _CandidateRollout,
     legal: np.ndarray,
 ) -> np.ndarray | None:
-    step = _owner_step(
-        _OwnerStepRequest(arr, cfg, batch, legal)
-    )
+    step = _owner_step(_OwnerStepRequest(arr, cfg, batch, legal))
     batch.owner_total = step.owner_total
     batch.owner_taken = step.owner_taken
     return step.choice

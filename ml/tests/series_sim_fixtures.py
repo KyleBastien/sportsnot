@@ -174,9 +174,7 @@ def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFr
                     date = f"{end_year - 1}-11-{day:02d}"
                     day = day + 1 if day < 28 else 1
                     team_rows.extend(
-                        _game_rows(
-                            _GameRowsInput(season_id, 2, gid, date, home, away, hg, ag)
-                        )
+                        _game_rows(_GameRowsInput(season_id, 2, gid, date, home, away, hg, ag))
                     )
 
         # Playoff series: AAA (top seed / home ice) beats DDD 4-1, with one
@@ -243,48 +241,52 @@ _ARCHIVE_TEAM_GAMES_2020_21 = pd.concat(
     ignore_index=True,
 )
 
-def _overlap_game(
-    spec: _OverlapGameInput,
-) -> list[dict[str, object]]:
-    return [
-        _scored_row(
-            _ScoredRowInput(
-                20212022,
-                game.game_type_id,
-                game.game_id,
-                game.game_date,
-                game.team_id,
-                game.team,
-                game.opp,
-                game.gf,
-                game.ga,
-                game.is_home,
-                False,
-            )
+
+def _overlap_game(spec: _OverlapGameInput) -> list[dict[str, object]]:
+    return [_overlap_scored_row(row) for row in _overlap_rows(spec)]
+
+
+def _overlap_rows(spec: _OverlapGameInput) -> tuple[_OverlapRowInput, _OverlapRowInput]:
+    return (
+        _OverlapRowInput(
+            spec.game_id,
+            spec.game_date,
+            spec.home,
+            spec.home_id,
+            spec.away,
+            spec.hg,
+            spec.ag,
+            True,
+        ),
+        _OverlapRowInput(
+            spec.game_id,
+            spec.game_date,
+            spec.away,
+            spec.away_id,
+            spec.home,
+            spec.ag,
+            spec.hg,
+            False,
+        ),
+    )
+
+
+def _overlap_scored_row(game: _OverlapRowInput) -> dict[str, object]:
+    return _scored_row(
+        _ScoredRowInput(
+            20212022,
+            game.game_type_id,
+            game.game_id,
+            game.game_date,
+            game.team_id,
+            game.team,
+            game.opp,
+            game.gf,
+            game.ga,
+            game.is_home,
+            False,
         )
-        for game in (
-            _OverlapRowInput(
-                spec.game_id,
-                spec.game_date,
-                spec.home,
-                spec.home_id,
-                spec.away,
-                spec.hg,
-                spec.ag,
-                True,
-            ),
-            _OverlapRowInput(
-                spec.game_id,
-                spec.game_date,
-                spec.away,
-                spec.away_id,
-                spec.home,
-                spec.ag,
-                spec.hg,
-                False,
-            ),
-        )
-    ]
+    )
 
 
 def _row_pair[T](

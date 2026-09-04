@@ -493,16 +493,11 @@ def _project_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--managers", type=int, default=4, help="League size (2-12); sets VOR replacement levels."
     )
-    parser.add_argument(
-        "--ir",
-        dest="ir",
-        action="store_true",
-        help="League uses IR slots (+1 F, +1 D per manager).",
+    _add_ir_toggle(
+        parser,
+        help_on="League uses IR slots (+1 F, +1 D per manager).",
+        help_off="League does not use IR slots.",
     )
-    parser.add_argument(
-        "--no-ir", dest="ir", action="store_false", help="League does not use IR slots."
-    )
-    parser.set_defaults(ir=False)
     parser.add_argument(
         "--archive-dir",
         type=Path,
@@ -512,22 +507,14 @@ def _project_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-refresh", action="store_true", help="Skip idempotent ingest refresh (offline)."
     )
-    parser.add_argument(
-        "--seed", type=int, default=20260827, help="Deterministic training/MC seed."
+    _add_seed_argument(parser, help_text="Deterministic training/MC seed.")
+    _add_toggle_argument(
+        parser,
+        name="slot_strategies",
+        help_on="Emit slot_strategies.md (per-slot draft plan, US-023).",
+        help_off="Skip slot_strategies.md output.",
+        default=True,
     )
-    parser.add_argument(
-        "--slot-strategies",
-        dest="slot_strategies",
-        action="store_true",
-        help="Emit slot_strategies.md (per-slot draft plan, US-023).",
-    )
-    parser.add_argument(
-        "--no-slot-strategies",
-        dest="slot_strategies",
-        action="store_false",
-        help="Skip slot_strategies.md output.",
-    )
-    parser.set_defaults(slot_strategies=True)
     parser.add_argument(
         "--slot-rollouts",
         type=int,
@@ -549,17 +536,13 @@ def _recommend_parser() -> argparse.ArgumentParser:
         required=True,
         help="Projection artifact directory (has skaters/teams parquet).",
     )
-    parser.add_argument(
-        "--managers", type=str, default="4", help="League size (2-12) or comma seat ids."
-    )
+    _add_manager_ids_argument(parser)
     parser.add_argument("--seat", type=int, default=1, help="Owner's snake seat (1-based).")
-    parser.add_argument(
-        "--ir", dest="ir", action="store_true", help="League uses IR slots (+1 F, +1 D)."
+    _add_ir_toggle(
+        parser,
+        help_on="League uses IR slots (+1 F, +1 D).",
+        help_off="League does not use IR slots.",
     )
-    parser.add_argument(
-        "--no-ir", dest="ir", action="store_false", help="League does not use IR slots."
-    )
-    parser.set_defaults(ir=False)
     parser.add_argument(
         "--rollouts", type=int, default=500, help="Monte-Carlo rollouts per candidate."
     )
@@ -569,16 +552,8 @@ def _recommend_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--temperature", type=float, default=0.3, help="Greedy opponent softmax temperature."
     )
-    parser.add_argument("--seed", type=int, default=20260827, help="Deterministic seed.")
-    parser.add_argument(
-        "--opponents", type=str, default="auto", help="Opponent model: greedy, fitted, or auto."
-    )
-    parser.add_argument(
-        "--opponent-artifact",
-        type=Path,
-        default=DEFAULT_OPPONENT_ARTIFACT_DIR,
-        help="Committed opponent-model artifact directory (fitted path).",
-    )
+    _add_seed_argument(parser, help_text="Deterministic seed.")
+    _add_opponent_arguments(parser)
     return parser
 
 
@@ -594,17 +569,13 @@ def _draft_parser() -> argparse.ArgumentParser:
         default=None,
         help="Projection artifact directory (skaters/teams parquet).",
     )
-    parser.add_argument(
-        "--managers", type=str, default="4", help="League size (2-12) or comma seat ids."
-    )
+    _add_manager_ids_argument(parser)
     parser.add_argument("--slot", type=int, default=1, help="Your snake seat (1-based).")
-    parser.add_argument(
-        "--ir", dest="ir", action="store_true", help="League uses IR slots (+1 F, +1 D)."
+    _add_ir_toggle(
+        parser,
+        help_on="League uses IR slots (+1 F, +1 D).",
+        help_off="League does not use IR slots.",
     )
-    parser.add_argument(
-        "--no-ir", dest="ir", action="store_false", help="League does not use IR slots."
-    )
-    parser.set_defaults(ir=False)
     parser.add_argument(
         "--eliminated", type=str, default="", help="Comma-separated eliminated team abbrevs."
     )
@@ -620,22 +591,14 @@ def _draft_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--temperature", type=float, default=0.3, help="Greedy opponent softmax temperature."
     )
-    parser.add_argument("--seed", type=int, default=20260827, help="Deterministic seed.")
+    _add_seed_argument(parser, help_text="Deterministic seed.")
     parser.add_argument(
         "--rollouts",
         type=int,
         default=500,
         help="Monte-Carlo rollouts per candidate for recommend.",
     )
-    parser.add_argument(
-        "--opponents", type=str, default="auto", help="Opponent model: greedy, fitted, or auto."
-    )
-    parser.add_argument(
-        "--opponent-artifact",
-        type=Path,
-        default=DEFAULT_OPPONENT_ARTIFACT_DIR,
-        help="Committed opponent-model artifact directory (fitted path).",
-    )
+    _add_opponent_arguments(parser)
     return parser
 
 
@@ -705,3 +668,48 @@ def _parse_args(
     if extras:
         raise typer.BadParameter(f"unknown {parser.prog} args: {' '.join(extras)}")
     return namespace
+
+
+def _add_toggle_argument(
+    parser: argparse.ArgumentParser,
+    *,
+    name: str,
+    help_on: str,
+    help_off: str,
+    default: bool,
+) -> None:
+    flag = name.replace("_", "-")
+    parser.add_argument(f"--{flag}", dest=name, action="store_true", help=help_on)
+    parser.add_argument(f"--no-{flag}", dest=name, action="store_false", help=help_off)
+    parser.set_defaults(**{name: default})
+
+
+def _add_ir_toggle(
+    parser: argparse.ArgumentParser,
+    *,
+    help_on: str,
+    help_off: str,
+) -> None:
+    _add_toggle_argument(parser, name="ir", help_on=help_on, help_off=help_off, default=False)
+
+
+def _add_seed_argument(parser: argparse.ArgumentParser, *, help_text: str) -> None:
+    parser.add_argument("--seed", type=int, default=20260827, help=help_text)
+
+
+def _add_manager_ids_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--managers", type=str, default="4", help="League size (2-12) or comma seat ids."
+    )
+
+
+def _add_opponent_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--opponents", type=str, default="auto", help="Opponent model: greedy, fitted, or auto."
+    )
+    parser.add_argument(
+        "--opponent-artifact",
+        type=Path,
+        default=DEFAULT_OPPONENT_ARTIFACT_DIR,
+        help="Committed opponent-model artifact directory (fitted path).",
+    )
