@@ -436,6 +436,16 @@ class _FittedExpectedRequest:
 
 
 @dataclass(frozen=True)
+class _ExpectedValueRequest:
+    state: DraftState
+    owner: str
+    asset: DraftAsset
+    opponent_model: OpponentModel | Mapping[str, OpponentModel]
+    replacement: Mapping[str, float]
+    cfg: RecommendConfig
+
+
+@dataclass(frozen=True)
 class _LegacyExpectedArgs:
     owner: str
     candidate_assets: Sequence[DraftAsset]
@@ -698,12 +708,8 @@ def _candidate_expected_means(
 
 
 def _expected_value(
-    state: DraftState,
-    owner: str,
-    asset: DraftAsset,
-    opponent_model: OpponentModel | Mapping[str, OpponentModel],
-    replacement: Mapping[str, float],
-    cfg: RecommendConfig,
+    request: DraftState | _ExpectedValueRequest,
+    *legacy: object,
 ) -> float:
     """Mean final owner-roster value if ``asset`` is taken now (seeded rollouts).
 
@@ -712,12 +718,53 @@ def _expected_value(
     the candidate comparison and slashes the variance of their differences so a modest
     rollout count still ranks picks correctly.
     """
+    resolved = _resolve_expected_value_request(request, *legacy)
     total = 0.0
-    query = _RolloutInput(state, owner, asset, opponent_model, replacement, cfg.depth)
-    for rollout in range(cfg.rollouts):
-        rng = random.Random(cfg.seed * _ROLLOUT_SALT + rollout)
+    query = _RolloutInput(
+        resolved.state,
+        resolved.owner,
+        resolved.asset,
+        resolved.opponent_model,
+        resolved.replacement,
+        resolved.cfg.depth,
+    )
+    for rollout in range(resolved.cfg.rollouts):
+        rng = random.Random(resolved.cfg.seed * _ROLLOUT_SALT + rollout)
         total += _rollout_owner_value(query, rng)
-    return total / cfg.rollouts
+    return total / resolved.cfg.rollouts
+
+
+def _resolve_expected_value_request(
+    request: DraftState | _ExpectedValueRequest,
+    *legacy: object,
+) -> _ExpectedValueRequest:
+    if isinstance(request, _ExpectedValueRequest):
+        return request
+    if len(legacy) != 5:
+        raise TypeError(
+            "legacy expected value calls require owner, asset/model, replacement, and config"
+        )
+    owner, asset, opponent_model, replacement, cfg = legacy
+    if not isinstance(owner, str):
+        raise TypeError("legacy expected value calls require string owner")
+    if not isinstance(asset, DraftAsset):
+        raise TypeError(
+            "legacy expected value calls require DraftAsset as third positional argument"
+        )
+    if not isinstance(opponent_model, (OpponentModel, Mapping)):
+        raise TypeError("legacy expected value calls require opponent model or mapping")
+    if not isinstance(replacement, Mapping):
+        raise TypeError("legacy expected value calls require replacement mapping")
+    if not isinstance(cfg, RecommendConfig):
+        raise TypeError("legacy expected value calls require RecommendConfig")
+    return _ExpectedValueRequest(
+        request,
+        owner,
+        asset,
+        opponent_model,
+        replacement,
+        cfg,
+    )
 
 
 def _expected_values(
@@ -758,7 +805,16 @@ def _expected_values(
             )
         )
     return [
-        _expected_value(state, owner, asset, opponent_model, replacement, cfg)
+        _expected_value(
+            _ExpectedValueRequest(
+                state,
+                owner,
+                asset,
+                opponent_model,
+                replacement,
+                cfg,
+            )
+        )
         for asset in candidate_assets
     ]
 
