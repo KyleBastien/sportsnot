@@ -310,11 +310,11 @@ def _owner_contingencies(
 def _owner_turn_plan(
     request: _PlanSlotRequest,
     state: DraftState,
-    owner: str,
-    managers: int,
     rec_config: RecommendConfig,
     turn_index: int,
 ) -> TurnPlan:
+    owner = state.current_manager
+    managers = len(request.manager_ids)
     ctx = _slot_ctx(state, request, owner)
     rec = recommend_pick(state, owner, request.opponents, config=rec_config)
     recommended_eval = rec.best
@@ -350,7 +350,7 @@ def _plan_slot(request: _PlanSlotRequest) -> SlotPlan:
             model = _resolve_model(request.opponents, manager)
             state.apply_pick(model.pick(state, manager, line_rng))
             continue
-        turn_plan = _owner_turn_plan(request, state, owner, managers, rec_config, turn_index)
+        turn_plan = _owner_turn_plan(request, state, rec_config, turn_index)
         turns.append(turn_plan)
         state.apply_pick(state.available[turn_plan.recommended.key])
         turn_index += 1

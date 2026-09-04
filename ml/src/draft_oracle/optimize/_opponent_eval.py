@@ -272,6 +272,14 @@ class _MembershipSeasonRequest:
     runtime: _MembershipEvalRuntime
 
 
+@dataclass(frozen=True)
+class _PerPickAccuracyRequest:
+    picks: pd.DataFrame
+    config: _OpponentEvalConfig
+    runtime: _MembershipEvalRuntime
+    rank_keys: Callable[[OpponentModel, DraftState, str, random.Random | None], list[str]]
+
+
 def _membership_event_score(
     pool: pd.DataFrame,
     fitted_mapping: Callable[[list[str]], Mapping[str, OpponentModel]],
@@ -299,30 +307,29 @@ def _membership_event_score(
     )
 
 
-def _per_pick_accuracy(
-    picks: pd.DataFrame,
-    config: _OpponentEvalConfig,
-    *,
-    fit_models: Callable[[pd.DataFrame, Any], Any],
-    prepare_picks: Callable[[pd.DataFrame], pd.DataFrame],
-    event_keys: Callable[[pd.DataFrame], list[str]],
-    rank_keys: Callable[[OpponentModel, DraftState, str, random.Random | None], list[str]],
-) -> PerPickScore | None:
+def _per_pick_accuracy(request: _PerPickAccuracyRequest) -> PerPickScore | None:
     """Teacher-forced per-pick top-1/top-K accuracy on events with a true pick order."""
-    ordered, train = _per_pick_training_frames(picks)
+    ordered, train = _per_pick_training_frames(request.picks)
     if ordered is None or train is None:
         return None
-    fitted = fit_models(train, config)
-    greedy = GreedyOpponentModel(temperature=0.0, need_weight=config.need_weight)
+    runtime = request.runtime
+    fitted = runtime.fit_models(train, request.config)
+    greedy = GreedyOpponentModel(temperature=0.0, need_weight=request.config.need_weight)
 
     total = 0
     fitted_top1 = 0
     greedy_top1 = 0
     fitted_topk = 0
     greedy_topk = 0
-    prepared = prepare_picks(ordered)
-    for _, pool in prepared.groupby(event_keys(prepared), sort=True):
-        event_score = _per_pick_event_score(pool, fitted.as_mapping, greedy, config, rank_keys)
+    prepared = runtime.prepare_picks(ordered)
+    for _, pool in prepared.groupby(runtime.event_keys(prepared), sort=True):
+        event_score = _per_pick_event_score(
+            pool,
+            fitted.as_mapping,
+            greedy,
+            request.config,
+            request.rank_keys,
+        )
         if event_score is None:
             continue
         total += event_score.picks
@@ -338,7 +345,7 @@ def _per_pick_accuracy(
         greedy_top1=greedy_top1 / total,
         fitted_topk=fitted_topk / total,
         greedy_topk=greedy_topk / total,
-        k=config.top_k,
+        k=request.config.top_k,
     )
 
 

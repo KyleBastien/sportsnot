@@ -73,6 +73,7 @@ from draft_oracle._projection_manifest import ProjectionManifestInput, _projecti
 from draft_oracle._projection_rows import (
     _build_skater_rows,
     _build_team_rows,
+    _BuildSkaterRowsRequest,
     _BuildTeamRowsRequest,
 )
 from draft_oracle._projection_slot_report import SlotReportInput, _build_slot_report
@@ -409,13 +410,15 @@ def _projection_outputs(
     if not eligible_feats.empty:
         projected = models.prod_model.project(eligible_feats)
         skater_rows = _build_skater_rows(
-            projected,
-            length_by_abbrev,
-            injured_ids,
-            season_id=context.season_id,
-            playoff_round=int(playoff_round),
-            config=context.config,
-            combined_by_abbrev=combined_by_abbrev,
+            _BuildSkaterRowsRequest(
+                projected=projected,
+                length_by_abbrev=length_by_abbrev,
+                injured_ids=injured_ids,
+                season_id=context.season_id,
+                playoff_round=int(playoff_round),
+                config=context.config,
+                combined_by_abbrev=combined_by_abbrev,
+            )
         )
     skaters = _finalize_skaters(skater_rows)
     teams = _finalize_teams(team_rows)

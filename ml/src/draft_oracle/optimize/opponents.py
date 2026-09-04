@@ -92,6 +92,7 @@ from draft_oracle.optimize._opponent_eval import (
     _membership_exclusions,
     _MembershipEvalRuntime,
     _MembershipSeasonRequest,
+    _PerPickAccuracyRequest,
 )
 from draft_oracle.optimize._opponent_eval import (
     _membership_for_season as _eval_membership_for_season,
@@ -582,12 +583,16 @@ def _per_pick_accuracy(
     config: OpponentFitConfig,
 ) -> PerPickScore | None:
     return _eval_per_pick_accuracy(
-        picks,
-        config,
-        fit_models=fit_opponent_models,
-        prepare_picks=_prepare_picks,
-        event_keys=event_keys,
-        rank_keys=_rank_keys,
+        _PerPickAccuracyRequest(
+            picks=picks,
+            config=config,
+            runtime=_MembershipEvalRuntime(
+                fit_models=fit_opponent_models,
+                prepare_picks=_prepare_picks,
+                event_keys=event_keys,
+            ),
+            rank_keys=_rank_keys,
+        )
     )
 
 

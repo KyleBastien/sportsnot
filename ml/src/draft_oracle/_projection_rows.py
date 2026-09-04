@@ -54,6 +54,17 @@ class _MatchupSeriesRequest:
     bottom_id: int
 
 
+@dataclass(frozen=True)
+class _BuildSkaterRowsRequest:
+    projected: pd.DataFrame
+    length_by_abbrev: dict[str, dict[int, float]]
+    injured_ids: set[int]
+    season_id: int
+    playoff_round: int
+    config: _ProjectionConfig
+    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None = None
+
+
 def _build_team_rows(
     request: _BuildTeamRowsRequest,
 ) -> tuple[list[dict[str, Any]], dict[str, dict[int, float]]]:
@@ -200,26 +211,21 @@ def _predict_matchup_series(
     )
 
 
-def _build_skater_rows(
-    projected: pd.DataFrame,
-    length_by_abbrev: dict[str, dict[int, float]],
-    injured_ids: set[int],
-    *,
-    season_id: int,
-    playoff_round: int,
-    config: _ProjectionConfig,
-    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None = None,
-) -> list[dict[str, Any]]:
+def _build_skater_rows(request: _BuildSkaterRowsRequest) -> list[dict[str, Any]]:
     """Project each eligible skater's round points with a seeded Monte Carlo."""
     rows: list[dict[str, Any]] = []
-    for rec in projected.to_dict("records"):
+    for rec in request.projected.to_dict("records"):
         team_abbrev = str(rec["team_abbrev"])
-        length_probs = length_by_abbrev.get(team_abbrev)
+        length_probs = request.length_by_abbrev.get(team_abbrev)
         if length_probs is None:
             continue
         player_id = int(rec["player_id"])
         ppg = float(rec["projected_points_per_game"])
-        combined = combined_by_abbrev.get(team_abbrev) if combined_by_abbrev else None
+        combined = (
+            request.combined_by_abbrev.get(team_abbrev)
+            if request.combined_by_abbrev
+            else None
+        )
         if combined is not None:
             p_advance, next_length_probs = combined
             projection = project_skater_combined(
@@ -227,16 +233,26 @@ def _build_skater_rows(
                 length_probs,
                 p_advance,
                 next_length_probs,
-                seed=_row_seed(config.seed, season_id, playoff_round, player_id),
-                n_sims=config.n_sims,
-                horizon=config.horizon,
+                seed=_row_seed(
+                    request.config.seed,
+                    request.season_id,
+                    request.playoff_round,
+                    player_id,
+                ),
+                n_sims=request.config.n_sims,
+                horizon=request.config.horizon,
             )
         else:
             projection = project_skater_round(
                 SkaterRoundRequest(ppg, length_probs),
-                seed=_row_seed(config.seed, season_id, playoff_round, player_id),
-                n_sims=config.n_sims,
-                horizon=config.horizon,
+                seed=_row_seed(
+                    request.config.seed,
+                    request.season_id,
+                    request.playoff_round,
+                    player_id,
+                ),
+                n_sims=request.config.n_sims,
+                horizon=request.config.horizon,
             )
         rows.append(
             {
@@ -251,7 +267,7 @@ def _build_skater_rows(
                 "pts_per_game": projection.pts_per_game,
                 "expected_games": projection.expected_games,
                 "availability_multiplier": projection.availability_multiplier,
-                "injured": player_id in injured_ids,
+                "injured": player_id in request.injured_ids,
                 "low_confidence": bool(rec.get("low_confidence", False)),
                 "ir_stash_ev": float("nan"),
                 "ir_stash_value": float("nan"),
