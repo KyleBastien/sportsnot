@@ -33,11 +33,18 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TypedDict, Unpack, cast
 
+from draft_oracle.optimize._slot_strategy_types import (
+    Contingency,
+    PickOption,
+    SlotPlan,
+    SlotStrategyReport,
+    TurnPlan,
+    slot_pick_numbers,
+)
 from draft_oracle.optimize.opponents import FittedLeagueOpponents
 from draft_oracle.optimize.recommend import (
-    PickEvaluation,
     RecommendConfig,
     asset_value,
     greedy_vor_pick,
@@ -56,6 +63,7 @@ __all__ = [
     "Contingency",
     "PickOption",
     "SlotPlan",
+    "SlotStrategyBuildRequest",
     "SlotStrategyConfig",
     "SlotStrategyReport",
     "TurnPlan",
@@ -106,87 +114,6 @@ class SlotStrategyConfig:
             raise ValueError(f"depth must be >= 1 or None, got {self.depth}")
 
 
-@dataclass(frozen=True)
-class PickOption:
-    """One asset surfaced in a turn plan, with its rolled-out value + reasoning."""
-
-    key: str
-    name: str
-    position: str
-    team_abbrev: str
-    expected_points: float
-    projection: float
-    vor: float
-
-    @classmethod
-    def from_evaluation(cls, ev: PickEvaluation) -> PickOption:
-        """Build from a US-021 :class:`PickEvaluation`."""
-        return cls(
-            key=ev.asset.key,
-            name=ev.asset.name,
-            position=ev.asset.position,
-            team_abbrev=ev.asset.team_abbrev,
-            expected_points=ev.expected_points,
-            projection=ev.immediate_value,
-            vor=ev.vor,
-        )
-
-    def label(self) -> str:
-        """Compact ASCII ``Name (POS TEAM)`` label."""
-        team = f" {self.team_abbrev}" if self.team_abbrev else ""
-        return f"{self.name} ({self.position}{team})"
-
-
-@dataclass(frozen=True)
-class Contingency:
-    """A conditional plan for one likely board state at the owner's next turn."""
-
-    probability: float
-    condition: str
-    recommendation: str
-
-
-@dataclass(frozen=True)
-class TurnPlan:
-    """The plan for one of the owner's turns: the pick, alternatives, contingencies."""
-
-    turn_index: int
-    round_index: int
-    pick_number: int
-    recommended: PickOption
-    alternatives: list[PickOption]
-    contingencies: list[Contingency]
-
-
-@dataclass(frozen=True)
-class SlotPlan:
-    """The full strategy plan for a single snake slot."""
-
-    slot: int
-    pick_numbers: list[int]
-    turns: list[TurnPlan]
-    projected_total: float
-
-
-def slot_pick_numbers(slot: int, managers: int, rounds: int) -> list[int]:
-    """1-based overall pick numbers a snake ``slot`` (1-based seat) owns.
-
-    Round ``r`` (0-indexed) uses the seat directly on even rounds and the mirror seat
-    ``managers - slot + 1`` on odd rounds; the overall pick number adds the completed
-    rounds' picks. Deterministic and independent of the pool -- this is exactly the
-    "expected pick numbers in the snake" the acceptance asks for.
-    """
-    if not 1 <= slot <= managers:
-        raise ValueError(f"slot must be in 1..{managers}, got {slot}")
-    if rounds < 0:
-        raise ValueError(f"rounds must be >= 0, got {rounds}")
-    picks: list[int] = []
-    for round_index in range(rounds):
-        seat = slot if round_index % 2 == 0 else managers - slot + 1
-        picks.append(round_index * managers + seat)
-    return picks
-
-
 def _resolve_model(
     opponents: OpponentModel | Mapping[str, OpponentModel], manager: str
 ) -> OpponentModel:
@@ -212,9 +139,8 @@ def _top_targets(
 
 
 def _simulate_gap_taken(
+    ctx: _SlotCtx,
     base: DraftState,
-    owner: str,
-    opponents: OpponentModel | Mapping[str, OpponentModel],
     target_keys: frozenset[str],
     rng: random.Random,
 ) -> frozenset[str]:
@@ -225,9 +151,9 @@ def _simulate_gap_taken(
     """
     sim = base.copy()
     taken: set[str] = set()
-    while not sim.is_complete and sim.current_manager != owner:
+    while not sim.is_complete and sim.current_manager != ctx.owner:
         manager = sim.current_manager
-        model = _resolve_model(opponents, manager)
+        model = _resolve_model(ctx.opponents, manager)
         asset = model.pick(sim, manager, rng)
         if asset.key in target_keys:
             taken.add(asset.key)
@@ -245,6 +171,27 @@ class _SlotCtx:
     config: SlotStrategyConfig
 
 
+@dataclass(frozen=True)
+class _PlanSlotRequest:
+    slot: int
+    manager_ids: Sequence[str]
+    pool: Sequence[DraftAsset]
+    allow_ir: bool
+    opponents: OpponentModel | Mapping[str, OpponentModel]
+    eliminated_team_ids: frozenset[int]
+    config: SlotStrategyConfig
+
+
+def _slot_ctx(
+    state: DraftState,
+    owner: str,
+    opponents: OpponentModel | Mapping[str, OpponentModel],
+    config: SlotStrategyConfig,
+    managers: int,
+) -> _SlotCtx:
+    return _SlotCtx(owner, opponents, replacement_levels(state, managers), config)
+
+
 def _gap_outcomes(
     ctx: _SlotCtx, after: DraftState, target_keys: frozenset[str], branch_seed: int
 ) -> Counter[frozenset[str]]:
@@ -252,7 +199,7 @@ def _gap_outcomes(
     outcomes: Counter[frozenset[str]] = Counter()
     for j in range(ctx.config.contingency_rollouts):
         rng = random.Random(branch_seed + j)
-        outcomes[_simulate_gap_taken(after, ctx.owner, ctx.opponents, target_keys, rng)] += 1
+        outcomes[_simulate_gap_taken(ctx, after, target_keys, rng)] += 1
     return outcomes
 
 
@@ -312,185 +259,105 @@ def _branch_contingencies(
     return _build_branches(ctx, after, targets, outcomes)
 
 
-def _plan_slot(
-    slot: int,
-    manager_ids: Sequence[str],
-    pool: Sequence[DraftAsset],
-    *,
-    allow_ir: bool,
-    opponents: OpponentModel | Mapping[str, OpponentModel],
-    eliminated_team_ids: frozenset[int],
-    config: SlotStrategyConfig,
-) -> SlotPlan:
-    """Play one full draft from ``slot``'s seat, recording the owner's turn plans."""
-    managers = len(manager_ids)
-    owner = manager_ids[slot - 1]
+def _slot_state(
+    request: _PlanSlotRequest,
+) -> tuple[str, DraftState, RecommendConfig, random.Random, int]:
+    owner = request.manager_ids[request.slot - 1]
     state = DraftState.new(
-        manager_ids, pool, allow_ir=allow_ir, eliminated_team_ids=eliminated_team_ids
+        request.manager_ids,
+        request.pool,
+        allow_ir=request.allow_ir,
+        eliminated_team_ids=request.eliminated_team_ids,
     )
     rec_config = RecommendConfig(
-        rollouts=config.rollouts,
-        depth=config.depth,
-        max_candidates=config.max_candidates,
-        top_n=config.top_alternatives + 1,
-        seed=config.seed + slot,
+        rollouts=request.config.rollouts,
+        depth=request.config.depth,
+        max_candidates=request.config.max_candidates,
+        top_n=request.config.top_alternatives + 1,
+        seed=request.config.seed + request.slot,
         compute_survival=False,
     )
-    line_rng = random.Random(config.seed * 7919 + slot)
+    line_rng = random.Random(request.config.seed * 7919 + request.slot)
+    return owner, state, rec_config, line_rng, state.capacity.total
 
+
+def _owner_done(state: DraftState, owner: str, total: int) -> bool:
+    roster = state.rosters[owner]
+    return roster.count("F") + roster.count("D") + roster.count("G") >= total
+
+
+def _owner_contingencies(
+    ctx: _SlotCtx,
+    state: DraftState,
+    recommended: DraftAsset,
+    turn_index: int,
+    slot: int,
+) -> list[Contingency]:
+    if turn_index >= ctx.config.contingency_turns:
+        return []
+    return _branch_contingencies(
+        ctx,
+        state,
+        recommended,
+        ctx.config.seed * 104729 + slot * 1009 + turn_index,
+    )
+
+
+def _owner_turn_plan(
+    request: _PlanSlotRequest,
+    state: DraftState,
+    owner: str,
+    managers: int,
+    rec_config: RecommendConfig,
+    turn_index: int,
+) -> TurnPlan:
+    ctx = _slot_ctx(state, owner, request.opponents, request.config, managers)
+    rec = recommend_pick(state, owner, request.opponents, config=rec_config)
+    recommended_eval = rec.best
+    return TurnPlan(
+        turn_index=turn_index,
+        round_index=state.pick_index // managers,
+        pick_number=state.pick_index + 1,
+        recommended=PickOption.from_evaluation(recommended_eval),
+        alternatives=[
+            PickOption.from_evaluation(ev)
+            for ev in rec.top()[1 : request.config.top_alternatives + 1]
+        ],
+        contingencies=_owner_contingencies(
+            ctx,
+            state,
+            recommended_eval.asset,
+            turn_index,
+            request.slot,
+        ),
+    )
+
+
+def _plan_slot(request: _PlanSlotRequest) -> SlotPlan:
+    """Play one full draft from ``slot``'s seat, recording the owner's turn plans."""
+    managers = len(request.manager_ids)
+    owner, state, rec_config, line_rng, total = _slot_state(request)
     turns: list[TurnPlan] = []
     turn_index = 0
-    total = state.capacity.total
     while not state.is_complete:
-        roster = state.rosters[owner]
-        if roster.count("F") + roster.count("D") + roster.count("G") >= total:
+        if _owner_done(state, owner, total):
             break
         manager = state.current_manager
         if manager != owner:
-            model = _resolve_model(opponents, manager)
+            model = _resolve_model(request.opponents, manager)
             state.apply_pick(model.pick(state, manager, line_rng))
             continue
-
-        rec = recommend_pick(state, owner, opponents, config=rec_config)
-        recommended_eval = rec.best
-        alternatives = [
-            PickOption.from_evaluation(ev) for ev in rec.top()[1 : config.top_alternatives + 1]
-        ]
-        contingencies: list[Contingency] = []
-        if turn_index < config.contingency_turns:
-            replacement = replacement_levels(state, managers)
-            contingencies = _branch_contingencies(
-                _SlotCtx(owner, opponents, replacement, config),
-                state,
-                recommended_eval.asset,
-                config.seed * 104729 + slot * 1009 + turn_index,
-            )
-        pick_number = state.pick_index + 1
-        turns.append(
-            TurnPlan(
-                turn_index=turn_index,
-                round_index=state.pick_index // managers,
-                pick_number=pick_number,
-                recommended=PickOption.from_evaluation(recommended_eval),
-                alternatives=alternatives,
-                contingencies=contingencies,
-            )
-        )
-        state.apply_pick(recommended_eval.asset)
+        turn_plan = _owner_turn_plan(request, state, owner, managers, rec_config, turn_index)
+        turns.append(turn_plan)
+        state.apply_pick(state.available[turn_plan.recommended.key])
         turn_index += 1
 
     return SlotPlan(
-        slot=slot,
-        pick_numbers=slot_pick_numbers(slot, managers, total),
+        slot=request.slot,
+        pick_numbers=slot_pick_numbers(request.slot, managers, total),
         turns=turns,
         projected_total=_owner_roster_value(state, owner),
     )
-
-
-@dataclass
-class SlotStrategyReport:
-    """The per-slot strategy report for a whole league."""
-
-    managers: int
-    ir: bool
-    rounds: int
-    slots: list[SlotPlan]
-    seed: int
-    rollouts: int
-    fitted_opponents: bool
-    opponent_label: str = "greedy fallback"
-
-    def best_slot(self) -> SlotPlan:
-        """The slot with the highest projected final-roster total (tie: lowest slot)."""
-        if not self.slots:
-            raise ValueError("report has no slots")
-        return max(self.slots, key=lambda plan: (plan.projected_total, -plan.slot))
-
-    def report_lines(self) -> list[str]:
-        """Human-readable Markdown report (ASCII only, cp1252-safe)."""
-        lines = [
-            "# Draft Oracle per-slot strategy report",
-            "",
-            f"- League size: {self.managers} managers"
-            f" ({'IR' if self.ir else 'no-IR'}, {self.rounds} rounds)",
-            f"- Opponents: {self.opponent_label}",
-            f"- Rollouts per turn: {self.rollouts} | seed {self.seed}",
-            "",
-            "## Projected final-roster points by slot",
-            "",
-            "| Slot | Pick numbers | Projected total |",
-            "| ---: | :----------- | --------------: |",
-        ]
-        for plan in sorted(self.slots, key=lambda p: p.slot):
-            picks = ", ".join(str(n) for n in plan.pick_numbers)
-            lines.append(f"| {plan.slot} | {picks} | {plan.projected_total:.2f} |")
-        best = self.best_slot()
-        lines.extend(
-            [
-                "",
-                f"Best-projected slot: **{best.slot}** ({best.projected_total:.2f} pts).",
-                "",
-            ]
-        )
-        for plan in sorted(self.slots, key=lambda p: p.slot):
-            lines.extend(self._slot_lines(plan))
-        return lines
-
-    def _slot_lines(self, plan: SlotPlan) -> list[str]:
-        lines = [
-            f"## Slot {plan.slot}",
-            "",
-            f"- Expected picks: {', '.join(str(n) for n in plan.pick_numbers)}",
-            f"- Projected final-roster total: {plan.projected_total:.2f}",
-            "",
-        ]
-        for turn in plan.turns:
-            lines.append(
-                f"### Turn {turn.turn_index + 1} "
-                f"(round {turn.round_index + 1}, pick #{turn.pick_number})"
-            )
-            lines.append("")
-            rec = turn.recommended
-            lines.append(
-                f"- Recommended: {rec.label()} -- "
-                f"E[roster] {rec.expected_points:.2f}, proj {rec.projection:.2f}, "
-                f"VOR {rec.vor:+.2f}"
-            )
-            if turn.alternatives:
-                alts = "; ".join(
-                    f"{alt.label()} (E[roster] {alt.expected_points:.2f})"
-                    for alt in turn.alternatives
-                )
-                lines.append(f"- Alternatives: {alts}")
-            for cont in turn.contingencies:
-                lines.append(
-                    f"- Contingency (P={cont.probability:.2f}) {cont.condition}: "
-                    f"{cont.recommendation}"
-                )
-            lines.append("")
-        return lines
-
-    def summary(self) -> dict[str, Any]:
-        """JSON-serialisable summary for the run manifest."""
-        return {
-            "managers": self.managers,
-            "ir": self.ir,
-            "rounds": self.rounds,
-            "seed": self.seed,
-            "rollouts": self.rollouts,
-            "fitted_opponents": self.fitted_opponents,
-            "opponent_label": self.opponent_label,
-            "best_slot": self.best_slot().slot,
-            "slots": [
-                {
-                    "slot": plan.slot,
-                    "pick_numbers": plan.pick_numbers,
-                    "projected_total": round(plan.projected_total, 6),
-                    "first_pick": (plan.turns[0].recommended.name if plan.turns else None),
-                }
-                for plan in sorted(self.slots, key=lambda p: p.slot)
-            ],
-        }
 
 
 def _resolve_opponent_setup(
@@ -521,14 +388,27 @@ def _resolve_opponent_setup(
     return opponent_model, genuinely_fitted, opponent_label
 
 
+class _BuildSlotStrategyKwargs(TypedDict, total=False):
+    managers: int
+    allow_ir: bool
+    opponents: FittedLeagueOpponents | None
+    eliminated_team_ids: frozenset[int]
+    config: SlotStrategyConfig | None
+
+
+@dataclass(frozen=True)
+class SlotStrategyBuildRequest:
+    pool: Sequence[DraftAsset]
+    managers: int
+    allow_ir: bool
+    opponents: FittedLeagueOpponents | None = None
+    eliminated_team_ids: frozenset[int] = frozenset()
+    config: SlotStrategyConfig | None = None
+
+
 def build_slot_strategies(
-    pool: Sequence[DraftAsset],
-    *,
-    managers: int,
-    allow_ir: bool,
-    opponents: FittedLeagueOpponents | None = None,
-    eliminated_team_ids: frozenset[int] = frozenset(),
-    config: SlotStrategyConfig | None = None,
+    pool: SlotStrategyBuildRequest | Sequence[DraftAsset] | None = None,
+    **legacy: Unpack[_BuildSlotStrategyKwargs],
 ) -> SlotStrategyReport:
     """Precompute a strategy plan for every slot ``1..managers``.
 
@@ -538,36 +418,66 @@ def build_slot_strategies(
     roster shape (adds the ``IR_F`` / ``IR_D`` slots), so the report covers both the
     IR and no-IR configurations when ``--ir`` is set.
     """
-    if managers < 2:
-        raise ValueError(f"managers must be >= 2, got {managers}")
-    cfg = config or SlotStrategyConfig()
-    manager_ids = [f"seat{i + 1}" for i in range(managers)]
+    resolved = _resolve_build_request(pool, legacy)
+    if resolved.managers < 2:
+        raise ValueError(f"managers must be >= 2, got {resolved.managers}")
+    cfg = resolved.config or SlotStrategyConfig()
+    manager_ids = [f"seat{i + 1}" for i in range(resolved.managers)]
     opponent_model, genuinely_fitted, opponent_label = _resolve_opponent_setup(
-        opponents, manager_ids, cfg
+        resolved.opponents, manager_ids, cfg
     )
 
-    rounds = roster_capacity(allow_ir).total
+    rounds = roster_capacity(resolved.allow_ir).total
     slots = [
         _plan_slot(
-            slot,
-            manager_ids,
-            pool,
-            allow_ir=allow_ir,
-            opponents=opponent_model,
-            eliminated_team_ids=eliminated_team_ids,
-            config=cfg,
+            _PlanSlotRequest(
+                slot=slot,
+                manager_ids=manager_ids,
+                pool=resolved.pool,
+                allow_ir=resolved.allow_ir,
+                opponents=opponent_model,
+                eliminated_team_ids=resolved.eliminated_team_ids,
+                config=cfg,
+            )
         )
-        for slot in range(1, managers + 1)
+        for slot in range(1, resolved.managers + 1)
     ]
     return SlotStrategyReport(
-        managers=managers,
-        ir=allow_ir,
+        managers=resolved.managers,
+        ir=resolved.allow_ir,
         rounds=rounds,
         slots=slots,
         seed=cfg.seed,
         rollouts=cfg.rollouts,
         fitted_opponents=genuinely_fitted,
         opponent_label=opponent_label,
+    )
+
+
+def _resolve_build_request(
+    pool: SlotStrategyBuildRequest | Sequence[DraftAsset] | None,
+    legacy: Mapping[str, object],
+) -> SlotStrategyBuildRequest:
+    if isinstance(pool, SlotStrategyBuildRequest):
+        if legacy:
+            raise TypeError("SlotStrategyBuildRequest calls do not accept extra keyword args")
+        return pool
+    if pool is None:
+        raise TypeError("build_slot_strategies requires pool")
+    if "managers" not in legacy:
+        raise TypeError("build_slot_strategies legacy calls require managers")
+    if "allow_ir" not in legacy:
+        raise TypeError("build_slot_strategies legacy calls require allow_ir")
+    return SlotStrategyBuildRequest(
+        pool=pool,
+        managers=cast("int", legacy["managers"]),
+        allow_ir=cast("bool", legacy["allow_ir"]),
+        opponents=cast("FittedLeagueOpponents | None", legacy.get("opponents")),
+        eliminated_team_ids=cast(
+            "frozenset[int]",
+            legacy.get("eliminated_team_ids", frozenset()),
+        ),
+        config=cast("SlotStrategyConfig | None", legacy.get("config")),
     )
 
 

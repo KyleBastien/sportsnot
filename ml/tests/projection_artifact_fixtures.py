@@ -235,6 +235,14 @@ _PROJECT_ARTIFACT_CONFIG = ProjectArtifactConfig(
 )
 
 _ARCHIVE = _synthetic_archive([2018, 2019, 2020, 2021, 2022], seed=1)
+_ROUND_ONE_RESULTS = [
+    ("top", 3, 0),
+    ("top", 4, 2),
+    ("bottom", 3, 1),
+    ("bottom", 2, 1),
+    ("top", 3, 2),
+    ("top", 2, 1),
+]
 
 
 @dataclass(frozen=True)
@@ -258,29 +266,21 @@ class _RoundOneGameInput:
     series: _RoundOneSeriesInput
 
 
+def _round1_game_inputs(spec: _RoundOneSeriesInput) -> list[_RoundOneGameInput]:
+    return [
+        _RoundOneGameInput(winner, wg, lg, offset, spec.gid_start + offset + 1, spec)
+        for offset, (winner, wg, lg) in enumerate(_ROUND_ONE_RESULTS)
+    ]
+
+
 def _round1_series_games(
     spec: _RoundOneSeriesInput,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], int]:
     """Emit a completed best-of-7 round-1 series (top wins 4-2) + its skater rows."""
-    results = [
-        (spec.top, 3, 0),
-        (spec.top, 4, 2),
-        (spec.bottom, 3, 1),
-        (spec.bottom, 2, 1),
-        (spec.top, 3, 2),
-        (spec.top, 2, 1),
-    ]
-    tg_rows: list[dict[str, object]] = []
-    sk_rows: list[dict[str, object]] = []
-    gid = spec.gid_start
-    for offset, (winner, wg, lg) in enumerate(results):
-        gid += 1
-        game_rows, skater_rows = _round1_game_rows(
-            _RoundOneGameInput(winner, wg, lg, offset, gid, spec)
-        )
-        tg_rows.extend(game_rows)
-        sk_rows.extend(skater_rows)
-    return tg_rows, sk_rows, gid
+    rounds = [_round1_game_rows(game) for game in _round1_game_inputs(spec)]
+    tg_rows = [row for game_rows, _skater_rows in rounds for row in game_rows]
+    sk_rows = [row for _game_rows, skater_rows in rounds for row in skater_rows]
+    return tg_rows, sk_rows, spec.gid_start + len(_ROUND_ONE_RESULTS)
 
 
 def _round1_game_rows(

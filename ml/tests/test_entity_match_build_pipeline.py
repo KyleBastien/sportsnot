@@ -9,11 +9,14 @@ import pytest
 
 from draft_oracle.ingest.entity_match import (
     POINT_CROSSCHECK_TOLERANCE,
+    LeagueEntityMatchResult,
     build_league_draft_picks,
 )
 from tests.test_entity_match import _write_manager_aliases
 
 # ── End-to-end build on a synthetic normalized dir ───────────────────────
+
+_DEFAULT_OVERRIDES = "players: {}\nteams: {}\n"
 
 
 def _write_normalized(normalized_dir: Path) -> None:
@@ -134,7 +137,7 @@ def _league_pick_rows() -> list[dict[str, object]]:
 
 
 def _prepare_match_inputs(
-    tmp_path: Path, overrides_text: str = "players: {}\nteams: {}\n"
+    tmp_path: Path, overrides_text: str = _DEFAULT_OVERRIDES
 ) -> tuple[Path, Path]:
     normalized = tmp_path / "normalized"
     out = tmp_path / "out"
@@ -144,13 +147,31 @@ def _prepare_match_inputs(
     return normalized, out
 
 
+def _write_pick_rows(normalized_dir: Path, rows: list[dict[str, object]]) -> None:
+    pd.DataFrame(rows).to_parquet(normalized_dir / "league_picks.parquet", index=False)
+
+
+def _write_single_pick(normalized_dir: Path, **kw: object) -> None:
+    _write_pick_rows(normalized_dir, [_league_pick(**kw)])
+
+
+def _build_draft_picks(
+    normalized_dir: Path,
+    overrides_dir: Path,
+    out_dir: Path,
+) -> LeagueEntityMatchResult:
+    return build_league_draft_picks(
+        normalized_dir=normalized_dir,
+        overrides_dir=overrides_dir,
+        out_dir=out_dir,
+    )
+
+
 def test_build_league_draft_picks_end_to_end(tmp_path: Path) -> None:
     normalized, out = _prepare_match_inputs(tmp_path)
     _write_league_picks(normalized)
 
-    result = build_league_draft_picks(
-        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=out
-    )
+    result = _build_draft_picks(normalized, tmp_path, out)
 
     assert (out / "league_draft_picks.parquet").exists()
     assert result.total == 5
@@ -182,11 +203,9 @@ def test_build_league_draft_picks_review_report(tmp_path: Path) -> None:
             slot_label="Forward 2",
         ),  # unmatched -> review
     ]
-    pd.DataFrame(rows).to_parquet(normalized / "league_picks.parquet", index=False)
+    _write_pick_rows(normalized, rows)
 
-    result = build_league_draft_picks(
-        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=out
-    )
+    result = _build_draft_picks(normalized, tmp_path, out)
     assert result.matched == 1
     assert result.total == 2
     assert result.review_path is not None
@@ -204,13 +223,9 @@ def test_build_league_draft_picks_override_closes_gap(tmp_path: Path) -> None:
         "    expected_matches: 1\n"
         "teams: {}\n",
     )
-    pd.DataFrame([_league_pick(player_or_team_name="Mystery Man")]).to_parquet(
-        normalized / "league_picks.parquet", index=False
-    )
+    _write_single_pick(normalized, player_or_team_name="Mystery Man")
 
-    result = build_league_draft_picks(
-        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=out
-    )
+    result = _build_draft_picks(normalized, tmp_path, out)
     assert result.matched == 1
     assert result.picks.iloc[0]["player_id"] == 8478402
     assert result.picks.iloc[0]["match_method"] == "override"
@@ -227,7 +242,8 @@ def test_name_override_expected_match_guard_rejects_second_raw_name(
         "    expected_matches: 1\n"
         "teams: {}\n",
     )
-    pd.DataFrame(
+    _write_pick_rows(
+        normalized,
         [
             _league_pick(manager="ben", player_or_team_name="McDavid"),
             _league_pick(
@@ -235,15 +251,11 @@ def test_name_override_expected_match_guard_rejects_second_raw_name(
                 slot_label="Forward 2",
                 player_or_team_name="McDavid",
             ),
-        ]
-    ).to_parquet(normalized / "league_picks.parquet", index=False)
+        ],
+    )
 
     with pytest.raises(ValueError, match=r"expected 1 league-pick match.*found 2"):
-        build_league_draft_picks(
-            normalized_dir=normalized,
-            overrides_dir=tmp_path,
-            out_dir=out,
-        )
+        _build_draft_picks(normalized, tmp_path, out)
 
 
 def test_name_override_guard_counts_corrected_name_used_by_matcher(
@@ -257,23 +269,16 @@ def test_name_override_guard_counts_corrected_name_used_by_matcher(
         "    expected_matches: 1\n"
         "teams: {}\n",
     )
-    pd.DataFrame(
-        [
-            _league_pick(
-                season=2024,
-                draft_event="R3_4",
-                player_or_team_name="McDavid",
-                corrected_name="Connor McDavid",
-            )
-        ]
-    ).to_parquet(normalized / "league_picks.parquet", index=False)
+    _write_single_pick(
+        normalized,
+        season=2024,
+        draft_event="R3_4",
+        player_or_team_name="McDavid",
+        corrected_name="Connor McDavid",
+    )
 
     with pytest.raises(ValueError, match=r"expected 1 league-pick match.*found 0"):
-        build_league_draft_picks(
-            normalized_dir=normalized,
-            overrides_dir=tmp_path,
-            out_dir=out,
-        )
+        _build_draft_picks(normalized, tmp_path, out)
 
 
 def test_team_override_guard_accepts_matching_g_slot_count(tmp_path: Path) -> None:
@@ -285,22 +290,15 @@ def test_team_override_guard_accepts_matching_g_slot_count(tmp_path: Path) -> No
         "    team_id: 13\n"
         "    expected_matches: 1\n",
     )
-    pd.DataFrame(
-        [
-            _league_pick(
-                position="G",
-                slot_label="Goalie 1",
-                player_or_team_name="Mystery Goalie",
-                team_name="Mystery Club",
-            )
-        ]
-    ).to_parquet(normalized / "league_picks.parquet", index=False)
-
-    result = build_league_draft_picks(
-        normalized_dir=normalized,
-        overrides_dir=tmp_path,
-        out_dir=out,
+    _write_single_pick(
+        normalized,
+        position="G",
+        slot_label="Goalie 1",
+        player_or_team_name="Mystery Goalie",
+        team_name="Mystery Club",
     )
+
+    result = _build_draft_picks(normalized, tmp_path, out)
 
     assert int(result.picks.iloc[0]["team_id"]) == 13
 
@@ -314,46 +312,34 @@ def test_team_override_guard_rejects_wrong_g_slot_count(tmp_path: Path) -> None:
         "    team_id: 13\n"
         "    expected_matches: 2\n",
     )
-    pd.DataFrame(
-        [
-            _league_pick(
-                position="G",
-                slot_label="Goalie 1",
-                player_or_team_name="Mystery Goalie",
-                team_name="Mystery Club",
-            )
-        ]
-    ).to_parquet(normalized / "league_picks.parquet", index=False)
+    _write_single_pick(
+        normalized,
+        position="G",
+        slot_label="Goalie 1",
+        player_or_team_name="Mystery Goalie",
+        team_name="Mystery Club",
+    )
 
     with pytest.raises(ValueError, match=r"expected 2 G-slot.*found 1"):
-        build_league_draft_picks(
-            normalized_dir=normalized,
-            overrides_dir=tmp_path,
-            out_dir=out,
-        )
+        _build_draft_picks(normalized, tmp_path, out)
 
 
 def test_point_split_crosscheck_flags_wrong_2024_mcdavid_match(tmp_path: Path) -> None:
     """Row 99's 24/7/31 split contradicts Connor McDavid in all three fields."""
     normalized, out = _prepare_match_inputs(tmp_path)
     _write_playoff_points(normalized, 8478402, {1: 12, 2: 9, 3: 10, 4: 11})
-    pd.DataFrame(
-        [
-            _league_pick(
-                season=2024,
-                draft_event="R3_4",
-                manager="levi",
-                player_or_team_name="McDavid",
-                points_for_round=7,
-                points_when_drafted=24,
-                current_total_points=31,
-            )
-        ]
-    ).to_parquet(normalized / "league_picks.parquet", index=False)
-
-    result = build_league_draft_picks(
-        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=out
+    _write_single_pick(
+        normalized,
+        season=2024,
+        draft_event="R3_4",
+        manager="levi",
+        player_or_team_name="McDavid",
+        points_for_round=7,
+        points_when_drafted=24,
+        current_total_points=31,
     )
+
+    result = _build_draft_picks(normalized, tmp_path, out)
 
     assert POINT_CROSSCHECK_TOLERANCE == 0
     assert result.point_mismatches == 1
@@ -363,16 +349,15 @@ def test_point_split_crosscheck_flags_wrong_2024_mcdavid_match(tmp_path: Path) -
 
 def test_duplicate_player_ownership_flags_every_manager_copy(tmp_path: Path) -> None:
     normalized, out = _prepare_match_inputs(tmp_path)
-    pd.DataFrame(
+    _write_pick_rows(
+        normalized,
         [
             _league_pick(manager="ben"),
             _league_pick(manager="levi", slot_label="Forward 2"),
-        ]
-    ).to_parquet(normalized / "league_picks.parquet", index=False)
-
-    result = build_league_draft_picks(
-        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=out
+        ],
     )
+
+    result = _build_draft_picks(normalized, tmp_path, out)
 
     assert result.duplicate_ownerships == 1
     assert result.duplicate_ownership_rows == 2
@@ -382,7 +367,8 @@ def test_duplicate_player_ownership_flags_every_manager_copy(tmp_path: Path) -> 
 
 def test_duplicate_goalie_team_ownership_flags_every_manager_copy(tmp_path: Path) -> None:
     normalized, out = _prepare_match_inputs(tmp_path)
-    pd.DataFrame(
+    _write_pick_rows(
+        normalized,
         [
             _league_pick(
                 manager="ben",
@@ -398,12 +384,10 @@ def test_duplicate_goalie_team_ownership_flags_every_manager_copy(tmp_path: Path
                 player_or_team_name="Florida Panthers",
                 team_name="Panthers",
             ),
-        ]
-    ).to_parquet(normalized / "league_picks.parquet", index=False)
-
-    result = build_league_draft_picks(
-        normalized_dir=normalized, overrides_dir=tmp_path, out_dir=out
+        ],
     )
+
+    result = _build_draft_picks(normalized, tmp_path, out)
 
     assert set(result.picks["team_id"].astype(int)) == {13}
     assert result.duplicate_ownerships == 1
@@ -419,11 +403,7 @@ def test_real_2024_override_resolves_draisaitl_without_ownership_conflict(
     if not (normalized / "league_picks.parquet").exists():
         pytest.skip("committed normalized league picks not present")
 
-    result = build_league_draft_picks(
-        normalized_dir=normalized,
-        overrides_dir=Path("data/overrides"),
-        out_dir=tmp_path,
-    )
+    result = _build_draft_picks(normalized, Path("data/overrides"), tmp_path)
     event = result.picks.loc[
         (result.picks["season"] == 2024) & (result.picks["draft_event"] == "R3_4")
     ]
@@ -445,8 +425,4 @@ def test_real_2024_override_resolves_draisaitl_without_ownership_conflict(
 
 def test_build_league_draft_picks_missing_input_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
-        build_league_draft_picks(
-            normalized_dir=tmp_path / "nope",
-            overrides_dir=tmp_path,
-            out_dir=tmp_path / "out",
-        )
+        _build_draft_picks(tmp_path / "nope", tmp_path, tmp_path / "out")

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from draft_oracle.backtest.replay import (
     RoundResult,
@@ -52,47 +54,80 @@ def _ir_swap_lookups() -> tuple[
     return skater_actual, team_actual
 
 
-def _league_row(
-    position: str,
-    *,
-    player_id: int | None = None,
-    team_id: int | None = None,
-    points_excluded: bool = False,
-    ir_activated: bool = False,
-) -> dict[str, object]:
+@dataclass(frozen=True)
+class _LeagueRowInput:
+    position: str
+    player_id: int | None = None
+    team_id: int | None = None
+    points_excluded: bool = False
+    ir_activated: bool = False
+
+
+def _league_row(spec: _LeagueRowInput) -> dict[str, object]:
     return {
-        'position': position,
-        'player_id': player_id,
-        'team_id': team_id,
-        'points_excluded': points_excluded,
-        'ir_activated': ir_activated,
+        'position': spec.position,
+        'player_id': spec.player_id,
+        'team_id': spec.team_id,
+        'points_excluded': spec.points_excluded,
+        'ir_activated': spec.ir_activated,
     }
 
 
-def test_score_league_roster_honors_retroactive_ir_swap() -> None:
+def _score_ir_swap_case(
+    rows: list[_LeagueRowInput],
+) -> float:
     skater_actual, team_actual = _ir_swap_lookups()
-    picks = pd.DataFrame(
+    picks = pd.DataFrame([_league_row(row) for row in rows])
+    return _score_league_roster(picks, ScoreContext(skater_actual, team_actual, 100, [1]))
+
+
+@pytest.mark.parametrize(
+    ('rows', 'expected'),
+    [
+        (
+            [
+                _LeagueRowInput('F', player_id=1, points_excluded=True),
+                _LeagueRowInput('IR_F', player_id=2, ir_activated=True),
+                _LeagueRowInput('G', team_id=10),
+            ],
+            10.0,
+        ),
+        (
+            [
+                _LeagueRowInput('F', player_id=1),
+                _LeagueRowInput('IR_F', player_id=2),
+                _LeagueRowInput('G', team_id=10),
+            ],
+            13.0,
+        ),
+    ],
+    ids=['retroactive-swap', 'no-swap'],
+)
+def test_score_league_roster_ir_swap_cases(
+    rows: list[_LeagueRowInput],
+    expected: float,
+) -> None:
+    assert _score_ir_swap_case(rows) == expected
+
+
+def test_score_league_roster_honors_retroactive_ir_swap() -> None:
+    assert _score_ir_swap_case(
         [
-            _league_row('F', player_id=1, points_excluded=True),
-            _league_row('IR_F', player_id=2, ir_activated=True),
-            _league_row('G', team_id=10),
+            _LeagueRowInput('F', player_id=1, points_excluded=True),
+            _LeagueRowInput('IR_F', player_id=2, ir_activated=True),
+            _LeagueRowInput('G', team_id=10),
         ]
-    )
-    total = _score_league_roster(picks, ScoreContext(skater_actual, team_actual, 100, [1]))
-    assert total == 10.0
+    ) == 10.0
 
 
 def test_score_league_roster_no_swap_counts_starter_benches_ir() -> None:
-    skater_actual, team_actual = _ir_swap_lookups()
-    picks = pd.DataFrame(
+    assert _score_ir_swap_case(
         [
-            _league_row('F', player_id=1),
-            _league_row('IR_F', player_id=2),
-            _league_row('G', team_id=10),
+            _LeagueRowInput('F', player_id=1),
+            _LeagueRowInput('IR_F', player_id=2),
+            _LeagueRowInput('G', team_id=10),
         ]
-    )
-    total = _score_league_roster(picks, ScoreContext(skater_actual, team_actual, 100, [1]))
-    assert total == 13.0
+    ) == 13.0
 
 
 def test_combined_league_comparison_scores_rounds_three_and_four() -> None:
@@ -146,7 +181,7 @@ def _league_event_row(
     player_id: int | None = None,
     team_id: int | None = None,
 ) -> dict[str, object]:
-    row = _league_row(position, player_id=player_id, team_id=team_id)
+    row = _league_row(_LeagueRowInput(position, player_id=player_id, team_id=team_id))
     row.update(
         {
             'season': FOUR_ROUND_TARGET,

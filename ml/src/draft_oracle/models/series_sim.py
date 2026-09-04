@@ -57,6 +57,14 @@ from draft_oracle.models._series_reconstruct import (
 from draft_oracle.models._series_reconstruct import (
     reconstruct_series_matchups as reconstruct_series_matchups,
 )
+from draft_oracle.models._series_sim_result import (
+    SERIES_SIM_VERSION,
+    LengthBin,
+    SeriesCalibrationBin,
+    SeriesSimConfig,
+    SeriesSimResult,
+    _held_out_years,
+)
 from draft_oracle.models.game_win import (
     GameWinConfig,
     GameWinModel,
@@ -91,8 +99,6 @@ __all__ = [
 ]
 
 reconstruct_series_matchups.__module__ = __name__
-
-SERIES_SIM_VERSION = "series-sim-v1"
 
 # First team to this many wins takes the best-of-7 series.
 WINS_NEEDED = 4
@@ -257,16 +263,10 @@ def _resolve_series_monte_carlo_request(
     p_a_away: float | None,
     legacy_kwargs: dict[str, object],
 ) -> SeriesMonteCarloRequest:
+    _validate_series_request_inputs(request, p_a_away, legacy_kwargs)
     if isinstance(request, SeriesMonteCarloRequest):
-        if p_a_away is not None or legacy_kwargs:
-            raise TypeError("SeriesMonteCarloRequest calls do not accept extra arguments")
         return request
-    if p_a_away is None:
-        raise TypeError("legacy simulate_series_monte_carlo calls require p_a_away")
-    unexpected = set(legacy_kwargs) - {"shutout_prob_a", "shutout_prob_b", "n_sims", "seed"}
-    if unexpected:
-        names = ", ".join(sorted(unexpected))
-        raise TypeError(f"unexpected simulate_series_monte_carlo kwargs: {names}")
+    assert p_a_away is not None
     return SeriesMonteCarloRequest(
         p_a_home=float(request),
         p_a_away=float(p_a_away),
@@ -275,6 +275,29 @@ def _resolve_series_monte_carlo_request(
         n_sims=_series_int_kwarg(legacy_kwargs, "n_sims", 20000),
         seed=_series_int_kwarg(legacy_kwargs, "seed", 20260827),
     )
+
+
+def _validate_series_request_inputs(
+    request: SeriesMonteCarloRequest | float,
+    p_a_away: float | None,
+    legacy_kwargs: dict[str, object],
+) -> None:
+    if isinstance(request, SeriesMonteCarloRequest):
+        if p_a_away is not None or legacy_kwargs:
+            raise TypeError("SeriesMonteCarloRequest calls do not accept extra arguments")
+        return
+    if p_a_away is None:
+        raise TypeError("legacy simulate_series_monte_carlo calls require p_a_away")
+    unexpected = _unexpected_series_kwargs(legacy_kwargs)
+    if unexpected:
+        raise TypeError(
+            f"unexpected simulate_series_monte_carlo kwargs: {', '.join(sorted(unexpected))}"
+        )
+
+
+def _unexpected_series_kwargs(legacy_kwargs: dict[str, object]) -> set[str]:
+    allowed = {"shutout_prob_a", "shutout_prob_b", "n_sims", "seed"}
+    return set(legacy_kwargs) - allowed
 
 
 def simulate_series_monte_carlo(
@@ -337,26 +360,6 @@ def simulate_series_monte_carlo(
 # ── Calibration on held-out seasons ─────────────────────────────────────────
 
 
-@dataclass(frozen=True)
-class SeriesCalibrationBin:
-    """One predicted-P(higher-seed-wins) bucket: predicted vs. observed frequency."""
-
-    lower: float
-    upper: float
-    count: int
-    mean_predicted: float
-    observed_rate: float
-
-
-@dataclass(frozen=True)
-class LengthBin:
-    """Predicted vs. observed frequency for one series length (4/5/6/7)."""
-
-    length: int
-    predicted_rate: float
-    observed_rate: float
-
-
 def _series_calibration_bins(
     probs: np.ndarray, labels: np.ndarray, *, n_bins: int
 ) -> list[SeriesCalibrationBin]:
@@ -366,177 +369,53 @@ def _series_calibration_bins(
     edges = np.linspace(0.0, 1.0, n_bins + 1)
     bins: list[SeriesCalibrationBin] = []
     for i in range(n_bins):
-        lo, hi = float(edges[i]), float(edges[i + 1])
-        upper_inclusive = i == n_bins - 1
-        mask = (probs >= lo) & (probs <= hi if upper_inclusive else probs < hi)
-        count = int(mask.sum())
-        if count == 0:
-            continue
-        bins.append(
-            SeriesCalibrationBin(
-                lower=lo,
-                upper=hi,
-                count=count,
-                mean_predicted=float(probs[mask].mean()),
-                observed_rate=float(labels[mask].mean()),
-            )
+        calibration_bin = _series_calibration_bin(
+            probs=probs,
+            labels=labels,
+            lower=float(edges[i]),
+            upper=float(edges[i + 1]),
+            upper_inclusive=i == n_bins - 1,
         )
+        if calibration_bin is not None:
+            bins.append(calibration_bin)
     return bins
 
 
-@dataclass(frozen=True)
-class SeriesSimConfig:
-    """Evaluation knobs; every stochastic step is seeded (SPEC section 3)."""
-
-    seed: int = 20260827
-    n_test_seasons: int = 2
-    calibration_bins: int = 5
-
-
-@dataclass
-class SeriesSimResult:
-    """Outcome of the series-simulator calibration on held-out seasons."""
-
-    config: SeriesSimConfig
-    test_years: tuple[int, ...]
-    n_series_scored: int
-    n_series_skipped: int
-    brier_series: float
-    brier_higher_seed: float
-    brier_coin_flip: float
-    calibration_bins: list[SeriesCalibrationBin]
-    length_bins: list[LengthBin]
-    predicted_shutouts_by_round: dict[int, float]
-    observed_shutouts_by_round: dict[int, int]
-
-    @property
-    def beats_higher_seed_baseline(self) -> bool:
-        return self.brier_series < self.brier_higher_seed
-
-    @property
-    def beats_coin_flip(self) -> bool:
-        return self.brier_series < self.brier_coin_flip
-
-    def manifest(self) -> dict[str, Any]:
-        """JSON-serialisable run summary (seed, split, metrics)."""
-        return {
-            "model_version": SERIES_SIM_VERSION,
-            "seed": self.config.seed,
-            "test_years": list(self.test_years),
-            "counts": {
-                "series_scored": self.n_series_scored,
-                "series_skipped": self.n_series_skipped,
-            },
-            "brier": {
-                "series_model": self.brier_series,
-                "higher_seed_baseline": self.brier_higher_seed,
-                "coin_flip_baseline": self.brier_coin_flip,
-            },
-            "beats_higher_seed_baseline": self.beats_higher_seed_baseline,
-            "beats_coin_flip": self.beats_coin_flip,
-            "series_winner_reliability": [
-                {
-                    "lower": b.lower,
-                    "upper": b.upper,
-                    "count": b.count,
-                    "mean_predicted": b.mean_predicted,
-                    "observed_rate": b.observed_rate,
-                }
-                for b in self.calibration_bins
-            ],
-            "series_length_distribution": [
-                {
-                    "length": b.length,
-                    "predicted_rate": b.predicted_rate,
-                    "observed_rate": b.observed_rate,
-                }
-                for b in self.length_bins
-            ],
-            "shutouts_by_round": {
-                str(rnd): {
-                    "predicted": self.predicted_shutouts_by_round.get(rnd, 0.0),
-                    "observed": self.observed_shutouts_by_round.get(rnd, 0),
-                }
-                for rnd in sorted(
-                    set(self.predicted_shutouts_by_round) | set(self.observed_shutouts_by_round)
-                )
-            },
-        }
-
-    def report_lines(self) -> list[str]:
-        """Human-readable calibration report (Markdown; ASCII only)."""
-        cfg = self.config
-        lines = [
-            f"# Best-of-7 series simulator ({SERIES_SIM_VERSION})",
-            "",
-            "Composes the per-game win model (US-011) and shutout model (US-012) into a",
-            "full best-of-7 outcome distribution with the 2-2-1-1-1 home-ice pattern. The",
-            "distribution is enumerated exactly over all series paths (no Monte Carlo). Per",
-            "series it yields P(win series), the 4/5/6/7-game length distribution, E[wins],",
-            "E[games], and E[goalie-slot points] scored through the rules engine (a shutout",
-            "win replaces a normal win: 4 pts vs 2).",
-            "",
-            "## Reproducibility",
-            f"- Seed: {cfg.seed}",
-            f"- Held-out test seasons (end year): {list(self.test_years)}",
-            "- The per-game win and shutout models are trained ONLY on seasons before the",
-            "  held-out set; test-season series never touch training (SPEC section 6).",
-            f"- Series scored: {self.n_series_scored} (skipped for missing pre-series "
-            f"state: {self.n_series_skipped}).",
-            "",
-            "## Series-winner calibration (held out)",
-            "Brier score for P(higher seed wins the series), lower is better:",
-            f"- series simulator:        {self.brier_series:.4f}",
-            f"- baseline higher seed=1:  {self.brier_higher_seed:.4f}",
-            f"- baseline coin flip=0.5:  {self.brier_coin_flip:.4f}",
-            f"- Beats higher-seed baseline: {'yes' if self.beats_higher_seed_baseline else 'NO'}",
-            f"- Beats coin flip: {'yes' if self.beats_coin_flip else 'NO'}",
-            "",
-            "### Reliability bins (predicted P(higher seed wins) -> observed)",
-            "| predicted range | n | mean predicted | observed |",
-            "| --- | --- | --- | --- |",
-        ]
-        for b in self.calibration_bins:
-            lines.append(
-                f"| {b.lower:.2f}-{b.upper:.2f} | {b.count} | "
-                f"{b.mean_predicted:.3f} | {b.observed_rate:.3f} |"
-            )
-        lines += [
-            "",
-            "## Series-length distribution: predicted vs. observed",
-            "| games | predicted | observed |",
-            "| --- | --- | --- |",
-        ]
-        for lb in self.length_bins:
-            lines.append(f"| {lb.length} | {lb.predicted_rate:.3f} | {lb.observed_rate:.3f} |")
-        lines += [
-            "",
-            "## Shutouts per playoff round: predicted E[shutouts] vs. observed",
-            "| round | predicted | observed |",
-            "| --- | --- | --- |",
-        ]
-        for rnd in sorted(
-            set(self.predicted_shutouts_by_round) | set(self.observed_shutouts_by_round)
-        ):
-            predicted = self.predicted_shutouts_by_round.get(rnd, 0.0)
-            observed = self.observed_shutouts_by_round.get(rnd, 0)
-            lines.append(f"| {rnd} | {predicted:.2f} | {observed} |")
-        lines += [
-            "",
-            "## Honesty note (SPEC section 7)",
-            f"Metrics are reported exactly as measured. With {self.n_series_scored} playoff "
-            "series held out the",
-            "sample is small, so the series-winner Brier is noisy and may not beat the",
-            "higher-seed baseline every split; the number is printed as-is. Series prices",
-            "are unavailable, so per-game probabilities come from the stat-only win model.",
-            "",
-        ]
-        return lines
+def _series_calibration_bin(
+    *,
+    probs: np.ndarray,
+    labels: np.ndarray,
+    lower: float,
+    upper: float,
+    upper_inclusive: bool,
+) -> SeriesCalibrationBin | None:
+    mask = _series_calibration_mask(
+        probs=probs,
+        lower=lower,
+        upper=upper,
+        upper_inclusive=upper_inclusive,
+    )
+    count = int(mask.sum())
+    if count == 0:
+        return None
+    return SeriesCalibrationBin(
+        lower=lower,
+        upper=upper,
+        count=count,
+        mean_predicted=float(probs[mask].mean()),
+        observed_rate=float(labels[mask].mean()),
+    )
 
 
-def _held_out_years(series: pd.DataFrame, n_test: int) -> tuple[int, ...]:
-    years = sorted({int(y) for y in series["year"].dropna().unique()})
-    return tuple(years[-n_test:]) if n_test > 0 else ()
+def _series_calibration_mask(
+    *,
+    probs: np.ndarray,
+    lower: float,
+    upper: float,
+    upper_inclusive: bool,
+) -> np.ndarray:
+    upper_mask = probs <= upper if upper_inclusive else probs < upper
+    return (probs >= lower) & upper_mask
 
 
 @dataclass(frozen=True)

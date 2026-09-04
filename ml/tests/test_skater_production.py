@@ -36,6 +36,14 @@ TEAMS = ["AAA", "BBB", "CCC", "DDD"]
 # Latent per-game scoring talent per team; skaters inherit their team's rate plus
 # a per-player offset so within-team ranking is learnable.
 TEAM_RATE = {"AAA": 0.9, "BBB": 0.6, "CCC": 0.4, "DDD": 0.2}
+_PLAYOFF_PAIRINGS = [
+    ("AAA", "DDD"),
+    ("DDD", "AAA"),
+    ("AAA", "DDD"),
+    ("DDD", "AAA"),
+    ("AAA", "DDD"),
+    ("DDD", "AAA"),
+]
 
 
 # ── Scalar metrics + shrinkage ─────────────────────────────────────────────
@@ -114,21 +122,11 @@ def _series_rows(seasons: list[int]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _synthetic_archive(
-    *, seasons: list[int], seed: int = 0, n_reg: int = 40
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Regular season (all teams) + a first-round AAA/DDD playoff, several seasons.
-
-    Each of two skaters per team scores at ``team_rate + offset`` per game in the
-    regular season and in the playoffs, so a model on the regular-season rate should
-    track playoff production and rank skaters sensibly.
-    """
-    rng = np.random.default_rng(seed)
-    sk_rows: list[dict[str, object]] = []
-    tg_rows: list[dict[str, object]] = []
-    player_rows: list[dict[str, object]] = []
-
+def _players(
+    last_season_id: int,
+) -> tuple[pd.DataFrame, dict[int, tuple[str, float, str]]]:
     players: dict[int, tuple[str, float, str]] = {}
+    player_rows: list[dict[str, object]] = []
     pid = 100
     for team in TEAMS:
         for offset, pos in ((0.25, "F"), (-0.1, "D")):
@@ -150,87 +148,162 @@ def _synthetic_archive(
                     "draft_round": 1,
                     "draft_overall": 5,
                     "current_team_abbrev": team,
-                    "last_season_id": seasons[-1],
+                    "last_season_id": last_season_id,
                 }
             )
             pid += 1
+    return pd.DataFrame(player_rows), players
+
+
+def _append_skater_rows(
+    rows: list[dict[str, object]],
+    players: dict[int, tuple[str, float, str]],
+    rng: np.random.Generator,
+    *,
+    game_id: int,
+    game_date: str,
+    season_id: int,
+    game_type_id: int,
+    team: str,
+    opp: str,
+) -> None:
+    for player_id, (player_team, rate, pos) in players.items():
+        if player_team != team:
+            continue
+        goals = int(rng.poisson(max(rate * 0.5, 0.01)))
+        assists = int(rng.poisson(max(rate * 0.5, 0.01)))
+        rows.append(
+            _fixture_skater_row(
+                _FixtureSkaterRowInput(
+                    player_id=player_id,
+                    pos=pos,
+                    game_id=game_id,
+                    game_date=game_date,
+                    season_id=season_id,
+                    game_type_id=game_type_id,
+                    team=team,
+                    opp=opp,
+                    goals=goals,
+                    assists=assists,
+                )
+            )
+        )
+
+
+def _emit_regular_season(
+    sk_rows: list[dict[str, object]],
+    tg_rows: list[dict[str, object]],
+    players: dict[int, tuple[str, float, str]],
+    rng: np.random.Generator,
+    *,
+    season_id: int,
+    year: int,
+    n_reg: int,
+    gid_start: int,
+) -> int:
+    gid = gid_start
+    day = 1
+    month = 11
+    for _ in range(n_reg // (len(TEAMS) - 1)):
+        for i, home in enumerate(TEAMS):
+            for away in TEAMS[i + 1 :]:
+                gid += 1
+                date = f"{year}-{month:02d}-{day:02d}"
+                day += 1
+                if day > 27:
+                    day = 1
+                    month = 12 if month == 11 else 11
+                _emit_team_game(
+                    tg_rows,
+                    _EmitTeamGameInput(gid, date, season_id, 2, home, away),
+                )
+                for team, opp in ((home, away), (away, home)):
+                    _append_skater_rows(
+                        sk_rows,
+                        players,
+                        rng,
+                        game_id=gid,
+                        game_date=date,
+                        season_id=season_id,
+                        game_type_id=2,
+                        team=team,
+                        opp=opp,
+                    )
+    return gid
+
+
+def _emit_playoff_series(
+    sk_rows: list[dict[str, object]],
+    tg_rows: list[dict[str, object]],
+    players: dict[int, tuple[str, float, str]],
+    rng: np.random.Generator,
+    *,
+    season_id: int,
+    end_year: int,
+    gid_start: int,
+) -> int:
+    gid = gid_start
+    for game_number, (home, away) in enumerate(_PLAYOFF_PAIRINGS):
+        gid += 1
+        date = f"{end_year}-04-{20 + game_number:02d}"
+        _emit_team_game(
+            tg_rows,
+            _EmitTeamGameInput(gid, date, season_id, 3, home, away),
+        )
+        for team, opp in (("AAA", "DDD"), ("DDD", "AAA")):
+            _append_skater_rows(
+                sk_rows,
+                players,
+                rng,
+                game_id=gid,
+                game_date=date,
+                season_id=season_id,
+                game_type_id=3,
+                team=team,
+                opp=opp,
+            )
+    return gid
+
+
+def _synthetic_archive(
+    *, seasons: list[int], seed: int = 0, n_reg: int = 40
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Regular season (all teams) + a first-round AAA/DDD playoff, several seasons.
+
+    Each of two skaters per team scores at ``team_rate + offset`` per game in the
+    regular season and in the playoffs, so a model on the regular-season rate should
+    track playoff production and rank skaters sensibly.
+    """
+    rng = np.random.default_rng(seed)
+    sk_rows: list[dict[str, object]] = []
+    tg_rows: list[dict[str, object]] = []
+    players_df, players = _players(seasons[-1])
 
     gid = 3_000_000
     for season_id in seasons:
         year = season_id // 10000
-        # Regular season: a round-robin repeated to reach ~n_reg games per team.
-        day = 1
-        month = 11
-        for _ in range(n_reg // (len(TEAMS) - 1)):
-            for i, home in enumerate(TEAMS):
-                for away in TEAMS[i + 1 :]:
-                    gid += 1
-                    date = f"{year}-{month:02d}-{day:02d}"
-                    day += 1
-                    if day > 27:
-                        day = 1
-                        month = 12 if month == 11 else 11
-                    _emit_team_game(
-                        tg_rows,
-                        _EmitTeamGameInput(gid, date, season_id, 2, home, away),
-                    )
-                    for team, opp in ((home, away), (away, home)):
-                        for p, (t, rate, _pos) in players.items():
-                            if t != team:
-                                continue
-                            g = int(rng.poisson(max(rate * 0.5, 0.01)))
-                            a = int(rng.poisson(max(rate * 0.5, 0.01)))
-                            sk_rows.append(
-                                _fixture_skater_row(
-                                    _FixtureSkaterRowInput(
-                                        player_id=p,
-                                        pos=players[p][2],
-                                        game_id=gid,
-                                        game_date=date,
-                                        season_id=season_id,
-                                        game_type_id=2,
-                                        team=team,
-                                        opp=opp,
-                                        goals=g,
-                                        assists=a,
-                                    )
-                                )
-                            )
-        # First-round playoff: AAA vs DDD, six games.
-        for gnum in range(6):
-            gid += 1
-            date = f"{year + 1}-04-{20 + gnum:02d}"
-            home, away = ("AAA", "DDD") if gnum % 2 == 0 else ("DDD", "AAA")
-            _emit_team_game(
-                tg_rows,
-                _EmitTeamGameInput(gid, date, season_id, 3, home, away),
-            )
-            for team, opp in (("AAA", "DDD"), ("DDD", "AAA")):
-                for p, (t, rate, _pos) in players.items():
-                    if t != team:
-                        continue
-                    g = int(rng.poisson(max(rate * 0.5, 0.01)))
-                    a = int(rng.poisson(max(rate * 0.5, 0.01)))
-                    sk_rows.append(
-                        _fixture_skater_row(
-                            _FixtureSkaterRowInput(
-                                player_id=p,
-                                pos=players[p][2],
-                                game_id=gid,
-                                game_date=date,
-                                season_id=season_id,
-                                game_type_id=3,
-                                team=team,
-                                opp=opp,
-                                goals=g,
-                                assists=a,
-                            )
-                        )
-                    )
+        gid = _emit_regular_season(
+            sk_rows,
+            tg_rows,
+            players,
+            rng,
+            season_id=season_id,
+            year=year,
+            n_reg=n_reg,
+            gid_start=gid,
+        )
+        gid = _emit_playoff_series(
+            sk_rows,
+            tg_rows,
+            players,
+            rng,
+            season_id=season_id,
+            end_year=year + 1,
+            gid_start=gid,
+        )
 
     skater_games = pd.DataFrame(sk_rows)
     team_games = pd.DataFrame(tg_rows)
-    players_df = pd.DataFrame(player_rows)
     series = _series_rows(seasons)
     return skater_games, team_games, players_df, series
 

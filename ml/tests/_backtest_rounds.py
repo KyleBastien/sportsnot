@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 from draft_oracle.backtest.replay import (
     BacktestConfig,
     Strategy,
+    _ReplayRoundRequest,
     replay_round,
     round_game_ids,
     run_backtest,
@@ -130,16 +131,19 @@ def test_replay_round_two_scores_only_round_two() -> None:
     skater_actual = skater_actual_points(tables['skater_games'], tables['series'])
     team_actual = team_actual_goalie_points(tables['team_games'], tables['series'])
     rnd = replay_round(
-        tables,
-        season=FOUR_ROUND_TARGET,
-        playoff_round=2,
-        league_picks=None,
-        injuries=None,
-        snapshot_id='four-round',
-        skater_actual=skater_actual,
-        team_actual=team_actual,
-        config=config,
-        scored_rounds=[2],
+        _ReplayRoundRequest(
+            tables=tables,
+            season=FOUR_ROUND_TARGET,
+            playoff_round=2,
+            league_picks=None,
+            injuries=None,
+            odds=None,
+            snapshot_id='four-round',
+            skater_actual=skater_actual,
+            team_actual=team_actual,
+            config=config,
+            scored_rounds=[2],
+        )
     )
     assert rnd.playoff_round == 2
     assert rnd.scored_rounds == [2]

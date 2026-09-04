@@ -13,6 +13,13 @@ import httpx
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
+from draft_oracle.ingest._odds_live_espn import (
+    _dig as _espn_dig,
+)
+from draft_oracle.ingest._odds_live_espn import (
+    _pickcenter_favorite_ml as _espn_pickcenter_favorite_ml,
+)
+from draft_oracle.ingest._odds_live_espn import espn_summary_to_rows as _espn_summary_to_rows
 from draft_oracle.ingest.nhl_api import (
     DEFAULT_MAX_ATTEMPTS,
     DEFAULT_TIMEOUT,
@@ -37,12 +44,6 @@ DEFAULT_ODDS_API_DELAY = 1.0
 
 
 @dataclass(frozen=True)
-class _FavoritePrice:
-    moneyline: float | None
-    side: str | None
-
-
-@dataclass(frozen=True)
 class OddsApiClientConfig:
     api_key: str | None = None
     base: str = ODDS_API_BASE
@@ -60,6 +61,12 @@ class EspnGameOddsClientConfig:
     max_attempts: int = DEFAULT_MAX_ATTEMPTS
     retry_backoff: float = 1.0
     timeout: float = DEFAULT_TIMEOUT
+
+
+@dataclass(frozen=True)
+class _ClientRuntime:
+    client: httpx.Client | None = None
+    sleep: Callable[[float], None] = time.sleep
 
 
 def _odds_api_config(
@@ -115,6 +122,46 @@ def _float_option(options: Mapping[str, object], name: str, default: float) -> f
 
 def _int_option(options: Mapping[str, object], name: str, default: int) -> int:
     return int(cast("float | int", options.get(name, default)))
+
+
+def _runtime_config(
+    runtime: _ClientRuntime | None,
+    legacy: dict[str, object],
+) -> _ClientRuntime:
+    base_runtime = runtime or _ClientRuntime()
+    client = _runtime_client(legacy, base_runtime.client)
+    sleep = _runtime_sleep(legacy, base_runtime.sleep)
+    return _ClientRuntime(client=client, sleep=sleep)
+
+
+def _runtime_client(
+    legacy: dict[str, object],
+    default: httpx.Client | None,
+) -> httpx.Client | None:
+    value = legacy.pop("client", default)
+    if value is None or isinstance(value, httpx.Client):
+        return value
+    raise TypeError("client must be an httpx.Client")
+
+
+def _runtime_sleep(
+    legacy: dict[str, object],
+    default: Callable[[float], None],
+) -> Callable[[float], None]:
+    value = legacy.pop("sleep", default)
+    if callable(value):
+        return cast("Callable[[float], None]", value)
+    raise TypeError("sleep must be callable")
+
+
+def _quota_header_value(headers: httpx.Headers, name: str) -> int | None:
+    value = headers.get(name)
+    if value is None:
+        return None
+    try:
+        return int(float(value))
+    except ValueError:
+        return None
 
 
 class OddsApiOutcome(BaseModel):
@@ -175,10 +222,10 @@ class OddsApiClient:
         cache_dir: Path | str = DEFAULT_ODDS_CACHE_DIR,
         *,
         config: OddsApiClientConfig | None = None,
-        client: httpx.Client | None = None,
-        sleep: Callable[[float], None] = time.sleep,
+        runtime: _ClientRuntime | None = None,
         **legacy: object,
     ) -> None:
+        resolved_runtime = _runtime_config(runtime, legacy)
         config = _odds_api_config(config, legacy)
         if config.max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
@@ -191,9 +238,13 @@ class OddsApiClient:
         self.max_attempts = config.max_attempts
         self.retry_backoff = config.retry_backoff
         self._cache = ResponseCache(Path(cache_dir))
-        self._sleep = sleep
-        self._owns_client = client is None
-        self._client = client if client is not None else httpx.Client(timeout=config.timeout)
+        self._sleep = resolved_runtime.sleep
+        self._owns_client = resolved_runtime.client is None
+        self._client = (
+            resolved_runtime.client
+            if resolved_runtime.client is not None
+            else httpx.Client(timeout=config.timeout)
+        )
         self.requests_remaining: int | None = None
         self.requests_used: int | None = None
 
@@ -246,18 +297,8 @@ class OddsApiClient:
             return None, error
 
     def _capture_quota(self, headers: httpx.Headers) -> None:
-        remaining = headers.get("x-requests-remaining")
-        used = headers.get("x-requests-used")
-        if remaining is not None:
-            try:
-                self.requests_remaining = int(float(remaining))
-            except ValueError:
-                self.requests_remaining = None
-        if used is not None:
-            try:
-                self.requests_used = int(float(used))
-            except ValueError:
-                self.requests_used = None
+        self.requests_remaining = _quota_header_value(headers, "x-requests-remaining")
+        self.requests_used = _quota_header_value(headers, "x-requests-used")
 
     def nhl_odds(
         self, *, markets: str = "h2h", regions: str = "us", odds_format: str = "american"
@@ -399,10 +440,10 @@ class EspnGameOddsClient:
         cache_dir: Path | str = DEFAULT_ESPN_CACHE_DIR,
         *,
         config: EspnGameOddsClientConfig | None = None,
-        client: httpx.Client | None = None,
-        sleep: Callable[[float], None] = time.sleep,
+        runtime: _ClientRuntime | None = None,
         **legacy: object,
     ) -> None:
+        resolved_runtime = _runtime_config(runtime, legacy)
         config = _espn_game_config(config, legacy)
         if config.max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
@@ -411,9 +452,13 @@ class EspnGameOddsClient:
         self.max_attempts = config.max_attempts
         self.retry_backoff = config.retry_backoff
         self._cache = ResponseCache(Path(cache_dir))
-        self._sleep = sleep
-        self._owns_client = client is None
-        self._client = client if client is not None else httpx.Client(timeout=config.timeout)
+        self._sleep = resolved_runtime.sleep
+        self._owns_client = resolved_runtime.client is None
+        self._client = (
+            resolved_runtime.client
+            if resolved_runtime.client is not None
+            else httpx.Client(timeout=config.timeout)
+        )
 
     def close(self) -> None:
         if self._owns_client:
@@ -468,145 +513,15 @@ class EspnGameOddsClient:
 
 
 def espn_summary_to_rows(summary: Mapping[str, Any]) -> pd.DataFrame:
-    """Convert one ESPN ``summary`` payload into a favorite-only odds row.
-
-    Reads ``header.competitions[0]`` for the teams/date and ``pickcenter[0]``
-    for the favorite moneyline and authoritative per-side favorite flag. A usable
-    home-relative spread (``spread < 0`` ⇒ home favorite - PROVENANCE §9) is only
-    the fallback when neither side is flagged. Missing/blank prices or attribution
-    are flagged, not imputed.
-    """
-    from draft_oracle.ingest.odds import (
-        _empty_odds_frame,
-        _favorite_only_row,
-        _finalize,
-        _uncovered_row,
+    return _espn_summary_to_rows(
+        summary,
+        source_label=SOURCE_ESPN_SUMMARY,
     )
-
-    game = _espn_summary_game(summary)
-    if game is None:
-        return _empty_odds_frame()
-    favorite = _espn_pickcenter_favorite(summary.get("pickcenter"))
-    if favorite.moneyline is None or favorite.side is None:
-        return _finalize([_uncovered_row(game)])
-    return _finalize(
-        [
-            _favorite_only_row(
-                game,
-                favorite_ml=favorite.moneyline,
-                favorite_side=favorite.side,
-            )
-        ]
-    )
-
-
-def _espn_summary_game(summary: Mapping[str, Any]) -> OddsRowGame | None:
-    from draft_oracle.ingest.odds import OddsRowGame, _parse_utc_date, resolve_team_id
-
-    competition = _first_espn_competition(summary)
-    if competition is None:
-        return None
-    home_name, away_name = _espn_competitor_names(competition)
-    game_date = _parse_utc_date(competition.get("date"))
-    if home_name is None:
-        return None
-    if away_name is None:
-        return None
-    if game_date is None:
-        return None
-    home_id = resolve_team_id(home_name)
-    away_id = resolve_team_id(away_name)
-    if home_id is None or away_id is None:
-        return None
-    season_end_year = game_date.year if game_date.month < 8 else game_date.year + 1
-    return OddsRowGame(
-        source=SOURCE_ESPN_SUMMARY,
-        season_end_year=season_end_year,
-        game_date=game_date,
-        away_id=away_id,
-        home_id=home_id,
-        away_name=away_name,
-        home_name=home_name,
-        neutral=False,
-    )
-
-
-def _first_espn_competition(summary: Mapping[str, Any]) -> dict[str, Any] | None:
-    competitions = _dig(summary, "header", "competitions")
-    if not isinstance(competitions, list):
-        return None
-    if not competitions:
-        return None
-    first = competitions[0]
-    return first if isinstance(first, dict) else None
-
-
-def _espn_competitor_names(competition: Mapping[str, Any]) -> tuple[str | None, str | None]:
-    competitors = competition.get("competitors", [])
-    if not isinstance(competitors, list):
-        return None, None
-    names = {
-        side: name
-        for side, name in (_espn_competitor_side_name(item) for item in competitors)
-        if side is not None
-    }
-    return names.get("home"), names.get("away")
-
-
-def _espn_competitor_side_name(competitor: object) -> tuple[str | None, str | None]:
-    if not isinstance(competitor, Mapping):
-        return None, None
-    team = competitor.get("team", {})
-    name = team.get("displayName") if isinstance(team, Mapping) else None
-    side = competitor.get("homeAway")
-    return str(side) if side is not None else None, str(name) if name is not None else None
-
-
-def _espn_pickcenter_favorite(pickcenter: object) -> _FavoritePrice:
-    from draft_oracle.ingest.odds import _american, _pickcenter_favorite_side
-
-    if not isinstance(pickcenter, list):
-        return _FavoritePrice(None, None)
-    if not pickcenter:
-        return _FavoritePrice(None, None)
-    first = pickcenter[0]
-    if not isinstance(first, Mapping):
-        return _FavoritePrice(None, None)
-    favorite_ml = _pickcenter_favorite_ml(first)
-    favorite_side = _pickcenter_favorite_side(first)
-    home_relative_spread = _american(first.get("spread"))
-    if favorite_side is None and home_relative_spread not in (None, 0.0):
-        favorite_side = "home" if home_relative_spread < 0 else "away"
-    return _FavoritePrice(favorite_ml, favorite_side)
 
 
 def _pickcenter_favorite_ml(pickcenter: Mapping[str, Any]) -> float | None:
-    """Extract the favorite's moneyline from an ESPN ``pickcenter`` entry."""
-    from draft_oracle.ingest.odds import _american
-
-    for side_key in ("homeTeamOdds", "awayTeamOdds"):
-        coerced = _favorite_side_moneyline(pickcenter.get(side_key))
-        if coerced is not None:
-            return coerced
-    # Fall back to a top-level moneyLine if the per-side flags are absent.
-    return _american(pickcenter.get("moneyLine"))
-
-
-def _favorite_side_moneyline(side: object) -> float | None:
-    from draft_oracle.ingest.odds import _american
-
-    if not isinstance(side, Mapping):
-        return None
-    if not side.get("favorite"):
-        return None
-    return _american(side.get("moneyLine"))
+    return _espn_pickcenter_favorite_ml(pickcenter)
 
 
 def _dig(obj: Any, *keys: str) -> Any:
-    """Safely walk nested mappings; return ``None`` on any miss."""
-    current = obj
-    for key in keys:
-        if not isinstance(current, Mapping) or key not in current:
-            return None
-        current = current[key]
-    return current
+    return _espn_dig(obj, *keys)

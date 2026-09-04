@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 
@@ -35,14 +37,40 @@ SERIES_RESULT = [
 ]
 HOME_PATTERN = ["top", "top", "bottom", "bottom", "top", "top"]
 
-def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
+
+@dataclass(frozen=True)
+class _PlayerPoolInput:
+    teams: list[str]
+    strengths: dict[str, float]
+    forwards: int
+    defense: int
+    pid_start: int
+
+
+@dataclass(frozen=True)
+class _TeamRowsInput:
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    home: str
+    away: str
+    home_goals: int
+    away_goals: int
+    teams: list[str]
+    team_ids: dict[str, int] | None = None
+
+
+def _player_tables(
+    spec: _PlayerPoolInput,
+) -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
     players: dict[int, tuple[str, str, float]] = {}
     rows: list[dict[str, object]] = []
-    pid = 100
-    for team in TEAMS:
-        for i in range(FORWARDS_PER_TEAM + DEFENSE_PER_TEAM):
-            pos = "F" if i < FORWARDS_PER_TEAM else "D"
-            rate = 0.6 + 0.05 * (STRENGTH[team]) - 0.03 * i
+    pid = spec.pid_start
+    for team in spec.teams:
+        for i in range(spec.forwards + spec.defense):
+            pos = "F" if i < spec.forwards else "D"
+            rate = 0.6 + 0.05 * spec.strengths[team] - 0.03 * i
             players[pid] = (team, pos, max(rate, 0.15))
             rows.append(
                 {
@@ -59,32 +87,35 @@ def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
             pid += 1
     return pd.DataFrame(rows), players
 
-def _team_rows(
-    game_id: int,
-    game_date: str,
-    season_id: int,
-    game_type_id: int,
-    home: str,
-    away: str,
-    home_goals: int,
-    away_goals: int,
-    team_ids: dict[str, int] | None = None,
-) -> list[dict[str, object]]:
+
+def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
+    return _player_tables(
+        _PlayerPoolInput(TEAMS, STRENGTH, FORWARDS_PER_TEAM, DEFENSE_PER_TEAM, 100)
+    )
+
+
+def _players16() -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
+    return _player_tables(
+        _PlayerPoolInput(TEAMS16, STRENGTH16, FORWARDS16, DEFENSE16, 1000)
+    )
+
+
+def _team_rows(spec: _TeamRowsInput) -> list[dict[str, object]]:
     def _team_id(team: str) -> int:
-        return team_ids[team] if team_ids is not None else TEAMS.index(team) + 1
+        return spec.team_ids[team] if spec.team_ids is not None else spec.teams.index(team) + 1
 
     rows: list[dict[str, object]] = []
     for team, opp, gf, ga, is_home in (
-        (home, away, home_goals, away_goals, True),
-        (away, home, away_goals, home_goals, False),
+        (spec.home, spec.away, spec.home_goals, spec.away_goals, True),
+        (spec.away, spec.home, spec.away_goals, spec.home_goals, False),
     ):
         won = gf > ga
         rows.append(
             {
-                "season_id": season_id,
-                "game_type_id": game_type_id,
-                "game_id": game_id,
-                "game_date": game_date,
+                "season_id": spec.season_id,
+                "game_type_id": spec.game_type_id,
+                "game_id": spec.game_id,
+                "game_date": spec.game_date,
                 "team_id": _team_id(team),
                 "team_abbrev": team,
                 "team_full_name": team,
@@ -144,7 +175,21 @@ def _synthetic_archive(
                     else:
                         ag = int(rng.integers(2, 5))
                         hg = int(rng.integers(0, ag))
-                    tg_rows.extend(_team_rows(gid, date, season_id, 2, home, away, hg, ag))
+                    tg_rows.extend(
+                        _team_rows(
+                            _TeamRowsInput(
+                                gid,
+                                date,
+                                season_id,
+                                2,
+                                home,
+                                away,
+                                hg,
+                                ag,
+                                TEAMS,
+                            )
+                        )
+                    )
                     for team, opp in ((home, away), (away, home)):
                         for p, (t, pos, rate) in players.items():
                             if t != team:
@@ -175,7 +220,21 @@ def _synthetic_archive(
                 winner = top if winner_side == "top" else bottom
                 hg, ag = (wg, lg) if winner == host else (lg, wg)
                 date = f"{end_year}-04-{15 + offset:02d}"
-                tg_rows.extend(_team_rows(gid, date, season_id, 3, host, visitor, hg, ag))
+                tg_rows.extend(
+                    _team_rows(
+                        _TeamRowsInput(
+                            gid,
+                            date,
+                            season_id,
+                            3,
+                            host,
+                            visitor,
+                            hg,
+                            ag,
+                            TEAMS,
+                        )
+                    )
+                )
                 for team, opp in ((top, bottom), (bottom, top)):
                     for p, (t, pos, rate) in players.items():
                         if t != team:
@@ -222,9 +281,6 @@ def _synthetic_archive(
         pd.DataFrame(series_rows),
     )
 
-_ARCHIVE_TABLES = _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=1)
-
-
 def _tables(seed: int = 1) -> dict[str, pd.DataFrame]:
     if seed == 1:
         sk, tg, players, series = _ARCHIVE_TABLES
@@ -242,53 +298,50 @@ def _tables(seed: int = 1) -> dict[str, pd.DataFrame]:
 # the combined R3_4 draft need a sixteen-team first round. The lower-indexed seed
 # wins every series (SERIES_RESULT: 4-2 in six), so the survivors are deterministic:
 # R1 -> T01..T08, R2 -> T01..T04, R3 (conference finals) -> T01,T02, R4 -> T01.
-TEAMS16 = [f"T{i:02d}" for i in range(1, 17)]
-TEAM16_ID = {t: i + 1 for i, t in enumerate(TEAMS16)}
-STRENGTH16 = {t: 8.0 - 0.4 * i for i, t in enumerate(TEAMS16)}
+
+
+def _team_labels(count: int) -> list[str]:
+    return [f"T{i:02d}" for i in range(1, count + 1)]
+
+
+def _team_id_lookup(teams: list[str]) -> dict[str, int]:
+    return {team: index + 1 for index, team in enumerate(teams)}
+
+
+def _team_strengths(teams: list[str]) -> dict[str, float]:
+    return {team: 8.0 - 0.4 * index for index, team in enumerate(teams)}
+
+
+def _round_pairs(teams: list[str]) -> dict[int, list[tuple[str, str]]]:
+    return {
+        1: [(teams[i], teams[15 - i]) for i in range(8)],
+        2: [(teams[i], teams[7 - i]) for i in range(4)],
+        3: [(teams[0], teams[3]), (teams[1], teams[2])],
+        4: [(teams[0], teams[1])],
+    }
+
+
+def _round_dates() -> dict[int, list[str]]:
+    return {
+        1: [f"-04-{15 + offset:02d}" for offset in range(6)],
+        2: [f"-04-{24 + offset:02d}" for offset in range(6)],
+        3: [f"-05-{5 + offset:02d}" for offset in range(6)],
+        4: [f"-05-{15 + offset:02d}" for offset in range(6)],
+    }
+
+
+TEAMS16 = _team_labels(16)
+TEAM16_ID = _team_id_lookup(TEAMS16)
+STRENGTH16 = _team_strengths(TEAMS16)
 FORWARDS16 = 6
 DEFENSE16 = 4
 FOUR_ROUND_YEARS = [2019, 2020, 2021, 2022]
 FOUR_ROUND_TARGET = 2022
 
 # Bracket pairings per round; first-named (lower seed index) wins each series.
-ROUND_PAIRS: dict[int, list[tuple[str, str]]] = {
-    1: [(TEAMS16[i], TEAMS16[15 - i]) for i in range(8)],
-    2: [(TEAMS16[i], TEAMS16[7 - i]) for i in range(4)],
-    3: [(TEAMS16[0], TEAMS16[3]), (TEAMS16[1], TEAMS16[2])],
-    4: [(TEAMS16[0], TEAMS16[1])],
-}
+ROUND_PAIRS = _round_pairs(TEAMS16)
 # Six strictly increasing game dates per round (round N is played after round N-1).
-ROUND_DATES: dict[int, list[str]] = {
-    1: [f"-04-{15 + o:02d}" for o in range(6)],
-    2: [f"-04-{24 + o:02d}" for o in range(6)],
-    3: [f"-05-{5 + o:02d}" for o in range(6)],
-    4: [f"-05-{15 + o:02d}" for o in range(6)],
-}
-
-
-def _players16() -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
-    players: dict[int, tuple[str, str, float]] = {}
-    rows: list[dict[str, object]] = []
-    pid = 1000
-    for team in TEAMS16:
-        for i in range(FORWARDS16 + DEFENSE16):
-            pos = "F" if i < FORWARDS16 else "D"
-            rate = 0.6 + 0.05 * STRENGTH16[team] - 0.03 * i
-            players[pid] = (team, pos, max(rate, 0.15))
-            rows.append(
-                {
-                    "player_id": pid,
-                    "player_name": f"{team}-{pid}",
-                    "last_name": f"L{pid}",
-                    "birth_date": "1996-01-01",
-                    "position_code": "C" if pos == "F" else "D",
-                    "position": pos,
-                    "shoots_catches": "L",
-                    "current_team_abbrev": team,
-                }
-            )
-            pid += 1
-    return pd.DataFrame(rows), players
+ROUND_DATES = _round_dates()
 
 
 def _four_round_archive(
@@ -327,7 +380,20 @@ def _four_round_archive(
                         ag = int(rng.integers(2, 5))
                         hg = int(rng.integers(0, ag))
                     tg_rows.extend(
-                        _team_rows(gid, date, season_id, 2, home, away, hg, ag, team_ids=TEAM16_ID)
+                        _team_rows(
+                            _TeamRowsInput(
+                                gid,
+                                date,
+                                season_id,
+                                2,
+                                home,
+                                away,
+                                hg,
+                                ag,
+                                TEAMS16,
+                                team_ids=TEAM16_ID,
+                            )
+                        )
                     )
                     for team, opp in ((home, away), (away, home)):
                         for p, (t, pos, rate) in players.items():
@@ -365,7 +431,18 @@ def _four_round_archive(
                     date = f"{end_year}{dates[offset]}"
                     tg_rows.extend(
                         _team_rows(
-                            gid, date, season_id, 3, host, visitor, hg, ag, team_ids=TEAM16_ID
+                            _TeamRowsInput(
+                                gid,
+                                date,
+                                season_id,
+                                3,
+                                host,
+                                visitor,
+                                hg,
+                                ag,
+                                TEAMS16,
+                                team_ids=TEAM16_ID,
+                            )
                         )
                     )
                     for team, opp in ((top, bottom), (bottom, top)):
@@ -440,3 +517,6 @@ def _four_round_config() -> BacktestConfig:
         strategies=("oracle",),
         project_config=project,
     )
+
+
+_ARCHIVE_TABLES = _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=1)

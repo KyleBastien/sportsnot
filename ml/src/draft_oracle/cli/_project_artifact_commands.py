@@ -24,6 +24,38 @@ if TYPE_CHECKING:
     from draft_oracle.projection_artifact import ProjectArtifactConfig, ProjectArtifactResult
 
 
+@dataclass(frozen=True)
+class _ProjectConfigRequest:
+    seed: int
+    managers: int
+    ir: bool
+    no_refresh: bool
+    slot_strategies: bool
+    slot_rollouts: int
+
+
+@dataclass(frozen=True)
+class _RecommendInputsRequest:
+    artifact_dir: Path
+    managers: str
+    seat: int
+    ir: bool
+    temperature: float
+    opponents: str
+    opponent_artifact: Path
+
+
+@dataclass(frozen=True)
+class _BuildRecommendSetupRequest:
+    manager_ids: list[str]
+    seat: int
+    ir: bool
+    pool: Sequence[DraftAsset]
+    opponents_kind: str
+    opponent_artifact: Path
+    temperature: float
+
+
 def _maybe_refresh_normalized_archive(
     *,
     no_refresh: bool,
@@ -38,25 +70,20 @@ def _maybe_refresh_normalized_archive(
     normalize_archive(archive_dir=archive_dir, out_dir=normalized_dir)
 
 
-def _project_config(
-    *,
-    seed: int,
-    managers: int,
-    ir: bool,
-    no_refresh: bool,
-    slot_strategies: bool,
-    slot_rollouts: int,
-) -> ProjectArtifactConfig:
+def _project_config(request: _ProjectConfigRequest) -> ProjectArtifactConfig:
     from draft_oracle.optimize.slot_strategies import SlotStrategyConfig
     from draft_oracle.projection_artifact import ProjectArtifactConfig
 
     return ProjectArtifactConfig(
-        seed=seed,
-        managers=managers,
-        ir=ir,
-        no_refresh=no_refresh,
-        slot_strategies=slot_strategies,
-        slot_strategy_config=SlotStrategyConfig(seed=seed, rollouts=slot_rollouts),
+        seed=request.seed,
+        managers=request.managers,
+        ir=request.ir,
+        no_refresh=request.no_refresh,
+        slot_strategies=request.slot_strategies,
+        slot_strategy_config=SlotStrategyConfig(
+            seed=request.seed,
+            rollouts=request.slot_rollouts,
+        ),
     )
 
 
@@ -155,12 +182,14 @@ def project(
         artifacts_root=artifacts_root,
         snapshot=snapshot or None,
         config=_project_config(
+            _ProjectConfigRequest(
             seed=seed,
             managers=managers,
             ir=ir,
             no_refresh=no_refresh,
             slot_strategies=slot_strategies,
             slot_rollouts=slot_rollouts,
+            )
         ),
     )
     _echo_project_summary(result, out_dir)
@@ -204,13 +233,15 @@ def recommend(
     real seat.
     """
     inputs = _recommend_inputs(
-        artifact_dir=artifact_dir,
-        managers=managers,
-        seat=seat,
-        ir=ir,
-        temperature=temperature,
-        opponents=opponents,
-        opponent_artifact=opponent_artifact,
+        _RecommendInputsRequest(
+            artifact_dir=artifact_dir,
+            managers=managers,
+            seat=seat,
+            ir=ir,
+            temperature=temperature,
+            opponents=opponents,
+            opponent_artifact=opponent_artifact,
+        )
     )
     result = _recommendation_result(inputs, rollouts=rollouts, depth=depth, seed=seed)
     _echo_recommendation(result, inputs.label)
@@ -222,16 +253,7 @@ class _RecommendInputs:
     label: str
 
 
-def _recommend_inputs(
-    *,
-    artifact_dir: Path,
-    managers: str,
-    seat: int,
-    ir: bool,
-    temperature: float,
-    opponents: str,
-    opponent_artifact: Path,
-) -> _RecommendInputs:
+def _recommend_inputs(request: _RecommendInputsRequest) -> _RecommendInputs:
     from draft_oracle.cli.draft import (
         opponent_label,
         parse_managers,
@@ -239,18 +261,20 @@ def _recommend_inputs(
     )
     from draft_oracle.optimize.recommend import build_pool_from_projection_artifact
 
-    manager_ids = parse_managers(managers)
-    _validate_seat(seat, len(manager_ids))
-    opponents_kind = resolve_opponents_kind(opponents, opponent_artifact)
-    pool = build_pool_from_projection_artifact(artifact_dir, ir=ir)
+    manager_ids = parse_managers(request.managers)
+    _validate_seat(request.seat, len(manager_ids))
+    opponents_kind = resolve_opponents_kind(request.opponents, request.opponent_artifact)
+    pool = build_pool_from_projection_artifact(request.artifact_dir, ir=request.ir)
     setup = _build_recommend_setup(
-        manager_ids=manager_ids,
-        seat=seat,
-        ir=ir,
-        pool=pool,
-        opponents_kind=opponents_kind,
-        opponent_artifact=opponent_artifact,
-        temperature=temperature,
+        _BuildRecommendSetupRequest(
+            manager_ids=manager_ids,
+            seat=request.seat,
+            ir=request.ir,
+            pool=pool,
+            opponents_kind=opponents_kind,
+            opponent_artifact=request.opponent_artifact,
+            temperature=request.temperature,
+        )
     )
     return _RecommendInputs(
         setup=setup,
@@ -299,29 +323,24 @@ def _validate_seat(seat: int, manager_count: int) -> None:
         raise typer.BadParameter(f"seat must be in 1..{manager_count}")
 
 
-def _build_recommend_setup(
-    *,
-    manager_ids: list[str],
-    seat: int,
-    ir: bool,
-    pool: Sequence[DraftAsset],
-    opponents_kind: str,
-    opponent_artifact: Path,
-    temperature: float,
-) -> _RecommendSetup:
+def _build_recommend_setup(request: _BuildRecommendSetupRequest) -> _RecommendSetup:
     from draft_oracle.optimize.opponents import load_committed_opponents
     from draft_oracle.optimize.simulator import DraftState, GreedyOpponentModel
 
-    owner = manager_ids[seat - 1]
-    state = DraftState.new(manager_ids, pool, allow_ir=ir)
-    fitted = load_committed_opponents(opponent_artifact) if opponents_kind == "fitted" else None
-    if opponents_kind == "fitted" and fitted is None:
+    owner = request.manager_ids[request.seat - 1]
+    state = DraftState.new(request.manager_ids, request.pool, allow_ir=request.ir)
+    fitted = (
+        load_committed_opponents(request.opponent_artifact)
+        if request.opponents_kind == "fitted"
+        else None
+    )
+    if request.opponents_kind == "fitted" and fitted is None:
         raise typer.BadParameter(
-            f"--opponents fitted needs a committed artifact at {opponent_artifact}"
+            f"--opponents fitted needs a committed artifact at {request.opponent_artifact}"
         )
     if fitted is not None:
-        return _RecommendSetup(owner, state, fitted.as_mapping(manager_ids), fitted)
-    greedy = GreedyOpponentModel(temperature=temperature, need_weight=4.0)
+        return _RecommendSetup(owner, state, fitted.as_mapping(request.manager_ids), fitted)
+    greedy = GreedyOpponentModel(temperature=request.temperature, need_weight=4.0)
     return _RecommendSetup(owner, state, greedy, None)
 
 

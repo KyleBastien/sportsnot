@@ -21,13 +21,11 @@ The Typer command :func:`draft` wires these together into an interactive loop.
 
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, TypedDict, Unpack, cast
 
 import typer
 
@@ -38,6 +36,19 @@ from draft_oracle.cli._draft_parsing import (
     parse_command,
     parse_managers,
     resolve_opponents_kind,
+)
+from draft_oracle.cli._draft_resolution import (
+    ActionResult,
+    AssetResolution,
+    RecordedPick,
+    resolve_asset,
+    resolve_manager,
+)
+from draft_oracle.cli._draft_runtime import _run_loop as _run_loop_impl
+from draft_oracle.cli._draft_session_io import (
+    _resume_inputs,
+    _save_session,
+    _session_dict,
 )
 from draft_oracle.optimize.opponents import (
     DEFAULT_OPPONENT_ARTIFACT_DIR,
@@ -78,182 +89,28 @@ DEFAULT_TEMPERATURE = 0.3
 DEFAULT_SEED = 20260827
 DEFAULT_ROLLOUTS = 500
 DEFAULT_NEED_WEIGHT = 4.0
-
-# A resolution is treated as unambiguous only when the best fuzzy match clears
-# the runner-up by this margin; otherwise the pick is rejected as ambiguous.
-_FUZZY_MARGIN = 0.08
-_FUZZY_FLOOR = 0.5
-
-
-# ── Pure helpers (command parsing + resolution) ───────────────────────────
-
-
-def resolve_manager(managers: list[str], token: str) -> str | None:
-    """Resolve a manager ``token`` (1-based seat number, id, or prefix)."""
-    stripped = token.strip().lower()
-    if not stripped:
-        return None
-    if stripped.isdigit():
-        return _manager_by_seat(managers, int(stripped))
-    exact = _manager_by_exact_id(managers, stripped)
-    if exact is not None:
-        return exact
-    return _manager_by_prefix(managers, stripped)
-
-
-def _manager_by_seat(managers: list[str], index: int) -> str | None:
-    if 1 <= index <= len(managers):
-        return managers[index - 1]
-    return None
-
-
-def _manager_by_exact_id(managers: list[str], stripped: str) -> str | None:
-    for manager in managers:
-        if manager.lower() == stripped:
-            return manager
-    return None
-
-
-def _manager_by_prefix(managers: list[str], stripped: str) -> str | None:
-    prefixed = [manager for manager in managers if manager.lower().startswith(stripped)]
-    if len(prefixed) == 1:
-        return prefixed[0]
-    return None
-
-
-@dataclass(frozen=True)
-class AssetResolution:
-    """Outcome of resolving a fuzzy name against the pool.
-
-    ``asset`` is the single confident match (or ``None``); ``matches`` are the
-    ranked candidates surfaced to the user; ``reason`` is ``""`` on success or a
-    short tag (``"ambiguous"`` / ``"no match"`` / ``"empty query"``).
-    """
-
-    asset: DraftAsset | None
-    matches: list[DraftAsset]
-    reason: str
-
-
-def _ratio(a: str, b: str) -> float:
-    return SequenceMatcher(None, a, b).ratio()
-
-
-def _named_asset_matches(
-    pool: list[DraftAsset],
-    normalized: str,
-    *,
-    limit: int,
-) -> AssetResolution | None:
-    exact = [asset for asset in pool if asset.name.lower() == normalized]
-    if len(exact) == 1:
-        return AssetResolution(exact[0], exact, "")
-    if len(exact) >= 2:
-        return AssetResolution(None, exact[:limit], "ambiguous")
-
-    substrings = [asset for asset in pool if normalized in asset.name.lower()]
-    if len(substrings) == 1:
-        return AssetResolution(substrings[0], substrings, "")
-    return None
-
-
-def _fuzzy_asset_resolution(
-    pool: list[DraftAsset],
-    normalized: str,
-    *,
-    limit: int,
-) -> AssetResolution:
-    substrings = [asset for asset in pool if normalized in asset.name.lower()]
-    candidates = substrings if substrings else list(pool)
-    scored = sorted(
-        candidates,
-        key=lambda asset: (-_ratio(normalized, asset.name.lower()), asset.name.lower(), asset.key),
-    )
-    if not scored:
-        return AssetResolution(None, [], "no match")
-
-    top = scored[0]
-    top_score = _ratio(normalized, top.name.lower())
-    if not substrings and top_score < _FUZZY_FLOOR:
-        return AssetResolution(None, scored[:limit], "no match")
-    if len(scored) >= 2:
-        second_score = _ratio(normalized, scored[1].name.lower())
-        if top_score - second_score < _FUZZY_MARGIN:
-            return AssetResolution(None, scored[:limit], "ambiguous")
-    return AssetResolution(top, scored[:limit], "")
-
-
-def resolve_asset(pool: list[DraftAsset], query: str, *, limit: int = 5) -> AssetResolution:
-    """Resolve a fuzzy ``query`` to a single pool asset (pure, deterministic).
-
-    Resolution order: exact (case-insensitive) name, then substring, then a
-    SequenceMatcher fuzzy pass. A match is only accepted when it is unique or
-    clears the runner-up by :data:`_FUZZY_MARGIN`; otherwise the candidates are
-    returned as ``ambiguous`` so the caller can ask again. Ties break by name
-    then key so the same query always resolves the same way.
-    """
-    normalized = query.strip().lower()
-    if not normalized:
-        return AssetResolution(None, [], "empty query")
-    named = _named_asset_matches(pool, normalized, limit=limit)
-    if named is not None:
-        return named
-    return _fuzzy_asset_resolution(pool, normalized, limit=limit)
-
-
 # ── Session engine ────────────────────────────────────────────────────────
-
-
-@dataclass(frozen=True)
-class RecordedPick:
-    """One recorded pick: who drafted which asset (a replayable log entry)."""
-
-    manager: str
-    asset_key: str
-    name: str
-    position: str
-
-    def as_dict(self) -> dict[str, str]:
-        """JSON-serialisable form."""
-        return {
-            "manager": self.manager,
-            "asset_key": self.asset_key,
-            "name": self.name,
-            "position": self.position,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> RecordedPick:
-        """Rebuild from :meth:`as_dict` output."""
-        return cls(
-            manager=str(data["manager"]),
-            asset_key=str(data["asset_key"]),
-            name=str(data["name"]),
-            position=str(data["position"]),
-        )
-
-
-@dataclass(frozen=True)
-class ActionResult:
-    """The outcome of a session action: success flag, message, and any lines."""
-
-    ok: bool
-    message: str
-    lines: list[str] = field(default_factory=list)
-
-
 def _resolve_eliminated(pool: list[DraftAsset], abbrevs: list[str]) -> frozenset[int]:
-    wanted = {abbrev.strip().upper() for abbrev in abbrevs if abbrev.strip()}
+    wanted = _wanted_eliminated_abbrevs(abbrevs)
     if not wanted:
         return frozenset()
-    team_ids: dict[str, set[int]] = defaultdict(set)
-    for asset in pool:
-        if asset.team_id is not None:
-            team_ids[asset.team_abbrev.upper()].add(asset.team_id)
+    team_ids = _team_ids_by_abbrev(pool)
     unknown = sorted(wanted - team_ids.keys())
     if unknown:
         raise typer.BadParameter(f"--eliminated unknown team abbrev(s): {', '.join(unknown)}")
     return frozenset(team_id for abbrev in wanted for team_id in team_ids[abbrev])
+
+
+def _wanted_eliminated_abbrevs(abbrevs: list[str]) -> set[str]:
+    return {abbrev.strip().upper() for abbrev in abbrevs if abbrev.strip()}
+
+
+def _team_ids_by_abbrev(pool: list[DraftAsset]) -> dict[str, set[int]]:
+    team_ids: dict[str, set[int]] = defaultdict(set)
+    for asset in pool:
+        if asset.team_id is not None:
+            team_ids[asset.team_abbrev.upper()].add(asset.team_id)
+    return team_ids
 
 
 def opponent_label(
@@ -302,52 +159,48 @@ class DraftSession:
     state: DraftState = field(init=False)
 
     def __post_init__(self) -> None:
+        self._validate_session_shape()
+        self._load_fitted_if_requested()
+        self._rebuild()
+
+    @classmethod
+    def from_artifact(
+        cls,
+        artifact_dir: DraftSessionArtifactRequest | Path,
+        **legacy: Unpack[_DraftSessionArtifactKwargs],
+    ) -> DraftSession:
+        """Start a fresh session from a US-017 projection artifact directory."""
+        request = _resolve_artifact_request(artifact_dir, legacy)
+        pool = build_pool_from_projection_artifact(request.artifact_dir, ir=request.ir)
+        manager_ids = request.managers or [f"seat{i + 1}" for i in range(request.manager_count)]
+        eliminated_ids = _resolve_eliminated(pool, request.eliminated or [])
+        return cls(
+            artifact_dir=request.artifact_dir,
+            manager_count=request.manager_count,
+            slot=request.slot,
+            ir=request.ir,
+            pool=pool,
+            managers=manager_ids,
+            eliminated_team_ids=eliminated_ids,
+            temperature=request.temperature,
+            seed=request.seed,
+            rollouts=request.rollouts,
+            opponents=request.opponents,
+            opponent_artifact_dir=request.opponent_artifact_dir,
+            fitted=request.fitted,
+        )
+
+    def _validate_session_shape(self) -> None:
         if not 1 <= self.slot <= self.manager_count:
             raise ValueError(f"slot must be in 1..{self.manager_count}, got {self.slot}")
         if len(self.managers) != self.manager_count:
             raise ValueError("managers length must equal manager_count")
         if self.opponents not in (OPPONENTS_GREEDY, OPPONENTS_FITTED):
             raise ValueError(f"opponents must be greedy or fitted, got {self.opponents!r}")
+
+    def _load_fitted_if_requested(self) -> None:
         if self.opponents == OPPONENTS_FITTED and self.fitted is None:
             self.fitted = FittedLeagueOpponents.load(self.opponent_artifact_dir)
-        self._rebuild()
-
-    @classmethod
-    def from_artifact(
-        cls,
-        artifact_dir: Path,
-        *,
-        manager_count: int,
-        slot: int,
-        ir: bool = False,
-        eliminated: list[str] | None = None,
-        temperature: float = DEFAULT_TEMPERATURE,
-        seed: int = DEFAULT_SEED,
-        rollouts: int = DEFAULT_ROLLOUTS,
-        managers: list[str] | None = None,
-        opponents: str = OPPONENTS_GREEDY,
-        opponent_artifact_dir: Path = DEFAULT_OPPONENT_ARTIFACT_DIR,
-        fitted: FittedLeagueOpponents | None = None,
-    ) -> DraftSession:
-        """Start a fresh session from a US-017 projection artifact directory."""
-        pool = build_pool_from_projection_artifact(artifact_dir, ir=ir)
-        manager_ids = managers or [f"seat{i + 1}" for i in range(manager_count)]
-        eliminated_ids = _resolve_eliminated(pool, eliminated or [])
-        return cls(
-            artifact_dir=artifact_dir,
-            manager_count=manager_count,
-            slot=slot,
-            ir=ir,
-            pool=pool,
-            managers=manager_ids,
-            eliminated_team_ids=eliminated_ids,
-            temperature=temperature,
-            seed=seed,
-            rollouts=rollouts,
-            opponents=opponents,
-            opponent_artifact_dir=opponent_artifact_dir,
-            fitted=fitted,
-        )
 
     @property
     def owner(self) -> str:
@@ -379,6 +232,25 @@ class DraftSession:
 
     def record_pick(self, manager_token: str, query: str) -> ActionResult:
         """Record ``manager``'s pick of the fuzzy-named asset, or reject with reason."""
+        manager_result = self._pick_manager_result(manager_token)
+        if manager_result is not None:
+            return manager_result
+        current = self.state.current_manager
+        asset_result = self._pick_asset_result(query)
+        if asset_result is not None:
+            return asset_result
+        asset = self._draftable_asset(query, current)
+        if isinstance(asset, ActionResult):
+            return asset
+        self.state.apply_pick(asset)
+        self.picks.append(RecordedPick(current, asset.key, asset.name, asset.position))
+        return ActionResult(
+            True,
+            f"pick #{len(self.picks)}: {current} drafts {asset.name} "
+            f"({asset.position} {asset.team_abbrev})",
+        )
+
+    def _pick_manager_result(self, manager_token: str) -> ActionResult | None:
         manager = resolve_manager(self.managers, manager_token)
         if manager is None:
             return ActionResult(False, f"unknown manager {manager_token!r}")
@@ -387,35 +259,35 @@ class DraftSession:
         current = self.state.current_manager
         if manager != current:
             return ActionResult(False, f"not {manager}'s turn (on the clock: {current})")
+        return None
 
+    def _pick_asset_result(self, query: str) -> ActionResult | None:
         resolution = resolve_asset(self.pool, query)
-        if resolution.asset is None:
-            if resolution.reason == "ambiguous":
-                names = ", ".join(
-                    f"{asset.name} ({asset.position} {asset.team_abbrev})"
-                    for asset in resolution.matches
-                )
-                return ActionResult(False, f"ambiguous name {query!r}; did you mean: {names}")
-            return ActionResult(False, f"no player matches {query!r}")
+        if resolution.asset is not None:
+            return None
+        if resolution.reason == "ambiguous":
+            names = ", ".join(
+                f"{asset.name} ({asset.position} {asset.team_abbrev})"
+                for asset in resolution.matches
+            )
+            return ActionResult(False, f"ambiguous name {query!r}; did you mean: {names}")
+        return ActionResult(False, f"no player matches {query!r}")
 
+    def _draftable_asset(self, query: str, current: str) -> DraftAsset | ActionResult:
+        resolution = resolve_asset(self.pool, query)
+        assert resolution.asset is not None
         asset = resolution.asset
         if asset.team_id is not None and asset.team_id in self.eliminated_team_ids:
             return ActionResult(
-                False, f"{asset.name} is on an eliminated team and cannot be drafted"
+                False,
+                f"{asset.name} is on an eliminated team and cannot be drafted",
             )
         if asset.key not in self.state.available:
             return ActionResult(False, f"{asset.name} is already drafted")
         if not self.state.has_capacity(current, asset.position):
             limit = self.state.capacity.limit(asset.position)
             return ActionResult(False, f"{current} is full at {asset.position} ({limit} slots)")
-
-        self.state.apply_pick(asset)
-        self.picks.append(RecordedPick(current, asset.key, asset.name, asset.position))
-        return ActionResult(
-            True,
-            f"pick #{len(self.picks)}: {current} drafts {asset.name} "
-            f"({asset.position} {asset.team_abbrev})",
-        )
+        return asset
 
     def undo(self) -> ActionResult:
         """Undo the most recent pick and rebuild the derived state."""
@@ -516,28 +388,11 @@ class DraftSession:
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-serialisable snapshot: config + recorded picks (a replay log)."""
-        return {
-            "version": SESSION_VERSION,
-            "artifact_dir": str(self.artifact_dir),
-            "manager_count": self.manager_count,
-            "managers": list(self.managers),
-            "slot": self.slot,
-            "ir": self.ir,
-            "temperature": self.temperature,
-            "seed": self.seed,
-            "rollouts": self.rollouts,
-            "opponents": self.opponents,
-            "opponent_artifact_dir": str(self.opponent_artifact_dir),
-            "eliminated_team_ids": sorted(self.eliminated_team_ids),
-            "picks": [pick.as_dict() for pick in self.picks],
-        }
+        return _session_dict(self, version=SESSION_VERSION)
 
     def save(self, path: Path) -> None:
         """Write the session JSON to ``path`` (parents created as needed)."""
-        path = Path(path)
-        if path.parent:
-            path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
+        _save_session(path, self.to_dict())
 
     @classmethod
     def resume(
@@ -551,13 +406,12 @@ class DraftSession:
         ``pool_loader`` overrides how the pool is rebuilt (defaults to reading the
         artifact directory); tests inject a synthetic pool this way.
         """
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
-        artifact_dir = Path(data["artifact_dir"])
-        ir = bool(data["ir"])
         loader = pool_loader or (
             lambda directory, use_ir: build_pool_from_projection_artifact(directory, ir=use_ir)
         )
-        pool = loader(artifact_dir, ir)
+        data, pool = _resume_inputs(path, pool_loader=loader)
+        artifact_dir = Path(data["artifact_dir"])
+        ir = bool(data["ir"])
         return cls(
             artifact_dir=artifact_dir,
             manager_count=int(data["manager_count"]),
@@ -592,133 +446,6 @@ def _roster_bucket_lines(label: str, bucket: list[DraftAsset], limit: int) -> li
 
 # ── Interactive loop + Typer command ──────────────────────────────────────
 
-_HELP_LINES = [
-    "Commands:",
-    "  pick <manager> <name>   record a pick (manager = seat number or id)",
-    "  undo                    undo the most recent pick",
-    "  board                   remaining assets by position",
-    "  roster [manager]        a roster (yours by default)",
-    "  recommend [--depth N]   top-5 explained picks (full lookahead by default)",
-    "  save <path>             write the session JSON",
-    "  resume <path>           replace session and switch autosave to that JSON",
-    "  help                    show this help",
-    "  quit                    exit",
-]
-
-
-@dataclass
-class _LoopState:
-    session: DraftSession
-    session_path: Path | None
-    echo: Callable[[str], None]
-
-
-def _run_loop(
-    session: DraftSession,
-    session_path: Path | None,
-    *,
-    input_fn: Callable[[str], str] = input,
-    echo: Callable[[str], None] = typer.echo,
-) -> DraftSession:
-    """Drive an interactive session until EOF/quit. Returns the final session."""
-    state = _LoopState(session, session_path, echo)
-    _show_help_banner(echo)
-    _autosave(state)
-    while True:
-        parsed = _read_command(state.session, input_fn, echo)
-        if parsed is None:
-            break
-        if _handle_loop_command(state, parsed):
-            break
-    _autosave(state)
-    return state.session
-
-
-def _show_help_banner(echo: Callable[[str], None]) -> None:
-    echo("Draft Oracle interactive assistant (US-024). Type 'help' for commands.")
-    _echo_lines(echo, _HELP_LINES)
-
-
-def _read_command(
-    session: DraftSession,
-    input_fn: Callable[[str], str],
-    echo: Callable[[str], None],
-) -> ParsedCommand | None:
-    try:
-        return parse_command(input_fn(_prompt(session)))
-    except (EOFError, KeyboardInterrupt):
-        echo("")
-        return None
-
-
-def _prompt(session: DraftSession) -> str:
-    if session.state.is_complete:
-        return "[draft complete] > "
-    return f"[#{session.state.pick_index + 1} {session.state.current_manager}] > "
-
-
-def _handle_loop_command(state: _LoopState, parsed: ParsedCommand) -> bool:
-    if parsed.name == "":
-        return False
-    if parsed.error:
-        state.echo(parsed.error)
-        return False
-    if parsed.name == "quit":
-        return True
-    handler = _LOOP_HANDLERS.get(parsed.name)
-    if handler is not None:
-        handler(state, parsed)
-        return False
-    _handle_action_command(state, parsed)
-    return False
-
-
-def _handle_help(state: _LoopState, _parsed: ParsedCommand) -> None:
-    _echo_lines(state.echo, _HELP_LINES)
-
-
-def _handle_resume(state: _LoopState, parsed: ParsedCommand) -> None:
-    assert parsed.path is not None
-    resume_path = Path(parsed.path)
-    state.session = DraftSession.resume(resume_path)
-    state.session_path = resume_path
-    state.echo(
-        f"resumed {len(state.session.picks)} pick(s) from {parsed.path}; "
-        f"autosave target switched to {parsed.path}"
-    )
-    _autosave(state)
-
-
-def _handle_save(state: _LoopState, parsed: ParsedCommand) -> None:
-    assert parsed.path is not None
-    state.session.save(Path(parsed.path))
-    state.echo(f"saved session -> {parsed.path}")
-
-
-def _handle_action_command(state: _LoopState, parsed: ParsedCommand) -> None:
-    result = _dispatch(state.session, parsed)
-    state.echo(result.message)
-    _echo_lines(state.echo, result.lines)
-    if parsed.name in ("pick", "undo") and result.ok:
-        _autosave(state)
-
-
-def _echo_lines(echo: Callable[[str], None], lines: list[str]) -> None:
-    for line in lines:
-        echo(line)
-
-
-def _autosave(state: _LoopState) -> None:
-    if state.session_path is not None:
-        state.session.save(state.session_path)
-
-
-_LOOP_HANDLERS: dict[str, Callable[[_LoopState, ParsedCommand], None]] = {
-    "help": _handle_help,
-    "resume": _handle_resume,
-    "save": _handle_save,
-}
-
 
 def _dispatch(session: DraftSession, parsed: ParsedCommand) -> ActionResult:
     if parsed.name == "pick":
@@ -735,13 +462,37 @@ def _dispatch(session: DraftSession, parsed: ParsedCommand) -> ActionResult:
     return ActionResult(False, f"unknown command {parsed.name!r}")
 
 
+def _run_loop(
+    session: DraftSession,
+    session_path: Path | None,
+    *,
+    input_fn: Callable[[str], str] = input,
+    echo: Callable[[str], None] = typer.echo,
+) -> DraftSession:
+    return cast(
+        "DraftSession",
+        _run_loop_impl(
+            session,
+            session_path,
+            dispatch=_dispatch,
+            resume_session=DraftSession.resume,
+            input_fn=input_fn,
+            echo=echo,
+        ),
+    )
+
+
 def _resume_session_path(resume: Path, session: Path | None) -> Path:
-    if session is not None and session.exists() and not _same_path(resume, session):
+    if _resume_conflicts_with_session(resume, session):
         raise typer.BadParameter(
             f"session log already exists at {session} and differs from resumed log "
             f"{resume}; omit --session to resume in place or choose a new path"
         )
     return session or resume
+
+
+def _resume_conflicts_with_session(resume: Path, session: Path | None) -> bool:
+    return session is not None and session.exists() and not _same_path(resume, session)
 
 
 def _new_session_path(session: Path | None) -> Path:
@@ -759,36 +510,97 @@ def _validate_draft_slot(slot: int, manager_count: int) -> None:
         raise typer.BadParameter(f"slot must be in 1..{manager_count}")
 
 
-def _new_draft_session(
-    artifact: Path,
-    managers: str,
-    *,
-    slot: int,
-    ir: bool,
-    eliminated: str,
-    temperature: float,
-    seed: int,
-    rollouts: int,
-    opponents: str,
-    opponent_artifact: Path,
-) -> DraftSession:
-    manager_ids = parse_managers(managers)
+class _DraftSessionArtifactKwargs(TypedDict, total=False):
+    manager_count: int
+    slot: int
+    ir: bool
+    eliminated: list[str] | None
+    temperature: float
+    seed: int
+    rollouts: int
+    managers: list[str] | None
+    opponents: str
+    opponent_artifact_dir: Path
+    fitted: FittedLeagueOpponents | None
+
+
+@dataclass(frozen=True)
+class DraftSessionArtifactRequest:
+    artifact_dir: Path
+    manager_count: int
+    slot: int
+    ir: bool = False
+    eliminated: list[str] | None = None
+    temperature: float = DEFAULT_TEMPERATURE
+    seed: int = DEFAULT_SEED
+    rollouts: int = DEFAULT_ROLLOUTS
+    managers: list[str] | None = None
+    opponents: str = OPPONENTS_GREEDY
+    opponent_artifact_dir: Path = DEFAULT_OPPONENT_ARTIFACT_DIR
+    fitted: FittedLeagueOpponents | None = None
+
+
+def _resolve_artifact_request(
+    artifact_dir: DraftSessionArtifactRequest | Path,
+    legacy: Mapping[str, object],
+) -> DraftSessionArtifactRequest:
+    if isinstance(artifact_dir, DraftSessionArtifactRequest):
+        if legacy:
+            raise TypeError("DraftSessionArtifactRequest calls do not accept extra keyword args")
+        return artifact_dir
+    return DraftSessionArtifactRequest(
+        artifact_dir=artifact_dir,
+        manager_count=cast("int", legacy["manager_count"]),
+        slot=cast("int", legacy["slot"]),
+        ir=cast("bool", legacy.get("ir", False)),
+        eliminated=cast("list[str] | None", legacy.get("eliminated")),
+        temperature=cast("float", legacy.get("temperature", DEFAULT_TEMPERATURE)),
+        seed=cast("int", legacy.get("seed", DEFAULT_SEED)),
+        rollouts=cast("int", legacy.get("rollouts", DEFAULT_ROLLOUTS)),
+        managers=cast("list[str] | None", legacy.get("managers")),
+        opponents=cast("str", legacy.get("opponents", OPPONENTS_GREEDY)),
+        opponent_artifact_dir=cast(
+            "Path",
+            legacy.get("opponent_artifact_dir", DEFAULT_OPPONENT_ARTIFACT_DIR),
+        ),
+        fitted=cast("FittedLeagueOpponents | None", legacy.get("fitted")),
+    )
+
+
+@dataclass(frozen=True)
+class _NewDraftSessionRequest:
+    artifact: Path
+    managers: str
+    slot: int
+    ir: bool
+    eliminated: str
+    temperature: float
+    seed: int
+    rollouts: int
+    opponents: str
+    opponent_artifact: Path
+
+
+def _new_draft_session(request: _NewDraftSessionRequest) -> DraftSession:
+    manager_ids = parse_managers(request.managers)
     manager_count = len(manager_ids)
-    _validate_draft_slot(slot, manager_count)
-    eliminated_teams = [token for token in eliminated.split(",") if token.strip()]
-    opponents_kind = resolve_opponents_kind(opponents, opponent_artifact)
+    _validate_draft_slot(request.slot, manager_count)
+    eliminated_teams = [token for token in request.eliminated.split(",") if token.strip()]
+    opponents_kind = resolve_opponents_kind(request.opponents, request.opponent_artifact)
     return DraftSession.from_artifact(
-        artifact,
-        manager_count=manager_count,
-        slot=slot,
-        ir=ir,
-        eliminated=eliminated_teams,
-        temperature=temperature,
-        seed=seed,
-        rollouts=rollouts,
-        managers=manager_ids,
-        opponents=opponents_kind,
-        opponent_artifact_dir=opponent_artifact,
+        DraftSessionArtifactRequest(
+            artifact_dir=request.artifact,
+            manager_count=manager_count,
+            slot=request.slot,
+            ir=request.ir,
+            eliminated=eliminated_teams,
+            temperature=request.temperature,
+            seed=request.seed,
+            rollouts=request.rollouts,
+            managers=manager_ids,
+            opponents=opponents_kind,
+            opponent_artifact_dir=request.opponent_artifact,
+        )
     )
 
 
@@ -853,16 +665,18 @@ def draft(
         raise typer.BadParameter("provide --artifact <dir> (or --resume <session.json>)")
     session_path = _new_session_path(session)
     new_session = _new_draft_session(
-        artifact,
-        managers,
-        slot=slot,
-        ir=ir,
-        eliminated=eliminated,
-        temperature=temperature,
-        seed=seed,
-        rollouts=rollouts,
-        opponents=opponents,
-        opponent_artifact=opponent_artifact,
+        _NewDraftSessionRequest(
+            artifact=artifact,
+            managers=managers,
+            slot=slot,
+            ir=ir,
+            eliminated=eliminated,
+            temperature=temperature,
+            seed=seed,
+            rollouts=rollouts,
+            opponents=opponents,
+            opponent_artifact=opponent_artifact,
+        )
     )
     _run_loop(new_session, session_path)
 

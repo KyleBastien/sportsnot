@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
@@ -33,6 +34,30 @@ ReportArtifactDirOption = Annotated[
 TrainingSeedOption = Annotated[int, typer.Option(help="Deterministic training seed.")]
 ProjectionSeedOption = Annotated[int, typer.Option(help="Deterministic training/MC seed.")]
 DeterministicSeedOption = Annotated[int, typer.Option(help="Deterministic seed.")]
+
+
+@dataclass(frozen=True)
+class _CompareStrategiesRequest:
+    normalized_dir: Path
+    managers: int
+    n_drafts: int
+    rollouts: int
+    max_candidates: int
+    seed: int
+
+
+@dataclass(frozen=True)
+class _BacktestCommandRequest:
+    seasons: list[int]
+    normalized_dir: Path
+    backtest_root: Path
+    snapshot: str
+    managers: int
+    ir: bool
+    n_drafts: int
+    rollouts: int
+    strategies: list[str] | None
+    seed: int
 
 
 def _yes_no(value: bool) -> str:
@@ -280,6 +305,20 @@ def compare_strategies_cmd(
     seed: DeterministicSeedOption = 20260827,
 ) -> None:
     """Run the committed multi-step vs. greedy-VOR vs. one-step comparison (US-021)."""
+    _run_compare_strategies(
+        _CompareStrategiesRequest(
+            normalized_dir=normalized_dir,
+            managers=managers,
+            n_drafts=n_drafts,
+            rollouts=rollouts,
+            max_candidates=max_candidates,
+            seed=seed,
+        )
+    )
+
+
+def _run_compare_strategies(request: _CompareStrategiesRequest) -> None:
+    """Execute recommendation-strategy comparison from a structured request."""
     from draft_oracle.optimize.recommend import (
         DEFAULT_RECOMMEND_ARTIFACT_DIR,
         RecommendationEvaluationRequest,
@@ -288,12 +327,12 @@ def compare_strategies_cmd(
 
     result = evaluate_recommendation_strategies_from_normalized(
         RecommendationEvaluationRequest(
-            normalized_dir=normalized_dir,
-            managers=managers,
-            n_drafts=n_drafts,
-            rollouts=rollouts,
-            max_candidates=max_candidates,
-            seed=seed,
+            normalized_dir=request.normalized_dir,
+            managers=request.managers,
+            n_drafts=request.n_drafts,
+            rollouts=request.rollouts,
+            max_candidates=request.max_candidates,
+            seed=request.seed,
         )
     )
     typer.echo(f"Strategy comparison -> {DEFAULT_RECOMMEND_ARTIFACT_DIR}")
@@ -335,29 +374,51 @@ def backtest(
     if any round-N game leaks into the as-of inputs. Per-round intermediates and the
     run manifest are written under backtest_root/<run-id>/.
     """
+    _run_backtest_command(
+        _BacktestCommandRequest(
+            seasons=seasons,
+            normalized_dir=normalized_dir,
+            backtest_root=backtest_root,
+            snapshot=snapshot,
+            managers=managers,
+            ir=ir,
+            n_drafts=n_drafts,
+            rollouts=rollouts,
+            strategies=strategies,
+            seed=seed,
+        )
+    )
+
+
+def _run_backtest_command(request: _BacktestCommandRequest) -> None:
+    """Execute backtest command from structured request."""
     from draft_oracle.backtest.replay import BacktestConfig, run_backtest_from_normalized
 
-    resolved: tuple[Strategy, ...] = tuple(_coerce_strategy(s) for s in (strategies or ["oracle"]))
+    resolved: tuple[Strategy, ...] = tuple(
+        _coerce_strategy(strategy) for strategy in (request.strategies or ["oracle"])
+    )
     config = BacktestConfig(
-        seed=seed,
-        managers=managers,
-        ir=ir,
-        n_drafts=n_drafts,
-        rollouts=rollouts,
+        seed=request.seed,
+        managers=request.managers,
+        ir=request.ir,
+        n_drafts=request.n_drafts,
+        rollouts=request.rollouts,
         strategies=resolved,
     )
     result, out_dir = run_backtest_from_normalized(
-        seasons=seasons,
-        normalized_dir=normalized_dir,
-        backtest_root=backtest_root,
-        snapshot=snapshot or None,
+        seasons=request.seasons,
+        normalized_dir=request.normalized_dir,
+        backtest_root=request.backtest_root,
+        snapshot=request.snapshot or None,
         config=config,
     )
     typer.echo(f"Backtest run {result.run_id} -> {out_dir}")
     typer.echo(f"  report: {out_dir / 'report.md'}")
     typer.echo(f"  seasons: {', '.join(str(s) for s in result.seasons)}")
     typer.echo(f"  rounds replayed: {len(result.rounds)}")
-    typer.echo(f"  strategies: {', '.join(config.strategies)}; drafts/slot: {n_drafts}")
+    typer.echo(
+        f"  strategies: {', '.join(config.strategies)}; drafts/slot: {request.n_drafts}"
+    )
     for round_result in result.rounds:
         drafts = len(round_result.slot_results)
         typer.echo(

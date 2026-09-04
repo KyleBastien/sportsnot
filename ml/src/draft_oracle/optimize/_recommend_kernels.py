@@ -27,6 +27,15 @@ from draft_oracle.optimize._recommend_core import (
     asset_value,
     replacement_levels,
 )
+from draft_oracle.optimize._recommend_kernel_utils import (
+    _affinity_row,
+)
+from draft_oracle.optimize._recommend_kernel_utils import (
+    _fitted_opponent_choice as _fitted_opponent_choice_impl,
+)
+from draft_oracle.optimize._recommend_kernel_utils import (
+    _greedy_opponent_choice as _greedy_opponent_choice_impl,
+)
 from draft_oracle.optimize.opponents import FittedOpponentModel
 from draft_oracle.optimize.simulator import (
     DraftAsset,
@@ -46,23 +55,6 @@ def _require_legal_rows(legal: np.ndarray, manager: str) -> None:
     """
     if not bool(legal.any(axis=1).all()):
         raise ValueError(f"manager {manager!r} has no legal asset to draft")
-
-
-def _rank_key_argmax(
-    scores: np.ndarray,
-    legal: np.ndarray,
-    rank_value: np.ndarray,
-    key_order: np.ndarray,
-) -> np.ndarray:
-    """Row-wise score argmax with object-model ``rank_value``/key tie-breaks."""
-    neg_inf = float("-inf")
-    masked = np.where(legal, scores, neg_inf)
-    best_score = masked.max(axis=1)
-    tied = legal & (scores == best_score[:, None])
-    tied_rank = np.where(tied, rank_value[None, :], neg_inf)
-    best_rank = tied_rank.max(axis=1)
-    tied &= rank_value[None, :] == best_rank[:, None]
-    return np.argmin(np.where(tied, key_order[None, :], len(key_order)), axis=1)
 
 
 def _vec_fill_owner(
@@ -126,26 +118,122 @@ class _RolloutArrays:
     base_owner_value: float
 
 
+@dataclass(frozen=True)
+class _AssetArrays:
+    pool: list[DraftAsset]
+    n_assets: int
+    key_to_idx: dict[str, int]
+    val: np.ndarray
+    rank_val: np.ndarray
+    key_order: np.ndarray
+    posc: np.ndarray
+    vor_owner: np.ndarray
+
+
+@dataclass(frozen=True)
+class _ManagerArrays:
+    mgr_ids: list[str]
+    mid_to_idx: dict[str, int]
+    n_managers: int
+    limits: np.ndarray
+    base_counts: np.ndarray
+    owner_idx: int
+    cap_total: int
+    rem_m: list[int]
+    last_owner_k: int
+
+
 def _build_rollout_arrays(
     state: DraftState, owner: str, replacement: Mapping[str, float]
 ) -> _RolloutArrays:
     """Build the pool/manager/schedule numpy arrays shared by the rollout kernels."""
-    pool = sorted(state.available.values(), key=lambda a: (-asset_value(a), a.key))
-    n_assets = len(pool)
-    key_to_idx = {asset.key: i for i, asset in enumerate(pool)}
-    val = np.array([asset_value(a) for a in pool], dtype="float64")
-    rank_val = np.array([a.rank_value for a in pool], dtype="float64")
-    key_order = np.empty(n_assets, dtype="int64")
-    key_order[np.argsort([a.key for a in pool])] = np.arange(n_assets)
-    posc = np.array([_POS_INDEX[a.position] for a in pool], dtype="int64")
-    repl_arr = np.array([replacement["F"], replacement["D"], replacement["G"]], dtype="float64")
-    vor_owner = val - repl_arr[posc]
+    asset_arrays = _build_asset_arrays(state, replacement)
+    manager_arrays = _build_manager_arrays(state, owner)
 
+    return _RolloutArrays(
+        pool=asset_arrays.pool,
+        n_assets=asset_arrays.n_assets,
+        key_to_idx=asset_arrays.key_to_idx,
+        val=asset_arrays.val,
+        rank_val=asset_arrays.rank_val,
+        key_order=asset_arrays.key_order,
+        posc=asset_arrays.posc,
+        vor_owner=asset_arrays.vor_owner,
+        mgr_ids=manager_arrays.mgr_ids,
+        mid_to_idx=manager_arrays.mid_to_idx,
+        n_managers=manager_arrays.n_managers,
+        limits=manager_arrays.limits,
+        base_counts=manager_arrays.base_counts,
+        owner_idx=manager_arrays.owner_idx,
+        cap_total=manager_arrays.cap_total,
+        rem_m=manager_arrays.rem_m,
+        last_owner_k=manager_arrays.last_owner_k,
+        base_owner_value=_owner_roster_value(state, owner),
+    )
+
+
+def _build_asset_arrays(
+    state: DraftState,
+    replacement: Mapping[str, float],
+) -> _AssetArrays:
+    pool = sorted(state.available.values(), key=lambda asset: (-asset_value(asset), asset.key))
+    n_assets = len(pool)
+    val = np.array([asset_value(asset) for asset in pool], dtype="float64")
+    posc = np.array([_POS_INDEX[asset.position] for asset in pool], dtype="int64")
+    return _AssetArrays(
+        pool=pool,
+        n_assets=n_assets,
+        key_to_idx={asset.key: i for i, asset in enumerate(pool)},
+        val=val,
+        rank_val=np.array([asset.rank_value for asset in pool], dtype="float64"),
+        key_order=_key_order(pool, n_assets),
+        posc=posc,
+        vor_owner=val - _replacement_array(replacement)[posc],
+    )
+
+
+def _replacement_array(replacement: Mapping[str, float]) -> np.ndarray:
+    return np.array([replacement["F"], replacement["D"], replacement["G"]], dtype="float64")
+
+
+def _key_order(pool: Sequence[DraftAsset], n_assets: int) -> np.ndarray:
+    key_order = np.empty(n_assets, dtype="int64")
+    key_order[np.argsort([asset.key for asset in pool])] = np.arange(n_assets)
+    return key_order
+
+
+def _build_manager_arrays(state: DraftState, owner: str) -> _ManagerArrays:
     mgr_ids = list(dict.fromkeys(state.order))
-    mid_to_idx = {m: i for i, m in enumerate(mgr_ids)}
-    n_managers = len(mgr_ids)
+    mid_to_idx = {manager: i for i, manager in enumerate(mgr_ids)}
+    limits = _capacity_limits(state)
+    base_counts = _base_counts(state, mid_to_idx, len(mgr_ids))
+    owner_idx = mid_to_idx[owner]
+    cap_total = state.capacity.total
+    rem_m = [mid_to_idx[manager] for manager in state.order[state.pick_index :]]
+    last_owner_k = _last_owner_pick_index(rem_m, owner_idx, cap_total, base_counts)
+    return _ManagerArrays(
+        mgr_ids=mgr_ids,
+        mid_to_idx=mid_to_idx,
+        n_managers=len(mgr_ids),
+        limits=limits,
+        base_counts=base_counts,
+        owner_idx=owner_idx,
+        cap_total=cap_total,
+        rem_m=rem_m,
+        last_owner_k=last_owner_k,
+    )
+
+
+def _capacity_limits(state: DraftState) -> np.ndarray:
     cap = state.capacity
-    limits = np.array([cap.forwards, cap.defense, cap.goalies], dtype="int64")
+    return np.array([cap.forwards, cap.defense, cap.goalies], dtype="int64")
+
+
+def _base_counts(
+    state: DraftState,
+    mid_to_idx: Mapping[str, int],
+    n_managers: int,
+) -> np.ndarray:
     base_counts = np.zeros((n_managers, 3), dtype="int64")
     for manager, roster in state.rosters.items():
         base_counts[mid_to_idx[manager]] = [
@@ -153,35 +241,18 @@ def _build_rollout_arrays(
             roster.count("D"),
             roster.count("G"),
         ]
-    owner_idx = mid_to_idx[owner]
-    cap_total = cap.total
+    return base_counts
 
-    rem = state.order[state.pick_index :]
-    rem_m = [mid_to_idx[m] for m in rem]
+
+def _last_owner_pick_index(
+    rem_m: Sequence[int],
+    owner_idx: int,
+    cap_total: int,
+    base_counts: np.ndarray,
+) -> int:
     owner_needed = cap_total - int(base_counts[owner_idx].sum())
-    owner_positions = [k for k, mi in enumerate(rem_m) if mi == owner_idx]
-    last_owner_k = owner_positions[owner_needed - 1]
-
-    return _RolloutArrays(
-        pool=pool,
-        n_assets=n_assets,
-        key_to_idx=key_to_idx,
-        val=val,
-        rank_val=rank_val,
-        key_order=key_order,
-        posc=posc,
-        vor_owner=vor_owner,
-        mgr_ids=mgr_ids,
-        mid_to_idx=mid_to_idx,
-        n_managers=n_managers,
-        limits=limits,
-        base_counts=base_counts,
-        owner_idx=owner_idx,
-        cap_total=cap_total,
-        rem_m=rem_m,
-        last_owner_k=last_owner_k,
-        base_owner_value=_owner_roster_value(state, owner),
-    )
+    owner_positions = [index for index, manager_idx in enumerate(rem_m) if manager_idx == owner_idx]
+    return owner_positions[owner_needed - 1]
 
 
 def _init_candidate_rollout(
@@ -204,6 +275,14 @@ class _OwnerStep:
 
     done: bool
     choice: np.ndarray | None
+    owner_total: np.ndarray
+    owner_taken: int
+
+
+@dataclass
+class _CandidateRollout:
+    alive: np.ndarray
+    counts: np.ndarray
     owner_total: np.ndarray
     owner_taken: int
 
@@ -257,17 +336,17 @@ def _greedy_opponent_choice(
     turn: _Turn,
     rng: np.random.Generator,
 ) -> np.ndarray:
-    """Greedy opponent's per-rollout pick: ``rank_value + need`` softmax (or argmax)."""
-    urgency = (arr.limits - turn.cnt_m) / arr.limits
-    # Score opponents by ``rank_value`` (public perception), matching
-    # ``GreedyOpponentModel.pick``; ``val`` (projection) would diverge.
-    scores = arr.rank_val[None, :] + (gmodel.need_weight * urgency)[:, arr.posc]
-    if gmodel.temperature <= 0.0:
-        return _rank_key_argmax(scores, turn.legal, arr.rank_val, arr.key_order)
-    rollouts, n_assets = turn.legal.shape
-    gumbel = -np.log(-np.log(rng.random((rollouts, n_assets))))
-    noisy = np.where(turn.legal, scores / gmodel.temperature + gumbel, float("-inf"))
-    return np.argmax(noisy, axis=1)
+    return _greedy_opponent_choice_impl(
+        arr.rank_val,
+        arr.limits,
+        arr.posc,
+        arr.key_order,
+        gmodel.need_weight,
+        gmodel.temperature,
+        turn.cnt_m,
+        turn.legal,
+        rng,
+    )
 
 
 def _fitted_opponent_choice(
@@ -276,17 +355,19 @@ def _fitted_opponent_choice(
     turn: _Turn,
     mgr_i: int,
 ) -> np.ndarray:
-    """Fitted opponent's deterministic per-rollout pick from its utility model."""
-    rollouts, n_assets = turn.legal.shape
-    pos_masks = [arr.posc == p for p in range(3)]
-    urgency = (arr.limits - turn.cnt_m) / arr.limits
-    rank_z = _fitted_rank_z(turn.legal, arr.rank_val, pos_masks, rollouts, n_assets)
-    utility = (
-        params.coef_rank[mgr_i] * rank_z
-        + params.coef_aff[mgr_i] * params.aff_matrix[mgr_i][None, :]
-        + params.need_weight[mgr_i] * urgency[:, arr.posc]
+    return _fitted_opponent_choice_impl(
+        arr.rank_val,
+        arr.limits,
+        arr.posc,
+        arr.key_order,
+        params.coef_rank,
+        params.coef_aff,
+        params.aff_matrix,
+        params.need_weight,
+        turn.cnt_m,
+        turn.legal,
+        mgr_i,
     )
-    return _rank_key_argmax(utility, turn.legal, arr.rank_val, arr.key_order)
 
 
 def _vectorized_greedy_expected(
@@ -308,36 +389,93 @@ def _vectorized_greedy_expected(
     """
     arr = _build_rollout_arrays(state, owner, replacement)
     rollouts = cfg.rollouts
-    rows = np.arange(rollouts)
     means: list[float] = []
     for asset in candidate_assets:
         # Common random numbers: identical opponent draws across candidates (pairs the
         # comparison; the seed does not depend on the candidate).
         rng = np.random.default_rng(cfg.seed * _ROLLOUT_SALT)
-        alive, counts, owner_total, owner_taken = _init_candidate_rollout(arr, asset, rollouts)
-
-        for k in range(1, arr.last_owner_k + 1):
-            mgr_i = arr.rem_m[k]
-            cnt_m = counts[:, mgr_i, :]
-            legal = alive & (cnt_m < arr.limits)[:, arr.posc]
-            if mgr_i == arr.owner_idx:
-                step = _owner_step(arr, cfg, alive, counts, owner_total, owner_taken, legal)
-                owner_total, owner_taken = step.owner_total, step.owner_taken
-                if step.done:
-                    break
-                assert step.choice is not None
-                choice = step.choice
-            else:
-                _require_legal_rows(legal, arr.mgr_ids[mgr_i])
-                choice = _greedy_opponent_choice(arr, gmodel, _Turn(cnt_m, legal), rng)
-            alive[rows, choice] = False
-            counts[rows, mgr_i, arr.posc[choice]] += 1
-
-        # ``owner_total`` accumulates only picks made during this rollout; add the
-        # owner's already-drafted roster so E[roster] matches the object path's
-        # ``_owner_roster_value`` (one documented definition).
-        means.append(float(owner_total.mean()) + arr.base_owner_value)
+        batch = _candidate_rollout(arr, asset, rollouts)
+        _advance_greedy_rollout(arr, cfg, gmodel, batch, rng)
+        means.append(_mean_owner_value(batch.owner_total, arr.base_owner_value))
     return means
+
+
+def _candidate_rollout(
+    arr: _RolloutArrays,
+    asset: DraftAsset,
+    rollouts: int,
+) -> _CandidateRollout:
+    alive, counts, owner_total, owner_taken = _init_candidate_rollout(arr, asset, rollouts)
+    return _CandidateRollout(alive, counts, owner_total, owner_taken)
+
+
+def _advance_greedy_rollout(
+    arr: _RolloutArrays,
+    cfg: RecommendConfig,
+    gmodel: GreedyOpponentModel,
+    batch: _CandidateRollout,
+    rng: np.random.Generator,
+) -> None:
+    rows = np.arange(batch.alive.shape[0])
+    for k in range(1, arr.last_owner_k + 1):
+        manager_idx = arr.rem_m[k]
+        choice = _greedy_rollout_choice(arr, cfg, gmodel, batch, rng, manager_idx)
+        if choice is None:
+            break
+        batch.alive[rows, choice] = False
+        batch.counts[rows, manager_idx, arr.posc[choice]] += 1
+
+
+def _greedy_rollout_choice(
+    arr: _RolloutArrays,
+    cfg: RecommendConfig,
+    gmodel: GreedyOpponentModel,
+    batch: _CandidateRollout,
+    rng: np.random.Generator,
+    manager_idx: int,
+) -> np.ndarray | None:
+    turn = _turn_state(arr, batch, manager_idx)
+    if manager_idx == arr.owner_idx:
+        return _owner_rollout_choice(arr, cfg, batch, turn.legal)
+    _require_legal_rows(turn.legal, arr.mgr_ids[manager_idx])
+    return _greedy_opponent_choice(arr, gmodel, turn, rng)
+
+
+def _turn_state(
+    arr: _RolloutArrays,
+    batch: _CandidateRollout,
+    manager_idx: int,
+) -> _Turn:
+    cnt_m = batch.counts[:, manager_idx, :]
+    legal = batch.alive & (cnt_m < arr.limits)[:, arr.posc]
+    return _Turn(cnt_m, legal)
+
+
+def _owner_rollout_choice(
+    arr: _RolloutArrays,
+    cfg: RecommendConfig,
+    batch: _CandidateRollout,
+    legal: np.ndarray,
+) -> np.ndarray | None:
+    step = _owner_step(
+        arr,
+        cfg,
+        batch.alive,
+        batch.counts,
+        batch.owner_total,
+        batch.owner_taken,
+        legal,
+    )
+    batch.owner_total = step.owner_total
+    batch.owner_taken = step.owner_taken
+    return step.choice
+
+
+def _mean_owner_value(owner_total: np.ndarray, base_owner_value: float) -> float:
+    # ``owner_total`` accumulates only picks made during this rollout; add the
+    # owner's already-drafted roster so E[roster] matches the object path's
+    # ``_owner_roster_value`` (one documented definition).
+    return float(owner_total.mean()) + base_owner_value
 
 
 def _fitted_zero_temp_models(
@@ -384,43 +522,8 @@ def _build_fitted_params(
         coef_rank[idx] = model.coefficients.rank
         coef_aff[idx] = model.coefficients.affinity
         need_weight[idx] = model.need_weight
-        aff_matrix[idx] = [
-            float(model.affinity.get(int(a.team_id), 0.0)) if a.team_id is not None else 0.0
-            for a in arr.pool
-        ]
+        aff_matrix[idx] = _affinity_row(arr.pool, model.affinity)
     return _FittedParams(coef_rank, coef_aff, aff_matrix, need_weight)
-
-
-def _fitted_rank_z(
-    legal: np.ndarray,
-    rank_val: np.ndarray,
-    pos_masks: Sequence[np.ndarray],
-    rollouts: int,
-    n_assets: int,
-) -> np.ndarray:
-    """Per-position standardized ``rank_value`` over the legal set (fitted utility term).
-
-    Reproduces :meth:`FittedOpponentModel._utilities` exactly: within each base
-    position, standardize ``rank_value`` across the currently-legal assets (mean 0,
-    unit std, 0 when a position has <2 legal assets), advanced across the rollout batch.
-    """
-    rank_z = np.zeros((rollouts, n_assets), dtype="float64")
-    for pos_mask in pos_masks:
-        legal_p = legal & pos_mask[None, :]
-        cnt = legal_p.sum(axis=1)
-        safe = np.maximum(cnt, 1)
-        mean = np.where(cnt > 0, (rank_val[None, :] * legal_p).sum(axis=1) / safe, 0.0)
-        sum_sq = ((rank_val[None, :] ** 2) * legal_p).sum(axis=1)
-        var = np.where(cnt > 0, sum_sq / safe - mean**2, 0.0)
-        std = np.sqrt(np.maximum(var, 0.0))
-        std_safe = np.where(std > 0.0, std, 1.0)
-        z_p = np.where(
-            std[:, None] > 0.0,
-            (rank_val[None, :] - mean[:, None]) / std_safe[:, None],
-            0.0,
-        )
-        rank_z[:, pos_mask] = z_p[:, pos_mask]
-    return rank_z
 
 
 def _vectorized_fitted_expected(

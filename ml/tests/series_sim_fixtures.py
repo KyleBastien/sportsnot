@@ -25,6 +25,7 @@ class _TeamRowInput:
     game_id: int
     game_date: str
     team: str
+    opp: str
     gf: int
     ga: int
     is_home: bool
@@ -67,23 +68,59 @@ class _OverlapGameInput:
     ag: int
 
 
-def _team_row(spec: _TeamRowInput) -> dict[str, object]:
+@dataclass(frozen=True)
+class _ScoredRowInput:
+    season_id: int
+    game_type_id: int
+    game_id: int | str
+    game_date: str
+    team_id: int
+    team: str
+    opp: str
+    gf: int
+    ga: int
+    is_home: bool
+    include_shutout: bool
+
+
+def _scored_row(spec: _ScoredRowInput) -> dict[str, object]:
     won = spec.gf > spec.ga
-    return {
+    row: dict[str, object] = {
         "season_id": spec.season_id,
         "game_type_id": spec.game_type_id,
         "game_id": spec.game_id,
         "game_date": spec.game_date,
-        "team_id": TEAMS.index(spec.team) + 1,
+        "team_id": spec.team_id,
         "team_abbrev": spec.team,
+        "opponent_team_abbrev": spec.opp,
         "home_road": "H" if spec.is_home else "R",
         "goals_for": spec.gf,
         "goals_against": spec.ga,
         "shots_against": SHOTS,
         "points": 2 if won else 0,
         "win": won,
-        "shutout_win": won and spec.ga == 0,
     }
+    if spec.include_shutout:
+        row["shutout_win"] = won and spec.ga == 0
+    return row
+
+
+def _team_row(spec: _TeamRowInput) -> dict[str, object]:
+    return _scored_row(
+        _ScoredRowInput(
+            spec.season_id,
+            spec.game_type_id,
+            spec.game_id,
+            spec.game_date,
+            TEAMS.index(spec.team) + 1,
+            spec.team,
+            spec.opp,
+            spec.gf,
+            spec.ga,
+            spec.is_home,
+            True,
+        )
+    )
 
 
 def _game_rows(game: _GameRowsInput) -> list[dict[str, object]]:
@@ -94,6 +131,7 @@ def _game_rows(game: _GameRowsInput) -> list[dict[str, object]]:
             game.game_id,
             game.game_date,
             game.home,
+            game.away,
             game.home_goals,
             game.away_goals,
             True,
@@ -104,6 +142,7 @@ def _game_rows(game: _GameRowsInput) -> list[dict[str, object]]:
             game.game_id,
             game.game_date,
             game.away,
+            game.home,
             game.away_goals,
             game.home_goals,
             False,
@@ -189,42 +228,38 @@ def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFr
                 "losing_team_id": TEAMS.index(bottom) + 1,
             }
         )
-
     return pd.DataFrame(team_rows), pd.DataFrame(series_rows)
 
 
-def _archive_paths(season_label: str | None) -> list[Path]:
-    archive_dir = Path("data/raw/nhl-archive")
-    if season_label is not None:
-        return [archive_dir / f"team-games-{season_label}.csv.gz"]
-    return sorted(archive_dir.glob("team-games-*.csv.gz"))
+_ARCHIVE_DIR = Path("data/raw/nhl-archive")
+_ARCHIVE_PATHS = sorted(_ARCHIVE_DIR.glob("team-games-*.csv.gz"))
+_ARCHIVE_PATHS_2020_21 = [_ARCHIVE_DIR / "team-games-2020-21.csv.gz"]
 
 
 def _archive_frames(season_label: str | None) -> list[pd.DataFrame]:
-    return [normalize_team_games(pd.read_csv(path)) for path in _archive_paths(season_label)]
+    paths = _ARCHIVE_PATHS_2020_21 if season_label == "2020-21" else _ARCHIVE_PATHS
+    return [normalize_team_games(pd.read_csv(path)) for path in paths]
 
 
 _ARCHIVE_TEAM_GAMES = pd.concat(_archive_frames(None), ignore_index=True)
 _ARCHIVE_TEAM_GAMES_2020_21 = pd.concat(_archive_frames("2020-21"), ignore_index=True)
 
-
 def _overlap_row(spec: _OverlapRowInput) -> dict[str, object]:
-    won = spec.gf > spec.ga
-    return {
-        "season_id": 20212022,
-        "game_type_id": spec.game_type_id,
-        "game_id": spec.game_id,
-        "game_date": spec.game_date,
-        "team_id": spec.team_id,
-        "team_abbrev": spec.team,
-        "opponent_team_abbrev": spec.opp,
-        "home_road": "H" if spec.is_home else "R",
-        "goals_for": spec.gf,
-        "goals_against": spec.ga,
-        "shots_against": SHOTS,
-        "points": 2 if won else 0,
-        "win": won,
-    }
+    return _scored_row(
+        _ScoredRowInput(
+            20212022,
+            spec.game_type_id,
+            spec.game_id,
+            spec.game_date,
+            spec.team_id,
+            spec.team,
+            spec.opp,
+            spec.gf,
+            spec.ga,
+            spec.is_home,
+            False,
+        )
+    )
 
 
 def _overlap_game(

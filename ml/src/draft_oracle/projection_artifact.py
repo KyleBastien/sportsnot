@@ -46,20 +46,15 @@ never in the Parquet payload.
 from __future__ import annotations
 
 import json
-import platform
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
-from draft_oracle import __version__
 from draft_oracle._projection_combined import (
     _COMBINED_CHEATSHEET_NOTE,
     _COMBINED_DRAFT_ROUND,
-    _COMBINED_SCORED_ROUNDS,
     CombinedValuationInput,
     _apply_combined_valuation,
 )
@@ -73,57 +68,23 @@ from draft_oracle._projection_io import (
     _require_complete_snapshot,
     _snapshot_id_for,
 )
+from draft_oracle._projection_ir import _apply_ir_stash, _IrStashInput
+from draft_oracle._projection_manifest import ProjectionManifestInput, _projection_manifest
+from draft_oracle._projection_rows import _build_skater_rows, _build_team_rows
 from draft_oracle._projection_slot_report import SlotReportInput, _build_slot_report
 from draft_oracle.features.skater import (
-    FEATURE_SET_VERSION,
     SkaterFeatureRequest,
     build_skater_features,
 )
-from draft_oracle.models.game_win import (
-    GAME_WIN_MODEL_VERSION,
-    GameWinConfig,
-    GameWinModel,
-    train_game_win_model,
-)
-from draft_oracle.models.projections import (
-    DEFAULT_HORIZON,
-    DEFAULT_N_SIMS,
-    PROJECTION_VERSION,
-    SkaterRoundRequest,
-    _row_seed,
-    project_skater_combined,
-    project_skater_round,
-)
-from draft_oracle.models.returns import (
-    STATUS_MEAN_GAMES,
-    ReturnTimeModel,
-    derive_absence_spells,
-    fit_return_time_model,
-)
-from draft_oracle.models.series_sim import (
-    SERIES_SIM_VERSION,
-    reconstruct_series_matchups,
-    simulate_series,
-)
-from draft_oracle.models.shutout import (
-    SHUTOUT_MODEL_VERSION,
-    ShutoutConfig,
-    ShutoutModel,
-    train_shutout_model,
-)
+from draft_oracle.models.game_win import GameWinConfig, GameWinModel, train_game_win_model
+from draft_oracle.models.projections import DEFAULT_HORIZON, DEFAULT_N_SIMS
+from draft_oracle.models.series_sim import reconstruct_series_matchups
+from draft_oracle.models.shutout import ShutoutConfig, ShutoutModel, train_shutout_model
 from draft_oracle.models.skater_production import (
-    SKATER_PRODUCTION_VERSION,
     SkaterProductionConfig,
     SkaterProductionModel,
     playoff_round_cutoffs,
     train_skater_production_model,
-)
-from draft_oracle.optimize.ir_value import (
-    StashInput,
-    StashValuation,
-    _BuildStashRequest,
-    build_stash_valuations,
-    render_ir_section,
 )
 from draft_oracle.optimize.slot_strategies import (
     SlotStrategyConfig,
@@ -136,7 +97,6 @@ from draft_oracle.optimize.vor import (
     build_cheatsheet,
     write_cheatsheet,
 )
-from draft_oracle.provenance import add_git_provenance
 
 __all__ = [
     "DEFAULT_ARTIFACTS_ROOT",
@@ -237,17 +197,6 @@ class ProjectArtifactResult:
 
 
 @dataclass(frozen=True)
-class _IrStashInput:
-    skaters: pd.DataFrame
-    cheatsheet: CheatSheet
-    injuries: pd.DataFrame | None
-    length_by_abbrev: dict[str, dict[int, float]]
-    train_sk: pd.DataFrame
-    train_tg: pd.DataFrame
-    config: ProjectArtifactConfig
-
-
-@dataclass(frozen=True)
 class _ProjectionRoundContext:
     config: ProjectArtifactConfig
     prod_config: SkaterProductionConfig
@@ -272,7 +221,7 @@ class _ProjectionOutputs:
     skaters: pd.DataFrame
     teams: pd.DataFrame
     cheatsheet: CheatSheet
-    ir_valuations: list[StashValuation]
+    ir_valuations: list[Any]
     slot_report: SlotStrategyReport | None
     length_by_abbrev: dict[str, dict[int, float]]
     combined_diagnostics: list[dict[str, Any]] | None
@@ -294,297 +243,6 @@ def _resolve_season_id(round_series: pd.DataFrame, season: int) -> int:
             f"expected exactly one season_id for season {season}, found {sorted(season_ids)}"
         )
     return season_ids.pop()
-
-
-def _team_meta(team_games: pd.DataFrame) -> dict[int, str]:
-    """Map ``team_id -> team_abbrev`` from the team-games table."""
-    pairs = team_games[["team_id", "team_abbrev"]].drop_duplicates()
-    return {int(rec["team_id"]): str(rec["team_abbrev"]) for rec in pairs.to_dict("records")}
-
-
-def _matchup_key(year: int, team_a: int, team_b: int) -> tuple[int, int, int]:
-    """Order-independent key matching the series reconstruction lookup."""
-    lo, hi = sorted((int(team_a), int(team_b)))
-    return (int(year), lo, hi)
-
-
-def _build_team_rows(
-    round_series: pd.DataFrame,
-    matchups: dict[tuple[int, int, int], Any],
-    win_model: Any,
-    shutout_model: Any,
-    season: int,
-    playoff_round: int,
-    warnings: list[str],
-) -> tuple[list[dict[str, Any]], dict[str, dict[int, float]]]:
-    """Predict each round matchup; return team rows + per-team length distributions."""
-    team_rows: list[dict[str, Any]] = []
-    length_by_abbrev: dict[str, dict[int, float]] = {}
-
-    for row in round_series.to_dict("records"):
-        top_id_raw = row["top_seed_team_id"]
-        bottom_id_raw = row["bottom_seed_team_id"]
-        if pd.isna(top_id_raw) or pd.isna(bottom_id_raw):
-            warnings.append(f"series {row.get('series_abbrev')} missing a seed team id; skipped")
-            continue
-        top_id = int(top_id_raw)
-        bottom_id = int(bottom_id_raw)
-        top_abbrev = str(row["top_seed_abbrev"])
-        bottom_abbrev = str(row["bottom_seed_abbrev"])
-
-        matchup = matchups.get(_matchup_key(season, top_id, bottom_id))
-        if (
-            matchup is None
-            or top_id not in matchup.win_snapshots
-            or bottom_id not in matchup.win_snapshots
-        ):
-            warnings.append(
-                f"no pre-series snapshot for {top_abbrev} vs {bottom_abbrev}; series skipped"
-            )
-            continue
-
-        outcome, shutout_top, shutout_bottom = _predict_matchup_series(
-            win_model, shutout_model, matchup, top_id, bottom_id
-        )
-        length_by_abbrev[top_abbrev] = dict(outcome.length_probs)
-        length_by_abbrev[bottom_abbrev] = dict(outcome.length_probs)
-
-        team_rows.append(
-            {
-                "team_id": top_id,
-                "team_abbrev": top_abbrev,
-                "opponent_abbrev": bottom_abbrev,
-                "is_top_seed": True,
-                "playoff_round": playoff_round,
-                "p_series_win": outcome.p_a_win_series,
-                "e_wins": outcome.e_wins_a,
-                "e_games": outcome.e_games,
-                "e_goalie_points": outcome.e_goalie_points_a,
-                "e_shutout_wins": outcome.e_wins_a * float(shutout_top),
-            }
-        )
-        team_rows.append(
-            {
-                "team_id": bottom_id,
-                "team_abbrev": bottom_abbrev,
-                "opponent_abbrev": top_abbrev,
-                "is_top_seed": False,
-                "playoff_round": playoff_round,
-                "p_series_win": outcome.p_b_win_series,
-                "e_wins": outcome.e_wins_b,
-                "e_games": outcome.e_games,
-                "e_goalie_points": outcome.e_goalie_points_b,
-                "e_shutout_wins": outcome.e_wins_b * float(shutout_bottom),
-            }
-        )
-
-    return team_rows, length_by_abbrev
-
-
-def _predict_matchup_series(
-    win_model: Any,
-    shutout_model: Any,
-    matchup: Any,
-    top_id: int,
-    bottom_id: int,
-) -> tuple[Any, float, float]:
-    top_win = matchup.win_snapshots[top_id]
-    bottom_win = matchup.win_snapshots[bottom_id]
-    top_sho = matchup.shutout_snapshots[top_id]
-    bottom_sho = matchup.shutout_snapshots[bottom_id]
-    p_top_home = win_model.predict_matchup(top_win, bottom_win, is_playoff=True)
-    p_top_away = 1.0 - win_model.predict_matchup(bottom_win, top_win, is_playoff=True)
-    shutout_top = shutout_model.predict_matchup(top_sho, bottom_sho)
-    shutout_bottom = shutout_model.predict_matchup(bottom_sho, top_sho)
-    return (
-        simulate_series(
-            p_top_home,
-            p_top_away,
-            shutout_prob_a=shutout_top,
-            shutout_prob_b=shutout_bottom,
-        ),
-        shutout_top,
-        shutout_bottom,
-    )
-
-
-def _build_skater_rows(
-    projected: pd.DataFrame,
-    length_by_abbrev: dict[str, dict[int, float]],
-    injured_ids: set[int],
-    *,
-    season_id: int,
-    playoff_round: int,
-    config: ProjectArtifactConfig,
-    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None = None,
-) -> list[dict[str, Any]]:
-    """Project each eligible skater's round points with a seeded Monte Carlo.
-
-    When ``combined_by_abbrev`` supplies a ``(p_advance, next_round_length_probs)``
-    entry for the skater's team, the projection spans the combined R3+R4 draft event
-    (US: combined-round valuation) rather than a single round.
-    """
-    rows: list[dict[str, Any]] = []
-    for rec in projected.to_dict("records"):
-        team_abbrev = str(rec["team_abbrev"])
-        length_probs = length_by_abbrev.get(team_abbrev)
-        if length_probs is None:
-            continue
-        player_id = int(rec["player_id"])
-        ppg = float(rec["projected_points_per_game"])
-        combined = combined_by_abbrev.get(team_abbrev) if combined_by_abbrev else None
-        if combined is not None:
-            p_advance, next_length_probs = combined
-            projection = project_skater_combined(
-                ppg,
-                length_probs,
-                p_advance,
-                next_length_probs,
-                seed=_row_seed(config.seed, season_id, playoff_round, player_id),
-                n_sims=config.n_sims,
-                horizon=config.horizon,
-            )
-        else:
-            projection = project_skater_round(
-                SkaterRoundRequest(ppg, length_probs),
-                seed=_row_seed(config.seed, season_id, playoff_round, player_id),
-                n_sims=config.n_sims,
-                horizon=config.horizon,
-            )
-        rows.append(
-            {
-                "player_id": player_id,
-                "player_name": str(rec.get("player_name", "")),
-                "team_abbrev": team_abbrev,
-                "position": str(rec["position"]),
-                "expected_points": projection.expected_points,
-                "p10": projection.p10,
-                "p50": projection.p50,
-                "p90": projection.p90,
-                "pts_per_game": projection.pts_per_game,
-                "expected_games": projection.expected_games,
-                "availability_multiplier": projection.availability_multiplier,
-                "injured": player_id in injured_ids,
-                "low_confidence": bool(rec.get("low_confidence", False)),
-                "ir_stash_ev": float("nan"),
-                "ir_stash_value": float("nan"),
-                "ir_verdict": "",
-            }
-        )
-    return rows
-
-
-def _fit_return_model(
-    train_sk: pd.DataFrame, train_tg: pd.DataFrame, horizon: int
-) -> ReturnTimeModel:
-    """Fit the US-015 return-time model from pre-cutoff archive spells (leakage-free).
-
-    The absence spells come only from games before the round start, so nothing about
-    the target round leaks. A fixture too small to yield any spell falls back to a
-    degenerate model whose curve is still driven by the documented status means.
-    """
-    spells = derive_absence_spells(train_sk, train_tg)
-    if spells.empty:
-        return ReturnTimeModel(
-            spell_lengths=(), horizon=horizon, status_mean_games=dict(STATUS_MEAN_GAMES)
-        )
-    return fit_return_time_model(spells, horizon=horizon)
-
-
-def _apply_ir_stash(request: _IrStashInput) -> list[StashValuation]:
-    """Value injured F/D as IR stashes and fold the result into the sheet + table.
-
-    Composes the US-015 return-time curve with each injured skater's US-016 per-game
-    production and the retroactive-swap rule (US-022). Mutates ``skaters`` (fills the
-    ``ir_stash_ev`` / ``ir_stash_value`` / ``ir_verdict`` columns) and attaches the
-    rendered IR section to ``cheatsheet``; returns the valuations for the manifest.
-    """
-    skaters = request.skaters
-    config = request.config
-    if not config.ir or skaters.empty:
-        return []
-    injured = skaters.loc[skaters["injured"] & skaters["position"].isin(("F", "D"))]
-    if injured.empty:
-        return []
-
-    model = _fit_return_model(request.train_sk, request.train_tg, config.horizon)
-    inputs = _stash_inputs(
-        injured,
-        request.length_by_abbrev,
-        _status_by_player_id(request.injuries),
-        model,
-    )
-    valuations = build_stash_valuations(
-        _BuildStashRequest(
-            inputs,
-            {
-                "F": request.cheatsheet.replacement_forward,
-                "D": request.cheatsheet.replacement_defense,
-            },
-        ),
-        seed=config.seed,
-        n_sims=config.n_sims,
-        horizon=config.horizon,
-    )
-    _write_stash_columns(skaters, valuations)
-    request.cheatsheet.ir_section = render_ir_section(valuations)
-    return valuations
-
-
-def _status_by_player_id(injuries: pd.DataFrame | None) -> dict[int, str]:
-    if injuries is None or injuries.empty:
-        return {}
-    statuses: dict[int, str] = {}
-    for rec in injuries.to_dict("records"):
-        pid = rec.get("player_id")
-        if pid is not None and pd.notna(pid):
-            statuses[int(pid)] = str(rec.get("status") or "out")
-    return statuses
-
-
-def _stash_inputs(
-    injured: pd.DataFrame,
-    length_by_abbrev: dict[str, dict[int, float]],
-    status_by_id: dict[int, str],
-    model: ReturnTimeModel,
-) -> list[StashInput]:
-    inputs: list[StashInput] = []
-    for rec in injured.to_dict("records"):
-        team_abbrev = str(rec["team_abbrev"])
-        length_probs = length_by_abbrev.get(team_abbrev)
-        if length_probs is None:
-            continue
-        player_id = int(rec["player_id"])
-        status = status_by_id.get(player_id, "out")
-        curve = model.availability_curve(status)
-        inputs.append(
-            StashInput(
-                player_id=player_id,
-                player_name=str(rec.get("player_name", "")),
-                position=str(rec["position"]),
-                team_abbrev=team_abbrev,
-                status=status,
-                pts_per_game=float(rec["pts_per_game"]),
-                length_probs=length_probs,
-                availability_curve=curve,
-                expected_games_available=float(sum(curve)),
-            )
-        )
-    return inputs
-
-
-def _write_stash_columns(skaters: pd.DataFrame, valuations: list[StashValuation]) -> None:
-    by_id = {val.player_id: val for val in valuations}
-    for column, attr in (
-        ("ir_stash_ev", "stash_ev"),
-        ("ir_stash_value", "stash_value"),
-    ):
-        skaters[column] = skaters["player_id"].map(
-            lambda pid, a=attr: getattr(by_id[int(pid)], a) if int(pid) in by_id else float("nan")
-        )
-        skaters["ir_verdict"] = skaters["player_id"].map(
-            lambda pid: by_id[int(pid)].verdict if int(pid) in by_id else ""
-        )
 
 
 def _projection_round_context(
@@ -803,75 +461,18 @@ def build_projection_artifact(
         models=models,
     )
 
-    manifest = add_git_provenance(
-        {
-            "artifact_version": LIVE_PROJECTION_VERSION,
-            "package_version": __version__,
-            "season": int(season),
-            "playoff_round": int(playoff_round),
-            "snapshot_id": snapshot_id,
-            "as_of_cutoff": context.cutoff,
-            "feature_version": FEATURE_SET_VERSION,
-            "model_versions": {
-                "game_win": GAME_WIN_MODEL_VERSION,
-                "shutout": SHUTOUT_MODEL_VERSION,
-                "skater_production": SKATER_PRODUCTION_VERSION,
-                "series_sim": SERIES_SIM_VERSION,
-                "projection": PROJECTION_VERSION,
-            },
-            "git_sha": git_sha,
-            "seeds": {"base": config.seed, "n_sims": config.n_sims, "horizon": config.horizon},
-            "cli_flags": {
-                "managers": config.managers,
-                "ir": config.ir,
-                "seed": config.seed,
-                "no_refresh": config.no_refresh,
-                "slot_strategies": config.slot_strategies,
-                "slot_rollouts": config.resolved_slot_config.rollouts,
-                "combine_final_rounds": config.combine_final_rounds,
-                "n_sims": config.n_sims,
-                "horizon": config.horizon,
-            },
-            "platform": {
-                "os": platform.system(),
-                "os_release": platform.release(),
-                "machine": platform.machine(),
-                "python": platform.python_version(),
-                "numpy": np.__version__,
-            },
-            "generated_at": generated_at or datetime.now(UTC).isoformat(),
-            "scarcity": outputs.cheatsheet.summary(),
-            "counts": {
-                "eligible_series": int(len(outputs.teams) // 2),
-                "eligible_teams": len(outputs.teams),
-                "skaters_projected": len(outputs.skaters),
-                "skaters_injured": (
-                    int(outputs.skaters["injured"].sum()) if not outputs.skaters.empty else 0
-                ),
-            },
-            "eligible_team_abbrevs": sorted(outputs.length_by_abbrev),
-            "ir_stash": {
-                "enabled": config.ir,
-                "candidates": len(outputs.ir_valuations),
-                "stash_verdicts": sum(
-                    1 for valuation in outputs.ir_valuations if valuation.verdict == "stash"
-                ),
-            },
-            "slot_strategies": (
-                outputs.slot_report.summary() if outputs.slot_report is not None else None
-            ),
-            "combined_event": (
-                {
-                    "draft_event": "R3_4",
-                    "draft_round": _COMBINED_DRAFT_ROUND,
-                    "scored_rounds": list(_COMBINED_SCORED_ROUNDS),
-                    "teams": outputs.combined_diagnostics,
-                }
-                if outputs.combined_diagnostics is not None
-                else None
-            ),
-            "warnings": context.warnings,
-        }
+    manifest = _projection_manifest(
+        ProjectionManifestInput(
+            artifact_version=LIVE_PROJECTION_VERSION,
+            season=int(season),
+            playoff_round=int(playoff_round),
+            snapshot_id=snapshot_id,
+            context=context,
+            outputs=outputs,
+            config=config,
+            git_sha=git_sha,
+            generated_at=generated_at,
+        )
     )
 
     return ProjectArtifactResult(
