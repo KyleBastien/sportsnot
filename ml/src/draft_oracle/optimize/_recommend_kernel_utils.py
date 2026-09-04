@@ -29,10 +29,9 @@ def _fitted_rank_z(
     legal: np.ndarray,
     rank_val: np.ndarray,
     pos_masks: Sequence[np.ndarray],
-    rollouts: int,
-    n_assets: int,
 ) -> np.ndarray:
     """Per-position standardized ``rank_value`` over legal set (fitted utility term)."""
+    rollouts, n_assets = legal.shape
     rank_z = np.zeros((rollouts, n_assets), dtype="float64")
     for pos_mask in pos_masks:
         legal_p = legal & pos_mask[None, :]
@@ -88,10 +87,9 @@ def _fitted_opponent_choice(
     mgr_i: int,
 ) -> np.ndarray:
     """Fitted opponent's deterministic per-rollout pick from utility model."""
-    rollouts, n_assets = legal.shape
     pos_masks = [posc == position_index for position_index in range(3)]
     urgency = (limits - cnt_m) / limits
-    rank_z = _fitted_rank_z(legal, rank_val, pos_masks, rollouts, n_assets)
+    rank_z = _fitted_rank_z(legal, rank_val, pos_masks)
     utility = (
         coef_rank[mgr_i] * rank_z
         + coef_aff[mgr_i] * aff_matrix[mgr_i][None, :]

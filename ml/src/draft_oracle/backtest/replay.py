@@ -175,6 +175,16 @@ class _ReplayRoundRequest:
 
 
 @dataclass(frozen=True)
+class _RunBacktestRequest:
+    tables: dict[str, pd.DataFrame]
+    seasons: list[int]
+    league_picks: pd.DataFrame | None = None
+    odds: pd.DataFrame | None = None
+    snapshot_id: str = "backtest"
+    config: BacktestConfig | None = None
+
+
+@dataclass(frozen=True)
 class _SlotSimulationRequest:
     base_state: DraftState
     managers_list: list[str]
@@ -429,8 +439,8 @@ def _replay_round_context(
 
 
 def run_backtest(
-    tables: dict[str, pd.DataFrame],
-    seasons: list[int],
+    tables: _RunBacktestRequest | dict[str, pd.DataFrame],
+    seasons: list[int] | None = None,
     *,
     league_picks: pd.DataFrame | None = None,
     odds: pd.DataFrame | None = None,
@@ -447,25 +457,41 @@ def run_backtest(
     today's live snapshot into a past round would leak future roster status into
     picks under ``ir=True`` (CODE_REVIEW m-4). Deterministic given ``(tables, seed)``.
     """
-    cfg = config or BacktestConfig()
-    if not seasons:
+    request = _resolve_run_backtest_request(
+        tables,
+        seasons,
+        league_picks=league_picks,
+        odds=odds,
+        snapshot_id=snapshot_id,
+        config=config,
+    )
+    cfg = request.config or BacktestConfig()
+    if not request.seasons:
         raise ValueError("seasons must be non-empty")
-    skater_actual = skater_actual_points(tables["skater_games"], tables["series"])
-    team_actual = team_actual_goalie_points(tables["team_games"], tables["series"])
+    skater_actual = skater_actual_points(
+        request.tables["skater_games"],
+        request.tables["series"],
+    )
+    team_actual = team_actual_goalie_points(
+        request.tables["team_games"],
+        request.tables["series"],
+    )
 
     rounds: list[RoundResult] = []
-    for season in seasons:
-        for draft_round, scored_rounds in _draft_events(_season_rounds(tables["series"], season)):
+    for season in request.seasons:
+        for draft_round, scored_rounds in _draft_events(
+            _season_rounds(request.tables["series"], season)
+        ):
             rounds.append(
                 replay_round(
                     _ReplayRoundRequest(
-                        tables=tables,
+                        tables=request.tables,
                         season=season,
                         playoff_round=draft_round,
-                        league_picks=league_picks,
+                        league_picks=request.league_picks,
                         injuries=None,
-                        odds=odds,
-                        snapshot_id=snapshot_id,
+                        odds=request.odds,
+                        snapshot_id=request.snapshot_id,
                         skater_actual=skater_actual,
                         team_actual=team_actual,
                         config=cfg,
@@ -474,15 +500,38 @@ def run_backtest(
                 )
             )
 
-    comparisons = _league_comparisons(rounds, league_picks, skater_actual, team_actual)
+    comparisons = _league_comparisons(rounds, request.league_picks, skater_actual, team_actual)
 
     return BacktestResult(
-        run_id=cfg.resolved_run_id(seasons),
-        seasons=list(seasons),
+        run_id=cfg.resolved_run_id(request.seasons),
+        seasons=list(request.seasons),
         config=cfg,
         rounds=rounds,
         generated_at=datetime.now(UTC).isoformat(),
         league_comparisons=comparisons,
+    )
+
+
+def _resolve_run_backtest_request(
+    tables: _RunBacktestRequest | dict[str, pd.DataFrame],
+    seasons: list[int] | None,
+    *,
+    league_picks: pd.DataFrame | None,
+    odds: pd.DataFrame | None,
+    snapshot_id: str,
+    config: BacktestConfig | None,
+) -> _RunBacktestRequest:
+    if isinstance(tables, _RunBacktestRequest):
+        return tables
+    if seasons is None:
+        raise ValueError("seasons must be provided")
+    return _RunBacktestRequest(
+        tables=tables,
+        seasons=seasons,
+        league_picks=league_picks,
+        odds=odds,
+        snapshot_id=snapshot_id,
+        config=config,
     )
 
 

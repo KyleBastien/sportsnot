@@ -31,28 +31,30 @@ class _LoopState:
     session: Any
     session_path: Path | None
     echo: Callable[[str], None]
+
+
+@dataclass(frozen=True)
+class _LoopRuntime:
     dispatch: Callable[[Any, ParsedCommand], ActionResult]
     resume_session: Callable[[Path], Any]
 
 
 def _run_loop(
+    runtime: _LoopRuntime,
     session: Any,
     session_path: Path | None,
-    *,
-    dispatch: Callable[[Any, ParsedCommand], ActionResult],
-    resume_session: Callable[[Path], Any],
     input_fn: Callable[[str], str] = input,
     echo: Callable[[str], None] = typer.echo,
 ) -> Any:
     """Drive an interactive session until EOF/quit. Returns final session."""
-    state = _LoopState(session, session_path, echo, dispatch, resume_session)
+    state = _LoopState(session, session_path, echo)
     _show_help_banner(echo)
     _autosave(state)
     while True:
         parsed = _read_command(state.session, input_fn, echo)
         if parsed is None:
             break
-        if _handle_loop_command(state, parsed):
+        if _handle_loop_command(state, runtime, parsed):
             break
     _autosave(state)
     return state.session
@@ -81,7 +83,11 @@ def _prompt(session: Any) -> str:
     return f"[#{session.state.pick_index + 1} {session.state.current_manager}] > "
 
 
-def _handle_loop_command(state: _LoopState, parsed: ParsedCommand) -> bool:
+def _handle_loop_command(
+    state: _LoopState,
+    runtime: _LoopRuntime,
+    parsed: ParsedCommand,
+) -> bool:
     if parsed.name == "":
         return False
     if parsed.error:
@@ -93,19 +99,23 @@ def _handle_loop_command(state: _LoopState, parsed: ParsedCommand) -> bool:
         _echo_lines(state.echo, _HELP_LINES)
         return False
     if parsed.name == "resume":
-        _handle_resume(state, parsed)
+        _handle_resume(state, runtime, parsed)
         return False
     if parsed.name == "save":
         _handle_save(state, parsed)
         return False
-    _handle_action_command(state, parsed)
+    _handle_action_command(state, runtime, parsed)
     return False
 
 
-def _handle_resume(state: _LoopState, parsed: ParsedCommand) -> None:
+def _handle_resume(
+    state: _LoopState,
+    runtime: _LoopRuntime,
+    parsed: ParsedCommand,
+) -> None:
     assert parsed.path is not None
     resume_path = Path(parsed.path)
-    state.session = state.resume_session(resume_path)
+    state.session = runtime.resume_session(resume_path)
     state.session_path = resume_path
     state.echo(
         f"resumed {len(state.session.picks)} pick(s) from {parsed.path}; "
@@ -120,8 +130,12 @@ def _handle_save(state: _LoopState, parsed: ParsedCommand) -> None:
     state.echo(f"saved session -> {parsed.path}")
 
 
-def _handle_action_command(state: _LoopState, parsed: ParsedCommand) -> None:
-    result = state.dispatch(state.session, parsed)
+def _handle_action_command(
+    state: _LoopState,
+    runtime: _LoopRuntime,
+    parsed: ParsedCommand,
+) -> None:
+    result = runtime.dispatch(state.session, parsed)
     state.echo(result.message)
     _echo_lines(state.echo, result.lines)
     if parsed.name in ("pick", "undo") and result.ok:

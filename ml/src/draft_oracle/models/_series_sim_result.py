@@ -112,76 +112,107 @@ class SeriesSimResult:
 
     def report_lines(self) -> list[str]:
         """Human-readable calibration report (Markdown; ASCII only)."""
-        cfg = self.config
-        lines = [
-            f"# Best-of-7 series simulator ({SERIES_SIM_VERSION})",
-            "",
-            "Composes the per-game win model (US-011) and shutout model (US-012) into a",
-            "full best-of-7 outcome distribution with the 2-2-1-1-1 home-ice pattern. The",
-            "distribution is enumerated exactly over all series paths (no Monte Carlo). Per",
-            "series it yields P(win series), the 4/5/6/7-game length distribution, E[wins],",
-            "E[games], and E[goalie-slot points] scored through the rules engine (a shutout",
-            "win replaces a normal win: 4 pts vs 2).",
-            "",
-            "## Reproducibility",
-            f"- Seed: {cfg.seed}",
-            f"- Held-out test seasons (end year): {list(self.test_years)}",
-            "- The per-game win and shutout models are trained ONLY on seasons before the",
-            "  held-out set; test-season series never touch training (SPEC section 6).",
-            f"- Series scored: {self.n_series_scored} (skipped for missing pre-series "
-            f"state: {self.n_series_skipped}).",
-            "",
-            "## Series-winner calibration (held out)",
-            "Brier score for P(higher seed wins the series), lower is better:",
-            f"- series simulator:        {self.brier_series:.4f}",
-            f"- baseline higher seed=1:  {self.brier_higher_seed:.4f}",
-            f"- baseline coin flip=0.5:  {self.brier_coin_flip:.4f}",
-            f"- Beats higher-seed baseline: {'yes' if self.beats_higher_seed_baseline else 'NO'}",
-            f"- Beats coin flip: {'yes' if self.beats_coin_flip else 'NO'}",
-            "",
-            "### Reliability bins (predicted P(higher seed wins) -> observed)",
-            "| predicted range | n | mean predicted | observed |",
-            "| --- | --- | --- | --- |",
-        ]
-        for bucket in self.calibration_bins:
-            lines.append(
-                f"| {bucket.lower:.2f}-{bucket.upper:.2f} | {bucket.count} | "
-                f"{bucket.mean_predicted:.3f} | {bucket.observed_rate:.3f} |"
+        lines = _report_intro(self)
+        lines.extend(_reliability_lines(self.calibration_bins))
+        lines.extend(_length_lines(self.length_bins))
+        lines.extend(
+            _shutout_lines(
+                self.predicted_shutouts_by_round,
+                self.observed_shutouts_by_round,
             )
-        lines += [
-            "",
-            "## Series-length distribution: predicted vs. observed",
-            "| games | predicted | observed |",
-            "| --- | --- | --- |",
-        ]
-        for length_bin in self.length_bins:
-            lines.append(
-                f"| {length_bin.length} | {length_bin.predicted_rate:.3f} | "
-                f"{length_bin.observed_rate:.3f} |"
-            )
-        lines += [
-            "",
-            "## Shutouts per playoff round: predicted E[shutouts] vs. observed",
-            "| round | predicted | observed |",
-            "| --- | --- | --- |",
-        ]
-        for playoff_round in sorted(
-            set(self.predicted_shutouts_by_round) | set(self.observed_shutouts_by_round)
-        ):
-            predicted = self.predicted_shutouts_by_round.get(playoff_round, 0.0)
-            observed = self.observed_shutouts_by_round.get(playoff_round, 0)
-            lines.append(f"| {playoff_round} | {predicted:.2f} | {observed} |")
-        lines += [
-            "",
-            "## Honesty note (SPEC section 7)",
-            f"Metrics are reported exactly as measured. With {self.n_series_scored} playoff "
-            "series held out the",
-            "sample is small, so the series-winner Brier is noisy and may not beat the",
-            "higher-seed baseline every split; the number is printed as-is. Series prices",
-            "are unavailable, so per-game probabilities come from the stat-only win model.",
-            "",
-        ]
+        )
+        lines.extend(_honesty_note(self.n_series_scored))
         return lines
+
+
+def _report_intro(result: SeriesSimResult) -> list[str]:
+    cfg = result.config
+    return [
+        f"# Best-of-7 series simulator ({SERIES_SIM_VERSION})",
+        "",
+        "Composes the per-game win model (US-011) and shutout model (US-012) into a",
+        "full best-of-7 outcome distribution with the 2-2-1-1-1 home-ice pattern. The",
+        "distribution is enumerated exactly over all series paths (no Monte Carlo). Per",
+        "series it yields P(win series), the 4/5/6/7-game length distribution, E[wins],",
+        "E[games], and E[goalie-slot points] scored through the rules engine (a shutout",
+        "win replaces a normal win: 4 pts vs 2).",
+        "",
+        "## Reproducibility",
+        f"- Seed: {cfg.seed}",
+        f"- Held-out test seasons (end year): {list(result.test_years)}",
+        "- The per-game win and shutout models are trained ONLY on seasons before the",
+        "  held-out set; test-season series never touch training (SPEC section 6).",
+        f"- Series scored: {result.n_series_scored} (skipped for missing pre-series "
+        f"state: {result.n_series_skipped}).",
+        "",
+        "## Series-winner calibration (held out)",
+        "Brier score for P(higher seed wins the series), lower is better:",
+        f"- series simulator:        {result.brier_series:.4f}",
+        f"- baseline higher seed=1:  {result.brier_higher_seed:.4f}",
+        f"- baseline coin flip=0.5:  {result.brier_coin_flip:.4f}",
+        f"- Beats higher-seed baseline: {'yes' if result.beats_higher_seed_baseline else 'NO'}",
+        f"- Beats coin flip: {'yes' if result.beats_coin_flip else 'NO'}",
+        "",
+    ]
+
+
+def _reliability_lines(bins: list[SeriesCalibrationBin]) -> list[str]:
+    lines = [
+        "### Reliability bins (predicted P(higher seed wins) -> observed)",
+        "| predicted range | n | mean predicted | observed |",
+        "| --- | --- | --- | --- |",
+    ]
+    for bucket in bins:
+        lines.append(
+            f"| {bucket.lower:.2f}-{bucket.upper:.2f} | {bucket.count} | "
+            f"{bucket.mean_predicted:.3f} | {bucket.observed_rate:.3f} |"
+        )
+    return lines
+
+
+def _length_lines(bins: list[LengthBin]) -> list[str]:
+    lines = [
+        "",
+        "## Series-length distribution: predicted vs. observed",
+        "| games | predicted | observed |",
+        "| --- | --- | --- |",
+    ]
+    for length_bin in bins:
+        lines.append(
+            f"| {length_bin.length} | {length_bin.predicted_rate:.3f} | "
+            f"{length_bin.observed_rate:.3f} |"
+        )
+    return lines
+
+
+def _shutout_lines(
+    predicted_by_round: dict[int, float],
+    observed_by_round: dict[int, int],
+) -> list[str]:
+    lines = [
+        "",
+        "## Shutouts per playoff round: predicted E[shutouts] vs. observed",
+        "| round | predicted | observed |",
+        "| --- | --- | --- |",
+    ]
+    for playoff_round in sorted(set(predicted_by_round) | set(observed_by_round)):
+        predicted = predicted_by_round.get(playoff_round, 0.0)
+        observed = observed_by_round.get(playoff_round, 0)
+        lines.append(f"| {playoff_round} | {predicted:.2f} | {observed} |")
+    return lines
+
+
+def _honesty_note(n_series_scored: int) -> list[str]:
+    return [
+        "",
+        "## Honesty note (SPEC section 7)",
+        f"Metrics are reported exactly as measured. With {n_series_scored} playoff "
+        "series held out the",
+        "sample is small, so the series-winner Brier is noisy and may not beat the",
+        "higher-seed baseline every split; the number is printed as-is. Series prices",
+        "are unavailable, so per-game probabilities come from the stat-only win model.",
+        "",
+    ]
 
 
 def _held_out_years(series: pd.DataFrame, n_test: int) -> tuple[int, ...]:

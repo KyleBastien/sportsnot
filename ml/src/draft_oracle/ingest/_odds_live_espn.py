@@ -57,8 +57,10 @@ def _espn_summary_game(
         return None
     home_name, away_name = _espn_competitor_names(competition)
     game_date = _parse_utc_date(competition.get("date"))
-    if home_name is None or away_name is None or game_date is None:
+    if _missing_espn_game_fields(home_name, away_name, game_date):
         return None
+    assert home_name is not None
+    assert away_name is not None
     home_id = resolve_team_id(home_name)
     away_id = resolve_team_id(away_name)
     if home_id is None or away_id is None:
@@ -74,6 +76,14 @@ def _espn_summary_game(
         home_name=home_name,
         neutral=False,
     )
+
+
+def _missing_espn_game_fields(
+    home_name: str | None,
+    away_name: str | None,
+    game_date: Any,
+) -> bool:
+    return home_name is None or away_name is None or game_date is None
 
 
 def _first_espn_competition(summary: Mapping[str, Any]) -> dict[str, Any] | None:
