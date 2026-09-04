@@ -35,16 +35,20 @@ from draft_oracle.projection_artifact import (
     write_projection_artifact,
 )
 from tests.projection_artifact_fixtures import (
+    _ARCHIVE,
     _PROJECT_ARTIFACT_CONFIG,
-    _archive,
     _pre_round_archive,
 )
 
 # ── Core assembly ──────────────────────────────────────────────────────────
 
 
+def _archive_copy() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    return tuple(frame.copy(deep=True) for frame in _ARCHIVE)  # type: ignore[return-value]
+
+
 def test_build_projection_artifact_shapes_and_columns() -> None:
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
     result = build_projection_artifact(
         sk,
         players,
@@ -90,7 +94,7 @@ def test_combined_cheatsheet_note_documents_team_column_contract() -> None:
 
 
 def test_round_one_has_no_combined_event() -> None:
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
     result = build_projection_artifact(
         sk,
         players,
@@ -106,7 +110,7 @@ def test_round_one_has_no_combined_event() -> None:
 
 
 def test_ineligible_teams_and_players_are_excluded() -> None:
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
     result = build_projection_artifact(
         sk,
         players,
@@ -126,7 +130,7 @@ def test_ineligible_teams_and_players_are_excluded() -> None:
 
 
 def test_series_win_probabilities_are_complementary() -> None:
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
     result = build_projection_artifact(
         sk,
         players,
@@ -144,7 +148,7 @@ def test_series_win_probabilities_are_complementary() -> None:
 
 
 def test_injury_flag_is_set_from_injuries_table() -> None:
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
     injured_pid = 100  # AAA forward
     injuries = pd.DataFrame(
         [
@@ -179,7 +183,7 @@ def test_espn_mapped_injury_drives_flag_and_ir_stash() -> None:
     # skater must be resolved by name + team to its NHL id before the injured
     # flag and _apply_ir_stash can fire. Here ESPN id 4900001 (~4-5M range) must
     # map to harness skater 100 (AAA forward) via injuries_response_to_rows.
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
     feed = {
         "injuries": [
             {
@@ -236,7 +240,7 @@ def test_espn_mapped_injury_drives_flag_and_ir_stash() -> None:
 
 
 def test_missing_round_raises() -> None:
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
     with pytest.raises(ValueError, match="no series found"):
         build_projection_artifact(
             sk,
@@ -307,7 +311,7 @@ def test_pre_round_cutoff_is_leak_safe() -> None:
 
 
 def test_manifest_records_versions_seeds_and_snapshot() -> None:
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
     result = build_projection_artifact(
         sk,
         players,
@@ -341,7 +345,7 @@ def test_manifest_records_versions_seeds_and_snapshot() -> None:
 
 
 def test_reruns_are_byte_identical_parquet(tmp_path: Path) -> None:
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
 
     def _run(sub: str) -> tuple[bytes, bytes]:
         result = build_projection_artifact(
@@ -372,7 +376,7 @@ def test_reruns_are_byte_identical_parquet(tmp_path: Path) -> None:
 
 
 def _write_normalized(dir_path: Path) -> None:
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
     dir_path.mkdir(parents=True, exist_ok=True)
     sk.to_parquet(dir_path / "skater_games.parquet", index=False)
     tg.to_parquet(dir_path / "team_games.parquet", index=False)
@@ -516,7 +520,7 @@ def test_pinned_run_without_snapshot_manifest_fails_loudly(tmp_path: Path) -> No
 def test_slot_strategies_skipped_when_pool_too_small() -> None:
     # The synthetic archive has only two eligible teams (a handful of assets), which
     # cannot fill a 4-manager league -- the report is skipped gracefully, not crashed.
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
     result = build_projection_artifact(
         sk,
         players,
@@ -533,7 +537,7 @@ def test_slot_strategies_skipped_when_pool_too_small() -> None:
 
 
 def test_slot_strategies_disabled_writes_no_file(tmp_path: Path) -> None:
-    sk, tg, players, series = _archive()
+    sk, tg, players, series = _archive_copy()
     config = ProjectArtifactConfig(
         seed=20260827,
         n_sims=300,

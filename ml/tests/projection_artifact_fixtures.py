@@ -234,9 +234,7 @@ _PROJECT_ARTIFACT_CONFIG = ProjectArtifactConfig(
     production_config=_PRODUCTION_CONFIG,
 )
 
-
-def _archive() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    return _synthetic_archive([2018, 2019, 2020, 2021, 2022], seed=1)
+_ARCHIVE = _synthetic_archive([2018, 2019, 2020, 2021, 2022], seed=1)
 
 
 @dataclass(frozen=True)
