@@ -253,6 +253,18 @@ class _PreRoundRegularSeasonRequest:
     gid_start: int
 
 
+@dataclass(frozen=True)
+class _PreRoundSeasonRequest:
+    sk_rows: list[dict[str, object]]
+    tg_rows: list[dict[str, object]]
+    series_rows: list[dict[str, object]]
+    players: dict[int, tuple[str, float, str]]
+    rng: np.random.Generator
+    end_year: int
+    target: int
+    gid_start: int
+
+
 def _pre_round_archive(
     end_years: list[int], *, seed: int = 3
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -272,14 +284,16 @@ def _pre_round_archive(
 
     for end_year in end_years:
         gid = _append_pre_round_season(
-            sk_rows,
-            tg_rows,
-            series_rows,
-            players,
-            rng,
-            end_year=end_year,
-            target=target,
-            gid_start=gid,
+            _PreRoundSeasonRequest(
+                sk_rows,
+                tg_rows,
+                series_rows,
+                players,
+                rng,
+                end_year,
+                target,
+                gid,
+            )
         )
 
     return (
@@ -290,19 +304,16 @@ def _pre_round_archive(
     )
 
 
-def _append_pre_round_season(
-    sk_rows: list[dict[str, object]],
-    tg_rows: list[dict[str, object]],
-    series_rows: list[dict[str, object]],
-    players: dict[int, tuple[str, float, str]],
-    rng: np.random.Generator,
-    *,
-    end_year: int,
-    target: int,
-    gid_start: int,
-) -> int:
+def _append_pre_round_season(request: _PreRoundSeasonRequest) -> int:
     season_id, gid = _append_pre_round_regular_season(
-        _PreRoundRegularSeasonRequest(sk_rows, tg_rows, players, rng, end_year, gid_start)
+        _PreRoundRegularSeasonRequest(
+            request.sk_rows,
+            request.tg_rows,
+            request.players,
+            request.rng,
+            request.end_year,
+            request.gid_start,
+        )
     )
     for top, bottom in _PRE_ROUND_SERIES:
         new_tg, new_sk, gid = _round1_series_games(
@@ -310,17 +321,24 @@ def _append_pre_round_season(
                 gid_start=gid,
                 top=top,
                 bottom=bottom,
-                end_year=end_year,
+                end_year=request.end_year,
                 season_id=season_id,
-                rng=rng,
-                players=players,
+                rng=request.rng,
+                players=request.players,
                 team_ids=_PRE_ROUND_TEAM_IDS,
             )
         )
-        tg_rows.extend(new_tg)
-        sk_rows.extend(new_sk)
-        series_rows.append(_completed_round_one_series_row(end_year, season_id, top, bottom))
-    _append_pending_round_two_series(series_rows, end_year, season_id, target)
+        request.tg_rows.extend(new_tg)
+        request.sk_rows.extend(new_sk)
+        request.series_rows.append(
+            _completed_round_one_series_row(request.end_year, season_id, top, bottom)
+        )
+    _append_pending_round_two_series(
+        request.series_rows,
+        request.end_year,
+        season_id,
+        request.target,
+    )
     return gid
 
 

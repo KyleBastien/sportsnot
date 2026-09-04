@@ -317,6 +317,15 @@ class _BuildProjectionArtifactKwargs(TypedDict, total=False):
     generated_at: str | None
 
 
+class _BuildProjectionArtifactFromNormalizedKwargs(TypedDict, total=False):
+    season: int
+    playoff_round: int
+    normalized_dir: Path
+    artifacts_root: Path
+    snapshot: str | None
+    config: ProjectArtifactConfig | None
+
+
 @dataclass(frozen=True)
 class _BuildProjectionArtifactDataRequest:
     skater_games: pd.DataFrame
@@ -331,6 +340,16 @@ class _BuildProjectionArtifactDataRequest:
     config: ProjectArtifactConfig
     git_sha: str | None
     generated_at: str | None
+
+
+@dataclass(frozen=True)
+class _BuildProjectionArtifactFromNormalizedRequest:
+    season: int
+    playoff_round: int
+    normalized_dir: Path = DEFAULT_NORMALIZED_DIR
+    artifacts_root: Path = DEFAULT_ARTIFACTS_ROOT
+    snapshot: str | None = None
+    config: ProjectArtifactConfig | None = None
 
 
 def _injured_player_ids(injuries: pd.DataFrame | None) -> set[int]:
@@ -774,13 +793,8 @@ def write_projection_artifact(result: ProjectArtifactResult, out_dir: Path) -> P
 
 
 def build_projection_artifact_from_normalized(
-    *,
-    season: int,
-    playoff_round: int,
-    normalized_dir: Path = DEFAULT_NORMALIZED_DIR,
-    artifacts_root: Path = DEFAULT_ARTIFACTS_ROOT,
-    snapshot: str | None = None,
-    config: ProjectArtifactConfig | None = None,
+    request: _BuildProjectionArtifactFromNormalizedRequest | None = None,
+    **legacy: Unpack[_BuildProjectionArtifactFromNormalizedKwargs],
 ) -> tuple[ProjectArtifactResult, Path]:
     """Load normalized tables, build the artifact, and write it to disk.
 
@@ -792,26 +806,51 @@ def build_projection_artifact_from_normalized(
     ``normalized_dir`` is used and the snapshot id is derived from its source
     signature. The artifact is written to ``artifacts_root/<season>-r<round>/``.
     """
-    source_dir = normalized_dir / SNAPSHOTS_SUBDIR / snapshot if snapshot else normalized_dir
-    if snapshot is not None:
+    resolved = _resolve_build_projection_artifact_from_normalized_request(request, legacy)
+    source_dir = (
+        resolved.normalized_dir / SNAPSHOTS_SUBDIR / resolved.snapshot
+        if resolved.snapshot
+        else resolved.normalized_dir
+    )
+    if resolved.snapshot is not None:
         _require_complete_snapshot(source_dir)
     tables = _load_tables(source_dir)
     injuries = _load_injuries(source_dir)
     league_picks = _load_league_picks(source_dir)
-    snapshot_id = _snapshot_id_for(source_dir, snapshot)
+    snapshot_id = _snapshot_id_for(source_dir, resolved.snapshot)
 
     result = build_projection_artifact(
         tables["skater_games"],
         tables["players"],
         tables["team_games"],
         tables["series"],
-        season=season,
-        playoff_round=playoff_round,
+        season=resolved.season,
+        playoff_round=resolved.playoff_round,
         snapshot_id=snapshot_id,
         injuries=injuries,
         league_picks=league_picks,
-        config=config,
+        config=resolved.config,
     )
-    out_dir = artifacts_root / f"{season}-r{playoff_round}"
+    out_dir = resolved.artifacts_root / f"{resolved.season}-r{resolved.playoff_round}"
     write_projection_artifact(result, out_dir)
     return result, out_dir
+
+
+def _resolve_build_projection_artifact_from_normalized_request(
+    request: _BuildProjectionArtifactFromNormalizedRequest | None,
+    legacy: _BuildProjectionArtifactFromNormalizedKwargs,
+) -> _BuildProjectionArtifactFromNormalizedRequest:
+    if request is not None:
+        if legacy:
+            raise TypeError(
+                "_BuildProjectionArtifactFromNormalizedRequest calls do not accept extra keywords"
+            )
+        return request
+    return _BuildProjectionArtifactFromNormalizedRequest(
+        season=legacy["season"],
+        playoff_round=legacy["playoff_round"],
+        normalized_dir=legacy.get("normalized_dir", DEFAULT_NORMALIZED_DIR),
+        artifacts_root=legacy.get("artifacts_root", DEFAULT_ARTIFACTS_ROOT),
+        snapshot=legacy.get("snapshot"),
+        config=legacy.get("config"),
+    )

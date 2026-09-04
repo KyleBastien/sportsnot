@@ -206,44 +206,62 @@ def _emit_regular_season_games(request: _ArchiveBuildRequest) -> int:
                 if day > 27:
                     day = 1
                     month = 11 if month == 10 else (12 if month == 11 else 10)
-                diff = STRENGTH[home] - STRENGTH[away]
-                home_win = request.rng.random() < 1.0 / (1.0 + np.exp(-0.5 * diff))
-                if home_win:
-                    home_goals = int(request.rng.integers(2, 5))
-                    away_goals = int(request.rng.integers(0, home_goals))
-                else:
-                    away_goals = int(request.rng.integers(2, 5))
-                    home_goals = int(request.rng.integers(0, away_goals))
-                request.tg_rows.extend(
-                    _team_rows(
-                        _TeamRowsInput(
-                            gid,
-                            date,
-                            request.season_id,
-                            2,
-                            home,
-                            away,
-                            home_goals,
-                            away_goals,
-                            TEAMS,
-                        )
-                    )
+                _append_regular_season_game(
+                    request,
+                    _RegularSeasonGameSpec(gid, date, home, away),
                 )
-                for team, opp in ((home, away), (away, home)):
-                    _append_backtest_skater_rows(
-                        _BacktestSkaterRowsRequest(
-                            rows=request.sk_rows,
-                            players=request.players,
-                            rng=request.rng,
-                            game_id=gid,
-                            game_date=date,
-                            season_id=request.season_id,
-                            game_type_id=2,
-                            team=team,
-                            opp=opp,
-                        )
-                    )
     return gid
+
+
+@dataclass(frozen=True)
+class _RegularSeasonGameSpec:
+    game_id: int
+    game_date: str
+    home: str
+    away: str
+
+
+def _append_regular_season_game(
+    request: _ArchiveBuildRequest,
+    game: _RegularSeasonGameSpec,
+) -> None:
+    diff = STRENGTH[game.home] - STRENGTH[game.away]
+    home_win = request.rng.random() < 1.0 / (1.0 + np.exp(-0.5 * diff))
+    if home_win:
+        home_goals = int(request.rng.integers(2, 5))
+        away_goals = int(request.rng.integers(0, home_goals))
+    else:
+        away_goals = int(request.rng.integers(2, 5))
+        home_goals = int(request.rng.integers(0, away_goals))
+    request.tg_rows.extend(
+        _team_rows(
+            _TeamRowsInput(
+                game.game_id,
+                game.game_date,
+                request.season_id,
+                2,
+                game.home,
+                game.away,
+                home_goals,
+                away_goals,
+                TEAMS,
+            )
+        )
+    )
+    for team, opp in ((game.home, game.away), (game.away, game.home)):
+        _append_backtest_skater_rows(
+            _BacktestSkaterRowsRequest(
+                rows=request.sk_rows,
+                players=request.players,
+                rng=request.rng,
+                game_id=game.game_id,
+                game_date=game.game_date,
+                season_id=request.season_id,
+                game_type_id=2,
+                team=team,
+                opp=opp,
+            )
+        )
 
 
 def _emit_series_games(
