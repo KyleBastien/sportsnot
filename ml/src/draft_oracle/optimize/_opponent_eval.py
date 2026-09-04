@@ -267,12 +267,8 @@ def _per_pick_accuracy(
     rank_keys: Callable[[OpponentModel, DraftState, str, random.Random | None], list[str]],
 ) -> PerPickScore | None:
     """Teacher-forced per-pick top-1/top-K accuracy on events with a true pick order."""
-    ordered = picks.loc[picks["pick_number"].notna()]
-    if ordered.empty:
-        return None
-    ordered_seasons = {int(season) for season in ordered["season"].unique()}
-    train = picks.loc[~picks["season"].isin(ordered_seasons)]
-    if train.empty:
+    ordered, train = _per_pick_training_frames(picks)
+    if ordered is None or train is None:
         return None
     fitted = fit_models(train, config)
     greedy = GreedyOpponentModel(temperature=0.0, need_weight=config.need_weight)
@@ -284,35 +280,14 @@ def _per_pick_accuracy(
     greedy_topk = 0
     prepared = prepare_picks(ordered)
     for _, pool in prepared.groupby(event_keys(prepared), sort=True):
-        order = _event_order(pool)
-        if order is None:
+        event_score = _per_pick_event_score(pool, fitted.as_mapping, greedy, config, rank_keys)
+        if event_score is None:
             continue
-        assets = _event_assets(pool)
-        allow_ir = bool((pool["position"].isin(["IR_F", "IR_D"])).any())
-        state = DraftState.new(order, assets, allow_ir=allow_ir)
-        fitted_models = fitted.as_mapping(order)
-        sequence = pool.sort_values("pick_number")
-        rng = random.Random(config.seed)
-        for _, pick in sequence.iterrows():
-            scored_pick = _score_pick(
-                state,
-                fitted_models[str(pick["manager"])],
-                greedy,
-                str(pick["manager"]),
-                str(pick["asset_key"]),
-                config.top_k,
-                rank_keys,
-                rng,
-            )
-            if scored_pick is None:
-                continue
-            fitted_hit, greedy_hit, fitted_topk_hit, greedy_topk_hit, asset = scored_pick
-            fitted_top1 += fitted_hit
-            greedy_top1 += greedy_hit
-            fitted_topk += fitted_topk_hit
-            greedy_topk += greedy_topk_hit
-            total += 1
-            state.place(str(pick["manager"]), asset)
+        total += event_score.picks
+        fitted_top1 += event_score.fitted_top1
+        greedy_top1 += event_score.greedy_top1
+        fitted_topk += event_score.fitted_topk
+        greedy_topk += event_score.greedy_topk
     if total == 0:
         return None
     return PerPickScore(
@@ -323,6 +298,73 @@ def _per_pick_accuracy(
         greedy_topk=greedy_topk / total,
         k=config.top_k,
     )
+
+
+def _per_pick_training_frames(
+    picks: pd.DataFrame,
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
+    ordered = picks.loc[picks["pick_number"].notna()]
+    if ordered.empty:
+        return None, None
+    ordered_seasons = {int(season) for season in ordered["season"].unique()}
+    train = picks.loc[~picks["season"].isin(ordered_seasons)]
+    if train.empty:
+        return None, None
+    return ordered, train
+
+
+@dataclass(frozen=True)
+class _PerPickEventScore:
+    picks: int
+    fitted_top1: int
+    greedy_top1: int
+    fitted_topk: int
+    greedy_topk: int
+
+
+def _per_pick_event_score(
+    pool: pd.DataFrame,
+    fitted_mapping: Callable[[list[str]], Mapping[str, OpponentModel]],
+    greedy: OpponentModel,
+    config: _OpponentEvalConfig,
+    rank_keys: Callable[[OpponentModel, DraftState, str, random.Random | None], list[str]],
+) -> _PerPickEventScore | None:
+    order = _event_order(pool)
+    if order is None:
+        return None
+    state = _event_state(pool, order)
+    fitted_models = fitted_mapping(order)
+    rng = random.Random(config.seed)
+    score = _PerPickEventScore(0, 0, 0, 0, 0)
+    for _, pick in pool.sort_values("pick_number").iterrows():
+        scored_pick = _score_pick(
+            state,
+            fitted_models[str(pick["manager"])],
+            greedy,
+            str(pick["manager"]),
+            str(pick["asset_key"]),
+            config.top_k,
+            rank_keys,
+            rng,
+        )
+        if scored_pick is None:
+            continue
+        fitted_hit, greedy_hit, fitted_topk_hit, greedy_topk_hit, asset = scored_pick
+        score = _PerPickEventScore(
+            picks=score.picks + 1,
+            fitted_top1=score.fitted_top1 + fitted_hit,
+            greedy_top1=score.greedy_top1 + greedy_hit,
+            fitted_topk=score.fitted_topk + fitted_topk_hit,
+            greedy_topk=score.greedy_topk + greedy_topk_hit,
+        )
+        state.place(str(pick["manager"]), asset)
+    return score
+
+
+def _event_state(pool: pd.DataFrame, order: list[str]) -> DraftState:
+    assets = _event_assets(pool)
+    allow_ir = bool((pool["position"].isin(["IR_F", "IR_D"])).any())
+    return DraftState.new(order, assets, allow_ir=allow_ir)
 
 
 def _score_pick(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Hashable, Mapping
 from typing import Any, Protocol
 
 import pandas as pd
@@ -46,22 +47,16 @@ def _build_team_rows(
     length_by_abbrev: dict[str, dict[int, float]] = {}
 
     for row in round_series.to_dict("records"):
-        top_id_raw = row["top_seed_team_id"]
-        bottom_id_raw = row["bottom_seed_team_id"]
-        if pd.isna(top_id_raw) or pd.isna(bottom_id_raw):
+        ids = _seed_team_ids(row)
+        if ids is None:
             warnings.append(f"series {row.get('series_abbrev')} missing a seed team id; skipped")
             continue
-        top_id = int(top_id_raw)
-        bottom_id = int(bottom_id_raw)
+        top_id, bottom_id = ids
         top_abbrev = str(row["top_seed_abbrev"])
         bottom_abbrev = str(row["bottom_seed_abbrev"])
 
         matchup = matchups.get(_matchup_key(season, top_id, bottom_id))
-        if (
-            matchup is None
-            or top_id not in matchup.win_snapshots
-            or bottom_id not in matchup.win_snapshots
-        ):
+        if _missing_matchup_snapshots(matchup, top_id, bottom_id):
             warnings.append(
                 f"no pre-series snapshot for {top_abbrev} vs {bottom_abbrev}; series skipped"
             )
@@ -78,34 +73,77 @@ def _build_team_rows(
         length_by_abbrev[bottom_abbrev] = dict(outcome.length_probs)
         team_rows.extend(
             [
-                {
-                    "team_id": top_id,
-                    "team_abbrev": top_abbrev,
-                    "opponent_abbrev": bottom_abbrev,
-                    "is_top_seed": True,
-                    "playoff_round": playoff_round,
-                    "p_series_win": outcome.p_a_win_series,
-                    "e_wins": outcome.e_wins_a,
-                    "e_games": outcome.e_games,
-                    "e_goalie_points": outcome.e_goalie_points_a,
-                    "e_shutout_wins": outcome.e_wins_a * float(shutout_top),
-                },
-                {
-                    "team_id": bottom_id,
-                    "team_abbrev": bottom_abbrev,
-                    "opponent_abbrev": top_abbrev,
-                    "is_top_seed": False,
-                    "playoff_round": playoff_round,
-                    "p_series_win": outcome.p_b_win_series,
-                    "e_wins": outcome.e_wins_b,
-                    "e_games": outcome.e_games,
-                    "e_goalie_points": outcome.e_goalie_points_b,
-                    "e_shutout_wins": outcome.e_wins_b * float(shutout_bottom),
-                },
+                _team_row(
+                    team_id=top_id,
+                    team_abbrev=top_abbrev,
+                    opponent_abbrev=bottom_abbrev,
+                    is_top_seed=True,
+                    playoff_round=playoff_round,
+                    p_series_win=outcome.p_a_win_series,
+                    e_wins=outcome.e_wins_a,
+                    e_games=outcome.e_games,
+                    e_goalie_points=outcome.e_goalie_points_a,
+                    e_shutout_wins=outcome.e_wins_a * float(shutout_top),
+                ),
+                _team_row(
+                    team_id=bottom_id,
+                    team_abbrev=bottom_abbrev,
+                    opponent_abbrev=top_abbrev,
+                    is_top_seed=False,
+                    playoff_round=playoff_round,
+                    p_series_win=outcome.p_b_win_series,
+                    e_wins=outcome.e_wins_b,
+                    e_games=outcome.e_games,
+                    e_goalie_points=outcome.e_goalie_points_b,
+                    e_shutout_wins=outcome.e_wins_b * float(shutout_bottom),
+                ),
             ]
         )
 
     return team_rows, length_by_abbrev
+
+
+def _seed_team_ids(row: Mapping[Hashable, Any]) -> tuple[int, int] | None:
+    top_id_raw = row["top_seed_team_id"]
+    bottom_id_raw = row["bottom_seed_team_id"]
+    if pd.isna(top_id_raw) or pd.isna(bottom_id_raw):
+        return None
+    return int(top_id_raw), int(bottom_id_raw)
+
+
+def _missing_matchup_snapshots(matchup: Any, top_id: int, bottom_id: int) -> bool:
+    return (
+        matchup is None
+        or top_id not in matchup.win_snapshots
+        or bottom_id not in matchup.win_snapshots
+    )
+
+
+def _team_row(
+    *,
+    team_id: int,
+    team_abbrev: str,
+    opponent_abbrev: str,
+    is_top_seed: bool,
+    playoff_round: int,
+    p_series_win: float,
+    e_wins: float,
+    e_games: float,
+    e_goalie_points: float,
+    e_shutout_wins: float,
+) -> dict[str, Any]:
+    return {
+        "team_id": team_id,
+        "team_abbrev": team_abbrev,
+        "opponent_abbrev": opponent_abbrev,
+        "is_top_seed": is_top_seed,
+        "playoff_round": playoff_round,
+        "p_series_win": p_series_win,
+        "e_wins": e_wins,
+        "e_games": e_games,
+        "e_goalie_points": e_goalie_points,
+        "e_shutout_wins": e_shutout_wins,
+    }
 
 
 def _predict_matchup_series(

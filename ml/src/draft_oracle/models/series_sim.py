@@ -283,9 +283,23 @@ def _validate_series_request_inputs(
     legacy_kwargs: dict[str, object],
 ) -> None:
     if isinstance(request, SeriesMonteCarloRequest):
-        if p_a_away is not None or legacy_kwargs:
-            raise TypeError("SeriesMonteCarloRequest calls do not accept extra arguments")
+        _validate_structured_series_request(p_a_away, legacy_kwargs)
         return
+    _validate_legacy_series_request(p_a_away, legacy_kwargs)
+
+
+def _validate_structured_series_request(
+    p_a_away: float | None,
+    legacy_kwargs: dict[str, object],
+) -> None:
+    if p_a_away is not None or legacy_kwargs:
+        raise TypeError("SeriesMonteCarloRequest calls do not accept extra arguments")
+
+
+def _validate_legacy_series_request(
+    p_a_away: float | None,
+    legacy_kwargs: dict[str, object],
+) -> None:
     if p_a_away is None:
         raise TypeError("legacy simulate_series_monte_carlo calls require p_a_away")
     unexpected = _unexpected_series_kwargs(legacy_kwargs)
@@ -367,18 +381,20 @@ def _series_calibration_bins(
     if probs.size == 0:
         return []
     edges = np.linspace(0.0, 1.0, n_bins + 1)
-    bins: list[SeriesCalibrationBin] = []
-    for i in range(n_bins):
-        calibration_bin = _series_calibration_bin(
+    return [
+        calibration_bin
+        for i in range(n_bins)
+        if (
+            calibration_bin := _series_calibration_bin(
             probs=probs,
             labels=labels,
             lower=float(edges[i]),
             upper=float(edges[i + 1]),
             upper_inclusive=i == n_bins - 1,
+            )
         )
-        if calibration_bin is not None:
-            bins.append(calibration_bin)
-    return bins
+        is not None
+    ]
 
 
 def _series_calibration_bin(

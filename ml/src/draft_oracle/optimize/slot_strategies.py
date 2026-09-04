@@ -464,10 +464,8 @@ def _resolve_build_request(
         return pool
     if pool is None:
         raise TypeError("build_slot_strategies requires pool")
-    if "managers" not in legacy:
-        raise TypeError("build_slot_strategies legacy calls require managers")
-    if "allow_ir" not in legacy:
-        raise TypeError("build_slot_strategies legacy calls require allow_ir")
+    _require_slot_request_field(legacy, "managers")
+    _require_slot_request_field(legacy, "allow_ir")
     return SlotStrategyBuildRequest(
         pool=pool,
         managers=cast("int", legacy["managers"]),
@@ -479,6 +477,11 @@ def _resolve_build_request(
         ),
         config=cast("SlotStrategyConfig | None", legacy.get("config")),
     )
+
+
+def _require_slot_request_field(legacy: Mapping[str, object], field_name: str) -> None:
+    if field_name not in legacy:
+        raise TypeError(f"build_slot_strategies legacy calls require {field_name}")
 
 
 def write_slot_strategies(report: SlotStrategyReport, path: Path) -> Path:
