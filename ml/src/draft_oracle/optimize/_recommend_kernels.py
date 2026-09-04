@@ -442,6 +442,16 @@ class _AdvanceGreedyRolloutRequest:
     rng: np.random.Generator
 
 
+@dataclass(frozen=True)
+class _GreedyRolloutChoiceRequest:
+    arr: _RolloutArrays
+    cfg: RecommendConfig
+    gmodel: GreedyOpponentModel
+    batch: _CandidateRollout
+    rng: np.random.Generator
+    manager_idx: int
+
+
 def _resolve_greedy_expected_request(
     state: DraftState | _GreedyExpectedRequest,
     *legacy: object,
@@ -502,12 +512,14 @@ def _advance_greedy_rollout(request: _AdvanceGreedyRolloutRequest) -> None:
     for k in range(1, request.arr.last_owner_k + 1):
         manager_idx = request.arr.rem_m[k]
         choice = _greedy_rollout_choice(
-            request.arr,
-            request.cfg,
-            request.gmodel,
-            request.batch,
-            request.rng,
-            manager_idx,
+            _GreedyRolloutChoiceRequest(
+                request.arr,
+                request.cfg,
+                request.gmodel,
+                request.batch,
+                request.rng,
+                manager_idx,
+            )
         )
         if choice is None:
             break
@@ -515,19 +527,12 @@ def _advance_greedy_rollout(request: _AdvanceGreedyRolloutRequest) -> None:
         request.batch.counts[rows, manager_idx, request.arr.posc[choice]] += 1
 
 
-def _greedy_rollout_choice(
-    arr: _RolloutArrays,
-    cfg: RecommendConfig,
-    gmodel: GreedyOpponentModel,
-    batch: _CandidateRollout,
-    rng: np.random.Generator,
-    manager_idx: int,
-) -> np.ndarray | None:
-    turn = _turn_state(arr, batch, manager_idx)
-    if manager_idx == arr.owner_idx:
-        return _owner_rollout_choice(arr, cfg, batch, turn.legal)
-    _require_legal_rows(turn.legal, arr.mgr_ids[manager_idx])
-    return _greedy_opponent_choice(arr, gmodel, turn, rng)
+def _greedy_rollout_choice(request: _GreedyRolloutChoiceRequest) -> np.ndarray | None:
+    turn = _turn_state(request.arr, request.batch, request.manager_idx)
+    if request.manager_idx == request.arr.owner_idx:
+        return _owner_rollout_choice(request.arr, request.cfg, request.batch, turn.legal)
+    _require_legal_rows(turn.legal, request.arr.mgr_ids[request.manager_idx])
+    return _greedy_opponent_choice(request.arr, request.gmodel, turn, request.rng)
 
 
 def _turn_state(

@@ -567,20 +567,6 @@ def _four_round_archive(
     )
 
 
-def _four_round_config() -> BacktestConfig:
-    # Smaller sims/rollouts than _config: this fixture replays three events across a
-    # sixteen-team archive, and the assertions are structural, not statistical.
-    return BacktestConfig(
-        seed=20260827,
-        managers=4,
-        n_drafts=1,
-        rollouts=4,
-        max_candidates=5,
-        strategies=("oracle",),
-        project_config=_four_round_project_config(),
-    )
-
-
 def _four_round_project_config() -> ProjectArtifactConfig:
     return ProjectArtifactConfig(
         seed=20260827,
@@ -592,6 +578,12 @@ def _four_round_project_config() -> ProjectArtifactConfig:
     )
 
 
+def _four_round_config() -> BacktestConfig:
+    # Smaller sims/rollouts than _config: this fixture replays three events across a
+    # sixteen-team archive, and the assertions are structural, not statistical.
+    return _FOUR_ROUND_CONFIG
+
+
 _ARCHIVE_TABLES = _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=1)
 _FOUR_ROUND_ARCHIVE = _four_round_archive()
 _FOUR_ROUND_TABLES = {
@@ -600,6 +592,15 @@ _FOUR_ROUND_TABLES = {
     "team_games": _FOUR_ROUND_ARCHIVE[1],
     "series": _FOUR_ROUND_ARCHIVE[3],
 }
+_FOUR_ROUND_CONFIG = BacktestConfig(
+    seed=20260827,
+    managers=4,
+    n_drafts=1,
+    rollouts=4,
+    max_candidates=5,
+    strategies=("oracle",),
+    project_config=_four_round_project_config(),
+)
 
 
 def _archive_tables(seed: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:

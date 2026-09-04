@@ -183,6 +183,15 @@ class _DraftCommandRequest:
     opponent_artifact: Path
 
 
+@dataclass(frozen=True)
+class _ToggleArgumentRequest:
+    parser: argparse.ArgumentParser
+    name: str
+    help_on: str
+    help_off: str
+    default: bool
+
+
 def _maybe_refresh_normalized_archive(
     *,
     no_refresh: bool,
@@ -509,11 +518,13 @@ def _project_parser() -> argparse.ArgumentParser:
     )
     _add_seed_argument(parser, help_text="Deterministic training/MC seed.")
     _add_toggle_argument(
-        parser,
-        name="slot_strategies",
-        help_on="Emit slot_strategies.md (per-slot draft plan, US-023).",
-        help_off="Skip slot_strategies.md output.",
-        default=True,
+        _ToggleArgumentRequest(
+            parser=parser,
+            name="slot_strategies",
+            help_on="Emit slot_strategies.md (per-slot draft plan, US-023).",
+            help_off="Skip slot_strategies.md output.",
+            default=True,
+        )
     )
     parser.add_argument(
         "--slot-rollouts",
@@ -670,18 +681,21 @@ def _parse_args(
     return namespace
 
 
-def _add_toggle_argument(
-    parser: argparse.ArgumentParser,
-    *,
-    name: str,
-    help_on: str,
-    help_off: str,
-    default: bool,
-) -> None:
-    flag = name.replace("_", "-")
-    parser.add_argument(f"--{flag}", dest=name, action="store_true", help=help_on)
-    parser.add_argument(f"--no-{flag}", dest=name, action="store_false", help=help_off)
-    parser.set_defaults(**{name: default})
+def _add_toggle_argument(request: _ToggleArgumentRequest) -> None:
+    flag = request.name.replace("_", "-")
+    request.parser.add_argument(
+        f"--{flag}",
+        dest=request.name,
+        action="store_true",
+        help=request.help_on,
+    )
+    request.parser.add_argument(
+        f"--no-{flag}",
+        dest=request.name,
+        action="store_false",
+        help=request.help_off,
+    )
+    request.parser.set_defaults(**{request.name: request.default})
 
 
 def _add_ir_toggle(
@@ -690,7 +704,15 @@ def _add_ir_toggle(
     help_on: str,
     help_off: str,
 ) -> None:
-    _add_toggle_argument(parser, name="ir", help_on=help_on, help_off=help_off, default=False)
+    _add_toggle_argument(
+        _ToggleArgumentRequest(
+            parser=parser,
+            name="ir",
+            help_on=help_on,
+            help_off=help_off,
+            default=False,
+        )
+    )
 
 
 def _add_seed_argument(parser: argparse.ArgumentParser, *, help_text: str) -> None:
