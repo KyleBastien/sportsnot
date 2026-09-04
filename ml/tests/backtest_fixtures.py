@@ -213,22 +213,23 @@ def _regular_season_schedule(request: _ArchiveBuildRequest) -> list[_RegularSeas
     gid = request.gid_start
     day, month = 1, 10
     games: list[_RegularSeasonGameSpec] = []
-    for _ in range(request.reg_cycles):
-        for i, home in enumerate(TEAMS):
-            for away in TEAMS[i + 1 :]:
-                gid += 1
-                games.append(
-                    _RegularSeasonGameSpec(
-                        gid,
-                        f"{request.end_year - 1}-{month:02d}-{day:02d}",
-                        home,
-                        away,
-                    )
-                )
-                day += 1
-                if day > 27:
-                    day = 1
-                    month = 11 if month == 10 else (12 if month == 11 else 10)
+    pairings = [(home, away) for i, home in enumerate(TEAMS) for away in TEAMS[i + 1 :]]
+    total_games = request.reg_cycles * len(pairings)
+    for game_index in range(total_games):
+        home, away = pairings[game_index % len(pairings)]
+        gid += 1
+        games.append(
+            _RegularSeasonGameSpec(
+                gid,
+                f"{request.end_year - 1}-{month:02d}-{day:02d}",
+                home,
+                away,
+            )
+        )
+        day += 1
+        if day > 27:
+            day = 1
+            month = 11 if month == 10 else (12 if month == 11 else 10)
     return games
 
 

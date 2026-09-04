@@ -284,8 +284,8 @@ class _PreRoundGameRequest:
     away: str
 
 
-def _pre_round_archive(
-    end_years: list[int], *, seed: int = 3
+def _build_pre_round_archive(
+    request: _PreRoundArchiveRequest,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Archive with completed round-1 (two series) and a round-2 bracket but NO round-2 games.
 
@@ -293,7 +293,6 @@ def _pre_round_archive(
     BBB-over-CCC, and (target-season only) a round-2 AAA-vs-BBB series row with zero
     games -- the genuine pre-round decision point (CODE_REVIEW M-1).
     """
-    request = _PreRoundArchiveRequest(end_years, seed)
     rng = np.random.default_rng(request.seed)
     players_df, players = _players()
     sk_rows: list[dict[str, object]] = []
@@ -322,7 +321,6 @@ def _pre_round_archive(
         players_df,
         pd.DataFrame(series_rows),
     )
-
 
 def _append_pre_round_season(request: _PreRoundSeasonRequest) -> int:
     season_id, gid = _append_pre_round_regular_season(
@@ -480,3 +478,8 @@ def _append_pending_round_two_series(
             "losing_team_id": None,
         }
     )
+
+
+_PRE_ROUND_ARCHIVE = _build_pre_round_archive(
+    _PreRoundArchiveRequest([2018, 2019, 2020, 2021, 2022], 3)
+)

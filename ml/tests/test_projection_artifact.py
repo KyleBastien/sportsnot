@@ -36,8 +36,8 @@ from draft_oracle.projection_artifact import (
 )
 from tests.projection_artifact_fixtures import (
     _ARCHIVE,
+    _PRE_ROUND_ARCHIVE,
     _PROJECT_ARTIFACT_CONFIG,
-    _pre_round_archive,
 )
 
 # ── Core assembly ──────────────────────────────────────────────────────────
@@ -261,7 +261,7 @@ def test_pre_round_artifact_builds_before_round_starts() -> None:
     # Archive has completed round-1 games (two series) and a round-2 bracket, but
     # NO round-2 games -- the moment the league actually drafts round 2. The cutoff
     # must derive from round-1's completion, not round-2's (absent) first game.
-    sk, tg, players, series = _pre_round_archive([2018, 2019, 2020, 2021, 2022])
+    sk, tg, players, series = _PRE_ROUND_ARCHIVE
     result = build_projection_artifact(
         sk,
         players,
@@ -288,7 +288,7 @@ def test_pre_round_cutoff_is_leak_safe() -> None:
     # The pre-round cutoff must remain strictly after every game used for training
     # (no round-2 leakage possible because none exists) and must exclude nothing that
     # belongs to round 1.
-    sk, tg, players, series = _pre_round_archive([2018, 2019, 2020, 2021, 2022])
+    sk, tg, players, series = _PRE_ROUND_ARCHIVE
     result = build_projection_artifact(
         sk,
         players,
