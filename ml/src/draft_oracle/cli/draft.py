@@ -601,6 +601,42 @@ def _new_draft_session(request: _NewDraftSessionRequest) -> DraftSession:
     )
 
 
+def _resume_draft_session(resume: Path, session: Path | None) -> None:
+    session_path = _resume_session_path(resume, session)
+    _run_loop(DraftSession.resume(resume), session_path)
+
+
+def _start_new_draft_session(
+    artifact: Path,
+    managers: str,
+    slot: int,
+    ir: bool,
+    eliminated: str,
+    temperature: float,
+    seed: int,
+    rollouts: int,
+    opponents: str,
+    opponent_artifact: Path,
+    session: Path | None,
+) -> None:
+    session_path = _new_session_path(session)
+    new_session = _new_draft_session(
+        _NewDraftSessionRequest(
+            artifact=artifact,
+            managers=managers,
+            slot=slot,
+            ir=ir,
+            eliminated=eliminated,
+            temperature=temperature,
+            seed=seed,
+            rollouts=rollouts,
+            opponents=opponents,
+            opponent_artifact=opponent_artifact,
+        )
+    )
+    _run_loop(new_session, session_path)
+
+
 def draft(
     artifact: Annotated[
         Path | None,
@@ -655,27 +691,23 @@ def draft(
     to their real seat.
     """
     if resume is not None:
-        session_path = _resume_session_path(resume, session)
-        _run_loop(DraftSession.resume(resume), session_path)
+        _resume_draft_session(resume, session)
         return
     if artifact is None:
         raise typer.BadParameter("provide --artifact <dir> (or --resume <session.json>)")
-    session_path = _new_session_path(session)
-    new_session = _new_draft_session(
-        _NewDraftSessionRequest(
-            artifact=artifact,
-            managers=managers,
-            slot=slot,
-            ir=ir,
-            eliminated=eliminated,
-            temperature=temperature,
-            seed=seed,
-            rollouts=rollouts,
-            opponents=opponents,
-            opponent_artifact=opponent_artifact,
-        )
+    _start_new_draft_session(
+        artifact,
+        managers,
+        slot,
+        ir,
+        eliminated,
+        temperature,
+        seed,
+        rollouts,
+        opponents,
+        opponent_artifact,
+        session,
     )
-    _run_loop(new_session, session_path)
 
 
 def _same_path(left: Path, right: Path) -> bool:
