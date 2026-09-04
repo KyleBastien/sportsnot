@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -297,23 +298,74 @@ def train_opponents(
 
 
 def compare_strategies_cmd(
-    normalized_dir: NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
-    managers: Annotated[int, typer.Option(help="League size for the simulated drafts.")] = 4,
-    n_drafts: Annotated[int, typer.Option(help="Seeded simulated drafts (>=200).")] = 200,
-    rollouts: Annotated[int, typer.Option(help="Rollouts per recommendation.")] = 40,
-    max_candidates: Annotated[int, typer.Option(help="Candidates rolled out.")] = 6,
-    seed: DeterministicSeedOption = 20260827,
+    ctx: typer.Context,
 ) -> None:
     """Run the committed multi-step vs. greedy-VOR vs. one-step comparison (US-021)."""
-    _run_compare_strategies(
-        _CompareStrategiesRequest(
-            normalized_dir=normalized_dir,
-            managers=managers,
-            n_drafts=n_drafts,
-            rollouts=rollouts,
-            max_candidates=max_candidates,
-            seed=seed,
-        )
+    _run_compare_strategies(_parse_compare_strategies_request(ctx.args))
+
+
+def _compare_strategies_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="compare-strategies",
+        add_help=False,
+        description=(
+            "Run committed multi-step vs. greedy-VOR vs. one-step comparison (US-021)."
+        ),
+    )
+    parser.add_argument(
+        "--normalized-dir",
+        type=Path,
+        default=DEFAULT_NORMALIZED_DIR,
+        help="Directory holding normalized Parquet tables.",
+    )
+    parser.add_argument(
+        "--managers",
+        type=int,
+        default=4,
+        help="League size for simulated drafts.",
+    )
+    parser.add_argument(
+        "--n-drafts",
+        type=int,
+        default=200,
+        help="Seeded simulated drafts (>=200).",
+    )
+    parser.add_argument(
+        "--rollouts",
+        type=int,
+        default=40,
+        help="Rollouts per recommendation.",
+    )
+    parser.add_argument(
+        "--max-candidates",
+        type=int,
+        default=6,
+        help="Candidates rolled out.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=20260827,
+        help="Deterministic seed.",
+    )
+    return parser
+
+
+def _parse_compare_strategies_request(args: list[str]) -> _CompareStrategiesRequest:
+    parser = _compare_strategies_parser()
+    if any(arg in {"-h", "--help"} for arg in args):
+        typer.echo(parser.format_help().rstrip())
+        raise typer.Exit()
+    namespace, extras = parser.parse_known_args(args)
+    if extras:
+        raise typer.BadParameter(f"unknown compare-strategies args: {' '.join(extras)}")
+    return _CompareStrategiesRequest(
+        normalized_dir=namespace.normalized_dir,
+        managers=namespace.managers,
+        n_drafts=namespace.n_drafts,
+        rollouts=namespace.rollouts,
+        max_candidates=namespace.max_candidates,
+        seed=namespace.seed,
     )
 
 

@@ -124,6 +124,14 @@ class _RegularSeasonRequest:
     gid_start: int
 
 
+@dataclass(frozen=True)
+class _RegularSeasonGame:
+    game_id: int
+    game_date: str
+    home: str
+    away: str
+
+
 def _series_rows(seasons: list[int]) -> pd.DataFrame:
     """One first-round series per season: AAA (top seed) vs DDD (bottom)."""
     rows = [
@@ -204,38 +212,59 @@ def _append_skater_rows(request: _AppendSkaterRowsRequest) -> None:
         )
 
 
-def _emit_regular_season(request: _RegularSeasonRequest) -> int:
+def _regular_season_games(request: _RegularSeasonRequest) -> list[_RegularSeasonGame]:
     gid = request.gid_start
     day = 1
     month = 11
+    games: list[_RegularSeasonGame] = []
     for _ in range(request.n_reg // (len(TEAMS) - 1)):
         for i, home in enumerate(TEAMS):
             for away in TEAMS[i + 1 :]:
                 gid += 1
-                date = f"{request.year}-{month:02d}-{day:02d}"
+                games.append(
+                    _RegularSeasonGame(
+                        game_id=gid,
+                        game_date=f"{request.year}-{month:02d}-{day:02d}",
+                        home=home,
+                        away=away,
+                    )
+                )
                 day += 1
                 if day > 27:
                     day = 1
                     month = 12 if month == 11 else 11
-                _emit_team_game(
-                    request.tg_rows,
-                    _EmitTeamGameInput(gid, date, request.season_id, 2, home, away),
+    return games
+
+
+def _emit_regular_season(request: _RegularSeasonRequest) -> int:
+    games = _regular_season_games(request)
+    for game in games:
+        _emit_team_game(
+            request.tg_rows,
+            _EmitTeamGameInput(
+                game.game_id,
+                game.game_date,
+                request.season_id,
+                2,
+                game.home,
+                game.away,
+            ),
+        )
+        for team, opp in ((game.home, game.away), (game.away, game.home)):
+            _append_skater_rows(
+                _AppendSkaterRowsRequest(
+                    rows=request.sk_rows,
+                    players=request.players,
+                    rng=request.rng,
+                    game_id=game.game_id,
+                    game_date=game.game_date,
+                    season_id=request.season_id,
+                    game_type_id=2,
+                    team=team,
+                    opp=opp,
                 )
-                for team, opp in ((home, away), (away, home)):
-                    _append_skater_rows(
-                        _AppendSkaterRowsRequest(
-                            rows=request.sk_rows,
-                            players=request.players,
-                            rng=request.rng,
-                            game_id=gid,
-                            game_date=date,
-                            season_id=request.season_id,
-                            game_type_id=2,
-                            team=team,
-                            opp=opp,
-                        )
-                    )
-    return gid
+            )
+    return games[-1].game_id if games else request.gid_start
 
 
 @dataclass(frozen=True)

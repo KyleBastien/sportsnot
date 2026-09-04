@@ -563,6 +563,21 @@ class _DraftSessionArtifactKwargs(TypedDict, total=False):
     fitted: FittedLeagueOpponents | None
 
 
+class _DraftCommandKwargs(TypedDict, total=False):
+    artifact: Path | None
+    managers: str
+    slot: int
+    ir: bool
+    eliminated: str
+    session: Path | None
+    resume: Path | None
+    temperature: float
+    seed: int
+    rollouts: int
+    opponents: str
+    opponent_artifact: Path
+
+
 @dataclass(frozen=True)
 class DraftSessionArtifactRequest:
     artifact_dir: Path
@@ -635,6 +650,22 @@ class _StartDraftRequest:
     session: Path | None
 
 
+@dataclass(frozen=True)
+class _DraftCommandRequest:
+    artifact: Path | None = None
+    managers: str = "4"
+    slot: int = 1
+    ir: bool = False
+    eliminated: str = ""
+    session: Path | None = None
+    resume: Path | None = None
+    temperature: float = DEFAULT_TEMPERATURE
+    seed: int = DEFAULT_SEED
+    rollouts: int = DEFAULT_ROLLOUTS
+    opponents: str = "auto"
+    opponent_artifact: Path = DEFAULT_OPPONENT_ARTIFACT_DIR
+
+
 def _new_draft_session(request: _NewDraftSessionRequest) -> DraftSession:
     manager_ids = parse_managers(request.managers)
     manager_count = len(manager_ids)
@@ -683,18 +714,8 @@ def _start_new_draft_session(request: _StartDraftRequest) -> None:
 
 
 def draft(
-    artifact: _ArtifactOption = None,
-    managers: _ManagersOption = "4",
-    slot: _SlotOption = 1,
-    ir: _IrOption = False,
-    eliminated: _EliminatedOption = "",
-    session: _SessionPathOption = None,
-    resume: _ResumePathOption = None,
-    temperature: _TemperatureOption = DEFAULT_TEMPERATURE,
-    seed: _SeedOption = DEFAULT_SEED,
-    rollouts: _RolloutsOption = DEFAULT_ROLLOUTS,
-    opponents: _OpponentsOption = "auto",
-    opponent_artifact: _OpponentArtifactOption = DEFAULT_OPPONENT_ARTIFACT_DIR,
+    request: _DraftCommandRequest | None = None,
+    **legacy: Unpack[_DraftCommandKwargs],
 ) -> None:
     """Start an interactive, artifact-powered draft assistant (US-024).
 
@@ -711,26 +732,38 @@ def draft(
     ``--managers`` (``ben,judah,levi,kyle``) to attach each manager's fitted model
     to their real seat.
     """
-    if resume is not None:
-        _resume_draft_session(resume, session)
+    resolved = _resolve_draft_command_request(request, legacy)
+    if resolved.resume is not None:
+        _resume_draft_session(resolved.resume, resolved.session)
         return
-    if artifact is None:
+    if resolved.artifact is None:
         raise typer.BadParameter("provide --artifact <dir> (or --resume <session.json>)")
     _start_new_draft_session(
         _StartDraftRequest(
-            artifact=artifact,
-            managers=managers,
-            slot=slot,
-            ir=ir,
-            eliminated=eliminated,
-            temperature=temperature,
-            seed=seed,
-            rollouts=rollouts,
-            opponents=opponents,
-            opponent_artifact=opponent_artifact,
-            session=session,
+            artifact=resolved.artifact,
+            managers=resolved.managers,
+            slot=resolved.slot,
+            ir=resolved.ir,
+            eliminated=resolved.eliminated,
+            temperature=resolved.temperature,
+            seed=resolved.seed,
+            rollouts=resolved.rollouts,
+            opponents=resolved.opponents,
+            opponent_artifact=resolved.opponent_artifact,
+            session=resolved.session,
         )
     )
+
+
+def _resolve_draft_command_request(
+    request: _DraftCommandRequest | None,
+    legacy: _DraftCommandKwargs,
+) -> _DraftCommandRequest:
+    if request is not None:
+        if legacy:
+            raise TypeError("DraftCommandRequest calls do not accept extra keyword args")
+        return request
+    return _DraftCommandRequest(**legacy)
 
 
 def _same_path(left: Path, right: Path) -> bool:

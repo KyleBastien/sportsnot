@@ -289,6 +289,18 @@ class _PerPickEventRequest:
     rank_keys: Callable[[OpponentModel, DraftState, str, random.Random | None], list[str]]
 
 
+@dataclass(frozen=True)
+class _ScorePickRequest:
+    state: DraftState
+    fitted_model: OpponentModel
+    greedy_model: OpponentModel
+    manager: str
+    key: str
+    top_k: int
+    rank_keys: Callable[[OpponentModel, DraftState, str, random.Random | None], list[str]]
+    rng: random.Random
+
+
 def _membership_event_score(
     pool: pd.DataFrame,
     fitted_mapping: Callable[[list[str]], Mapping[str, OpponentModel]],
@@ -394,14 +406,16 @@ def _per_pick_event_score(
     score = _PerPickEventScore(0, 0, 0, 0, 0)
     for _, pick in request.pool.sort_values("pick_number").iterrows():
         scored_pick = _score_pick(
-            state,
-            fitted_models[str(pick["manager"])],
-            request.greedy,
-            str(pick["manager"]),
-            str(pick["asset_key"]),
-            request.config.top_k,
-            request.rank_keys,
-            rng,
+            _ScorePickRequest(
+                state=state,
+                fitted_model=fitted_models[str(pick["manager"])],
+                greedy_model=request.greedy,
+                manager=str(pick["manager"]),
+                key=str(pick["asset_key"]),
+                top_k=request.config.top_k,
+                rank_keys=request.rank_keys,
+                rng=rng,
+            )
         )
         if scored_pick is None:
             continue
@@ -424,30 +438,33 @@ def _event_state(pool: pd.DataFrame, order: list[str]) -> DraftState:
 
 
 def _score_pick(
-    state: DraftState,
-    fitted_model: OpponentModel,
-    greedy_model: OpponentModel,
-    manager: str,
-    key: str,
-    top_k: int,
-    rank_keys: Callable[[OpponentModel, DraftState, str, random.Random | None], list[str]],
-    rng: random.Random,
+    request: _ScorePickRequest,
 ) -> tuple[int, int, int, int, DraftAsset] | None:
-    if key not in state.available:
+    if request.key not in request.state.available:
         return None
-    asset = state.available[key]
-    if not state.has_capacity(manager, asset.position):
+    asset = request.state.available[request.key]
+    if not request.state.has_capacity(request.manager, asset.position):
         return None
-    legal = state.legal_assets(manager)
-    if not any(legal_asset.key == key for legal_asset in legal):
+    legal = request.state.legal_assets(request.manager)
+    if not any(legal_asset.key == request.key for legal_asset in legal):
         return None
-    fitted_rank = rank_keys(fitted_model, state, manager, None)
-    greedy_rank = rank_keys(greedy_model, state, manager, rng)
+    fitted_rank = request.rank_keys(
+        request.fitted_model,
+        request.state,
+        request.manager,
+        None,
+    )
+    greedy_rank = request.rank_keys(
+        request.greedy_model,
+        request.state,
+        request.manager,
+        request.rng,
+    )
     return (
-        int(bool(fitted_rank) and fitted_rank[0] == key),
-        int(bool(greedy_rank) and greedy_rank[0] == key),
-        int(key in fitted_rank[:top_k]),
-        int(key in greedy_rank[:top_k]),
+        int(bool(fitted_rank) and fitted_rank[0] == request.key),
+        int(bool(greedy_rank) and greedy_rank[0] == request.key),
+        int(request.key in fitted_rank[: request.top_k]),
+        int(request.key in greedy_rank[: request.top_k]),
         asset,
     )
 

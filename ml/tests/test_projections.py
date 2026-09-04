@@ -368,38 +368,39 @@ def _draw_ga(rng: np.random.Generator, rate: float) -> tuple[int, int]:
 
 
 def _emit_regular_season(request: _RegularSeasonRequest) -> int:
-    gid = request.gid_start
-    day, month = 1, 11
-    for _ in range(request.n_reg // (len(TEAMS) - 1)):
-        for i, home in enumerate(TEAMS):
-            for away in TEAMS[i + 1 :]:
-                gid += 1
-                date = f"{request.end_year - 1}-{month:02d}-{day:02d}"
-                day += 1
-                if day > 27:
-                    day, month = 1, (12 if month == 11 else 11)
-                home_win = STRENGTH[home] + 0.3 >= STRENGTH[away]
-                hg, ag = (3, 1) if home_win else (1, 3)
-                request.tg_rows.extend(
-                    _team_rows(
-                        _TeamRowsInput(gid, date, request.season_id, 2, home, away, hg, ag)
-                    )
+    games = _regular_season_games(request)
+    for game in games:
+        home_win = STRENGTH[game.home] + 0.3 >= STRENGTH[game.away]
+        hg, ag = (3, 1) if home_win else (1, 3)
+        request.tg_rows.extend(
+            _team_rows(
+                _TeamRowsInput(
+                    game.game_id,
+                    game.game_date,
+                    request.season_id,
+                    2,
+                    game.home,
+                    game.away,
+                    hg,
+                    ag,
                 )
-                for team, opp in ((home, away), (away, home)):
-                    _append_skater_rows(
-                        _AppendSkaterRowsRequest(
-                            rows=request.sk_rows,
-                            players=request.players,
-                            rng=request.rng,
-                            game_id=gid,
-                            game_date=date,
-                            season_id=request.season_id,
-                            game_type_id=2,
-                            team=team,
-                            opp=opp,
-                        )
-                    )
-    return gid
+            )
+        )
+        for team, opp in ((game.home, game.away), (game.away, game.home)):
+            _append_skater_rows(
+                _AppendSkaterRowsRequest(
+                    rows=request.sk_rows,
+                    players=request.players,
+                    rng=request.rng,
+                    game_id=game.game_id,
+                    game_date=game.game_date,
+                    season_id=request.season_id,
+                    game_type_id=2,
+                    team=team,
+                    opp=opp,
+                )
+            )
+    return games[-1].game_id if games else request.gid_start
 
 
 @dataclass(frozen=True)
@@ -411,6 +412,37 @@ class _PlayoffSeriesRequest:
     end_year: int
     season_id: int
     gid_start: int
+
+
+@dataclass(frozen=True)
+class _RegularSeasonGame:
+    game_id: int
+    game_date: str
+    home: str
+    away: str
+
+
+def _regular_season_games(request: _RegularSeasonRequest) -> list[_RegularSeasonGame]:
+    gid = request.gid_start
+    day = 1
+    month = 11
+    games: list[_RegularSeasonGame] = []
+    for _ in range(request.n_reg // (len(TEAMS) - 1)):
+        for i, home in enumerate(TEAMS):
+            for away in TEAMS[i + 1 :]:
+                gid += 1
+                games.append(
+                    _RegularSeasonGame(
+                        game_id=gid,
+                        game_date=f"{request.end_year - 1}-{month:02d}-{day:02d}",
+                        home=home,
+                        away=away,
+                    )
+                )
+                day += 1
+                if day > 27:
+                    day, month = 1, (12 if month == 11 else 11)
+    return games
 
 
 def _emit_playoff_series(request: _PlayoffSeriesRequest) -> int:

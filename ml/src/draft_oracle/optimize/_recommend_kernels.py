@@ -433,27 +433,59 @@ class _GreedyExpectedRequest:
     cfg: RecommendConfig
 
 
+@dataclass(frozen=True)
+class _LegacyGreedyExpectedArgs:
+    owner: str
+    candidate_assets: Sequence[DraftAsset]
+    gmodel: GreedyOpponentModel
+    replacement: Mapping[str, float]
+    cfg: RecommendConfig
+
+
 def _resolve_greedy_expected_request(
     state: DraftState | _GreedyExpectedRequest,
-    owner: str | None,
-    candidate_assets: Sequence[DraftAsset] | None,
-    gmodel: GreedyOpponentModel | None,
-    replacement: Mapping[str, float] | None,
-    cfg: RecommendConfig | None,
+    *legacy: object,
 ) -> _GreedyExpectedRequest:
     if isinstance(state, _GreedyExpectedRequest):
         return state
-    if (
-        owner is None
-        or candidate_assets is None
-        or gmodel is None
-        or replacement is None
-        or cfg is None
-    ):
+    request = _legacy_greedy_expected_request(legacy)
+    if request is None:
         raise TypeError(
             "legacy greedy expected calls require owner, candidates, model, replacement, and config"
         )
-    return _GreedyExpectedRequest(state, owner, candidate_assets, gmodel, replacement, cfg)
+    return _GreedyExpectedRequest(
+        state,
+        request.owner,
+        request.candidate_assets,
+        request.gmodel,
+        request.replacement,
+        request.cfg,
+    )
+
+
+def _legacy_greedy_expected_request(
+    legacy: tuple[object, ...],
+) -> _LegacyGreedyExpectedArgs | None:
+    if len(legacy) != 5:
+        return None
+    owner, candidate_assets, gmodel, replacement, cfg = legacy
+    if not isinstance(owner, str):
+        return None
+    if not isinstance(candidate_assets, Sequence):
+        return None
+    if not isinstance(gmodel, GreedyOpponentModel):
+        return None
+    if not isinstance(replacement, Mapping):
+        return None
+    if not isinstance(cfg, RecommendConfig):
+        return None
+    return _LegacyGreedyExpectedArgs(
+        owner=owner,
+        candidate_assets=candidate_assets,
+        gmodel=gmodel,
+        replacement=replacement,
+        cfg=cfg,
+    )
 
 
 def _candidate_rollout(

@@ -24,6 +24,88 @@ if TYPE_CHECKING:
     from draft_oracle.projection_artifact import ProjectArtifactConfig, ProjectArtifactResult
 
 
+_NormalizedDirOption = Annotated[
+    Path,
+    typer.Option(help="Directory holding normalized Parquet tables."),
+]
+_ArtifactDirOption = Annotated[
+    Path,
+    typer.Option(help="Projection artifact directory (has skaters/teams parquet)."),
+]
+_ArtifactsRootOption = Annotated[
+    Path,
+    typer.Option(help="Root directory for the written artifact."),
+]
+_SnapshotOption = Annotated[
+    str,
+    typer.Option(help="Pin a frozen snapshot id (defaults to the live tables)."),
+]
+_ManagersOption = Annotated[
+    int,
+    typer.Option(help="League size (2-12); sets VOR replacement levels."),
+]
+_ManagersInputOption = Annotated[
+    str,
+    typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."),
+]
+_SeatOption = Annotated[int, typer.Option(help="Owner's snake seat (1-based).")]
+_SlotOption = Annotated[int, typer.Option("--slot", help="Your snake seat (1-based).")]
+_IrOption = Annotated[
+    bool,
+    typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D)."),
+]
+_DraftIrOption = Annotated[
+    bool,
+    typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D per manager)."),
+]
+_TemperatureOption = Annotated[float, typer.Option(help="Greedy opponent softmax temperature.")]
+_SeedOption = Annotated[int, typer.Option(help="Deterministic seed.")]
+_ProjectionSeedOption = Annotated[int, typer.Option(help="Deterministic training/MC seed.")]
+_OpponentsOption = Annotated[
+    str,
+    typer.Option(
+        help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."
+    ),
+]
+_OpponentArtifactOption = Annotated[
+    Path,
+    typer.Option(help="Committed opponent-model artifact directory (fitted path)."),
+]
+_RolloutsOption = Annotated[int, typer.Option(help="Monte-Carlo rollouts per candidate.")]
+_SlotRolloutsOption = Annotated[
+    int,
+    typer.Option(help="Monte-Carlo rollouts per turn in the slot report."),
+]
+_DepthOption = Annotated[
+    int,
+    typer.Option(help="Owner turns simulated vs. opponents (0 = full depth)."),
+]
+_ArchiveDirOption = Annotated[
+    Path,
+    typer.Option(help="Committed NHL archive directory (for the ingest refresh)."),
+]
+_NoRefreshOption = Annotated[
+    bool,
+    typer.Option("--no-refresh", help="Skip the idempotent ingest refresh (offline)."),
+]
+_SlotStrategiesOption = Annotated[
+    bool,
+    typer.Option(
+        "--slot-strategies/--no-slot-strategies",
+        help="Emit slot_strategies.md (per-slot draft plan, US-023).",
+    ),
+]
+_EliminatedOption = Annotated[str, typer.Option(help="Comma-separated eliminated team abbrevs.")]
+_SessionPathOption = Annotated[
+    Path | None,
+    typer.Option(help="Session-log path (defaults to ./draft-session.json)."),
+]
+_ResumePathOption = Annotated[
+    Path | None,
+    typer.Option("--resume", help="Resume a saved session JSON instead."),
+]
+
+
 @dataclass(frozen=True)
 class _ProjectConfigRequest:
     seed: int
@@ -125,40 +207,16 @@ def _echo_project_summary(result: ProjectArtifactResult, out_dir: Path) -> None:
 def project(
     season: Annotated[int, typer.Option(help="Playoff season end year, e.g. 2026.")],
     playoff_round: Annotated[int, typer.Option("--round", help="Playoff round number (1-4).")],
-    normalized_dir: Annotated[
-        Path, typer.Option(help="Directory holding normalized Parquet tables.")
-    ] = DEFAULT_NORMALIZED_DIR,
-    artifacts_root: Annotated[
-        Path, typer.Option(help="Root directory for the written artifact.")
-    ] = DEFAULT_ARTIFACTS_ROOT,
-    snapshot: Annotated[
-        str, typer.Option(help="Pin a frozen snapshot id (defaults to the live tables).")
-    ] = "",
-    managers: Annotated[
-        int, typer.Option(help="League size (2-12); sets VOR replacement levels.")
-    ] = 4,
-    ir: Annotated[
-        bool,
-        typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D per manager)."),
-    ] = False,
-    archive_dir: Annotated[
-        Path, typer.Option(help="Committed NHL archive directory (for the ingest refresh).")
-    ] = DEFAULT_ARCHIVE_DIR,
-    no_refresh: Annotated[
-        bool,
-        typer.Option("--no-refresh", help="Skip the idempotent ingest refresh (offline)."),
-    ] = False,
-    seed: Annotated[int, typer.Option(help="Deterministic training/MC seed.")] = 20260827,
-    slot_strategies: Annotated[
-        bool,
-        typer.Option(
-            "--slot-strategies/--no-slot-strategies",
-            help="Emit slot_strategies.md (per-slot draft plan, US-023).",
-        ),
-    ] = True,
-    slot_rollouts: Annotated[
-        int, typer.Option(help="Monte-Carlo rollouts per turn in the slot report.")
-    ] = 60,
+    normalized_dir: _NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
+    artifacts_root: _ArtifactsRootOption = DEFAULT_ARTIFACTS_ROOT,
+    snapshot: _SnapshotOption = "",
+    managers: _ManagersOption = 4,
+    ir: _DraftIrOption = False,
+    archive_dir: _ArchiveDirOption = DEFAULT_ARCHIVE_DIR,
+    no_refresh: _NoRefreshOption = False,
+    seed: _ProjectionSeedOption = 20260827,
+    slot_strategies: _SlotStrategiesOption = True,
+    slot_rollouts: _SlotRolloutsOption = 60,
 ) -> None:
     """Precompute a self-contained projection artifact for one upcoming round.
 
@@ -183,12 +241,12 @@ def project(
         snapshot=snapshot or None,
         config=_project_config(
             _ProjectConfigRequest(
-            seed=seed,
-            managers=managers,
-            ir=ir,
-            no_refresh=no_refresh,
-            slot_strategies=slot_strategies,
-            slot_rollouts=slot_rollouts,
+                seed=seed,
+                managers=managers,
+                ir=ir,
+                no_refresh=no_refresh,
+                slot_strategies=slot_strategies,
+                slot_rollouts=slot_rollouts,
             )
         ),
     )
@@ -196,32 +254,16 @@ def project(
 
 
 def recommend(
-    artifact_dir: Annotated[
-        Path, typer.Option(help="Projection artifact directory (has skaters/teams parquet).")
-    ],
-    managers: Annotated[
-        str,
-        typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."),
-    ] = "4",
-    seat: Annotated[int, typer.Option(help="Owner's snake seat (1-based).")] = 1,
-    ir: Annotated[
-        bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
-    ] = False,
-    rollouts: Annotated[int, typer.Option(help="Monte-Carlo rollouts per candidate.")] = 500,
-    depth: Annotated[
-        int, typer.Option(help="Owner turns simulated vs. opponents (0 = full depth).")
-    ] = 0,
-    temperature: Annotated[float, typer.Option(help="Greedy opponent softmax temperature.")] = 0.3,
-    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
-    opponents: Annotated[
-        str,
-        typer.Option(
-            help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."
-        ),
-    ] = "auto",
-    opponent_artifact: Annotated[
-        Path, typer.Option(help="Committed opponent-model artifact directory (fitted path).")
-    ] = DEFAULT_OPPONENT_ARTIFACT_DIR,
+    artifact_dir: _ArtifactDirOption,
+    managers: _ManagersInputOption = "4",
+    seat: _SeatOption = 1,
+    ir: _IrOption = False,
+    rollouts: _RolloutsOption = 500,
+    depth: _DepthOption = 0,
+    temperature: _TemperatureOption = 0.3,
+    seed: _SeedOption = 20260827,
+    opponents: _OpponentsOption = "auto",
+    opponent_artifact: _OpponentArtifactOption = DEFAULT_OPPONENT_ARTIFACT_DIR,
 ) -> None:
     """Recommend the best pick right now via multi-step Monte-Carlo rollout (US-021).
 
@@ -369,36 +411,19 @@ def draft_cmd(
         Path | None,
         typer.Option(help="Projection artifact directory (skaters/teams parquet)."),
     ] = None,
-    managers: Annotated[
-        str,
-        typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."),
-    ] = "4",
-    slot: Annotated[int, typer.Option("--slot", help="Your snake seat (1-based).")] = 1,
-    ir: Annotated[
-        bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
-    ] = False,
-    eliminated: Annotated[str, typer.Option(help="Comma-separated eliminated team abbrevs.")] = "",
-    session: Annotated[
-        Path | None,
-        typer.Option(help="Session-log path (defaults to ./draft-session.json)."),
-    ] = None,
-    resume: Annotated[
-        Path | None, typer.Option("--resume", help="Resume a saved session JSON instead.")
-    ] = None,
-    temperature: Annotated[float, typer.Option(help="Greedy opponent softmax temperature.")] = 0.3,
-    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = 20260827,
+    managers: _ManagersInputOption = "4",
+    slot: _SlotOption = 1,
+    ir: _IrOption = False,
+    eliminated: _EliminatedOption = "",
+    session: _SessionPathOption = None,
+    resume: _ResumePathOption = None,
+    temperature: _TemperatureOption = 0.3,
+    seed: _SeedOption = 20260827,
     rollouts: Annotated[
         int, typer.Option(help="Monte-Carlo rollouts per candidate for recommend.")
     ] = 500,
-    opponents: Annotated[
-        str,
-        typer.Option(
-            help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."
-        ),
-    ] = "auto",
-    opponent_artifact: Annotated[
-        Path, typer.Option(help="Committed opponent-model artifact directory (fitted path).")
-    ] = DEFAULT_OPPONENT_ARTIFACT_DIR,
+    opponents: _OpponentsOption = "auto",
+    opponent_artifact: _OpponentArtifactOption = DEFAULT_OPPONENT_ARTIFACT_DIR,
 ) -> None:
     """Start the interactive, artifact-powered draft assistant (US-024)."""
     from draft_oracle.cli.draft import draft

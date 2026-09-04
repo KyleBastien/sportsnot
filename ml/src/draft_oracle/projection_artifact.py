@@ -214,6 +214,13 @@ class _ProjectionRoundContext:
 
 
 @dataclass(frozen=True)
+class _ProjectionRoundInputs:
+    round_series: pd.DataFrame
+    season_id: int
+    cutoff: str
+
+
+@dataclass(frozen=True)
 class _ProjectionModels:
     win_model: GameWinModel
     shutout_model: ShutoutModel
@@ -261,6 +268,26 @@ def _projection_round_context(
 ) -> _ProjectionRoundContext:
     prod_config = config.production_config or SkaterProductionConfig(seed=config.seed)
     warnings: list[str] = []
+    round_inputs = _projection_round_inputs(team_games, series, season, playoff_round)
+    train_tg, train_sk = _require_training_frames(skater_games, team_games, round_inputs.cutoff)
+    return _ProjectionRoundContext(
+        config=config,
+        prod_config=prod_config,
+        warnings=warnings,
+        round_series=round_inputs.round_series,
+        season_id=round_inputs.season_id,
+        cutoff=round_inputs.cutoff,
+        train_tg=train_tg,
+        train_sk=train_sk,
+    )
+
+
+def _projection_round_inputs(
+    team_games: pd.DataFrame,
+    series: pd.DataFrame,
+    season: int,
+    playoff_round: int,
+) -> _ProjectionRoundInputs:
     round_series = _round_series_for_context(series, season, playoff_round)
     if round_series.empty:
         raise ValueError(
@@ -274,19 +301,7 @@ def _projection_round_context(
             f"cannot derive the round-start cutoff for season {season} round {playoff_round}; "
             "the previous round has no games in the archive yet"
         )
-    train_tg, train_sk = _training_frames(skater_games, team_games, cutoff)
-    if train_tg.empty or train_sk.empty:
-        raise ValueError("no games available before the round start to train on")
-    return _ProjectionRoundContext(
-        config=config,
-        prod_config=prod_config,
-        warnings=warnings,
-        round_series=round_series,
-        season_id=season_id,
-        cutoff=cutoff,
-        train_tg=train_tg,
-        train_sk=train_sk,
-    )
+    return _ProjectionRoundInputs(round_series, season_id, cutoff)
 
 
 def _round_series_for_context(
@@ -321,6 +336,17 @@ def _training_frames(
     sk = skater_games.copy()
     sk["game_date"] = pd.to_datetime(sk["game_date"])
     return tg.loc[tg["game_date"] < cutoff_ts], sk.loc[sk["game_date"] < cutoff_ts]
+
+
+def _require_training_frames(
+    skater_games: pd.DataFrame,
+    team_games: pd.DataFrame,
+    cutoff: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    train_tg, train_sk = _training_frames(skater_games, team_games, cutoff)
+    if train_tg.empty or train_sk.empty:
+        raise ValueError("no games available before the round start to train on")
+    return train_tg, train_sk
 
 
 def _train_projection_models(
