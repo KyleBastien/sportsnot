@@ -393,30 +393,7 @@ def _run_compare_strategies(request: _CompareStrategiesRequest) -> None:
 
 
 def backtest(
-    seasons: Annotated[
-        list[int], typer.Option("--seasons", help="Playoff end years to replay, e.g. 2022.")
-    ],
-    normalized_dir: NormalizedDirOption = DEFAULT_NORMALIZED_DIR,
-    backtest_root: Annotated[
-        Path, typer.Option(help="Root directory for the written backtest run.")
-    ] = DEFAULT_BACKTEST_ROOT,
-    snapshot: Annotated[
-        str, typer.Option(help="Pin a frozen snapshot id (defaults to the live tables).")
-    ] = "",
-    managers: Annotated[int, typer.Option(help="League size (2-12).")] = 4,
-    ir: Annotated[
-        bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
-    ] = False,
-    n_drafts: Annotated[int, typer.Option(help="Seeded drafts per (round, slot).")] = 1,
-    rollouts: Annotated[int, typer.Option(help="Monte-Carlo rollouts per oracle pick.")] = 40,
-    strategies: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--strategy",
-            help="Oracle policies to seat (oracle/greedy_vor/one_step/random_legal).",
-        ),
-    ] = None,
-    seed: DeterministicSeedOption = 20260827,
+    ctx: typer.Context,
 ) -> None:
     """Replay historical playoff rounds end-to-end and score against actuals (US-025).
 
@@ -426,19 +403,106 @@ def backtest(
     if any round-N game leaks into the as-of inputs. Per-round intermediates and the
     run manifest are written under backtest_root/<run-id>/.
     """
-    _run_backtest_command(
-        _BacktestCommandRequest(
-            seasons=seasons,
-            normalized_dir=normalized_dir,
-            backtest_root=backtest_root,
-            snapshot=snapshot,
-            managers=managers,
-            ir=ir,
-            n_drafts=n_drafts,
-            rollouts=rollouts,
-            strategies=strategies,
-            seed=seed,
-        )
+    _run_backtest_command(_parse_backtest_request(ctx.args))
+
+
+def _backtest_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="backtest",
+        add_help=False,
+        description="Replay historical playoff rounds end-to-end and score against actuals.",
+    )
+    parser.add_argument(
+        "--seasons",
+        dest="seasons",
+        type=int,
+        action="append",
+        required=True,
+        help="Playoff end years to replay, e.g. 2022.",
+    )
+    parser.add_argument(
+        "--normalized-dir",
+        type=Path,
+        default=DEFAULT_NORMALIZED_DIR,
+        help="Directory holding normalized Parquet tables.",
+    )
+    parser.add_argument(
+        "--backtest-root",
+        type=Path,
+        default=DEFAULT_BACKTEST_ROOT,
+        help="Root directory for written backtest run.",
+    )
+    parser.add_argument(
+        "--snapshot",
+        type=str,
+        default="",
+        help="Pin a frozen snapshot id (defaults to live tables).",
+    )
+    parser.add_argument(
+        "--managers",
+        type=int,
+        default=4,
+        help="League size (2-12).",
+    )
+    parser.add_argument(
+        "--ir",
+        dest="ir",
+        action="store_true",
+        help="League uses IR slots (+1 F, +1 D).",
+    )
+    parser.add_argument(
+        "--no-ir",
+        dest="ir",
+        action="store_false",
+        help="League does not use IR slots.",
+    )
+    parser.set_defaults(ir=False)
+    parser.add_argument(
+        "--n-drafts",
+        type=int,
+        default=1,
+        help="Seeded drafts per (round, slot).",
+    )
+    parser.add_argument(
+        "--rollouts",
+        type=int,
+        default=40,
+        help="Monte-Carlo rollouts per oracle pick.",
+    )
+    parser.add_argument(
+        "--strategy",
+        dest="strategies",
+        action="append",
+        help="Oracle policies to seat (oracle/greedy_vor/one_step/random_legal).",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=20260827,
+        help="Deterministic seed.",
+    )
+    return parser
+
+
+def _parse_backtest_request(args: list[str]) -> _BacktestCommandRequest:
+    parser = _backtest_parser()
+    if any(arg in {"-h", "--help"} for arg in args):
+        typer.echo(parser.format_help().rstrip())
+        raise typer.Exit()
+    namespace, extras = parser.parse_known_args(args)
+    if extras:
+        raise typer.BadParameter(f"unknown backtest args: {' '.join(extras)}")
+    return _BacktestCommandRequest(
+        seasons=namespace.seasons,
+        normalized_dir=namespace.normalized_dir,
+        backtest_root=namespace.backtest_root,
+        snapshot=namespace.snapshot,
+        managers=namespace.managers,
+        ir=namespace.ir,
+        n_drafts=namespace.n_drafts,
+        rollouts=namespace.rollouts,
+        strategies=namespace.strategies,
+        seed=namespace.seed,
     )
 
 

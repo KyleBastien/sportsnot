@@ -19,7 +19,7 @@ from draft_oracle.backtest.replay import (
 )
 from draft_oracle.rules import goalie_series_points, player_points
 from tests._backtest_shared import _require_real_backtest_tables, _tables
-from tests.backtest_fixtures import FOUR_ROUND_TARGET, TEAMS, TEAMS16, _four_round_tables
+from tests.backtest_fixtures import _FOUR_ROUND_TABLES, FOUR_ROUND_TARGET, TEAMS, TEAMS16
 
 
 def test_team_actual_goalie_points_match_rules() -> None:
@@ -131,7 +131,7 @@ def test_score_league_roster_no_swap_counts_starter_benches_ir() -> None:
 
 
 def test_combined_league_comparison_scores_rounds_three_and_four() -> None:
-    tables = _four_round_tables()
+    tables = _FOUR_ROUND_TABLES
     season_id = (FOUR_ROUND_TARGET - 1) * 10000 + FOUR_ROUND_TARGET
     skater_actual = skater_actual_points(tables['skater_games'], tables['series'])
     team_actual = team_actual_goalie_points(tables['team_games'], tables['series'])

@@ -567,11 +567,6 @@ def _four_round_archive(
     )
 
 
-def _four_round_tables() -> dict[str, pd.DataFrame]:
-    sk, tg, players, series = _four_round_tables_data()
-    return {"skater_games": sk, "players": players, "team_games": tg, "series": series}
-
-
 def _four_round_config() -> BacktestConfig:
     # Smaller sims/rollouts than _config: this fixture replays three events across a
     # sixteen-team archive, and the assertions are structural, not statistical.
@@ -595,7 +590,13 @@ def _four_round_config() -> BacktestConfig:
 
 
 _ARCHIVE_TABLES = _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=1)
-_FOUR_ROUND_TABLES = _four_round_archive()
+_FOUR_ROUND_ARCHIVE = _four_round_archive()
+_FOUR_ROUND_TABLES = {
+    "skater_games": _FOUR_ROUND_ARCHIVE[0],
+    "players": _FOUR_ROUND_ARCHIVE[2],
+    "team_games": _FOUR_ROUND_ARCHIVE[1],
+    "series": _FOUR_ROUND_ARCHIVE[3],
+}
 
 
 def _archive_tables(seed: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -605,4 +606,4 @@ def _archive_tables(seed: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame
 
 
 def _four_round_tables_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    return _FOUR_ROUND_TABLES
+    return _FOUR_ROUND_ARCHIVE

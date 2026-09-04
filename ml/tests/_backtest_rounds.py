@@ -29,14 +29,14 @@ from draft_oracle.models.skater_production import (
 from draft_oracle.projection_artifact import ProjectArtifactConfig, build_projection_artifact
 from tests._backtest_shared import _config, _config_ir, _tables
 from tests.backtest_fixtures import (
+    _FOUR_ROUND_TABLES,
     FOUR_ROUND_TARGET,
     _four_round_config,
-    _four_round_tables,
 )
 
 
 def test_run_backtest_replays_rounds_2_and_combined_r3_r4() -> None:
-    tables = _four_round_tables()
+    tables = _FOUR_ROUND_TABLES
     result = run_backtest(tables, [FOUR_ROUND_TARGET], config=_four_round_config())
     by_round = {r.playoff_round: r for r in result.rounds}
     assert sorted(by_round) == [1, 2, 3]
@@ -61,7 +61,7 @@ def test_run_backtest_replays_rounds_2_and_combined_r3_r4() -> None:
 
 
 def test_combined_r3_r4_roster_scoring_uses_both_rounds() -> None:
-    tables = _four_round_tables()
+    tables = _FOUR_ROUND_TABLES
     result = run_backtest(tables, [FOUR_ROUND_TARGET], config=_four_round_config())
     combined = next(rnd for rnd in result.rounds if rnd.playoff_round == 3)
     seat_one = next(slot for slot in combined.slot_results if slot.seat == 1)
@@ -86,7 +86,7 @@ def test_combined_r3_r4_roster_scoring_uses_both_rounds() -> None:
 
 
 def test_build_projection_artifact_combined_event_folds_r3_and_r4() -> None:
-    tables = _four_round_tables()
+    tables = _FOUR_ROUND_TABLES
     config = ProjectArtifactConfig(
         seed=20260827,
         n_sims=60,
@@ -126,7 +126,7 @@ def test_build_projection_artifact_combined_event_folds_r3_and_r4() -> None:
 
 
 def test_replay_round_two_scores_only_round_two() -> None:
-    tables = _four_round_tables()
+    tables = _FOUR_ROUND_TABLES
     config = _four_round_config()
     skater_actual = skater_actual_points(tables['skater_games'], tables['series'])
     team_actual = team_actual_goalie_points(tables['team_games'], tables['series'])
@@ -154,7 +154,7 @@ def test_replay_round_two_scores_only_round_two() -> None:
 
 
 def test_leakage_guard_spans_the_combined_r3_r4_game_union() -> None:
-    tables = _four_round_tables()
+    tables = _FOUR_ROUND_TABLES
     season_id = (FOUR_ROUND_TARGET - 1) * 10000 + FOUR_ROUND_TARGET
     r3_ids = round_game_ids(
         tables['team_games'],

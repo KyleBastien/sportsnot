@@ -239,6 +239,14 @@ class _ProjectionOutputs:
     combined_diagnostics: list[dict[str, Any]] | None
 
 
+@dataclass(frozen=True)
+class _TeamProjectionRows:
+    team_rows: list[dict[str, Any]]
+    length_by_abbrev: dict[str, dict[int, float]]
+    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None
+    combined_diagnostics: list[dict[str, Any]] | None
+
+
 def _injured_player_ids(injuries: pd.DataFrame | None) -> set[int]:
     """Skater player ids currently out/IR/day-to-day (goalies excluded here)."""
     if injuries is None or injuries.empty:
@@ -388,6 +396,52 @@ def _projection_outputs(
     context: _ProjectionRoundContext,
     models: _ProjectionModels,
 ) -> _ProjectionOutputs:
+    team_projection = _team_projection_rows(context, models, season, playoff_round)
+    skater_rows = _skater_projection_rows(
+        skater_games,
+        players,
+        team_games,
+        injuries,
+        playoff_round,
+        context,
+        models,
+        team_projection.length_by_abbrev,
+        team_projection.combined_by_abbrev,
+    )
+    skaters = _finalize_skaters(skater_rows)
+    teams = _finalize_teams(team_projection.team_rows)
+    cheatsheet = build_cheatsheet(skaters, teams, config=context.config.vor_config)
+    if team_projection.combined_diagnostics is not None:
+        cheatsheet.note = _COMBINED_CHEATSHEET_NOTE
+    return _ProjectionOutputs(
+        skaters=skaters,
+        teams=teams,
+        cheatsheet=cheatsheet,
+        ir_valuations=_apply_ir_stash(
+            _IrStashInput(
+                skaters,
+                cheatsheet,
+                injuries,
+                team_projection.length_by_abbrev,
+                context.train_sk,
+                context.train_tg,
+                context.config,
+            )
+        ),
+        slot_report=_build_slot_report(
+            SlotReportInput(skaters, teams, league_picks, context.warnings, context.config)
+        ),
+        length_by_abbrev=team_projection.length_by_abbrev,
+        combined_diagnostics=team_projection.combined_diagnostics,
+    )
+
+
+def _team_projection_rows(
+    context: _ProjectionRoundContext,
+    models: _ProjectionModels,
+    season: int,
+    playoff_round: int,
+) -> _TeamProjectionRows:
     team_rows, length_by_abbrev = _build_team_rows(
         _BuildTeamRowsRequest(
             round_series=context.round_series,
@@ -420,6 +474,25 @@ def _projection_outputs(
                     "combined R3+R4 valuation covers active-roster projections only; "
                     "IR-stash values remain single-round (R3)"
                 )
+    return _TeamProjectionRows(
+        team_rows=team_rows,
+        length_by_abbrev=length_by_abbrev,
+        combined_by_abbrev=combined_by_abbrev,
+        combined_diagnostics=combined_diagnostics,
+    )
+
+
+def _skater_projection_rows(
+    skater_games: pd.DataFrame,
+    players: pd.DataFrame,
+    team_games: pd.DataFrame,
+    injuries: pd.DataFrame | None,
+    playoff_round: int,
+    context: _ProjectionRoundContext,
+    models: _ProjectionModels,
+    length_by_abbrev: dict[str, dict[int, float]],
+    combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None,
+) -> list[dict[str, Any]]:
     injured_ids = _injured_player_ids(injuries)
     feats = build_skater_features(
         skater_games,
@@ -432,47 +505,19 @@ def _projection_outputs(
         ),
     )
     eligible_feats = feats.loc[feats["team_abbrev"].isin(length_by_abbrev)]
-    skater_rows: list[dict[str, Any]] = []
-    if not eligible_feats.empty:
-        projected = models.prod_model.project(eligible_feats)
-        skater_rows = _build_skater_rows(
-            _BuildSkaterRowsRequest(
-                projected=projected,
-                length_by_abbrev=length_by_abbrev,
-                injured_ids=injured_ids,
-                season_id=context.season_id,
-                playoff_round=int(playoff_round),
-                config=context.config,
-                combined_by_abbrev=combined_by_abbrev,
-            )
+    if eligible_feats.empty:
+        return []
+    projected = models.prod_model.project(eligible_feats)
+    return _build_skater_rows(
+        _BuildSkaterRowsRequest(
+            projected=projected,
+            length_by_abbrev=length_by_abbrev,
+            injured_ids=injured_ids,
+            season_id=context.season_id,
+            playoff_round=int(playoff_round),
+            config=context.config,
+            combined_by_abbrev=combined_by_abbrev,
         )
-    skaters = _finalize_skaters(skater_rows)
-    teams = _finalize_teams(team_rows)
-    cheatsheet = build_cheatsheet(skaters, teams, config=context.config.vor_config)
-    if combined_diagnostics is not None:
-        cheatsheet.note = _COMBINED_CHEATSHEET_NOTE
-    ir_valuations = _apply_ir_stash(
-        _IrStashInput(
-            skaters,
-            cheatsheet,
-            injuries,
-            length_by_abbrev,
-            context.train_sk,
-            context.train_tg,
-            context.config,
-        )
-    )
-    slot_report = _build_slot_report(
-        SlotReportInput(skaters, teams, league_picks, context.warnings, context.config)
-    )
-    return _ProjectionOutputs(
-        skaters=skaters,
-        teams=teams,
-        cheatsheet=cheatsheet,
-        ir_valuations=ir_valuations,
-        slot_report=slot_report,
-        length_by_abbrev=length_by_abbrev,
-        combined_diagnostics=combined_diagnostics,
     )
 
 

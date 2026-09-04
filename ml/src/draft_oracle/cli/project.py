@@ -271,15 +271,31 @@ app.command(name="train-return-time")(train_return_time)
 app.command(name="eval-series-sim")(eval_series_sim)
 app.command(name="project-skaters")(project_skaters)
 app.command(name="train-opponents")(train_opponents)
-app.command(name="project")(project)
-app.command(name="recommend")(recommend)
+app.command(
+    name="project",
+    add_help_option=False,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)(project)
+app.command(
+    name="recommend",
+    add_help_option=False,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)(recommend)
 app.command(
     name="compare-strategies",
     add_help_option=False,
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )(compare_strategies_cmd)
-app.command(name="draft")(draft_cmd)
-app.command(name="backtest")(backtest)
+app.command(
+    name="backtest",
+    add_help_option=False,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)(backtest)
+app.command(
+    name="draft",
+    add_help_option=False,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)(draft_cmd)
 
 if __name__ == "__main__":  # pragma: no cover
     app()

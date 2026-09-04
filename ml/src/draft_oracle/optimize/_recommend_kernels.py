@@ -387,11 +387,7 @@ def _fitted_opponent_choice(
 
 def _vectorized_greedy_expected(
     state: DraftState | _GreedyExpectedRequest,
-    owner: str | None = None,
-    candidate_assets: Sequence[DraftAsset] | None = None,
-    gmodel: GreedyOpponentModel | None = None,
-    replacement: Mapping[str, float] | None = None,
-    cfg: RecommendConfig | None = None,
+    *legacy: object,
 ) -> list[float]:
     """Batched Monte-Carlo expected owner value against a greedy opponent (US-021).
 
@@ -402,14 +398,7 @@ def _vectorized_greedy_expected(
     the object-model rollout (greedy-VOR owner tail, opponent ``rank_value + need``
     softmax, owner-full early stop, ``depth`` cap).
     """
-    request = _resolve_greedy_expected_request(
-        state,
-        owner,
-        candidate_assets,
-        gmodel,
-        replacement,
-        cfg,
-    )
+    request = _resolve_greedy_expected_request(state, *legacy)
     arr = _build_rollout_arrays(request.state, request.owner, request.replacement)
     rollouts = request.cfg.rollouts
     means: list[float] = []

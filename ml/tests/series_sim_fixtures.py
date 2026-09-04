@@ -243,50 +243,48 @@ _ARCHIVE_TEAM_GAMES_2020_21 = pd.concat(
     ignore_index=True,
 )
 
-def _overlap_row(spec: _OverlapRowInput) -> dict[str, object]:
-    return _scored_row(
-        _ScoredRowInput(
-            20212022,
-            spec.game_type_id,
-            spec.game_id,
-            spec.game_date,
-            spec.team_id,
-            spec.team,
-            spec.opp,
-            spec.gf,
-            spec.ga,
-            spec.is_home,
-            False,
-        )
-    )
-
-
 def _overlap_game(
     spec: _OverlapGameInput,
 ) -> list[dict[str, object]]:
-    return _row_pair(
-        _OverlapRowInput(
-            spec.game_id,
-            spec.game_date,
-            spec.home,
-            spec.home_id,
-            spec.away,
-            spec.hg,
-            spec.ag,
-            True,
-        ),
-        _OverlapRowInput(
-            spec.game_id,
-            spec.game_date,
-            spec.away,
-            spec.away_id,
-            spec.home,
-            spec.ag,
-            spec.hg,
-            False,
-        ),
-        _overlap_row,
-    )
+    return [
+        _scored_row(
+            _ScoredRowInput(
+                20212022,
+                game.game_type_id,
+                game.game_id,
+                game.game_date,
+                game.team_id,
+                game.team,
+                game.opp,
+                game.gf,
+                game.ga,
+                game.is_home,
+                False,
+            )
+        )
+        for game in (
+            _OverlapRowInput(
+                spec.game_id,
+                spec.game_date,
+                spec.home,
+                spec.home_id,
+                spec.away,
+                spec.hg,
+                spec.ag,
+                True,
+            ),
+            _OverlapRowInput(
+                spec.game_id,
+                spec.game_date,
+                spec.away,
+                spec.away_id,
+                spec.home,
+                spec.ag,
+                spec.hg,
+                False,
+            ),
+        )
+    ]
 
 
 def _row_pair[T](

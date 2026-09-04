@@ -44,6 +44,9 @@ _PLAYOFF_PAIRINGS = [
     ("AAA", "DDD"),
     ("DDD", "AAA"),
 ]
+_REGULAR_SEASON_MATCHUPS = [
+    (home, away) for index, home in enumerate(TEAMS) for away in TEAMS[index + 1 :]
+]
 
 
 # ── Scalar metrics + shrinkage ─────────────────────────────────────────────
@@ -217,22 +220,22 @@ def _regular_season_games(request: _RegularSeasonRequest) -> list[_RegularSeason
     day = 1
     month = 11
     games: list[_RegularSeasonGame] = []
-    for _ in range(request.n_reg // (len(TEAMS) - 1)):
-        for i, home in enumerate(TEAMS):
-            for away in TEAMS[i + 1 :]:
-                gid += 1
-                games.append(
-                    _RegularSeasonGame(
-                        game_id=gid,
-                        game_date=f"{request.year}-{month:02d}-{day:02d}",
-                        home=home,
-                        away=away,
-                    )
-                )
-                day += 1
-                if day > 27:
-                    day = 1
-                    month = 12 if month == 11 else 11
+    total_games = len(_REGULAR_SEASON_MATCHUPS) * (request.n_reg // (len(TEAMS) - 1))
+    for game_index in range(total_games):
+        home, away = _REGULAR_SEASON_MATCHUPS[game_index % len(_REGULAR_SEASON_MATCHUPS)]
+        gid += 1
+        games.append(
+            _RegularSeasonGame(
+                game_id=gid,
+                game_date=f"{request.year}-{month:02d}-{day:02d}",
+                home=home,
+                away=away,
+            )
+        )
+        day += 1
+        if day > 27:
+            day = 1
+            month = 12 if month == 11 else 11
     return games
 
 
