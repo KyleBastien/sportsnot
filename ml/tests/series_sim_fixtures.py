@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -86,24 +87,29 @@ def _team_row(spec: _TeamRowInput) -> dict[str, object]:
 
 
 def _game_rows(game: _GameRowsInput) -> list[dict[str, object]]:
-    def _side(team: str, gf: int, ga: int, is_home: bool) -> dict[str, object]:
-        return _team_row(
-            _TeamRowInput(
-                game.season_id,
-                game.game_type_id,
-                game.game_id,
-                game.game_date,
-                team,
-                gf,
-                ga,
-                is_home,
-            )
-        )
-
-    return [
-        _side(game.home, game.home_goals, game.away_goals, True),
-        _side(game.away, game.away_goals, game.home_goals, False),
-    ]
+    return _row_pair(
+        _TeamRowInput(
+            game.season_id,
+            game.game_type_id,
+            game.game_id,
+            game.game_date,
+            game.home,
+            game.home_goals,
+            game.away_goals,
+            True,
+        ),
+        _TeamRowInput(
+            game.season_id,
+            game.game_type_id,
+            game.game_id,
+            game.game_date,
+            game.away,
+            game.away_goals,
+            game.home_goals,
+            False,
+        ),
+        _team_row,
+    )
 
 
 def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -187,10 +193,6 @@ def _synthetic_league(end_years: list[int], *, seed: int = 0) -> tuple[pd.DataFr
     return pd.DataFrame(team_rows), pd.DataFrame(series_rows)
 
 
-def _real_team_games(season_label: str | None = None) -> pd.DataFrame:
-    return pd.concat(_archive_frames(season_label), ignore_index=True)
-
-
 def _archive_paths(season_label: str | None) -> list[Path]:
     archive_dir = Path("data/raw/nhl-archive")
     if season_label is not None:
@@ -200,6 +202,10 @@ def _archive_paths(season_label: str | None) -> list[Path]:
 
 def _archive_frames(season_label: str | None) -> list[pd.DataFrame]:
     return [normalize_team_games(pd.read_csv(path)) for path in _archive_paths(season_label)]
+
+
+_ARCHIVE_TEAM_GAMES = pd.concat(_archive_frames(None), ignore_index=True)
+_ARCHIVE_TEAM_GAMES_2020_21 = pd.concat(_archive_frames("2020-21"), ignore_index=True)
 
 
 def _overlap_row(spec: _OverlapRowInput) -> dict[str, object]:
@@ -224,29 +230,34 @@ def _overlap_row(spec: _OverlapRowInput) -> dict[str, object]:
 def _overlap_game(
     spec: _OverlapGameInput,
 ) -> list[dict[str, object]]:
-    return [
-        _overlap_row(
-            _OverlapRowInput(
-                spec.game_id,
-                spec.game_date,
-                spec.home,
-                spec.home_id,
-                spec.away,
-                spec.hg,
-                spec.ag,
-                True,
-            )
+    return _row_pair(
+        _OverlapRowInput(
+            spec.game_id,
+            spec.game_date,
+            spec.home,
+            spec.home_id,
+            spec.away,
+            spec.hg,
+            spec.ag,
+            True,
         ),
-        _overlap_row(
-            _OverlapRowInput(
-                spec.game_id,
-                spec.game_date,
-                spec.away,
-                spec.away_id,
-                spec.home,
-                spec.ag,
-                spec.hg,
-                False,
-            )
+        _OverlapRowInput(
+            spec.game_id,
+            spec.game_date,
+            spec.away,
+            spec.away_id,
+            spec.home,
+            spec.ag,
+            spec.hg,
+            False,
         ),
-    ]
+        _overlap_row,
+    )
+
+
+def _row_pair[T](
+    first: T,
+    second: T,
+    builder: Callable[[T], dict[str, object]],
+) -> list[dict[str, object]]:
+    return [builder(first), builder(second)]

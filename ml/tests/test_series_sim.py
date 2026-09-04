@@ -32,14 +32,21 @@ from draft_oracle.models.series_sim import (
 )
 from draft_oracle.rules import goalie_series_points
 from tests.series_sim_fixtures import (
+    _ARCHIVE_TEAM_GAMES,
+    _ARCHIVE_TEAM_GAMES_2020_21,
     TEAMS,
     _game_rows,
     _GameRowsInput,
     _overlap_game,
     _OverlapGameInput,
-    _real_team_games,
     _synthetic_league,
 )
+
+
+def _real_team_games(season_label: str | None = None) -> pd.DataFrame:
+    if season_label == "2020-21":
+        return _ARCHIVE_TEAM_GAMES_2020_21.copy(deep=True)
+    return _ARCHIVE_TEAM_GAMES.copy(deep=True)
 
 # ── Home-ice pattern + per-game probability schedule ───────────────────────
 
