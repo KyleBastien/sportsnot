@@ -280,6 +280,15 @@ class _PerPickAccuracyRequest:
     rank_keys: Callable[[OpponentModel, DraftState, str, random.Random | None], list[str]]
 
 
+@dataclass(frozen=True)
+class _PerPickEventRequest:
+    pool: pd.DataFrame
+    fitted_mapping: Callable[[list[str]], Mapping[str, OpponentModel]]
+    greedy: OpponentModel
+    config: _OpponentEvalConfig
+    rank_keys: Callable[[OpponentModel, DraftState, str, random.Random | None], list[str]]
+
+
 def _membership_event_score(
     pool: pd.DataFrame,
     fitted_mapping: Callable[[list[str]], Mapping[str, OpponentModel]],
@@ -324,11 +333,13 @@ def _per_pick_accuracy(request: _PerPickAccuracyRequest) -> PerPickScore | None:
     prepared = runtime.prepare_picks(ordered)
     for _, pool in prepared.groupby(runtime.event_keys(prepared), sort=True):
         event_score = _per_pick_event_score(
-            pool,
-            fitted.as_mapping,
-            greedy,
-            request.config,
-            request.rank_keys,
+            _PerPickEventRequest(
+                pool,
+                fitted.as_mapping,
+                greedy,
+                request.config,
+                request.rank_keys,
+            )
         )
         if event_score is None:
             continue
@@ -372,28 +383,24 @@ class _PerPickEventScore:
 
 
 def _per_pick_event_score(
-    pool: pd.DataFrame,
-    fitted_mapping: Callable[[list[str]], Mapping[str, OpponentModel]],
-    greedy: OpponentModel,
-    config: _OpponentEvalConfig,
-    rank_keys: Callable[[OpponentModel, DraftState, str, random.Random | None], list[str]],
+    request: _PerPickEventRequest,
 ) -> _PerPickEventScore | None:
-    order = _event_order(pool)
+    order = _event_order(request.pool)
     if order is None:
         return None
-    state = _event_state(pool, order)
-    fitted_models = fitted_mapping(order)
-    rng = random.Random(config.seed)
+    state = _event_state(request.pool, order)
+    fitted_models = request.fitted_mapping(order)
+    rng = random.Random(request.config.seed)
     score = _PerPickEventScore(0, 0, 0, 0, 0)
-    for _, pick in pool.sort_values("pick_number").iterrows():
+    for _, pick in request.pool.sort_values("pick_number").iterrows():
         scored_pick = _score_pick(
             state,
             fitted_models[str(pick["manager"])],
-            greedy,
+            request.greedy,
             str(pick["manager"]),
             str(pick["asset_key"]),
-            config.top_k,
-            rank_keys,
+            request.config.top_k,
+            request.rank_keys,
             rng,
         )
         if scored_pick is None:

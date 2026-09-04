@@ -90,6 +90,48 @@ DEFAULT_TEMPERATURE = 0.3
 DEFAULT_SEED = 20260827
 DEFAULT_ROLLOUTS = 500
 DEFAULT_NEED_WEIGHT = 4.0
+
+_ArtifactOption = Annotated[
+    Path | None,
+    typer.Option(help="Projection artifact directory (skaters/teams parquet)."),
+]
+_ManagersOption = Annotated[
+    str,
+    typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."),
+]
+_SlotOption = Annotated[int, typer.Option("--slot", help="Your snake seat (1-based).")]
+_IrOption = Annotated[
+    bool,
+    typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D)."),
+]
+_EliminatedOption = Annotated[str, typer.Option(help="Comma-separated eliminated team abbrevs.")]
+_SessionPathOption = Annotated[
+    Path | None,
+    typer.Option(help="Session-log path (defaults to ./draft-session.json)."),
+]
+_ResumePathOption = Annotated[
+    Path | None,
+    typer.Option("--resume", help="Resume a saved session JSON instead."),
+]
+_TemperatureOption = Annotated[
+    float,
+    typer.Option(help="Greedy opponent softmax temperature."),
+]
+_SeedOption = Annotated[int, typer.Option(help="Deterministic seed.")]
+_RolloutsOption = Annotated[
+    int,
+    typer.Option(help="Monte-Carlo rollouts per candidate for recommend."),
+]
+_OpponentsOption = Annotated[
+    str,
+    typer.Option(
+        help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."
+    ),
+]
+_OpponentArtifactOption = Annotated[
+    Path,
+    typer.Option(help="Committed opponent-model artifact directory (fitted path)."),
+]
 # ── Session engine ────────────────────────────────────────────────────────
 def _resolve_eliminated(pool: list[DraftAsset], abbrevs: list[str]) -> frozenset[int]:
     wanted = _wanted_eliminated_abbrevs(abbrevs)
@@ -641,42 +683,18 @@ def _start_new_draft_session(request: _StartDraftRequest) -> None:
 
 
 def draft(
-    artifact: Annotated[
-        Path | None,
-        typer.Option(help="Projection artifact directory (skaters/teams parquet)."),
-    ] = None,
-    managers: Annotated[
-        str,
-        typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."),
-    ] = "4",
-    slot: Annotated[int, typer.Option("--slot", help="Your snake seat (1-based).")] = 1,
-    ir: Annotated[
-        bool, typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
-    ] = False,
-    eliminated: Annotated[str, typer.Option(help="Comma-separated eliminated team abbrevs.")] = "",
-    session: Annotated[
-        Path | None,
-        typer.Option(help="Session-log path (defaults to ./draft-session.json)."),
-    ] = None,
-    resume: Annotated[
-        Path | None, typer.Option("--resume", help="Resume a saved session JSON instead.")
-    ] = None,
-    temperature: Annotated[
-        float, typer.Option(help="Greedy opponent softmax temperature.")
-    ] = DEFAULT_TEMPERATURE,
-    seed: Annotated[int, typer.Option(help="Deterministic seed.")] = DEFAULT_SEED,
-    rollouts: Annotated[
-        int, typer.Option(help="Monte-Carlo rollouts per candidate for recommend.")
-    ] = DEFAULT_ROLLOUTS,
-    opponents: Annotated[
-        str,
-        typer.Option(
-            help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."
-        ),
-    ] = "auto",
-    opponent_artifact: Annotated[
-        Path, typer.Option(help="Committed opponent-model artifact directory (fitted path).")
-    ] = DEFAULT_OPPONENT_ARTIFACT_DIR,
+    artifact: _ArtifactOption = None,
+    managers: _ManagersOption = "4",
+    slot: _SlotOption = 1,
+    ir: _IrOption = False,
+    eliminated: _EliminatedOption = "",
+    session: _SessionPathOption = None,
+    resume: _ResumePathOption = None,
+    temperature: _TemperatureOption = DEFAULT_TEMPERATURE,
+    seed: _SeedOption = DEFAULT_SEED,
+    rollouts: _RolloutsOption = DEFAULT_ROLLOUTS,
+    opponents: _OpponentsOption = "auto",
+    opponent_artifact: _OpponentArtifactOption = DEFAULT_OPPONENT_ARTIFACT_DIR,
 ) -> None:
     """Start an interactive, artifact-powered draft assistant (US-024).
 

@@ -74,6 +74,19 @@ class _ArchiveBuildRequest:
     gid_start: int
 
 
+@dataclass(frozen=True)
+class _BacktestSkaterRowsRequest:
+    rows: list[dict[str, object]]
+    players: dict[int, tuple[str, str, float]]
+    rng: np.random.Generator
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    team: str
+    opp: str
+
+
 def _player_tables(
     spec: _PlayerPoolInput,
 ) -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
@@ -159,32 +172,23 @@ def _team_rows(spec: _TeamRowsInput) -> list[dict[str, object]]:
 
 
 def _append_backtest_skater_rows(
-    rows: list[dict[str, object]],
-    players: dict[int, tuple[str, str, float]],
-    rng: np.random.Generator,
-    *,
-    game_id: int,
-    game_date: str,
-    season_id: int,
-    game_type_id: int,
-    team: str,
-    opp: str,
+    request: _BacktestSkaterRowsRequest,
 ) -> None:
-    for player_id, (player_team, pos, rate) in players.items():
-        if player_team != team:
+    for player_id, (player_team, pos, rate) in request.players.items():
+        if player_team != request.team:
             continue
-        goals, assists = _draw_ga(rng, rate)
-        rows.append(
+        goals, assists = _draw_ga(request.rng, rate)
+        request.rows.append(
             _skater_row(
                 _SkaterRowInput(
                     player_id,
                     pos,
-                    game_id,
-                    game_date,
-                    season_id,
-                    game_type_id,
-                    team,
-                    opp,
+                    request.game_id,
+                    request.game_date,
+                    request.season_id,
+                    request.game_type_id,
+                    request.team,
+                    request.opp,
                     goals,
                     assists,
                 )
@@ -229,15 +233,17 @@ def _emit_regular_season_games(request: _ArchiveBuildRequest) -> int:
                 )
                 for team, opp in ((home, away), (away, home)):
                     _append_backtest_skater_rows(
-                        request.sk_rows,
-                        request.players,
-                        request.rng,
-                        game_id=gid,
-                        game_date=date,
-                        season_id=request.season_id,
-                        game_type_id=2,
-                        team=team,
-                        opp=opp,
+                        _BacktestSkaterRowsRequest(
+                            rows=request.sk_rows,
+                            players=request.players,
+                            rng=request.rng,
+                            game_id=gid,
+                            game_date=date,
+                            season_id=request.season_id,
+                            game_type_id=2,
+                            team=team,
+                            opp=opp,
+                        )
                     )
     return gid
 
@@ -274,15 +280,17 @@ def _emit_series_games(
         )
         for team, opp in ((top, bottom), (bottom, top)):
             _append_backtest_skater_rows(
-                request.sk_rows,
-                request.players,
-                request.rng,
-                game_id=gid,
-                game_date=date,
-                season_id=request.season_id,
-                game_type_id=3,
-                team=team,
-                opp=opp,
+                _BacktestSkaterRowsRequest(
+                    rows=request.sk_rows,
+                    players=request.players,
+                    rng=request.rng,
+                    game_id=gid,
+                    game_date=date,
+                    season_id=request.season_id,
+                    game_type_id=3,
+                    team=team,
+                    opp=opp,
+                )
             )
     request.series_rows.append(
         {
@@ -560,7 +568,7 @@ def _four_round_archive(
 
 
 def _four_round_tables() -> dict[str, pd.DataFrame]:
-    sk, tg, players, series = _four_round_archive()
+    sk, tg, players, series = _four_round_tables_data()
     return {"skater_games": sk, "players": players, "team_games": tg, "series": series}
 
 
@@ -587,9 +595,14 @@ def _four_round_config() -> BacktestConfig:
 
 
 _ARCHIVE_TABLES = _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=1)
+_FOUR_ROUND_TABLES = _four_round_archive()
 
 
 def _archive_tables(seed: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     if seed == 1:
         return _ARCHIVE_TABLES
     return _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=seed)
+
+
+def _four_round_tables_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    return _FOUR_ROUND_TABLES

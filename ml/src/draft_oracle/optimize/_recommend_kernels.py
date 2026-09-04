@@ -386,12 +386,12 @@ def _fitted_opponent_choice(
 
 
 def _vectorized_greedy_expected(
-    state: DraftState,
-    owner: str,
-    candidate_assets: Sequence[DraftAsset],
-    gmodel: GreedyOpponentModel,
-    replacement: Mapping[str, float],
-    cfg: RecommendConfig,
+    state: DraftState | _GreedyExpectedRequest,
+    owner: str | None = None,
+    candidate_assets: Sequence[DraftAsset] | None = None,
+    gmodel: GreedyOpponentModel | None = None,
+    replacement: Mapping[str, float] | None = None,
+    cfg: RecommendConfig | None = None,
 ) -> list[float]:
     """Batched Monte-Carlo expected owner value against a greedy opponent (US-021).
 
@@ -402,17 +402,58 @@ def _vectorized_greedy_expected(
     the object-model rollout (greedy-VOR owner tail, opponent ``rank_value + need``
     softmax, owner-full early stop, ``depth`` cap).
     """
-    arr = _build_rollout_arrays(state, owner, replacement)
-    rollouts = cfg.rollouts
+    request = _resolve_greedy_expected_request(
+        state,
+        owner,
+        candidate_assets,
+        gmodel,
+        replacement,
+        cfg,
+    )
+    arr = _build_rollout_arrays(request.state, request.owner, request.replacement)
+    rollouts = request.cfg.rollouts
     means: list[float] = []
-    for asset in candidate_assets:
+    for asset in request.candidate_assets:
         # Common random numbers: identical opponent draws across candidates (pairs the
         # comparison; the seed does not depend on the candidate).
-        rng = np.random.default_rng(cfg.seed * _ROLLOUT_SALT)
+        rng = np.random.default_rng(request.cfg.seed * _ROLLOUT_SALT)
         batch = _candidate_rollout(arr, asset, rollouts)
-        _advance_greedy_rollout(arr, cfg, gmodel, batch, rng)
+        _advance_greedy_rollout(arr, request.cfg, request.gmodel, batch, rng)
         means.append(_mean_owner_value(batch.owner_total, arr.base_owner_value))
     return means
+
+
+@dataclass(frozen=True)
+class _GreedyExpectedRequest:
+    state: DraftState
+    owner: str
+    candidate_assets: Sequence[DraftAsset]
+    gmodel: GreedyOpponentModel
+    replacement: Mapping[str, float]
+    cfg: RecommendConfig
+
+
+def _resolve_greedy_expected_request(
+    state: DraftState | _GreedyExpectedRequest,
+    owner: str | None,
+    candidate_assets: Sequence[DraftAsset] | None,
+    gmodel: GreedyOpponentModel | None,
+    replacement: Mapping[str, float] | None,
+    cfg: RecommendConfig | None,
+) -> _GreedyExpectedRequest:
+    if isinstance(state, _GreedyExpectedRequest):
+        return state
+    if (
+        owner is None
+        or candidate_assets is None
+        or gmodel is None
+        or replacement is None
+        or cfg is None
+    ):
+        raise TypeError(
+            "legacy greedy expected calls require owner, candidates, model, replacement, and config"
+        )
+    return _GreedyExpectedRequest(state, owner, candidate_assets, gmodel, replacement, cfg)
 
 
 def _candidate_rollout(
@@ -652,7 +693,14 @@ def _expected_values(
     """
     if isinstance(opponent_model, GreedyOpponentModel):
         return _vectorized_greedy_expected(
-            state, owner, candidate_assets, opponent_model, replacement, cfg
+            _GreedyExpectedRequest(
+                state,
+                owner,
+                candidate_assets,
+                opponent_model,
+                replacement,
+                cfg,
+            )
         )
     fitted_models = _fitted_zero_temp_models(opponent_model, state)
     if fitted_models is not None:
