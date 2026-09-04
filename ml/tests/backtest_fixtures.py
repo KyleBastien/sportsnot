@@ -61,6 +61,19 @@ class _TeamRowsInput:
     team_ids: dict[str, int] | None = None
 
 
+@dataclass(frozen=True)
+class _ArchiveBuildRequest:
+    sk_rows: list[dict[str, object]]
+    tg_rows: list[dict[str, object]]
+    series_rows: list[dict[str, object]]
+    players: dict[int, tuple[str, str, float]]
+    rng: np.random.Generator
+    end_year: int
+    season_id: int
+    reg_cycles: int
+    gid_start: int
+
+
 def _player_tables(
     spec: _PlayerPoolInput,
 ) -> tuple[pd.DataFrame, dict[int, tuple[str, str, float]]]:
@@ -144,6 +157,152 @@ def _team_rows(spec: _TeamRowsInput) -> list[dict[str, object]]:
         )
     return rows
 
+
+def _append_backtest_skater_rows(
+    rows: list[dict[str, object]],
+    players: dict[int, tuple[str, str, float]],
+    rng: np.random.Generator,
+    *,
+    game_id: int,
+    game_date: str,
+    season_id: int,
+    game_type_id: int,
+    team: str,
+    opp: str,
+) -> None:
+    for player_id, (player_team, pos, rate) in players.items():
+        if player_team != team:
+            continue
+        goals, assists = _draw_ga(rng, rate)
+        rows.append(
+            _skater_row(
+                _SkaterRowInput(
+                    player_id,
+                    pos,
+                    game_id,
+                    game_date,
+                    season_id,
+                    game_type_id,
+                    team,
+                    opp,
+                    goals,
+                    assists,
+                )
+            )
+        )
+
+
+def _emit_regular_season_games(request: _ArchiveBuildRequest) -> int:
+    gid = request.gid_start
+    day, month = 1, 10
+    for _ in range(request.reg_cycles):
+        for i, home in enumerate(TEAMS):
+            for away in TEAMS[i + 1 :]:
+                gid += 1
+                date = f"{request.end_year - 1}-{month:02d}-{day:02d}"
+                day += 1
+                if day > 27:
+                    day = 1
+                    month = 11 if month == 10 else (12 if month == 11 else 10)
+                diff = STRENGTH[home] - STRENGTH[away]
+                home_win = request.rng.random() < 1.0 / (1.0 + np.exp(-0.5 * diff))
+                if home_win:
+                    home_goals = int(request.rng.integers(2, 5))
+                    away_goals = int(request.rng.integers(0, home_goals))
+                else:
+                    away_goals = int(request.rng.integers(2, 5))
+                    home_goals = int(request.rng.integers(0, away_goals))
+                request.tg_rows.extend(
+                    _team_rows(
+                        _TeamRowsInput(
+                            gid,
+                            date,
+                            request.season_id,
+                            2,
+                            home,
+                            away,
+                            home_goals,
+                            away_goals,
+                            TEAMS,
+                        )
+                    )
+                )
+                for team, opp in ((home, away), (away, home)):
+                    _append_backtest_skater_rows(
+                        request.sk_rows,
+                        request.players,
+                        request.rng,
+                        game_id=gid,
+                        game_date=date,
+                        season_id=request.season_id,
+                        game_type_id=2,
+                        team=team,
+                        opp=opp,
+                    )
+    return gid
+
+
+def _emit_series_games(
+    request: _ArchiveBuildRequest,
+    *,
+    letter_idx: int,
+    top: str,
+    bottom: str,
+) -> int:
+    gid = request.gid_start
+    for offset, (winner_side, wg, lg) in enumerate(SERIES_RESULT):
+        gid += 1
+        host = top if HOME_PATTERN[offset] == "top" else bottom
+        visitor = bottom if host == top else top
+        winner = top if winner_side == "top" else bottom
+        hg, ag = (wg, lg) if winner == host else (lg, wg)
+        date = f"{request.end_year}-04-{15 + offset:02d}"
+        request.tg_rows.extend(
+            _team_rows(
+                _TeamRowsInput(
+                    gid,
+                    date,
+                    request.season_id,
+                    3,
+                    host,
+                    visitor,
+                    hg,
+                    ag,
+                    TEAMS,
+                )
+            )
+        )
+        for team, opp in ((top, bottom), (bottom, top)):
+            _append_backtest_skater_rows(
+                request.sk_rows,
+                request.players,
+                request.rng,
+                game_id=gid,
+                game_date=date,
+                season_id=request.season_id,
+                game_type_id=3,
+                team=team,
+                opp=opp,
+            )
+    request.series_rows.append(
+        {
+            "year": request.end_year,
+            "season_id": request.season_id,
+            "series_letter": chr(ord("A") + letter_idx),
+            "series_abbrev": f"{top}{bottom}",
+            "playoff_round": 1,
+            "top_seed_team_id": TEAMS.index(top) + 1,
+            "top_seed_abbrev": top,
+            "top_seed_wins": 4,
+            "bottom_seed_team_id": TEAMS.index(bottom) + 1,
+            "bottom_seed_abbrev": bottom,
+            "bottom_seed_wins": 2,
+            "winning_team_id": TEAMS.index(top) + 1,
+            "losing_team_id": TEAMS.index(bottom) + 1,
+        }
+    )
+    return gid
+
 def _synthetic_archive(
     end_years: list[int], *, seed: int = 0, reg_cycles: int = 2
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -157,121 +316,35 @@ def _synthetic_archive(
 
     for end_year in end_years:
         season_id = (end_year - 1) * 10000 + end_year
-        day, month = 1, 10
-        for _ in range(reg_cycles):
-            for i, home in enumerate(TEAMS):
-                for away in TEAMS[i + 1 :]:
-                    gid += 1
-                    date = f"{end_year - 1}-{month:02d}-{day:02d}"
-                    day += 1
-                    if day > 27:
-                        day = 1
-                        month = 11 if month == 10 else (12 if month == 11 else 10)
-                    diff = STRENGTH[home] - STRENGTH[away]
-                    home_win = rng.random() < 1.0 / (1.0 + np.exp(-0.5 * diff))
-                    if home_win:
-                        hg = int(rng.integers(2, 5))
-                        ag = int(rng.integers(0, hg))
-                    else:
-                        ag = int(rng.integers(2, 5))
-                        hg = int(rng.integers(0, ag))
-                    tg_rows.extend(
-                        _team_rows(
-                            _TeamRowsInput(
-                                gid,
-                                date,
-                                season_id,
-                                2,
-                                home,
-                                away,
-                                hg,
-                                ag,
-                                TEAMS,
-                            )
-                        )
-                    )
-                    for team, opp in ((home, away), (away, home)):
-                        for p, (t, pos, rate) in players.items():
-                            if t != team:
-                                continue
-                            g, a = _draw_ga(rng, rate)
-                            sk_rows.append(
-                                _skater_row(
-                                    _SkaterRowInput(
-                                        p,
-                                        pos,
-                                        gid,
-                                        date,
-                                        season_id,
-                                        2,
-                                        team,
-                                        opp,
-                                        g,
-                                        a,
-                                    )
-                                )
-                            )
-
+        request = _ArchiveBuildRequest(
+            sk_rows=sk_rows,
+            tg_rows=tg_rows,
+            series_rows=series_rows,
+            players=players,
+            rng=rng,
+            end_year=end_year,
+            season_id=season_id,
+            reg_cycles=reg_cycles,
+            gid_start=gid,
+        )
+        gid = _emit_regular_season_games(request)
+        request = _ArchiveBuildRequest(
+            sk_rows=sk_rows,
+            tg_rows=tg_rows,
+            series_rows=series_rows,
+            players=players,
+            rng=rng,
+            end_year=end_year,
+            season_id=season_id,
+            reg_cycles=reg_cycles,
+            gid_start=gid,
+        )
         for letter_idx, (top, bottom) in enumerate(SERIES_PAIRS):
-            for offset, (winner_side, wg, lg) in enumerate(SERIES_RESULT):
-                gid += 1
-                host = top if HOME_PATTERN[offset] == "top" else bottom
-                visitor = bottom if host == top else top
-                winner = top if winner_side == "top" else bottom
-                hg, ag = (wg, lg) if winner == host else (lg, wg)
-                date = f"{end_year}-04-{15 + offset:02d}"
-                tg_rows.extend(
-                    _team_rows(
-                        _TeamRowsInput(
-                            gid,
-                            date,
-                            season_id,
-                            3,
-                            host,
-                            visitor,
-                            hg,
-                            ag,
-                            TEAMS,
-                        )
-                    )
-                )
-                for team, opp in ((top, bottom), (bottom, top)):
-                    for p, (t, pos, rate) in players.items():
-                        if t != team:
-                            continue
-                        g, a = _draw_ga(rng, rate)
-                        sk_rows.append(
-                            _skater_row(
-                                _SkaterRowInput(
-                                    p,
-                                    pos,
-                                    gid,
-                                    date,
-                                    season_id,
-                                    3,
-                                    team,
-                                    opp,
-                                    g,
-                                    a,
-                                )
-                            )
-                        )
-            series_rows.append(
-                {
-                    "year": end_year,
-                    "season_id": season_id,
-                    "series_letter": chr(ord("A") + letter_idx),
-                    "series_abbrev": f"{top}{bottom}",
-                    "playoff_round": 1,
-                    "top_seed_team_id": TEAMS.index(top) + 1,
-                    "top_seed_abbrev": top,
-                    "top_seed_wins": 4,
-                    "bottom_seed_team_id": TEAMS.index(bottom) + 1,
-                    "bottom_seed_abbrev": bottom,
-                    "bottom_seed_wins": 2,
-                    "winning_team_id": TEAMS.index(top) + 1,
-                    "losing_team_id": TEAMS.index(bottom) + 1,
-                }
+            gid = _emit_series_games(
+                request,
+                letter_idx=letter_idx,
+                top=top,
+                bottom=bottom,
             )
 
     return (
