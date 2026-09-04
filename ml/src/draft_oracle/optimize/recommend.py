@@ -67,6 +67,7 @@ from draft_oracle.optimize._recommend_kernels import (
 )
 from draft_oracle.optimize._recommend_kernels import (
     _expected_values,
+    _ExpectedValuesRequest,
     choose_pick,
 )
 from draft_oracle.optimize._recommend_kernels import (
@@ -296,12 +297,14 @@ def _rank_candidates(
 ) -> tuple[list[tuple[_Candidate, float]], float]:
     """Roll out each candidate and rank by expected value, VOR, then key ascending."""
     expecteds = _expected_values(
-        ctx.state,
-        ctx.owner,
-        [c.asset for c in candidates],
-        ctx.opponent_model,
-        replacement,
-        ctx.cfg,
+        _ExpectedValuesRequest(
+            ctx.state,
+            ctx.owner,
+            [c.asset for c in candidates],
+            ctx.opponent_model,
+            replacement,
+            ctx.cfg,
+        )
     )
     ranked = sorted(
         zip(candidates, expecteds, strict=True),

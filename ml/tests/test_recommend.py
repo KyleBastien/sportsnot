@@ -10,7 +10,6 @@ network, no committed data (SPEC section 7).
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -44,7 +43,6 @@ from draft_oracle.optimize.simulator import (
     DraftAsset,
     DraftState,
     GreedyOpponentModel,
-    OpponentModel,
     roster_capacity,
 )
 
@@ -93,26 +91,6 @@ def _pool(managers: int, allow_ir: bool, *, surplus: int = 6) -> list[DraftAsset
     for i in range(cap.goalies * managers + surplus):
         pool.append(_team(100 + i, 25.0 - 2.0 * i))
     return pool
-
-
-def _scalar_expected_value(
-    state: DraftState,
-    owner: str,
-    asset: DraftAsset,
-    opponent_model: OpponentModel | Mapping[str, OpponentModel],
-    replacement: Mapping[str, float],
-    config: RecommendConfig,
-) -> float:
-    return _expected_value(
-        _ExpectedValueRequest(
-            state,
-            owner,
-            asset,
-            opponent_model,
-            replacement,
-            config,
-        )
-    )
 
 
 # ── Primitives ────────────────────────────────────────────────────────────
@@ -385,7 +363,16 @@ def test_fast_paths_match_object_rank_then_key_tie_break() -> None:
         state, "m1", [candidate], greedy, replacement, config
     )
     greedy_object = [
-        _scalar_expected_value(state, "m1", candidate, greedy_mapping, replacement, config)
+        _expected_value(
+            _ExpectedValueRequest(
+                state,
+                "m1",
+                candidate,
+                greedy_mapping,
+                replacement,
+                config,
+            )
+        )
     ]
 
     fitted_mapping = {
@@ -400,7 +387,16 @@ def test_fast_paths_match_object_rank_then_key_tie_break() -> None:
         state, "m1", [candidate], fitted_mapping, replacement, config
     )
     fitted_object = [
-        _scalar_expected_value(state, "m1", candidate, fitted_mapping, replacement, config)
+        _expected_value(
+            _ExpectedValueRequest(
+                state,
+                "m1",
+                candidate,
+                fitted_mapping,
+                replacement,
+                config,
+            )
+        )
     ]
 
     assert greedy_object == pytest.approx([205.0])
@@ -424,7 +420,10 @@ def test_fast_path_scores_opponents_by_rank_value_and_matches_object(
     candidates = [c.asset for c in _prune_candidates(state, "m0", repl, 6)]
     cfg = RecommendConfig(rollouts=6, seed=7)
     vec = _vectorized_greedy_expected(state, "m0", candidates, gmodel, repl, cfg)
-    obj = [_scalar_expected_value(state, "m0", asset, mapping, repl, cfg) for asset in candidates]
+    obj = [
+        _expected_value(_ExpectedValueRequest(state, "m0", asset, mapping, repl, cfg))
+        for asset in candidates
+    ]
     assert vec == pytest.approx(obj, abs=1e-9)
     # The base roster value is actually part of the number (guards against m-8
     # silently zeroing it): every candidate's E[roster] exceeds it.
@@ -458,7 +457,10 @@ def test_fast_path_raises_on_dry_pool_like_object_path() -> None:
         _vectorized_greedy_expected(state, "m2", candidates, gmodel, repl, cfg)
     # The object path raises on the same starved state.
     with pytest.raises(ValueError, match="no legal asset"):
-        [_scalar_expected_value(state, "m2", asset, mapping, repl, cfg) for asset in candidates]
+        [
+            _expected_value(_ExpectedValueRequest(state, "m2", asset, mapping, repl, cfg))
+            for asset in candidates
+        ]
 
 
 def test_vectorized_greedy_matches_object_path_when_deterministic() -> None:
@@ -498,7 +500,10 @@ def test_vectorized_fitted_matches_object_path() -> None:
     models = _fitted_zero_temp_models(mapping, state)
     assert models is not None
     vec = _vectorized_fitted_expected(state, "m0", candidates, models, repl, cfg)
-    obj = [_scalar_expected_value(state, "m0", asset, mapping, repl, cfg) for asset in candidates]
+    obj = [
+        _expected_value(_ExpectedValueRequest(state, "m0", asset, mapping, repl, cfg))
+        for asset in candidates
+    ]
     assert vec == pytest.approx(obj, abs=1e-9)
 
 
@@ -523,7 +528,16 @@ def test_vectorized_fitted_uses_each_managers_need_weight() -> None:
         state, "m0", candidates, mapping, replacement, config
     )
     object_path = [
-        _scalar_expected_value(state, "m0", asset, mapping, replacement, config)
+        _expected_value(
+            _ExpectedValueRequest(
+                state,
+                "m0",
+                asset,
+                mapping,
+                replacement,
+                config,
+            )
+        )
         for asset in candidates
     ]
 

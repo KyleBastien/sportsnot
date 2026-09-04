@@ -446,6 +446,16 @@ class _ExpectedValueRequest:
 
 
 @dataclass(frozen=True)
+class _ExpectedValuesRequest:
+    state: DraftState
+    owner: str
+    candidate_assets: Sequence[DraftAsset]
+    opponent_model: OpponentModel | Mapping[str, OpponentModel]
+    replacement: Mapping[str, float]
+    cfg: RecommendConfig
+
+
+@dataclass(frozen=True)
 class _LegacyExpectedArgs:
     owner: str
     candidate_assets: Sequence[DraftAsset]
@@ -733,12 +743,7 @@ def _expected_value(
 
 
 def _expected_values(
-    state: DraftState,
-    owner: str,
-    candidate_assets: Sequence[DraftAsset],
-    opponent_model: OpponentModel | Mapping[str, OpponentModel],
-    replacement: Mapping[str, float],
-    cfg: RecommendConfig,
+    request: _ExpectedValuesRequest,
 ) -> list[float]:
     """Expected final owner value per candidate, vectorized where possible.
 
@@ -746,41 +751,41 @@ def _expected_values(
     per-manager set of deterministic fitted models (the <10s fast paths); otherwise
     falls back to the general object-model rollout.
     """
-    if isinstance(opponent_model, GreedyOpponentModel):
+    if isinstance(request.opponent_model, GreedyOpponentModel):
         return _vectorized_greedy_expected(
             _GreedyExpectedRequest(
-                state,
-                owner,
-                candidate_assets,
-                opponent_model,
-                replacement,
-                cfg,
+                request.state,
+                request.owner,
+                request.candidate_assets,
+                request.opponent_model,
+                request.replacement,
+                request.cfg,
             )
         )
-    fitted_models = _fitted_zero_temp_models(opponent_model, state)
+    fitted_models = _fitted_zero_temp_models(request.opponent_model, request.state)
     if fitted_models is not None:
         return _vectorized_fitted_expected(
             _FittedExpectedRequest(
-                state,
-                owner,
-                candidate_assets,
+                request.state,
+                request.owner,
+                request.candidate_assets,
                 fitted_models,
-                replacement,
-                cfg,
+                request.replacement,
+                request.cfg,
             )
         )
     return [
         _expected_value(
             _ExpectedValueRequest(
-                state,
-                owner,
+                request.state,
+                request.owner,
                 asset,
-                opponent_model,
-                replacement,
-                cfg,
+                request.opponent_model,
+                request.replacement,
+                request.cfg,
             )
         )
-        for asset in candidate_assets
+        for asset in request.candidate_assets
     ]
 
 
@@ -806,7 +811,14 @@ def choose_pick(
     if not candidates:
         raise ValueError(f"owner {owner!r} has no legal pick")
     expecteds = _expected_values(
-        state, owner, [c.asset for c in candidates], opponent_model, replacement, cfg
+        _ExpectedValuesRequest(
+            state,
+            owner,
+            [c.asset for c in candidates],
+            opponent_model,
+            replacement,
+            cfg,
+        )
     )
     # argmax by expected, then VOR, then key ascending — the object-model tie-break,
     # expressed as one deterministic sort so there is no compound branch.
