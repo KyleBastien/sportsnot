@@ -248,6 +248,16 @@ class _RoundOneSeriesInput:
     players: dict[int, tuple[str, float, str]]
 
 
+@dataclass(frozen=True)
+class _RoundOneGameInput:
+    winner: str
+    wg: int
+    lg: int
+    offset: int
+    gid: int
+    series: _RoundOneSeriesInput
+
+
 def _round1_series_games(
     spec: _RoundOneSeriesInput,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], int]:
@@ -265,46 +275,65 @@ def _round1_series_games(
     gid = spec.gid_start
     for offset, (winner, wg, lg) in enumerate(results):
         gid += 1
-        host = spec.top if HOME_ICE_PATTERN[offset] == "A" else spec.bottom
-        visitor = spec.bottom if host == spec.top else spec.top
-        hg, ag = (wg, lg) if winner == host else (lg, wg)
-        date = f"{spec.end_year}-04-{20 + offset:02d}"
-        tg_rows.extend(
-            _team_rows(
-                _TeamRowsInput(
-                    game_id=gid,
-                    game_date=date,
-                    season_id=spec.season_id,
-                    game_type_id=3,
-                    home=host,
-                    away=visitor,
-                    home_goals=hg,
-                    away_goals=ag,
-                )
-            )
+        game_rows, skater_rows = _round1_game_rows(
+            _RoundOneGameInput(winner, wg, lg, offset, gid, spec)
         )
-        for team, opp in ((spec.top, spec.bottom), (spec.bottom, spec.top)):
-            for p, (t, rate, pos) in spec.players.items():
-                if t != team:
-                    continue
-                g, a = _draw_ga(spec.rng, rate)
-                sk_rows.append(
-                    _skater_row(
-                        _SkaterRowInput(
-                            p,
-                            pos,
-                            gid,
-                            date,
-                            spec.season_id,
-                            3,
-                            team,
-                            opp,
-                            g,
-                            a,
-                        )
+        tg_rows.extend(game_rows)
+        sk_rows.extend(skater_rows)
+    return tg_rows, sk_rows, gid
+
+
+def _round1_game_rows(
+    spec: _RoundOneGameInput,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    host = spec.series.top if HOME_ICE_PATTERN[spec.offset] == "A" else spec.series.bottom
+    visitor = spec.series.bottom if host == spec.series.top else spec.series.top
+    hg, ag = (spec.wg, spec.lg) if spec.winner == host else (spec.lg, spec.wg)
+    date = f"{spec.series.end_year}-04-{20 + spec.offset:02d}"
+    game_rows = _team_rows(
+        _TeamRowsInput(
+            game_id=spec.gid,
+            game_date=date,
+            season_id=spec.series.season_id,
+            game_type_id=3,
+            home=host,
+            away=visitor,
+            home_goals=hg,
+            away_goals=ag,
+        )
+    )
+    skater_rows = _round1_game_skaters(spec.series, spec.gid, date)
+    return game_rows, skater_rows
+
+
+def _round1_game_skaters(
+    series: _RoundOneSeriesInput,
+    gid: int,
+    date: str,
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for team, opp in ((series.top, series.bottom), (series.bottom, series.top)):
+        for p, (t, rate, pos) in series.players.items():
+            if t != team:
+                continue
+            g, a = _draw_ga(series.rng, rate)
+            rows.append(
+                _skater_row(
+                    _SkaterRowInput(
+                        p,
+                        pos,
+                        gid,
+                        date,
+                        series.season_id,
+                        3,
+                        team,
+                        opp,
+                        g,
+                        a,
                     )
                 )
-    return tg_rows, sk_rows, gid
+            )
+    return rows
 
 
 def _pre_round_archive(
