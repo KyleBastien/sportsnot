@@ -29,6 +29,8 @@ from draft_oracle.models import (
     spearman_correlation,
     train_skater_production_model,
 )
+from tests._fixture_rows import SkaterRowInput as _FixtureSkaterRowInput
+from tests._fixture_rows import skater_row as _fixture_skater_row
 
 TEAMS = ["AAA", "BBB", "CCC", "DDD"]
 # Latent per-game scoring talent per team; skaters inherit their team's rate plus
@@ -179,9 +181,18 @@ def _synthetic_archive(
                             g = int(rng.poisson(max(rate * 0.5, 0.01)))
                             a = int(rng.poisson(max(rate * 0.5, 0.01)))
                             sk_rows.append(
-                                _skater_row(
-                                    _SkaterRowInput(
-                                        p, players[p], gid, date, season_id, 2, team, opp, g, a
+                                _fixture_skater_row(
+                                    _FixtureSkaterRowInput(
+                                        player_id=p,
+                                        pos=players[p][2],
+                                        game_id=gid,
+                                        game_date=date,
+                                        season_id=season_id,
+                                        game_type_id=2,
+                                        team=team,
+                                        opp=opp,
+                                        goals=g,
+                                        assists=a,
                                     )
                                 )
                             )
@@ -201,9 +212,18 @@ def _synthetic_archive(
                     g = int(rng.poisson(max(rate * 0.5, 0.01)))
                     a = int(rng.poisson(max(rate * 0.5, 0.01)))
                     sk_rows.append(
-                        _skater_row(
-                            _SkaterRowInput(
-                                p, players[p], gid, date, season_id, 3, team, opp, g, a
+                        _fixture_skater_row(
+                            _FixtureSkaterRowInput(
+                                player_id=p,
+                                pos=players[p][2],
+                                game_id=gid,
+                                game_date=date,
+                                season_id=season_id,
+                                game_type_id=3,
+                                team=team,
+                                opp=opp,
+                                goals=g,
+                                assists=a,
                             )
                         )
                     )
@@ -216,20 +236,6 @@ def _synthetic_archive(
 
 
 @dataclass(frozen=True)
-class _SkaterRowInput:
-    player_id: int
-    meta: tuple[str, float, str]
-    game_id: int
-    game_date: str
-    season_id: int
-    game_type_id: int
-    team: str
-    opp: str
-    goals: int
-    assists: int
-
-
-@dataclass(frozen=True)
 class _EmitTeamGameInput:
     game_id: int
     game_date: str
@@ -238,40 +244,6 @@ class _EmitTeamGameInput:
     home: str
     away: str
 
-
-def _skater_row(spec: _SkaterRowInput) -> dict[str, object]:
-    _team, _rate, pos = spec.meta
-    return {
-        "season_id": spec.season_id,
-        "game_type_id": spec.game_type_id,
-        "game_id": spec.game_id,
-        "game_date": spec.game_date,
-        "player_id": spec.player_id,
-        "player_name": f"{spec.team}-{spec.player_id}",
-        "position_code": "C" if pos == "F" else "D",
-        "position": pos,
-        "shoots_catches": "L",
-        "team_abbrev": spec.team,
-        "opponent_team_abbrev": spec.opp,
-        "home_road": "H",
-        "goals": spec.goals,
-        "assists": spec.assists,
-        "points": spec.goals + spec.assists,
-        "shots": spec.goals * 3 + 2,
-        "toi_seconds": 1000,
-        "pp_goals": 0,
-        "pp_points": 0,
-        "sh_goals": 0,
-        "sh_points": 0,
-        "ev_goals": spec.goals,
-        "ev_points": spec.goals + spec.assists,
-        "plus_minus": 0,
-        "penalty_minutes": 0,
-        "game_winning_goals": 0,
-        "ot_goals": 0,
-        "shooting_pct": 0.1,
-        "faceoff_win_pct": 0.5,
-    }
 
 
 def _emit_team_game(rows: list[dict[str, object]], spec: _EmitTeamGameInput) -> None:
