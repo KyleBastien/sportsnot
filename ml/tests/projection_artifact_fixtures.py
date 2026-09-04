@@ -228,45 +228,59 @@ _PRODUCTION_CONFIG = SkaterProductionConfig(
     min_confident_games=5,
 )
 
+_PROJECT_ARTIFACT_CONFIG = ProjectArtifactConfig(
+    seed=20260827,
+    n_sims=300,
+    production_config=_PRODUCTION_CONFIG,
+)
+
 
 def _config() -> ProjectArtifactConfig:
-    return ProjectArtifactConfig(
-        seed=20260827,
-        n_sims=300,
-        production_config=_PRODUCTION_CONFIG,
-    )
+    return _PROJECT_ARTIFACT_CONFIG
 
 
 def _archive() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return _synthetic_archive([2018, 2019, 2020, 2021, 2022], seed=1)
 
 
+@dataclass(frozen=True)
+class _RoundOneSeriesInput:
+    gid_start: int
+    top: str
+    bottom: str
+    end_year: int
+    season_id: int
+    rng: np.random.Generator
+    players: dict[int, tuple[str, float, str]]
+
+
 def _round1_series_games(
-    gid_start: int,
-    top: str,
-    bottom: str,
-    end_year: int,
-    season_id: int,
-    rng: np.random.Generator,
-    players: dict[int, tuple[str, float, str]],
+    spec: _RoundOneSeriesInput,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], int]:
     """Emit a completed best-of-7 round-1 series (top wins 4-2) + its skater rows."""
-    results = [(top, 3, 0), (top, 4, 2), (bottom, 3, 1), (bottom, 2, 1), (top, 3, 2), (top, 2, 1)]
+    results = [
+        (spec.top, 3, 0),
+        (spec.top, 4, 2),
+        (spec.bottom, 3, 1),
+        (spec.bottom, 2, 1),
+        (spec.top, 3, 2),
+        (spec.top, 2, 1),
+    ]
     tg_rows: list[dict[str, object]] = []
     sk_rows: list[dict[str, object]] = []
-    gid = gid_start
+    gid = spec.gid_start
     for offset, (winner, wg, lg) in enumerate(results):
         gid += 1
-        host = top if HOME_ICE_PATTERN[offset] == "A" else bottom
-        visitor = bottom if host == top else top
+        host = spec.top if HOME_ICE_PATTERN[offset] == "A" else spec.bottom
+        visitor = spec.bottom if host == spec.top else spec.top
         hg, ag = (wg, lg) if winner == host else (lg, wg)
-        date = f"{end_year}-04-{20 + offset:02d}"
+        date = f"{spec.end_year}-04-{20 + offset:02d}"
         tg_rows.extend(
             _team_rows(
                 _TeamRowsInput(
                     game_id=gid,
                     game_date=date,
-                    season_id=season_id,
+                    season_id=spec.season_id,
                     game_type_id=3,
                     home=host,
                     away=visitor,
@@ -275,14 +289,25 @@ def _round1_series_games(
                 )
             )
         )
-        for team, opp in ((top, bottom), (bottom, top)):
-            for p, (t, rate, pos) in players.items():
+        for team, opp in ((spec.top, spec.bottom), (spec.bottom, spec.top)):
+            for p, (t, rate, pos) in spec.players.items():
                 if t != team:
                     continue
-                g, a = _draw_ga(rng, rate)
+                g, a = _draw_ga(spec.rng, rate)
                 sk_rows.append(
                     _skater_row(
-                        _SkaterRowInput(p, pos, gid, date, season_id, 3, team, opp, g, a)
+                        _SkaterRowInput(
+                            p,
+                            pos,
+                            gid,
+                            date,
+                            spec.season_id,
+                            3,
+                            team,
+                            opp,
+                            g,
+                            a,
+                        )
                     )
                 )
     return tg_rows, sk_rows, gid
@@ -356,7 +381,7 @@ def _pre_round_archive(
 
         for top, bottom in (("AAA", "DDD"), ("BBB", "CCC")):
             new_tg, new_sk, gid = _round1_series_games(
-                gid, top, bottom, end_year, season_id, rng, players
+                _RoundOneSeriesInput(gid, top, bottom, end_year, season_id, rng, players)
             )
             tg_rows.extend(new_tg)
             sk_rows.extend(new_sk)
