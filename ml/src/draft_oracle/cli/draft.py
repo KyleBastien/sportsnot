@@ -44,7 +44,7 @@ from draft_oracle.cli._draft_resolution import (
     resolve_asset,
     resolve_manager,
 )
-from draft_oracle.cli._draft_runtime import _LoopRuntime
+from draft_oracle.cli._draft_runtime import _LoopRequest, _LoopRuntime
 from draft_oracle.cli._draft_runtime import _run_loop as _run_loop_impl
 from draft_oracle.cli._draft_session_io import (
     _resume_inputs,
@@ -474,10 +474,7 @@ def _run_loop(
         "DraftSession",
         _run_loop_impl(
             _LoopRuntime(_dispatch, DraftSession.resume),
-            session,
-            session_path,
-            input_fn=input_fn,
-            echo=echo,
+            _LoopRequest(session, session_path, input_fn, echo),
         ),
     )
 

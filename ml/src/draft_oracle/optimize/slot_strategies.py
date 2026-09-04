@@ -187,9 +187,8 @@ def _slot_ctx(
     owner: str,
     opponents: OpponentModel | Mapping[str, OpponentModel],
     config: SlotStrategyConfig,
-    managers: int,
 ) -> _SlotCtx:
-    return _SlotCtx(owner, opponents, replacement_levels(state, managers), config)
+    return _SlotCtx(owner, opponents, replacement_levels(state, len(state.rosters)), config)
 
 
 def _gap_outcomes(
@@ -311,7 +310,7 @@ def _owner_turn_plan(
     rec_config: RecommendConfig,
     turn_index: int,
 ) -> TurnPlan:
-    ctx = _slot_ctx(state, owner, request.opponents, request.config, managers)
+    ctx = _slot_ctx(state, owner, request.opponents, request.config)
     rec = recommend_pick(state, owner, request.opponents, config=rec_config)
     recommended_eval = rec.best
     return TurnPlan(

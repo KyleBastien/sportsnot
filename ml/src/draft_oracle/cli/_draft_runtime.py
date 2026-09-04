@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import typer
-
 from draft_oracle.cli._draft_parsing import ParsedCommand, parse_command
 from draft_oracle.cli._draft_resolution import ActionResult
 
@@ -39,19 +37,24 @@ class _LoopRuntime:
     resume_session: Callable[[Path], Any]
 
 
+@dataclass(frozen=True)
+class _LoopRequest:
+    session: Any
+    session_path: Path | None
+    input_fn: Callable[[str], str]
+    echo: Callable[[str], None]
+
+
 def _run_loop(
     runtime: _LoopRuntime,
-    session: Any,
-    session_path: Path | None,
-    input_fn: Callable[[str], str] = input,
-    echo: Callable[[str], None] = typer.echo,
+    request: _LoopRequest,
 ) -> Any:
     """Drive an interactive session until EOF/quit. Returns final session."""
-    state = _LoopState(session, session_path, echo)
-    _show_help_banner(echo)
+    state = _LoopState(request.session, request.session_path, request.echo)
+    _show_help_banner(request.echo)
     _autosave(state)
     while True:
-        parsed = _read_command(state.session, input_fn, echo)
+        parsed = _read_command(state.session, request.input_fn, request.echo)
         if parsed is None:
             break
         if _handle_loop_command(state, runtime, parsed):

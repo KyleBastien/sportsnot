@@ -70,7 +70,11 @@ from draft_oracle._projection_io import (
 )
 from draft_oracle._projection_ir import _apply_ir_stash, _IrStashInput
 from draft_oracle._projection_manifest import ProjectionManifestInput, _projection_manifest
-from draft_oracle._projection_rows import _build_skater_rows, _build_team_rows
+from draft_oracle._projection_rows import (
+    _build_skater_rows,
+    _build_team_rows,
+    _BuildTeamRowsRequest,
+)
 from draft_oracle._projection_slot_report import SlotReportInput, _build_slot_report
 from draft_oracle.features.skater import (
     SkaterFeatureRequest,
@@ -334,13 +338,15 @@ def _projection_outputs(
     models: _ProjectionModels,
 ) -> _ProjectionOutputs:
     team_rows, length_by_abbrev = _build_team_rows(
-        context.round_series,
-        models.matchups,
-        models.win_model,
-        models.shutout_model,
-        int(season),
-        int(playoff_round),
-        context.warnings,
+        _BuildTeamRowsRequest(
+            round_series=context.round_series,
+            matchups=models.matchups,
+            win_model=models.win_model,
+            shutout_model=models.shutout_model,
+            season=int(season),
+            playoff_round=int(playoff_round),
+            warnings=context.warnings,
+        )
     )
     combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None = None
     combined_diagnostics: list[dict[str, Any]] | None = None

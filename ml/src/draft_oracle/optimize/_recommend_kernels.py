@@ -29,6 +29,7 @@ from draft_oracle.optimize._recommend_core import (
 )
 from draft_oracle.optimize._recommend_kernel_utils import (
     _affinity_row,
+    _GreedyChoiceInputs,
 )
 from draft_oracle.optimize._recommend_kernel_utils import (
     _fitted_opponent_choice as _fitted_opponent_choice_impl,
@@ -337,15 +338,17 @@ def _greedy_opponent_choice(
     rng: np.random.Generator,
 ) -> np.ndarray:
     return _greedy_opponent_choice_impl(
-        arr.rank_val,
-        arr.limits,
-        arr.posc,
-        arr.key_order,
-        gmodel.need_weight,
-        gmodel.temperature,
-        turn.cnt_m,
-        turn.legal,
-        rng,
+        _GreedyChoiceInputs(
+            arr.rank_val,
+            arr.limits,
+            arr.posc,
+            arr.key_order,
+            gmodel.need_weight,
+            gmodel.temperature,
+            turn.cnt_m,
+            turn.legal,
+            rng,
+        )
     )
 
 

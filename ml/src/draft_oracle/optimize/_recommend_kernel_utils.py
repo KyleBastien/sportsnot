@@ -3,9 +3,23 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+
+
+@dataclass(frozen=True)
+class _GreedyChoiceInputs:
+    rank_val: np.ndarray
+    limits: np.ndarray
+    posc: np.ndarray
+    key_order: np.ndarray
+    need_weight: float
+    temperature: float
+    cnt_m: np.ndarray
+    legal: np.ndarray
+    rng: np.random.Generator
 
 
 def _rank_key_argmax(
@@ -52,24 +66,16 @@ def _fitted_rank_z(
 
 
 def _greedy_opponent_choice(
-    rank_val: np.ndarray,
-    limits: np.ndarray,
-    posc: np.ndarray,
-    key_order: np.ndarray,
-    need_weight: float,
-    temperature: float,
-    cnt_m: np.ndarray,
-    legal: np.ndarray,
-    rng: np.random.Generator,
+    request: _GreedyChoiceInputs,
 ) -> np.ndarray:
     """Greedy opponent's per-rollout pick: ``rank_value + need`` softmax (or argmax)."""
-    urgency = (limits - cnt_m) / limits
-    scores = rank_val[None, :] + (need_weight * urgency)[:, posc]
-    if temperature <= 0.0:
-        return _rank_key_argmax(scores, legal, rank_val, key_order)
-    rollouts, n_assets = legal.shape
-    gumbel = -np.log(-np.log(rng.random((rollouts, n_assets))))
-    noisy = np.where(legal, scores / temperature + gumbel, float("-inf"))
+    urgency = (request.limits - request.cnt_m) / request.limits
+    scores = request.rank_val[None, :] + (request.need_weight * urgency)[:, request.posc]
+    if request.temperature <= 0.0:
+        return _rank_key_argmax(scores, request.legal, request.rank_val, request.key_order)
+    rollouts, n_assets = request.legal.shape
+    gumbel = -np.log(-np.log(request.rng.random((rollouts, n_assets))))
+    noisy = np.where(request.legal, scores / request.temperature + gumbel, float("-inf"))
     return np.argmax(noisy, axis=1)
 
 

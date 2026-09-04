@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Mapping
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 import pandas as pd
@@ -33,38 +34,45 @@ def _matchup_key(year: int, team_a: int, team_b: int) -> tuple[int, int, int]:
     return (int(year), lo, hi)
 
 
+@dataclass(frozen=True)
+class _BuildTeamRowsRequest:
+    round_series: pd.DataFrame
+    matchups: dict[tuple[int, int, int], Any]
+    win_model: Any
+    shutout_model: Any
+    season: int
+    playoff_round: int
+    warnings: list[str]
+
+
 def _build_team_rows(
-    round_series: pd.DataFrame,
-    matchups: dict[tuple[int, int, int], Any],
-    win_model: Any,
-    shutout_model: Any,
-    season: int,
-    playoff_round: int,
-    warnings: list[str],
+    request: _BuildTeamRowsRequest,
 ) -> tuple[list[dict[str, Any]], dict[str, dict[int, float]]]:
     """Predict each round matchup; return team rows + per-team length distributions."""
     team_rows: list[dict[str, Any]] = []
     length_by_abbrev: dict[str, dict[int, float]] = {}
 
-    for row in round_series.to_dict("records"):
+    for row in request.round_series.to_dict("records"):
         ids = _seed_team_ids(row)
         if ids is None:
-            warnings.append(f"series {row.get('series_abbrev')} missing a seed team id; skipped")
+            request.warnings.append(
+                f"series {row.get('series_abbrev')} missing a seed team id; skipped"
+            )
             continue
         top_id, bottom_id = ids
         top_abbrev = str(row["top_seed_abbrev"])
         bottom_abbrev = str(row["bottom_seed_abbrev"])
 
-        matchup = matchups.get(_matchup_key(season, top_id, bottom_id))
+        matchup = request.matchups.get(_matchup_key(request.season, top_id, bottom_id))
         if _missing_matchup_snapshots(matchup, top_id, bottom_id):
-            warnings.append(
+            request.warnings.append(
                 f"no pre-series snapshot for {top_abbrev} vs {bottom_abbrev}; series skipped"
             )
             continue
 
         outcome, shutout_top, shutout_bottom = _predict_matchup_series(
-            win_model,
-            shutout_model,
+            request.win_model,
+            request.shutout_model,
             matchup,
             top_id,
             bottom_id,
@@ -78,7 +86,7 @@ def _build_team_rows(
                     team_abbrev=top_abbrev,
                     opponent_abbrev=bottom_abbrev,
                     is_top_seed=True,
-                    playoff_round=playoff_round,
+                    playoff_round=request.playoff_round,
                     p_series_win=outcome.p_a_win_series,
                     e_wins=outcome.e_wins_a,
                     e_games=outcome.e_games,
@@ -90,7 +98,7 @@ def _build_team_rows(
                     team_abbrev=bottom_abbrev,
                     opponent_abbrev=top_abbrev,
                     is_top_seed=False,
-                    playoff_round=playoff_round,
+                    playoff_round=request.playoff_round,
                     p_series_win=outcome.p_b_win_series,
                     e_wins=outcome.e_wins_b,
                     e_games=outcome.e_games,

@@ -386,40 +386,46 @@ def _series_calibration_bins(
         for i in range(n_bins)
         if (
             calibration_bin := _series_calibration_bin(
-            probs=probs,
-            labels=labels,
-            lower=float(edges[i]),
-            upper=float(edges[i + 1]),
-            upper_inclusive=i == n_bins - 1,
+                _SeriesCalibrationRequest(
+                    probs=probs,
+                    labels=labels,
+                    lower=float(edges[i]),
+                    upper=float(edges[i + 1]),
+                    upper_inclusive=i == n_bins - 1,
+                )
             )
         )
         is not None
     ]
 
 
+@dataclass(frozen=True)
+class _SeriesCalibrationRequest:
+    probs: np.ndarray
+    labels: np.ndarray
+    lower: float
+    upper: float
+    upper_inclusive: bool
+
+
 def _series_calibration_bin(
-    *,
-    probs: np.ndarray,
-    labels: np.ndarray,
-    lower: float,
-    upper: float,
-    upper_inclusive: bool,
+    request: _SeriesCalibrationRequest,
 ) -> SeriesCalibrationBin | None:
     mask = _series_calibration_mask(
-        probs=probs,
-        lower=lower,
-        upper=upper,
-        upper_inclusive=upper_inclusive,
+        probs=request.probs,
+        lower=request.lower,
+        upper=request.upper,
+        upper_inclusive=request.upper_inclusive,
     )
     count = int(mask.sum())
     if count == 0:
         return None
     return SeriesCalibrationBin(
-        lower=lower,
-        upper=upper,
+        lower=request.lower,
+        upper=request.upper,
         count=count,
-        mean_predicted=float(probs[mask].mean()),
-        observed_rate=float(labels[mask].mean()),
+        mean_predicted=float(request.probs[mask].mean()),
+        observed_rate=float(request.labels[mask].mean()),
     )
 
 

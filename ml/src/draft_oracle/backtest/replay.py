@@ -32,6 +32,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
@@ -441,11 +442,7 @@ def _replay_round_context(
 def run_backtest(
     tables: _RunBacktestRequest | dict[str, pd.DataFrame],
     seasons: list[int] | None = None,
-    *,
-    league_picks: pd.DataFrame | None = None,
-    odds: pd.DataFrame | None = None,
-    snapshot_id: str = "backtest",
-    config: BacktestConfig | None = None,
+    **legacy: object,
 ) -> BacktestResult:
     """Replay every playoff round of each season in ``seasons`` end-to-end.
 
@@ -460,10 +457,10 @@ def run_backtest(
     request = _resolve_run_backtest_request(
         tables,
         seasons,
-        league_picks=league_picks,
-        odds=odds,
-        snapshot_id=snapshot_id,
-        config=config,
+        league_picks=cast("pd.DataFrame | None", legacy.get("league_picks")),
+        odds=cast("pd.DataFrame | None", legacy.get("odds")),
+        snapshot_id=cast("str", legacy.get("snapshot_id", "backtest")),
+        config=cast("BacktestConfig | None", legacy.get("config")),
     )
     cfg = request.config or BacktestConfig()
     if not request.seasons:
