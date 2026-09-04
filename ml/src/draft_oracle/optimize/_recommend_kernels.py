@@ -472,9 +472,7 @@ def _resolve_greedy_expected_request(
         return state
     request = _legacy_greedy_expected_request(legacy)
     if request is None:
-        raise TypeError(
-            "legacy greedy expected calls require owner, candidates, model, replacement, and config"
-        )
+        raise TypeError(_LEGACY_GREEDY_EXPECTED_ERROR)
     return _GreedyExpectedRequest(
         state,
         request.owner,
@@ -488,18 +486,11 @@ def _resolve_greedy_expected_request(
 def _legacy_greedy_expected_request(
     legacy: tuple[object, ...],
 ) -> _LegacyGreedyExpectedArgs | None:
-    if len(legacy) != 5:
+    resolved = _legacy_expected_args(legacy)
+    if resolved is None:
         return None
-    owner, candidate_assets, gmodel, replacement, cfg = legacy
-    if not isinstance(owner, str):
-        return None
-    if not isinstance(candidate_assets, Sequence):
-        return None
+    owner, candidate_assets, gmodel, replacement, cfg = resolved
     if not isinstance(gmodel, GreedyOpponentModel):
-        return None
-    if not isinstance(replacement, Mapping):
-        return None
-    if not isinstance(cfg, RecommendConfig):
         return None
     return _LegacyGreedyExpectedArgs(
         owner=owner,
@@ -671,10 +662,7 @@ def _resolve_fitted_expected_request(
         return state
     request = _legacy_fitted_expected_request(legacy)
     if request is None:
-        raise TypeError(
-            "legacy fitted expected calls require owner, candidates, models, "
-            "replacement, and config"
-        )
+        raise TypeError(_LEGACY_FITTED_EXPECTED_ERROR)
     return _FittedExpectedRequest(
         state,
         request.owner,
@@ -688,18 +676,11 @@ def _resolve_fitted_expected_request(
 def _legacy_fitted_expected_request(
     legacy: tuple[object, ...],
 ) -> _LegacyFittedExpectedArgs | None:
-    if len(legacy) != 5:
+    resolved = _legacy_expected_args(legacy)
+    if resolved is None:
         return None
-    owner, candidate_assets, models, replacement, cfg = legacy
-    if not isinstance(owner, str):
-        return None
-    if not isinstance(candidate_assets, Sequence):
-        return None
+    owner, candidate_assets, models, replacement, cfg = resolved
     if not isinstance(models, Mapping):
-        return None
-    if not isinstance(replacement, Mapping):
-        return None
-    if not isinstance(cfg, RecommendConfig):
         return None
     return _LegacyFittedExpectedArgs(
         owner=owner,
@@ -708,6 +689,31 @@ def _legacy_fitted_expected_request(
         replacement=replacement,
         cfg=cfg,
     )
+
+
+_LEGACY_GREEDY_EXPECTED_ERROR = (
+    "legacy greedy expected calls require owner, candidates, model, replacement, and config"
+)
+_LEGACY_FITTED_EXPECTED_ERROR = (
+    "legacy fitted expected calls require owner, candidates, models, replacement, and config"
+)
+
+
+def _legacy_expected_args(
+    legacy: tuple[object, ...],
+) -> tuple[str, Sequence[DraftAsset], object, Mapping[str, float], RecommendConfig] | None:
+    if len(legacy) != 5:
+        return None
+    owner, candidate_assets, model_like, replacement, cfg = legacy
+    if not isinstance(owner, str):
+        return None
+    if not isinstance(candidate_assets, Sequence):
+        return None
+    if not isinstance(replacement, Mapping):
+        return None
+    if not isinstance(cfg, RecommendConfig):
+        return None
+    return owner, candidate_assets, model_like, replacement, cfg
 
 
 def _advance_fitted_rollout(

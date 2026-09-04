@@ -243,6 +243,16 @@ _PRE_ROUND_TEAM_IDS = {team: TEAMS.index(team) + 1 for team in TEAMS}
 _PRE_ROUND_SERIES = (("AAA", "DDD"), ("BBB", "CCC"))
 
 
+@dataclass(frozen=True)
+class _PreRoundRegularSeasonRequest:
+    sk_rows: list[dict[str, object]]
+    tg_rows: list[dict[str, object]]
+    players: dict[int, tuple[str, float, str]]
+    rng: np.random.Generator
+    end_year: int
+    gid_start: int
+
+
 def _pre_round_archive(
     end_years: list[int], *, seed: int = 3
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -261,33 +271,16 @@ def _pre_round_archive(
     target = end_years[-1]
 
     for end_year in end_years:
-        season_id, gid = _append_pre_round_regular_season(
+        gid = _append_pre_round_season(
             sk_rows,
             tg_rows,
+            series_rows,
             players,
             rng,
             end_year=end_year,
+            target=target,
             gid_start=gid,
         )
-
-        for top, bottom in _PRE_ROUND_SERIES:
-            new_tg, new_sk, gid = _round1_series_games(
-                _RoundOneSeriesInput(
-                    gid_start=gid,
-                    top=top,
-                    bottom=bottom,
-                    end_year=end_year,
-                    season_id=season_id,
-                    rng=rng,
-                    players=players,
-                    team_ids=_PRE_ROUND_TEAM_IDS,
-                )
-            )
-            tg_rows.extend(new_tg)
-            sk_rows.extend(new_sk)
-            series_rows.append(_completed_round_one_series_row(end_year, season_id, top, bottom))
-
-        _append_pending_round_two_series(series_rows, end_year, season_id, target)
 
     return (
         pd.DataFrame(sk_rows),
@@ -297,31 +290,59 @@ def _pre_round_archive(
     )
 
 
-def _append_pre_round_regular_season(
+def _append_pre_round_season(
     sk_rows: list[dict[str, object]],
     tg_rows: list[dict[str, object]],
+    series_rows: list[dict[str, object]],
     players: dict[int, tuple[str, float, str]],
     rng: np.random.Generator,
     *,
     end_year: int,
+    target: int,
     gid_start: int,
+) -> int:
+    season_id, gid = _append_pre_round_regular_season(
+        _PreRoundRegularSeasonRequest(sk_rows, tg_rows, players, rng, end_year, gid_start)
+    )
+    for top, bottom in _PRE_ROUND_SERIES:
+        new_tg, new_sk, gid = _round1_series_games(
+            _RoundOneSeriesInput(
+                gid_start=gid,
+                top=top,
+                bottom=bottom,
+                end_year=end_year,
+                season_id=season_id,
+                rng=rng,
+                players=players,
+                team_ids=_PRE_ROUND_TEAM_IDS,
+            )
+        )
+        tg_rows.extend(new_tg)
+        sk_rows.extend(new_sk)
+        series_rows.append(_completed_round_one_series_row(end_year, season_id, top, bottom))
+    _append_pending_round_two_series(series_rows, end_year, season_id, target)
+    return gid
+
+
+def _append_pre_round_regular_season(
+    request: _PreRoundRegularSeasonRequest,
 ) -> tuple[int, int]:
-    season_id = (end_year - 1) * 10000 + end_year
-    gid = gid_start
+    season_id = (request.end_year - 1) * 10000 + request.end_year
+    gid = request.gid_start
     day, month = 1, 11
     for _ in range(36 // (len(TEAMS) - 1)):
         for i, home in enumerate(TEAMS):
             for away in TEAMS[i + 1 :]:
                 gid += 1
-                date = f"{end_year - 1}-{month:02d}-{day:02d}"
+                date = f"{request.end_year - 1}-{month:02d}-{day:02d}"
                 day += 1
                 if day > 27:
                     day, month = 1, (12 if month == 11 else 11)
                 _append_pre_round_game(
-                    sk_rows,
-                    tg_rows,
-                    players,
-                    rng,
+                    request.sk_rows,
+                    request.tg_rows,
+                    request.players,
+                    request.rng,
                     gid=gid,
                     date=date,
                     season_id=season_id,

@@ -596,5 +596,3 @@ _FOUR_ROUND_CONFIG = BacktestConfig(
     strategies=("oracle",),
     project_config=_FOUR_ROUND_PROJECT_CONFIG,
 )
-def _four_round_tables_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    return _FOUR_ROUND_ARCHIVE

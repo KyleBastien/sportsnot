@@ -317,6 +317,22 @@ class _BuildProjectionArtifactKwargs(TypedDict, total=False):
     generated_at: str | None
 
 
+@dataclass(frozen=True)
+class _BuildProjectionArtifactDataRequest:
+    skater_games: pd.DataFrame
+    players: pd.DataFrame
+    team_games: pd.DataFrame
+    series: pd.DataFrame
+    season: int
+    playoff_round: int
+    snapshot_id: str
+    injuries: pd.DataFrame | None
+    league_picks: pd.DataFrame | None
+    config: ProjectArtifactConfig
+    git_sha: str | None
+    generated_at: str | None
+
+
 def _injured_player_ids(injuries: pd.DataFrame | None) -> set[int]:
     """Skater player ids currently out/IR/day-to-day (goalies excluded here)."""
     if injuries is None or injuries.empty:
@@ -604,18 +620,20 @@ def build_projection_artifact(
         legacy_options,
     )
     built = _build_projection_artifact_data(
-        skater_games=resolved.skater_games,
-        players=resolved.players,
-        team_games=resolved.team_games,
-        series=resolved.series,
-        season=resolved.season,
-        playoff_round=resolved.playoff_round,
-        snapshot_id=resolved.snapshot_id,
-        injuries=resolved.injuries,
-        league_picks=resolved.league_picks,
-        config=resolved.config or ProjectArtifactConfig(),
-        git_sha=resolved.git_sha,
-        generated_at=resolved.generated_at,
+        _BuildProjectionArtifactDataRequest(
+            skater_games=resolved.skater_games,
+            players=resolved.players,
+            team_games=resolved.team_games,
+            series=resolved.series,
+            season=resolved.season,
+            playoff_round=resolved.playoff_round,
+            snapshot_id=resolved.snapshot_id,
+            injuries=resolved.injuries,
+            league_picks=resolved.league_picks,
+            config=resolved.config or ProjectArtifactConfig(),
+            git_sha=resolved.git_sha,
+            generated_at=resolved.generated_at,
+        )
     )
     return ProjectArtifactResult(
         season=int(resolved.season),
@@ -663,40 +681,28 @@ def _resolve_build_projection_artifact_request(
 
 
 def _build_projection_artifact_data(
-    *,
-    skater_games: pd.DataFrame,
-    players: pd.DataFrame,
-    team_games: pd.DataFrame,
-    series: pd.DataFrame,
-    season: int,
-    playoff_round: int,
-    snapshot_id: str,
-    injuries: pd.DataFrame | None,
-    league_picks: pd.DataFrame | None,
-    config: ProjectArtifactConfig,
-    git_sha: str | None,
-    generated_at: str | None,
+    request: _BuildProjectionArtifactDataRequest,
 ) -> _BuiltProjectionArtifact:
     context = _projection_round_context(
         _ProjectionRoundContextRequest(
-            skater_games=skater_games,
-            team_games=team_games,
-            series=series,
-            season=season,
-            playoff_round=playoff_round,
-            config=config,
+            skater_games=request.skater_games,
+            team_games=request.team_games,
+            series=request.series,
+            season=request.season,
+            playoff_round=request.playoff_round,
+            config=request.config,
         )
     )
-    models = _train_projection_models(context, players, team_games, series)
+    models = _train_projection_models(context, request.players, request.team_games, request.series)
     outputs = _projection_outputs(
         _ProjectionOutputsRequest(
-            skater_games=skater_games,
-            players=players,
-            team_games=team_games,
-            injuries=injuries,
-            league_picks=league_picks,
-            season=season,
-            playoff_round=playoff_round,
+            skater_games=request.skater_games,
+            players=request.players,
+            team_games=request.team_games,
+            injuries=request.injuries,
+            league_picks=request.league_picks,
+            season=request.season,
+            playoff_round=request.playoff_round,
             context=context,
             models=models,
         )
@@ -704,14 +710,14 @@ def _build_projection_artifact_data(
     manifest = _projection_manifest(
         ProjectionManifestInput(
             artifact_version=LIVE_PROJECTION_VERSION,
-            season=int(season),
-            playoff_round=int(playoff_round),
-            snapshot_id=snapshot_id,
+            season=int(request.season),
+            playoff_round=int(request.playoff_round),
+            snapshot_id=request.snapshot_id,
             context=context,
             outputs=outputs,
-            config=config,
-            git_sha=git_sha,
-            generated_at=generated_at,
+            config=request.config,
+            git_sha=request.git_sha,
+            generated_at=request.generated_at,
         )
     )
     return _BuiltProjectionArtifact(context, outputs, manifest)
