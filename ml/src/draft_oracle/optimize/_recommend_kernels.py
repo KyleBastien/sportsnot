@@ -11,7 +11,7 @@ greedy and fitted paths cannot silently diverge. See
 from __future__ import annotations
 
 import random
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -400,18 +400,11 @@ def _vectorized_greedy_expected(
     """
     request = _resolve_greedy_expected_request(state, *legacy)
     arr = _build_rollout_arrays(request.state, request.owner, request.replacement)
-    rollouts = request.cfg.rollouts
-    means: list[float] = []
-    for asset in request.candidate_assets:
-        # Common random numbers: identical opponent draws across candidates (pairs the
-        # comparison; the seed does not depend on the candidate).
-        rng = np.random.default_rng(request.cfg.seed * _ROLLOUT_SALT)
-        batch = _candidate_rollout(arr, asset, rollouts)
-        _advance_greedy_rollout(
-            _AdvanceGreedyRolloutRequest(arr, request.cfg, request.gmodel, batch, rng)
-        )
-        means.append(_mean_owner_value(batch.owner_total, arr.base_owner_value))
-    return means
+    return _candidate_expected_means(
+        request.candidate_assets,
+        arr.base_owner_value,
+        lambda asset: _greedy_owner_total(arr, request, asset),
+    )
 
 
 @dataclass(frozen=True)
@@ -554,6 +547,21 @@ def _greedy_rollout_choice(request: _GreedyRolloutChoiceRequest) -> np.ndarray |
     return _greedy_opponent_choice(request.arr, request.gmodel, turn, request.rng)
 
 
+def _greedy_owner_total(
+    arr: _RolloutArrays,
+    request: _GreedyExpectedRequest,
+    asset: DraftAsset,
+) -> np.ndarray:
+    # Common random numbers: identical opponent draws across candidates (pairs the
+    # comparison; the seed does not depend on the candidate).
+    rng = np.random.default_rng(request.cfg.seed * _ROLLOUT_SALT)
+    batch = _candidate_rollout(arr, asset, request.cfg.rollouts)
+    _advance_greedy_rollout(
+        _AdvanceGreedyRolloutRequest(arr, request.cfg, request.gmodel, batch, rng)
+    )
+    return batch.owner_total
+
+
 def _turn_state(
     arr: _RolloutArrays,
     batch: _CandidateRollout,
@@ -648,26 +656,11 @@ def _vectorized_fitted_expected(
     request = _resolve_fitted_expected_request(state, legacy)
     arr = _build_rollout_arrays(request.state, request.owner, request.replacement)
     params = _build_fitted_params(request.models, arr)
-    rollouts = request.cfg.rollouts
-    rows = np.arange(rollouts)
-    means: list[float] = []
-    for asset in request.candidate_assets:
-        alive, counts, owner_total, owner_taken = _init_candidate_rollout(arr, asset, rollouts)
-        owner_total, owner_taken = _advance_fitted_rollout(
-            arr,
-            params,
-            request.cfg,
-            alive,
-            counts,
-            owner_total,
-            owner_taken,
-            rows,
-        )
-
-        # Same E[roster] definition as the greedy and object paths: include the
-        # owner's already-drafted roster value.
-        means.append(float(owner_total.mean()) + arr.base_owner_value)
-    return means
+    return _candidate_expected_means(
+        request.candidate_assets,
+        arr.base_owner_value,
+        lambda asset: _fitted_owner_total(arr, params, request, asset),
+    )
 
 
 def _resolve_fitted_expected_request(
@@ -751,6 +744,39 @@ def _advance_fitted_rollout(
         alive[rows, choice] = False
         counts[rows, mgr_i, arr.posc[choice]] += 1
     return owner_total, owner_taken
+
+
+def _fitted_owner_total(
+    arr: _RolloutArrays,
+    params: _FittedParams,
+    request: _FittedExpectedRequest,
+    asset: DraftAsset,
+) -> np.ndarray:
+    rollouts = request.cfg.rollouts
+    rows = np.arange(rollouts)
+    alive, counts, owner_total, owner_taken = _init_candidate_rollout(arr, asset, rollouts)
+    owner_total, _owner_taken = _advance_fitted_rollout(
+        arr,
+        params,
+        request.cfg,
+        alive,
+        counts,
+        owner_total,
+        owner_taken,
+        rows,
+    )
+    return owner_total
+
+
+def _candidate_expected_means(
+    candidate_assets: Sequence[DraftAsset],
+    base_owner_value: float,
+    owner_total_for_asset: Callable[[DraftAsset], np.ndarray],
+) -> list[float]:
+    return [
+        _mean_owner_value(owner_total_for_asset(asset), base_owner_value)
+        for asset in candidate_assets
+    ]
 
 
 def _expected_value(

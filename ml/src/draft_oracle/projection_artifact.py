@@ -48,7 +48,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict, Unpack, cast
 
 import pandas as pd
 
@@ -288,6 +288,33 @@ class _SkaterProjectionRowsRequest:
     models: _ProjectionModels
     length_by_abbrev: dict[str, dict[int, float]]
     combined_by_abbrev: dict[str, tuple[float, dict[int, float]]] | None
+
+
+@dataclass(frozen=True)
+class _BuildProjectionArtifactRequest:
+    skater_games: pd.DataFrame
+    players: pd.DataFrame
+    team_games: pd.DataFrame
+    series: pd.DataFrame
+    season: int
+    playoff_round: int
+    snapshot_id: str
+    injuries: pd.DataFrame | None = None
+    league_picks: pd.DataFrame | None = None
+    config: ProjectArtifactConfig | None = None
+    git_sha: str | None = None
+    generated_at: str | None = None
+
+
+class _BuildProjectionArtifactKwargs(TypedDict, total=False):
+    season: int
+    playoff_round: int
+    snapshot_id: str
+    injuries: pd.DataFrame | None
+    league_picks: pd.DataFrame | None
+    config: ProjectArtifactConfig | None
+    git_sha: str | None
+    generated_at: str | None
 
 
 def _injured_player_ids(injuries: pd.DataFrame | None) -> set[int]:
@@ -560,19 +587,9 @@ def _skater_projection_rows(request: _SkaterProjectionRowsRequest) -> list[dict[
 
 
 def build_projection_artifact(
-    skater_games: pd.DataFrame,
-    players: pd.DataFrame,
-    team_games: pd.DataFrame,
-    series: pd.DataFrame,
-    *,
-    season: int,
-    playoff_round: int,
-    snapshot_id: str,
-    injuries: pd.DataFrame | None = None,
-    league_picks: pd.DataFrame | None = None,
-    config: ProjectArtifactConfig | None = None,
-    git_sha: str | None = None,
-    generated_at: str | None = None,
+    request: _BuildProjectionArtifactRequest | pd.DataFrame,
+    *legacy_tables: object,
+    **legacy_options: Unpack[_BuildProjectionArtifactKwargs],
 ) -> ProjectArtifactResult:
     """Compose the sub-models into a batch projection artifact for one round.
 
@@ -581,23 +598,28 @@ def build_projection_artifact(
     teams are excluded automatically. Sub-models train only on games strictly before
     the round start; every stochastic step is seeded for byte-identical reruns.
     """
+    resolved = _resolve_build_projection_artifact_request(
+        request,
+        legacy_tables,
+        legacy_options,
+    )
     built = _build_projection_artifact_data(
-        skater_games=skater_games,
-        players=players,
-        team_games=team_games,
-        series=series,
-        season=season,
-        playoff_round=playoff_round,
-        snapshot_id=snapshot_id,
-        injuries=injuries,
-        league_picks=league_picks,
-        config=config or ProjectArtifactConfig(),
-        git_sha=git_sha,
-        generated_at=generated_at,
+        skater_games=resolved.skater_games,
+        players=resolved.players,
+        team_games=resolved.team_games,
+        series=resolved.series,
+        season=resolved.season,
+        playoff_round=resolved.playoff_round,
+        snapshot_id=resolved.snapshot_id,
+        injuries=resolved.injuries,
+        league_picks=resolved.league_picks,
+        config=resolved.config or ProjectArtifactConfig(),
+        git_sha=resolved.git_sha,
+        generated_at=resolved.generated_at,
     )
     return ProjectArtifactResult(
-        season=int(season),
-        playoff_round=int(playoff_round),
+        season=int(resolved.season),
+        playoff_round=int(resolved.playoff_round),
         as_of_cutoff=built.context.cutoff,
         skaters=built.outputs.skaters,
         teams=built.outputs.teams,
@@ -605,6 +627,38 @@ def build_projection_artifact(
         manifest=built.manifest,
         warnings=built.context.warnings,
         slot_strategies=built.outputs.slot_report,
+    )
+
+
+def _resolve_build_projection_artifact_request(
+    request: _BuildProjectionArtifactRequest | pd.DataFrame,
+    legacy_tables: tuple[object, ...],
+    legacy_options: _BuildProjectionArtifactKwargs,
+) -> _BuildProjectionArtifactRequest:
+    if isinstance(request, _BuildProjectionArtifactRequest):
+        if legacy_tables or legacy_options:
+            raise TypeError(
+                "_BuildProjectionArtifactRequest calls do not accept extra arguments"
+            )
+        return request
+    if len(legacy_tables) != 3:
+        raise TypeError(
+            "legacy build_projection_artifact calls require players, team_games, and series"
+        )
+    players, team_games, series = legacy_tables
+    return _BuildProjectionArtifactRequest(
+        skater_games=request,
+        players=cast("pd.DataFrame", players),
+        team_games=cast("pd.DataFrame", team_games),
+        series=cast("pd.DataFrame", series),
+        season=legacy_options["season"],
+        playoff_round=legacy_options["playoff_round"],
+        snapshot_id=legacy_options["snapshot_id"],
+        injuries=legacy_options.get("injuries"),
+        league_picks=legacy_options.get("league_picks"),
+        config=legacy_options.get("config"),
+        git_sha=legacy_options.get("git_sha"),
+        generated_at=legacy_options.get("generated_at"),
     )
 
 

@@ -363,7 +363,11 @@ def _synthetic_archive(
 
 
 def _tables(seed: int = 1) -> dict[str, pd.DataFrame]:
-    sk, tg, players, series = _archive_tables(seed)
+    sk, tg, players, series = (
+        _ARCHIVE_TABLES
+        if seed == 1
+        else _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=seed)
+    )
     return {"skater_games": sk, "players": players, "team_games": tg, "series": series}
 
 
@@ -592,13 +596,5 @@ _FOUR_ROUND_CONFIG = BacktestConfig(
     strategies=("oracle",),
     project_config=_FOUR_ROUND_PROJECT_CONFIG,
 )
-
-
-def _archive_tables(seed: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    if seed == 1:
-        return _ARCHIVE_TABLES
-    return _synthetic_archive([2017, 2018, 2019, 2020, 2021, 2022], seed=seed)
-
-
 def _four_round_tables_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return _FOUR_ROUND_ARCHIVE
