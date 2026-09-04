@@ -6,7 +6,12 @@ import random
 from dataclasses import dataclass, replace
 
 from draft_oracle.backtest._replay_types import BacktestConfig, Strategy
-from draft_oracle.optimize.recommend import choose_pick, greedy_vor_pick, replacement_levels
+from draft_oracle.optimize.recommend import (
+    _ChoosePickRequest,
+    choose_pick,
+    greedy_vor_pick,
+    replacement_levels,
+)
 from draft_oracle.optimize.simulator import DraftAsset, DraftState, OpponentModel, _resolve_model
 
 
@@ -42,7 +47,14 @@ def _oracle_pick(request: _OraclePickRequest, rng: random.Random) -> DraftAsset:
     cfg = request.config.recommend_config()
     if request.strategy == "one_step":
         cfg = replace(cfg, depth=1)
-    return choose_pick(request.state, request.oracle, request.opponent_model, config=cfg)
+    return choose_pick(
+        _ChoosePickRequest(
+            request.state,
+            request.oracle,
+            request.opponent_model,
+            config=cfg,
+        )
+    )
 
 
 def _play_oracle_draft(request: _OracleDraftRequest) -> DraftState:

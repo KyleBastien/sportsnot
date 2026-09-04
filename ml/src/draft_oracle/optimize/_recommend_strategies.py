@@ -23,7 +23,7 @@ from draft_oracle.optimize._recommend_core import (
     greedy_vor_pick,
     replacement_levels,
 )
-from draft_oracle.optimize._recommend_kernels import choose_pick
+from draft_oracle.optimize._recommend_kernels import _ChoosePickRequest, choose_pick
 from draft_oracle.optimize.opponents import (
     FittedLeagueOpponents,
     OpponentFitConfig,
@@ -214,11 +214,13 @@ def _decision_pick(ctx: _CompareCtx, state: DraftState, strategy: _Strategy) -> 
         return greedy_vor_pick(state, ctx.owner, ctx.replacement)
     depth = 1 if strategy == "one_step" else None
     return choose_pick(
-        state,
-        ctx.owner,
-        ctx.opponent_model,
-        config=replace(ctx.cfg, depth=depth),
-        managers=ctx.managers,
+        _ChoosePickRequest(
+            state,
+            ctx.owner,
+            ctx.opponent_model,
+            config=replace(ctx.cfg, depth=depth),
+            managers=ctx.managers,
+        )
     )
 
 

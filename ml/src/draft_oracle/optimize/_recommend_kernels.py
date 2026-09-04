@@ -456,6 +456,15 @@ class _ExpectedValuesRequest:
 
 
 @dataclass(frozen=True)
+class _ChoosePickRequest:
+    state: DraftState
+    owner: str
+    opponent_model: OpponentModel | Mapping[str, OpponentModel]
+    config: RecommendConfig | None = None
+    managers: int | None = None
+
+
+@dataclass(frozen=True)
 class _LegacyExpectedArgs:
     owner: str
     candidate_assets: Sequence[DraftAsset]
@@ -789,14 +798,7 @@ def _expected_values(
     ]
 
 
-def choose_pick(
-    state: DraftState,
-    owner: str,
-    opponent_model: OpponentModel | Mapping[str, OpponentModel],
-    *,
-    config: RecommendConfig | None = None,
-    managers: int | None = None,
-) -> DraftAsset:
+def choose_pick(request: _ChoosePickRequest) -> DraftAsset:
     """Lean argmax pick: rollout-expected best asset, skipping explanations/survival.
 
     The policy used by the strategy comparison and any caller that only needs the
@@ -804,18 +806,23 @@ def choose_pick(
     or the explained board, so it is cheap enough to call at every pick of a full
     simulated draft.
     """
-    cfg = config or RecommendConfig()
-    n_managers = managers if managers is not None else len(state.rosters)
-    replacement = replacement_levels(state, n_managers)
-    candidates = _prune_candidates(state, owner, replacement, cfg.max_candidates)
+    cfg = request.config or RecommendConfig()
+    n_managers = request.managers if request.managers is not None else len(request.state.rosters)
+    replacement = replacement_levels(request.state, n_managers)
+    candidates = _prune_candidates(
+        request.state,
+        request.owner,
+        replacement,
+        cfg.max_candidates,
+    )
     if not candidates:
-        raise ValueError(f"owner {owner!r} has no legal pick")
+        raise ValueError(f"owner {request.owner!r} has no legal pick")
     expecteds = _expected_values(
         _ExpectedValuesRequest(
-            state,
-            owner,
+            request.state,
+            request.owner,
             [c.asset for c in candidates],
-            opponent_model,
+            request.opponent_model,
             replacement,
             cfg,
         )

@@ -63,6 +63,9 @@ from draft_oracle.optimize._recommend_core import (
     _prune_candidates as _prune_candidates,
 )
 from draft_oracle.optimize._recommend_kernels import (
+    _ChoosePickRequest as _ChoosePickRequest,
+)
+from draft_oracle.optimize._recommend_kernels import (
     _expected_value as _expected_value,
 )
 from draft_oracle.optimize._recommend_kernels import (
