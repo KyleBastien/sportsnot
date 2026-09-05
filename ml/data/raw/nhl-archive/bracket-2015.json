@@ -1,0 +1,748 @@
+{
+ "bracketLogo": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-en.png",
+ "bracketLogoFr": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-fr.png",
+ "series": [
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-a/senators-vs-canadiens",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "A",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC1",
+   "bottomSeedWins": 2,
+   "winningTeamId": 8,
+   "losingTeamId": 9,
+   "topSeedTeam": {
+    "id": 8,
+    "abbrev": "MTL",
+    "name": {
+     "default": "Montr\u00e9al Canadiens",
+     "fr": "Canadiens de Montr\u00e9al"
+    },
+    "commonName": {
+     "default": "Canadiens"
+    },
+    "placeNameWithPreposition": {
+     "default": "Montr\u00e9al",
+     "fr": "de Montr\u00e9al"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MTL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MTL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 9,
+    "abbrev": "OTT",
+    "name": {
+     "default": "Ottawa Senators",
+     "fr": "S\u00e9nateurs d'Ottawa"
+    },
+    "commonName": {
+     "default": "Senators",
+     "fr": "S\u00e9nateurs"
+    },
+    "placeNameWithPreposition": {
+     "default": "Ottawa",
+     "fr": "d'Ottawa"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/OTT_20072008-20192020_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/OTT_20072008-20192020_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-b/redwings-vs-lightning",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "B",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 3,
+   "winningTeamId": 14,
+   "losingTeamId": 17,
+   "topSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 17,
+    "abbrev": "DET",
+    "name": {
+     "default": "Detroit Red Wings",
+     "fr": "Red Wings de Detroit"
+    },
+    "commonName": {
+     "default": "Red Wings"
+    },
+    "placeNameWithPreposition": {
+     "default": "Detroit",
+     "fr": "de Detroit"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/DET_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/DET_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-c/penguins-vs-rangers",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "C",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC2",
+   "bottomSeedWins": 1,
+   "winningTeamId": 3,
+   "losingTeamId": 5,
+   "topSeedTeam": {
+    "id": 3,
+    "abbrev": "NYR",
+    "name": {
+     "default": "New York Rangers",
+     "fr": "Rangers de New York"
+    },
+    "commonName": {
+     "default": "Rangers"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYR_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-d/islanders-vs-capitals",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "D",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 3,
+   "winningTeamId": 15,
+   "losingTeamId": 2,
+   "topSeedTeam": {
+    "id": 15,
+    "abbrev": "WSH",
+    "name": {
+     "default": "Washington Capitals",
+     "fr": "Capitals de Washington"
+    },
+    "commonName": {
+     "default": "Capitals"
+    },
+    "placeNameWithPreposition": {
+     "default": "Washington",
+     "fr": "de Washington"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WSH_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 2,
+    "abbrev": "NYI",
+    "name": {
+     "default": "New York Islanders",
+     "fr": "Islanders de New York"
+    },
+    "commonName": {
+     "default": "Islanders"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYI_20102011-20162017_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYI_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-e/wild-vs-blues",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "E",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 2,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC1",
+   "bottomSeedWins": 4,
+   "winningTeamId": 30,
+   "losingTeamId": 19,
+   "topSeedTeam": {
+    "id": 19,
+    "abbrev": "STL",
+    "name": {
+     "default": "St. Louis Blues",
+     "fr": "Blues de St. Louis"
+    },
+    "commonName": {
+     "default": "Blues"
+    },
+    "placeNameWithPreposition": {
+     "default": "St. Louis",
+     "fr": "de St. Louis"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 30,
+    "abbrev": "MIN",
+    "name": {
+     "default": "Minnesota Wild",
+     "fr": "Wild du Minnesota"
+    },
+    "commonName": {
+     "default": "Wild"
+    },
+    "placeNameWithPreposition": {
+     "default": "Minnesota",
+     "fr": "du Minnesota"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MIN_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MIN_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-f/blackhawks-vs-predators",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "F",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 2,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 4,
+   "winningTeamId": 16,
+   "losingTeamId": 18,
+   "topSeedTeam": {
+    "id": 18,
+    "abbrev": "NSH",
+    "name": {
+     "default": "Nashville Predators",
+     "fr": "Predators de Nashville"
+    },
+    "commonName": {
+     "default": "Predators"
+    },
+    "placeNameWithPreposition": {
+     "default": "Nashville",
+     "fr": "de Nashville"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NSH_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 16,
+    "abbrev": "CHI",
+    "name": {
+     "default": "Chicago Blackhawks",
+     "fr": "Blackhawks de Chicago"
+    },
+    "commonName": {
+     "default": "Blackhawks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Chicago",
+     "fr": "de Chicago"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-g/jets-vs-ducks",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "G",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC2",
+   "bottomSeedWins": 0,
+   "winningTeamId": 24,
+   "losingTeamId": 52,
+   "topSeedTeam": {
+    "id": 24,
+    "abbrev": "ANA",
+    "name": {
+     "default": "Anaheim Ducks",
+     "fr": "Ducks d'Anaheim"
+    },
+    "commonName": {
+     "default": "Ducks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Anaheim",
+     "fr": "d'Anaheim"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 52,
+    "abbrev": "WPG",
+    "name": {
+     "default": "Winnipeg Jets",
+     "fr": "Jets de Winnipeg"
+    },
+    "commonName": {
+     "default": "Jets"
+    },
+    "placeNameWithPreposition": {
+     "default": "Winnipeg",
+     "fr": "de Winnipeg"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WPG_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WPG_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-h/flames-vs-canucks",
+   "seriesTitle": "1st Round",
+   "seriesAbbrev": "R1",
+   "seriesLetter": "H",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 2,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 4,
+   "winningTeamId": 20,
+   "losingTeamId": 23,
+   "topSeedTeam": {
+    "id": 23,
+    "abbrev": "VAN",
+    "name": {
+     "default": "Vancouver Canucks",
+     "fr": "Canucks de Vancouver"
+    },
+    "commonName": {
+     "default": "Canucks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Vancouver",
+     "fr": "de Vancouver"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/VAN_20072008-20182019_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/VAN_20072008-20182019_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 20,
+    "abbrev": "CGY",
+    "name": {
+     "default": "Calgary Flames",
+     "fr": "Flames de Calgary"
+    },
+    "commonName": {
+     "default": "Flames"
+    },
+    "placeNameWithPreposition": {
+     "default": "Calgary",
+     "fr": "de Calgary"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CGY_19941995-20192020_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CGY_19941995-20192020_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-i/lightning-vs-canadiens",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "I",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 2,
+   "bottomSeedRank": 2,
+   "bottomSeedRankAbbrev": "D2",
+   "bottomSeedWins": 4,
+   "winningTeamId": 14,
+   "losingTeamId": 8,
+   "topSeedTeam": {
+    "id": 8,
+    "abbrev": "MTL",
+    "name": {
+     "default": "Montr\u00e9al Canadiens",
+     "fr": "Canadiens de Montr\u00e9al"
+    },
+    "commonName": {
+     "default": "Canadiens"
+    },
+    "placeNameWithPreposition": {
+     "default": "Montr\u00e9al",
+     "fr": "de Montr\u00e9al"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MTL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MTL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-j/capitals-vs-rangers",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "J",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 2,
+   "bottomSeedRankAbbrev": "D2",
+   "bottomSeedWins": 3,
+   "winningTeamId": 3,
+   "losingTeamId": 15,
+   "topSeedTeam": {
+    "id": 3,
+    "abbrev": "NYR",
+    "name": {
+     "default": "New York Rangers",
+     "fr": "Rangers de New York"
+    },
+    "commonName": {
+     "default": "Rangers"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYR_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 15,
+    "abbrev": "WSH",
+    "name": {
+     "default": "Washington Capitals",
+     "fr": "Capitals de Washington"
+    },
+    "commonName": {
+     "default": "Capitals"
+    },
+    "placeNameWithPreposition": {
+     "default": "Washington",
+     "fr": "de Washington"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WSH_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-k/wild-vs-blackhawks",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "K",
+   "playoffRound": 2,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "D3",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "WC1",
+   "bottomSeedWins": 0,
+   "winningTeamId": 16,
+   "losingTeamId": 30,
+   "topSeedTeam": {
+    "id": 16,
+    "abbrev": "CHI",
+    "name": {
+     "default": "Chicago Blackhawks",
+     "fr": "Blackhawks de Chicago"
+    },
+    "commonName": {
+     "default": "Blackhawks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Chicago",
+     "fr": "de Chicago"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 30,
+    "abbrev": "MIN",
+    "name": {
+     "default": "Minnesota Wild",
+     "fr": "Wild du Minnesota"
+    },
+    "commonName": {
+     "default": "Wild"
+    },
+    "placeNameWithPreposition": {
+     "default": "Minnesota",
+     "fr": "du Minnesota"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/MIN_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/MIN_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-l/flames-vs-ducks",
+   "seriesTitle": "2nd Round",
+   "seriesAbbrev": "R2",
+   "seriesLetter": "L",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 1,
+   "winningTeamId": 24,
+   "losingTeamId": 20,
+   "topSeedTeam": {
+    "id": 24,
+    "abbrev": "ANA",
+    "name": {
+     "default": "Anaheim Ducks",
+     "fr": "Ducks d'Anaheim"
+    },
+    "commonName": {
+     "default": "Ducks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Anaheim",
+     "fr": "d'Anaheim"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 20,
+    "abbrev": "CGY",
+    "name": {
+     "default": "Calgary Flames",
+     "fr": "Flames de Calgary"
+    },
+    "commonName": {
+     "default": "Flames"
+    },
+    "placeNameWithPreposition": {
+     "default": "Calgary",
+     "fr": "de Calgary"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CGY_19941995-20192020_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CGY_19941995-20192020_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-m/lightning-vs-rangers",
+   "seriesTitle": "Eastern Conference Finals",
+   "seriesAbbrev": "ECF",
+   "seriesLetter": "M",
+   "conferenceAbbrev": "E",
+   "conferenceName": "Eastern",
+   "playoffRound": 3,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 3,
+   "bottomSeedRank": 2,
+   "bottomSeedRankAbbrev": "D2",
+   "bottomSeedWins": 4,
+   "winningTeamId": 14,
+   "losingTeamId": 3,
+   "topSeedTeam": {
+    "id": 3,
+    "abbrev": "NYR",
+    "name": {
+     "default": "New York Rangers",
+     "fr": "Rangers de New York"
+    },
+    "commonName": {
+     "default": "Rangers"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYR_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-n/blackhawks-vs-ducks",
+   "seriesTitle": "Western Conference Finals",
+   "seriesAbbrev": "WCF",
+   "seriesLetter": "N",
+   "conferenceAbbrev": "W",
+   "conferenceName": "Western",
+   "playoffRound": 3,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 3,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 4,
+   "winningTeamId": 16,
+   "losingTeamId": 24,
+   "topSeedTeam": {
+    "id": 24,
+    "abbrev": "ANA",
+    "name": {
+     "default": "Anaheim Ducks",
+     "fr": "Ducks d'Anaheim"
+    },
+    "commonName": {
+     "default": "Ducks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Anaheim",
+     "fr": "d'Anaheim"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/ANA_20132014-20232024_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 16,
+    "abbrev": "CHI",
+    "name": {
+     "default": "Chicago Blackhawks",
+     "fr": "Blackhawks de Chicago"
+    },
+    "commonName": {
+     "default": "Blackhawks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Chicago",
+     "fr": "de Chicago"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2015/series-o/blackhawks-vs-lightning",
+   "seriesLogo": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesLogoFr": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesTitle": "Stanley Cup Final",
+   "seriesAbbrev": "SCF",
+   "seriesLetter": "O",
+   "playoffRound": 4,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D2",
+   "topSeedWins": 2,
+   "bottomSeedRank": 3,
+   "bottomSeedRankAbbrev": "D3",
+   "bottomSeedWins": 4,
+   "winningTeamId": 16,
+   "losingTeamId": 14,
+   "topSeedTeam": {
+    "id": 14,
+    "abbrev": "TBL",
+    "name": {
+     "default": "Tampa Bay Lightning",
+     "fr": "Lightning de Tampa Bay"
+    },
+    "commonName": {
+     "default": "Lightning"
+    },
+    "placeNameWithPreposition": {
+     "default": "Tampa Bay",
+     "fr": "de Tampa Bay"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/TBL_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/TBL_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 16,
+    "abbrev": "CHI",
+    "name": {
+     "default": "Chicago Blackhawks",
+     "fr": "Blackhawks de Chicago"
+    },
+    "commonName": {
+     "default": "Blackhawks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Chicago",
+     "fr": "de Chicago"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_dark.svg"
+   }
+  }
+ ]
+}
