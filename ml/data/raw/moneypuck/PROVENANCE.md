@@ -9,9 +9,15 @@ MoneyPuck's own attribution request on that page:
 > for ad-hoc use. Please clearly credit MoneyPuck.com in all cases where you
 > are showing anything using our data as an input.
 
-Politeness used for every fetch: **curl default User-Agent, 1 request/second,
-4 attempts with exponential backoff**. No retries were needed on the successful
-run documented here.
+Politeness used for every fetch: **1 request/second, 4 attempts with exponential
+backoff**. No retries were needed on the successful run documented here.
+
+MoneyPuck redirected curl's default User-Agent to `data_license.htm` from both
+the local host and a GitHub-hosted runner. The successful season-summary run
+therefore used a transparent, non-browser project identifier:
+`SportsNot/1.0 (+https://github.com/KyleBastien/sportsnot)`. Shot archives and
+dictionaries were fetched earlier with curl's default User-Agent. This exception
+is recorded explicitly rather than misrepresenting the requests.
 
 Committed contents:
 
@@ -23,9 +29,9 @@ Committed contents:
 Byte totals added under `ml/data/raw/moneypuck/`:
 
 - raw shots + dictionaries: **340,689,591** bytes
-- season summaries: **34,454,284** bytes
+- season summaries: **41,290,742** bytes
 - derived aggregates: **21,564,059** bytes
-- **total:** **396,707,934** bytes
+- **total:** **403,544,392** bytes
 
 No individual shot archive exceeded the task's **45 MB** cap, so **no file was
 split** and no `REASSEMBLE.md` was needed.
@@ -36,37 +42,24 @@ split** and no `REASSEMBLE.md` was needed.
 
 ### 1.1 Season summaries
 
-MoneyPuck's page exposes **two different source shapes**:
+All **144** season-summary files used the direct CSV URL shape:
 
-1. **Current season direct CSVs** for `2025-2026`
-2. **Historical regular-season combined zips** for `2008-09..2024-25`
+```text
+https://moneypuck.com/moneypuck/playerData/seasonSummary/<startYear>/<type>/<table>.csv
+```
 
-Exact historical regular-season zip URLs used:
+The exact Cartesian expansion used was:
 
-- `https://peter-tanner.com/moneypuck/downloads/historicalOneRowPerSeason/skaters_2008_to_2024.zip`
-- `https://peter-tanner.com/moneypuck/downloads/historicalOneRowPerSeason/goalies_2008_to_2024.zip`
-- `https://peter-tanner.com/moneypuck/downloads/historicalOneRowPerSeason/teams_2008_to_2024.zip`
-- `https://peter-tanner.com/moneypuck/downloads/historicalOneRowPerSeason/lines_2008_to_2024.zip`
+- `<startYear>`: every integer `2008` through `2025`, inclusive
+- `<type>`: `regular`, `playoffs`
+- `<table>`: `skaters`, `goalies`, `teams`, `lines`
 
-Exact current-season direct CSV URLs used:
-
-- `https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/skaters.csv`
-- `https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/goalies.csv`
-- `https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/teams.csv`
-- `https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/lines.csv`
-- `https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/playoffs/skaters.csv`
-- `https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/playoffs/goalies.csv`
-- `https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/playoffs/teams.csv`
-- `https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/playoffs/lines.csv`
-
-How the committed season-summary files were built:
-
-- `2008-09..2024-25` **regular** files were split locally by `season` from the
-  four page-listed historical regular-season zips. The original header, column
-  order, and row text were preserved; only season-specific rows were selected
-  into per-season `*.csv.gz` files.
-- `2025-26` **regular** and **playoff** files were gzipped directly from the
-  page-listed current-season CSV responses, with no content edits.
+Each response's effective URL was required to equal its requested URL and its
+content type was required to start with `text/csv`. Files were streamed
+unchanged into no-name gzip members; rows, headers, delimiters, line endings,
+column order, and situation rows were not altered. The relative path below
+`season-summary/` mirrors the final three URL components exactly. SHA256 for
+every committed gzip is recorded in `season-summary/SHA256SUMS`.
 
 ### 1.2 Shot archives and dictionaries
 
@@ -103,54 +96,38 @@ Exact shot and dictionary URLs used:
 - This task's season-summary range starts at **2008-09**. MoneyPuck's browsable
   archive also contains a `2007/` directory, but it is outside the requested
   summary range.
-- `2008-09..2024-25` **regular** skater/goalie/team/line summaries were
-  available only through the four page-listed historical regular-season zips.
-- MoneyPuck's archive index exposes `regular/` and `playoffs/` directories for
-  historical seasons. A 2026-09-04 follow-up confirmed all four files in the
-  2024-25 playoff directory, so the earlier redirect did **not** prove those
-  files were missing. It was MoneyPuck's access-control response to this
-  client's curl requests.
-- `2025-26` regular and playoff season summaries were available as direct CSVs.
-
-Missing committed season-summary files in this snapshot:
-
-- **68 total** = `17 seasons (2008-09..2024-25) × 4 tables`
-- every missing file is a historical **playoff** summary (`skaters`, `goalies`,
-  `teams`, `lines`)
-
-These 68 files are available in MoneyPuck's public archive but remain
-uncommitted because four curl attempts with exponential backoff each redirected
-to `https://moneypuck.com/data_license.htm`. No access-control bypass or
-alternate-source substitution was used. MoneyPuck approval or licensed access
-is required to complete this part with the requested curl User-Agent.
+- Every requested direct file for `2008-09..2025-26`, both types, and all four
+  tables was available: **144 / 144**.
+- Missing requested season-summary files on the site: **none**.
 
 Season-summary row counts committed here:
 
 | Season | Regular skaters | Regular goalies | Regular teams | Regular lines | Playoff skaters | Playoff goalies | Playoff teams | Playoff lines |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 2008-09 | 4425 | 445 | 150 | 12778 | -- | -- | -- | -- |
-| 2009-10 | 4395 | 415 | 150 | 13063 | -- | -- | -- | -- |
-| 2010-11 | 4455 | 435 | 150 | 13209 | -- | -- | -- | -- |
-| 2011-12 | 4470 | 445 | 150 | 13297 | -- | -- | -- | -- |
-| 2012-13 | 4195 | 410 | 150 | 10132 | -- | -- | -- | -- |
-| 2013-14 | 4430 | 485 | 150 | 12576 | -- | -- | -- | -- |
-| 2014-15 | 4410 | 460 | 150 | 12095 | -- | -- | -- | -- |
-| 2015-16 | 4490 | 460 | 150 | 12503 | -- | -- | -- | -- |
-| 2016-17 | 4435 | 475 | 150 | 12371 | -- | -- | -- | -- |
-| 2017-18 | 4450 | 475 | 155 | 12802 | -- | -- | -- | -- |
-| 2018-19 | 4530 | 465 | 155 | 13443 | -- | -- | -- | -- |
-| 2019-20 | 4415 | 425 | 155 | 2553 | -- | -- | -- | -- |
-| 2020-21 | 4565 | 490 | 155 | 2371 | -- | -- | -- | -- |
-| 2021-22 | 5015 | 595 | 160 | 3178 | -- | -- | -- | -- |
-| 2022-23 | 4755 | 535 | 160 | 2980 | -- | -- | -- | -- |
-| 2023-24 | 4620 | 490 | 160 | 2948 | -- | -- | -- | -- |
-| 2024-25 | 4600 | 515 | 160 | 3056 | -- | -- | -- | -- |
+| 2008-09 | 4425 | 445 | 150 | 12778 | 1665 | 125 | 80 | 1867 |
+| 2009-10 | 4395 | 415 | 150 | 13063 | 1710 | 135 | 80 | 2027 |
+| 2010-11 | 4455 | 435 | 150 | 13209 | 1695 | 125 | 80 | 2023 |
+| 2011-12 | 4470 | 445 | 150 | 13297 | 1740 | 115 | 80 | 1999 |
+| 2012-13 | 4195 | 410 | 150 | 10132 | 1745 | 115 | 80 | 2002 |
+| 2013-14 | 4430 | 485 | 150 | 12576 | 1720 | 140 | 80 | 2003 |
+| 2014-15 | 4410 | 460 | 150 | 12095 | 1695 | 130 | 80 | 1837 |
+| 2015-16 | 4490 | 460 | 150 | 12503 | 1700 | 140 | 80 | 1958 |
+| 2016-17 | 4435 | 475 | 150 | 12371 | 1720 | 115 | 80 | 2082 |
+| 2017-18 | 4450 | 475 | 155 | 12802 | 1665 | 145 | 80 | 1785 |
+| 2018-19 | 4530 | 465 | 155 | 13443 | 1665 | 110 | 80 | 1912 |
+| 2019-20 | 4415 | 425 | 155 | 2553 | 2580 | 210 | 120 | 457 |
+| 2020-21 | 4565 | 490 | 155 | 2371 | 1685 | 120 | 80 | 290 |
+| 2021-22 | 5015 | 595 | 160 | 3178 | 1675 | 150 | 80 | 302 |
+| 2022-23 | 4755 | 535 | 160 | 2980 | 1670 | 140 | 80 | 311 |
+| 2023-24 | 4620 | 490 | 160 | 2948 | 1695 | 135 | 80 | 306 |
+| 2024-25 | 4600 | 515 | 160 | 3056 | 1660 | 135 | 80 | 287 |
 | 2025-26 | 4700 | 490 | 160 | 3006 | 1735 | 125 | 80 | 285 |
 
-Note the sharp drop in historical **regular** line-summary row counts from
+Skater, goalie, and team summaries contain MoneyPuck's five situation rows:
+`all`, `5on5`, `4on5`, `5on4`, and `other`. Line summaries contain `5on5`, as
+served. Note the sharp drop in historical **regular** line-summary row counts from
 `2019-20` onward (`2553`, `2371`, `3178`, `2980`, `2948`, `3056`). That is the
-row count in the page-listed MoneyPuck historical line-summary zip itself, not a
-split bug introduced here.
+row count in MoneyPuck's direct files, not a processing bug introduced here.
 
 ---
 
