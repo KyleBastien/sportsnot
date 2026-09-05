@@ -116,6 +116,8 @@ pre-series benchmark stays the game-1 line through the simulator.
 
 **Acceptance Criteria:**
 - [ ] A committed fetch script `ml/data/raw/odds-archive/the-odds-api-history/fetch_odds_history.py` reads game start times from the committed NHL archive, requests the historical snapshot immediately preceding each playoff game start (2020–2026), and stores each raw response gzipped with its snapshot timestamp; `PROVENANCE.md` documents endpoint, parameters, plan used, credits spent (formula: 10 × markets × regions per snapshot), and any gaps — run from the owner's machine (sandboxes cannot reach the API); key from `ODDS_API_KEY`, never committed
+- [ ] **Encrypted at rest (terms compliance).** The Odds API's terms forbid redistributing its data as downloadable files, and this repo is public, so no Odds API data is ever committed in the clear: raw snapshots, the index and the flat lines extraction are bundled per season and encrypted with AES-256-GCM (Python `cryptography`, 32-byte key, random 12-byte nonce prefixed to each ciphertext) into `<season>.tar.enc`; only ciphertext, `PROVENANCE.md` (with sha256 of each ciphertext and of the plaintext tarball), and a README explaining why the files are opaque are committed. A directory `.gitignore` blocks `plain/`, `*.json.gz`, `*.csv.gz` so plaintext can never be committed by accident
+- [ ] Key contract: the key lives in `ml/.env` as `ODDS_ARCHIVE_KEY` (urlsafe-base64 of 32 bytes), in the owner's password manager, and as an environment secret of the Claude Code environment that runs Ralph and evidence regeneration; `oracle odds` decrypts in memory when the key is present and otherwise runs the stat-only path exactly as today (SPEC §5); a missing or wrong key produces one clear message, never a traceback. Tests use synthetic fixtures only — no real Odds API data appears in `ml/tests/`
 - [ ] Regular-season coverage for the same seasons: one `h2h`-only snapshot per game day (taken 60 minutes before that day's first game, regions `us,eu`) so the game-win model's market feature has lines for 2020-21..2025-26 instead of only the SBR 2017-2022 and ESPN 2025-26 windows; stored and indexed the same way as the playoff snapshots
 - [ ] A **probe step** runs first (one request per market type for one game) and writes the observed market list to PROVENANCE so the absence of a series market is recorded as observed, not assumed
 - [ ] Budget guard: the script computes the credit estimate before fetching and refuses to exceed a `--max-credits` argument (default 90,000, sized to the 100K plan)
@@ -429,6 +431,7 @@ goals, so I know before next spring whether v2 is a real step up.
 - FR-7: New external sources (The Odds API history, the extended NHL archive, MoneyPuck, NaturalStatTrick, NHL pre-game lineups) are fetched by committed scripts run from the owner's machine, committed as snapshots with `PROVENANCE.md`, and parsed by tested code; the pipeline never depends on live availability of these sites.
 - FR-8: Every new table carries an as-of date and is covered by the leakage tests.
 - FR-9: Paid API keys live in `ml/.env` (gitignored); fetch scripts fail loudly without them; fetch cost per run is estimated before fetching, capped by argument, and recorded in PROVENANCE.
+- FR-9a: Data whose license forbids redistribution (The Odds API) is committed only as AES-256-GCM ciphertext; the decryption key is never committed, the pipeline degrades to stat-only without it, and derived per-game market probabilities are likewise not committed in the clear.
 - FR-10: The pre-series market benchmark is the game-1 de-vigged consensus line pushed through the series simulator; no series-winner market is assumed to exist.
 
 ### Models
@@ -455,6 +458,7 @@ goals, so I know before next spring whether v2 is a real step up.
 - **No in-round roster management** beyond IR draft valuation (mid-round activation alerts remain a future idea).
 - **No trading of honesty for headline numbers.** If a target is missed, it stays unmet in the evidence.
 - **No live scraping at draft time.** Everything the CLI needs is in the artifact; live sources are used only when building it.
+- **No Odds API data in the clear, ever** — raw snapshots, indexes, flat lines, and derived per-game market probabilities are encrypted or not committed; only aggregate metrics in reports are public.
 - **No scraping of DailyFaceoff or similar lineup sites.** Starters are modeled, read from the NHL API when posted, or pinned by hand.
 - **No hand-maintained feature spreadsheets.** Every feature has a scripted, reproducible source.
 
@@ -470,6 +474,7 @@ goals, so I know before next spring whether v2 is a real step up.
 - **Stack widening** (SPEC §3 amendment): add `catboost`, a probabilistic-programming library (`numpyro` or `pymc`), `mapie` (conformal), and optionally `torch` (CPU) as extras; keep the `uv` lockfile, seeds, `mypy --strict`, ruff; the draft-time CLI must still import none of them (US-208 guard extended).
 - **Sandbox limits.** The repo's cloud sandboxes cannot reach the NHL API, ESPN, MoneyPuck, NaturalStatTrick or The Odds API (confirmed again while writing this PRD); every fetch story specifies the owner-machine steps and commits snapshots, as the v1 data foundation did.
 - **Odds cost model.** The Odds API bills historical snapshots at 10 × (markets × regions) credits each; a snapshot per playoff game start (≈ 630 games, 2020–2026) with `h2h,spreads,totals` over `us,eu` is ≈ 630 × 10 × 3 × 2 ≈ 38,000 credits — inside the 100K plan (~$59 for one month) with headroom for the probe and one re-pull. Data exists from June 6, 2020, which includes the 2020 bubble playoffs; additional (period/prop) markets only from May 2023 and are not needed.
+- **Encrypted archive mechanics.** One tiny module (`ingest/sealed.py`) wraps `cryptography.hazmat.primitives.ciphers.aead.AESGCM`: `seal(bytes, key) -> nonce || ciphertext` and `open(blob, key)`; per-season tarballs keep file counts small and diffs reviewable (a re-fetch changes one file). Chosen over `age` because every machine that builds artifacts (the owner's Windows box, the cloud sandbox, CI) must decrypt in-process without installing a binary; `cryptography` ships wheels for all of them. Add `cryptography` to `ml/pyproject.toml` in US-502.
 - **Correlation vs speed.** A 2,000-draw tensor over ~450 skaters × 7 games is ~6M cells per round; store as compact integers/float16 and precompute per-player cumulative points per draw so `recommend` reduces to sums over selected columns.
 - **Calibration set discipline.** Post-hoc calibrators (isotonic/Platt/conformal) fit on validation years only; a test asserts they never see test rows.
 - **Era handling.** Pre-2014 seasons used 1–8 conference seeding; defining "higher seed" by regular-season points keeps the feature stable across formats. Playoff overtime has always been 5-on-5 and shootouts never occur in the playoffs, so the 2015 regular-season OT change is irrelevant here.
@@ -515,7 +520,8 @@ merge), 95% paired-bootstrap intervals; each row is met/not-met in `ml/EVALUATIO
 4. **Archive depth.** Extend to 2007-08 (the floor of MoneyPuck/NaturalStatTrick data), add
    an era indicator, define seeding by regular-season points, and ablate 2007–2013 under the
    harness; drop them if they hurt and say so (US-503).
-5. **Scope.** Everything is committed work in one ordered list; there is no deferred
+5. **Odds API data at rest.** The Odds API's terms prohibit redistributing its data as downloadable files and this repo is public, so the archive is committed only as AES-256-GCM ciphertext (Python `cryptography`; key `ODDS_ARCHIVE_KEY` held by the owner and injected as an environment secret where Ralph runs). The owner will confirm the arrangement with The Odds API by email; the stat-only path remains first-class so the tool works without the key.
+6. **Scope.** Everything is committed work in one ordered list; there is no deferred
    backlog. Data acquisition stories (US-502..US-504) sit early because every model story
    downstream consumes them; US-506 (joint tensor) deliberately follows US-505 so the goalie
    model and the optimizer change are evaluated separately.
