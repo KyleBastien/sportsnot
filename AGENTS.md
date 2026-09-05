@@ -82,6 +82,8 @@ Set `VITE_MOCK_MODE=true` in `.env` to run the entire app offline with in-memory
 - Swaps real Supabase hooks for mock equivalents via `mockHooksRegistry` (`packages/web/src/mock/`)
 - Uses static data from `@sportsnot/mock-data` (players, teams, games, bracket)
 - When mock mode is off, Rspack aliases `@sportsnot/mock-data` to `false` to tree-shake it out
+- Mock query results must include every TanStack Query status field consumed by shared
+  hooks (for example, `isFetched: true` for successful static results).
 
 The `packages/web/src/mock/` directory contains all mock infrastructure. The hook registry pattern (`mockHooksRegistry.ts`) maps each real Supabase hook to a mock implementation.
 
@@ -218,6 +220,84 @@ The Android CI workflow (`.github/workflows/android-build.yml`) runs on
 `ubuntu-latest` and is **not** part of the default `nx affected` lint/test
 gate — it triggers only on PRs touching `android/`, `packages/widget-*`,
 `packages/web/`, or `capacitor.config.ts`.
+
+## Draft Oracle (`ml/`)
+
+- Run Python checks from `ml/`: `.venv/Scripts/python.exe -m ruff check src tests scripts`,
+  `.venv/Scripts/python.exe -m mypy src tests scripts`, and
+  `.venv/Scripts/python.exe -m pytest`.
+- Tests enforce offline execution through the autouse socket guard in
+  `ml/tests/conftest.py`; HTTP tests must use fixture transports.
+- Stamp generated artifact manifests through
+  `draft_oracle.provenance.add_git_provenance` so `git_sha` and `git_dirty` stay
+  consistent. For clean-worktree regeneration, run the Python process with its
+  working directory inside that clean worktree; changing `PYTHONPATH` alone does not
+  change the repository inspected by `git_state()`.
+- `test_committed_model_evidence.py` guards committed model/backtest/projection
+  provenance, seeds, coverage, and league-comparison structure. Every manifest SHA
+  must equal the single SHA pinned in `ml/artifacts/EVIDENCE_PASS.json`, with
+  `git_dirty=false`; never compare provenance to current HEAD ancestry because squash
+  merges and shallow clones may omit the generating commit. Regenerate every committed
+  report/manifest pair together at a fixed seed. The 2026 `r500` backtest can run for
+  roughly seven CPU hours and writes its artifact only when the run completes; quiet
+  output is normal while the process remains active.
+- Committed projection CSV/parquet twins must contain the same ordered rows and
+  columns. Compare them with blank-string/null normalization and a `1e-12` float
+  tolerance in `test_committed_projection_artifacts.py`.
+- Combined-event manifest components are independently serialized to six decimal
+  places. Formula decomposition assertions need `3e-6` absolute tolerance.
+- Projection run manifests persist resolved generating flags plus OS/Python/numpy
+  versions. Rebuilds target float-ULP equality across platforms and byte identity on
+  the generating platform. In combined R3+R4 team tables, only `e_goalie_points` is
+  combined; `e_wins`, `e_games`, and `e_shutout_wins` remain R3-only and the manifest
+  carries the recomputable fold.
+- Keep imports in `draft_oracle.cli.project` lightweight. Import training and HTTP
+  modules inside command bodies so draft-time commands start without LightGBM,
+  scikit-learn, or httpx. Keep `draft_oracle.optimize` package re-exports lazy and
+  isolate artifact-consumption primitives from simulation/training modules; import
+  guards must exercise real `draft` and `recommend` commands, not only `--help`.
+- Team outcome features belong to `draft_oracle.models.game_win`; shared Elo math
+  lives in `draft_oracle.features.elo`. Do not recreate a parallel team/series
+  matrix unless a production model consumes and evaluates it.
+- All team-game consumers call `models._games.pivot_decided_games`; do not recreate
+  local home/away pivots in game-win training, series-sim replay, or shutout training.
+  The helper derives winners from normalized `team_games.win`, never goal comparison.
+  Shootout rows can have equal `goals_for`; retain them and warn when a game lacks
+  exactly one archive winner.
+- Game-win reports/manifests must list priced/total market coverage for every temporal
+  split season and explicitly mark zero-coverage seasons. Normalize `season_end_year`
+  keys before integer conversion because odds joins can promote them to floats.
+- Odds cross-validation compares each source's `home_implied`, never favorite-probability
+  magnitudes; opposite favorites can otherwise look equal. Market joins are
+  orientation-sensitive even though game-type lookup is not, so reverse-only archive
+  matches must be blanked, counted, and logged as unjoinable.
+- NHL stats-rest cap guards check both declared `total` and `len(data)`; omitted/null
+  totals must not let a full 10,000-row response pass as complete.
+- League entity matching requires `skater_games.parquet` as well as the pick/player/team
+  tables. Scored sheet matches are review-flagged when all three exact integer point
+  splits disagree with the NHL archive; goalie/team rows skip this skater-points check.
+  Guard globally keyed overrides with `expected_matches` in `name_overrides.yaml`;
+  count skaters by the effective lookup name (`corrected_name` when present, else raw)
+  and team overrides by the first matching G-slot team/raw candidate.
+  Duplicate asset ownership is scoped by `(league_name, season, draft_event)`, keyed by
+  `player_id` for skaters and `team_id` for goalie/team slots, and ignores same-manager
+  source copies.
+- Opponent fitting must call `dedupe_duplicate_events` and group through league-aware
+  `event_keys`. App rows remain authoritative, but missing app skater `team_id` values
+  inherit an unambiguous sheet match on `(league event, manager, player_id)` before
+  sheet rows are dropped; existing app ids and goalie/team rows stay untouched.
+- Opponent evaluation manifests/reports list every membership event excluded from
+  replay and its reason; missing snake order must never disappear silently.
+- Recommend vectorized kernels must match object policies on exact ties
+  (`rank_value` descending, then asset key ascending) and keep fitted `need_weight`
+  per manager. Fitted CLI output must disclose league-average/no-affinity fallback
+  when seat ids do not match committed per-manager keys.
+- Draft-night CLI validation is shared by `draft` and `recommend`: manager ids must
+  be unique case-insensitively, eliminated-team abbreviations must all resolve, and
+  `DraftState.new` repeats manager uniqueness validation. A new draft refuses any
+  existing session path; users must pass `--resume` or choose another `--session`.
+  `--resume A --session B` refuses an existing distinct `B`; in-loop
+  `resume <path>` switches autosave to that resumed path.
 
 ## Ralph Agent System
 

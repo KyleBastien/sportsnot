@@ -1,0 +1,24 @@
+# Manager identity normalization across seasons (US-007 / PRD US-015).
+#
+# The four canonical Gemmell Cup managers are `ben`, `judah`, `kyle`, `levi`.
+# Sheet spellings and in-app usernames both fold to the canonical id below.
+# `Evi` = `Levi` is owner-confirmed (SCHEMA §6). App usernames come from
+# APP_EXPORT.md. Keys under each canonical id are matched case-insensitively
+# after whitespace is stripped; the canonical id always maps to itself.
+#
+# Managers not listed here (e.g. the 2026 in-app league's other players) keep
+# their lowercased surface form so they are never silently merged.
+
+ben:
+  - ben
+  - bentunigold
+judah:
+  - judah
+  - judah18
+kyle:
+  - kyle
+  - nuttguy
+levi:
+  - levi
+  - evi
+  - gemmell.levi

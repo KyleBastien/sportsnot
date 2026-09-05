@@ -1,0 +1,226 @@
+{
+  "run_id": "2026-combined-r500-seed20260827",
+  "package_version": "0.1.0",
+  "seasons": [
+    2026
+  ],
+  "generated_at": "2026-09-02T16:22:09.507592+00:00",
+  "config": {
+    "seed": 20260827,
+    "managers": 4,
+    "ir": false,
+    "n_drafts": 8,
+    "rollouts": 500,
+    "max_candidates": 24,
+    "opponent_temperature": 0.75,
+    "depth": null,
+    "strategies": [
+      "oracle",
+      "greedy_vor",
+      "one_step",
+      "random_legal"
+    ]
+  },
+  "rounds": [
+    {
+      "season": 2026,
+      "playoff_round": 1,
+      "as_of_cutoff": "2026-04-18",
+      "opponents_kind": "fitted-league",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 128
+    },
+    {
+      "season": 2026,
+      "playoff_round": 2,
+      "as_of_cutoff": "2026-05-02",
+      "opponents_kind": "fitted-league",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 128
+    },
+    {
+      "season": 2026,
+      "playoff_round": 3,
+      "as_of_cutoff": "2026-05-20",
+      "opponents_kind": "fitted-league",
+      "leakage_ok": true,
+      "slots": 4,
+      "drafts": 128
+    }
+  ],
+  "league_comparisons": [
+    {
+      "season": 2026,
+      "playoff_round": 1,
+      "draft_event": "R1",
+      "league_name": "Press Play-offs",
+      "oracle_mean_points": 53.875,
+      "oracle_best_points": 55.0,
+      "league_mean_points": 49.5,
+      "league_best_points": 59.0,
+      "managers": [
+        {
+          "manager": "connor.fehr",
+          "actual_points": 59.0
+        },
+        {
+          "manager": "kyle",
+          "actual_points": 50.0
+        },
+        {
+          "manager": "tobi",
+          "actual_points": 45.0
+        },
+        {
+          "manager": "paul.markhauser",
+          "actual_points": 44.0
+        }
+      ]
+    },
+    {
+      "season": 2026,
+      "playoff_round": 1,
+      "draft_event": "R1",
+      "league_name": "The Gemmell Cup",
+      "oracle_mean_points": 53.875,
+      "oracle_best_points": 55.0,
+      "league_mean_points": 49.25,
+      "league_best_points": 56.0,
+      "managers": [
+        {
+          "manager": "levi",
+          "actual_points": 56.0
+        },
+        {
+          "manager": "judah",
+          "actual_points": 53.0
+        },
+        {
+          "manager": "ben",
+          "actual_points": 51.0
+        },
+        {
+          "manager": "kyle",
+          "actual_points": 37.0
+        }
+      ]
+    },
+    {
+      "season": 2026,
+      "playoff_round": 2,
+      "draft_event": "R2",
+      "league_name": "Press Play-offs",
+      "oracle_mean_points": 66.25,
+      "oracle_best_points": 68.0,
+      "league_mean_points": 43.5,
+      "league_best_points": 49.0,
+      "managers": [
+        {
+          "manager": "paul.markhauser",
+          "actual_points": 49.0
+        },
+        {
+          "manager": "kyle",
+          "actual_points": 48.0
+        },
+        {
+          "manager": "connor.fehr",
+          "actual_points": 43.0
+        },
+        {
+          "manager": "tobi",
+          "actual_points": 34.0
+        }
+      ]
+    },
+    {
+      "season": 2026,
+      "playoff_round": 2,
+      "draft_event": "R2",
+      "league_name": "The Gemmell Cup",
+      "oracle_mean_points": 66.25,
+      "oracle_best_points": 68.0,
+      "league_mean_points": 42.5,
+      "league_best_points": 47.0,
+      "managers": [
+        {
+          "manager": "judah",
+          "actual_points": 47.0
+        },
+        {
+          "manager": "levi",
+          "actual_points": 47.0
+        },
+        {
+          "manager": "ben",
+          "actual_points": 39.0
+        },
+        {
+          "manager": "kyle",
+          "actual_points": 37.0
+        }
+      ]
+    },
+    {
+      "season": 2026,
+      "playoff_round": 3,
+      "draft_event": "R3_4",
+      "league_name": "Press Play-offs",
+      "oracle_mean_points": 32.96875,
+      "oracle_best_points": 54.0,
+      "league_mean_points": 38.25,
+      "league_best_points": 62.0,
+      "managers": [
+        {
+          "manager": "kyle",
+          "actual_points": 62.0
+        },
+        {
+          "manager": "tobi",
+          "actual_points": 49.0
+        },
+        {
+          "manager": "connor.fehr",
+          "actual_points": 22.0
+        },
+        {
+          "manager": "paul.markhauser",
+          "actual_points": 20.0
+        }
+      ]
+    },
+    {
+      "season": 2026,
+      "playoff_round": 3,
+      "draft_event": "R3_4",
+      "league_name": "The Gemmell Cup",
+      "oracle_mean_points": 32.96875,
+      "oracle_best_points": 54.0,
+      "league_mean_points": 35.5,
+      "league_best_points": 74.0,
+      "managers": [
+        {
+          "manager": "ben",
+          "actual_points": 74.0
+        },
+        {
+          "manager": "judah",
+          "actual_points": 44.0
+        },
+        {
+          "manager": "levi",
+          "actual_points": 15.0
+        },
+        {
+          "manager": "kyle",
+          "actual_points": 9.0
+        }
+      ]
+    }
+  ],
+  "leakage_ok": true,
+  "git_sha": "e8656219b87297262c39461456fc527f70e350b7",
+  "git_dirty": false
+}

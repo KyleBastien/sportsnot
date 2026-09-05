@@ -1,0 +1,84 @@
+{
+  "model_version": "series-sim-v1",
+  "seed": 20260827,
+  "test_years": [
+    2025,
+    2026
+  ],
+  "counts": {
+    "series_scored": 30,
+    "series_skipped": 0
+  },
+  "brier": {
+    "series_model": 0.22904674336337083,
+    "higher_seed_baseline": 0.5,
+    "coin_flip_baseline": 0.25
+  },
+  "beats_higher_seed_baseline": true,
+  "beats_coin_flip": true,
+  "series_winner_reliability": [
+    {
+      "lower": 0.4,
+      "upper": 0.6000000000000001,
+      "count": 14,
+      "mean_predicted": 0.5171332570272693,
+      "observed_rate": 0.21428571428571427
+    },
+    {
+      "lower": 0.6000000000000001,
+      "upper": 0.8,
+      "count": 15,
+      "mean_predicted": 0.65511847321524,
+      "observed_rate": 0.7333333333333333
+    },
+    {
+      "lower": 0.8,
+      "upper": 1.0,
+      "count": 1,
+      "mean_predicted": 0.8168301492470055,
+      "observed_rate": 1.0
+    }
+  ],
+  "series_length_distribution": [
+    {
+      "length": 4,
+      "predicted_rate": 0.13692590258058362,
+      "observed_rate": 0.13333333333333333
+    },
+    {
+      "length": 5,
+      "predicted_rate": 0.25760438014594533,
+      "observed_rate": 0.3
+    },
+    {
+      "length": 6,
+      "predicted_rate": 0.30716611680820766,
+      "observed_rate": 0.4
+    },
+    {
+      "length": 7,
+      "predicted_rate": 0.2983036004652634,
+      "observed_rate": 0.16666666666666666
+    }
+  ],
+  "shutouts_by_round": {
+    "1": {
+      "predicted": 9.392854832440674,
+      "observed": 7
+    },
+    "2": {
+      "predicted": 4.640663375081866,
+      "observed": 8
+    },
+    "3": {
+      "predicted": 2.276498781127906,
+      "observed": 4
+    },
+    "4": {
+      "predicted": 1.129117422962127,
+      "observed": 1
+    }
+  },
+  "git_sha": "e8656219b87297262c39461456fc527f70e350b7",
+  "git_dirty": false
+}

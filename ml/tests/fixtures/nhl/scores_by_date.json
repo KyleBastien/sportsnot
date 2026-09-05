@@ -1,0 +1,15 @@
+{
+  "currentDate": "2026-04-20",
+  "games": [
+    {
+      "id": 2025030111,
+      "season": 20252026,
+      "gameType": 3,
+      "gameDate": "2026-04-20",
+      "gameState": "OFF",
+      "awayTeam": { "id": 6, "abbrev": "BOS", "score": 2 },
+      "homeTeam": { "id": 7, "abbrev": "BUF", "score": 3 },
+      "gameOutcome": { "lastPeriodType": "REG" }
+    }
+  ]
+}

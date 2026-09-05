@@ -1,0 +1,101 @@
+{
+  "model_version": "shutout-v1",
+  "seed": 20260827,
+  "min_pregame_games": 5,
+  "goalie_last_n": 15,
+  "chosen_model_type": "logistic_regression",
+  "split": {
+    "train_years": [
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023
+    ],
+    "val_years": [
+      2024
+    ],
+    "test_years": [
+      2025,
+      2026
+    ]
+  },
+  "counts": {
+    "train": 9696,
+    "val": 1319,
+    "test": 2626
+  },
+  "validation_brier": {
+    "logistic_regression": 0.09558489711127517,
+    "lightgbm": 0.09565262248215836
+  },
+  "test_brier": {
+    "model": 0.09226198173047151,
+    "model_unshrunk": 0.09226198173047151,
+    "base_rate": 0.09210454015667696
+  },
+  "shrinkage": {
+    "weight": 1.0,
+    "base_rate": 0.11511575124829777,
+    "adopted": false,
+    "validation_brier_by_weight": {
+      "1.00": 0.09558489711127517,
+      "0.90": 0.09562173287215281,
+      "0.80": 0.09566269654929242,
+      "0.70": 0.09570778814269398,
+      "0.60": 0.09575700765235748,
+      "0.50": 0.09581035507828296,
+      "0.40": 0.09586783042047038,
+      "0.30": 0.09592943367891978,
+      "0.20": 0.0959951648536311,
+      "0.10": 0.0960650239446044,
+      "0.00": 0.09613901095183965
+    }
+  },
+  "shutout_rate": {
+    "train": 0.11511575124829777,
+    "test_observed": 0.10243716679360244,
+    "test_predicted": 0.10472022532330232
+  },
+  "calibration": {
+    "relative_error": 0.02228740408547161,
+    "tolerance": 0.25,
+    "within_tolerance": true,
+    "bins": [
+      {
+        "lower": 0.036153531349263274,
+        "upper": 0.07230706269852655,
+        "count": 16,
+        "mean_predicted": 0.06609993420838234,
+        "observed_rate": 0.1875
+      },
+      {
+        "lower": 0.07230706269852655,
+        "upper": 0.10846059404778982,
+        "count": 1631,
+        "mean_predicted": 0.09782413622391628,
+        "observed_rate": 0.10239117106069896
+      },
+      {
+        "lower": 0.10846059404778982,
+        "upper": 0.1446141253970531,
+        "count": 969,
+        "mean_predicted": 0.11644193941364793,
+        "observed_rate": 0.1021671826625387
+      },
+      {
+        "lower": 0.1446141253970531,
+        "upper": 0.18076765674631637,
+        "count": 10,
+        "mean_predicted": 0.15543072786254128,
+        "observed_rate": 0.0
+      }
+    ]
+  },
+  "beats_base_rate": false,
+  "git_sha": "e8656219b87297262c39461456fc527f70e350b7",
+  "git_dirty": false
+}

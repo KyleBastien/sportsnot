@@ -41,7 +41,8 @@ in the sheets was a one-time favor). The simulator and optimizer must never assu
 - Sheet-era seasons (2024, 2025, 2026 drafts) have **three draft events**: R1, R2, and
   R3+4 combined. The app era has four. Sheet rows are **not** in pick order —
   `pick_number` exists only in the 2026 app export.
-- IR slots: used in 2025, disabled for 2026.
+- IR slots: used in 2025. For 2026, Gemmell Cup disables IR; Press Play-offs
+  enables IR and drafts 11 picks per manager.
 - All sheet-era source data, its schema, and every known data correction live in
   `ml/data/raw/league-drafts/` (`SCHEMA.md`, `OPEN_QUESTIONS.md`, `APP_EXPORT.md`).
   Read those before touching parsing code (story US-006/US-007).
@@ -58,6 +59,9 @@ in the sheets was a one-time favor). The simulator and optimizer must never assu
 - Config/overrides: YAML via **pyyaml**.
 - Seeds: every stochastic component takes an explicit seed; artifact manifests record
   them. `oracle` entry points must be deterministic given (snapshot, seed).
+- Rebuilds reproduce to float-ULP across platforms and byte-identically on the
+  generating platform; run manifests record OS, Python, numpy, and generating flags
+  for like-for-like comparison.
 
 ## 4. Directory contract
 
@@ -70,7 +74,7 @@ ml/
     rules.py                 ← US-002 (scoring, snake/redraft order, roster validation)
     ingest/                  ← US-003..008 (nhl_api.py, normalize.py, odds.py,
                                 league_drafts.py, entity_match.py, injuries.py)
-    features/                ← US-009/010 (skater.py, team_series.py, leakage.py)
+    features/                ← skater.py, elo.py, leakage.py
     models/                  ← US-011..016 (game_win.py, shutout.py, series_sim.py,
                                 skater_rate.py, returns.py, projections.py)
     optimize/                ← US-018..023 (vor.py, simulator.py, opponents.py,
@@ -82,8 +86,24 @@ ml/
     raw/league-drafts/       ← committed sheet snapshots + app exports + docs
     features/                ← versioned matrices (gitignored)
     overrides/               ← injuries.yaml, name_overrides.yaml, manager_aliases.yaml
-  artifacts/                 ← gitignored except backtests/*/report.md and manifests
+  artifacts/                 ← generated; gitignored except approved outputs below
+    EVIDENCE_PASS.json       ← shared source commit for all committed evidence
+    2026-r1/..2026-r4/       ← committed 2026 projection reproducibility fixtures
+    backtests/*/             ← committed report.md and manifest.json only
+    models/*/                ← committed report.md and manifest.json only
 ```
+
+The committed `artifacts/2026-r1/` through `artifacts/2026-r4/` directories are an
+explicit owner-approved exception to the generated-artifact rule. They preserve the
+2026 playoff draft evidence, including the combined R3+R4 event, and are regression
+fixtures for the structural checks in `tests/test_committed_projection_artifacts.py`.
+Regenerate them only from a clean committed HEAD; every `run_manifest.json` must name
+that source commit and record `git_dirty: false`.
+
+All committed model, backtest, and projection evidence manifests must name the one
+source commit pinned in `artifacts/EVIDENCE_PASS.json` and record `git_dirty: false`.
+The pin deliberately avoids comparing artifact provenance to the current checkout:
+squash merges and shallow clones need not retain the generating commit object.
 
 ## 5. External data sources (decided — do not re-evaluate)
 
@@ -111,8 +131,10 @@ playoff windows in 2020/2021, team-name variants, ending-year season labels, pre
 rows). Two committed sources: SBR workbooks (2016-17 – 2021-22 complete with both-side
 Open/Close moneylines — preferred where present; 2022-23 partial) and the Kaggle/ESPN
 file (2004 – Dec 2025 with favorite-side moneyline only, playoffs included through
-2024-25). The 2025-26 completion (Dec 2025 - June 2026, incl. the full 2026 playoffs, 100%
-odds fill, DraftKings via ESPN's pickcenter) is committed under
+2024-25). Its repeated game-level spread does not provide trustworthy side attribution,
+so the pipeline carries its 2022-23 onward favorite prices `covered=False`; raw price
+presence is not usable modeled coverage. The 2025-26 completion (Dec 2025 - June 2026,
+incl. the full 2026 playoffs, 100% odds fill, DraftKings via ESPN's pickcenter) is committed under
 `odds-archive/espn-2025-26-completion/` — so committed archives now cover every game
 2004 through June 2026 with no gaps. ESPN's public summary endpoint
 (`site.api.espn.com/.../summary?event=<id>`, `pickcenter` block; note: browser-like

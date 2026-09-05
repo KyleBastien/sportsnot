@@ -1,0 +1,156 @@
+{
+  "artifact_version": "live-projection-v1",
+  "as_of_cutoff": "2026-05-02",
+  "cli_flags": {
+    "combine_final_rounds": true,
+    "horizon": 7,
+    "ir": false,
+    "managers": 4,
+    "n_sims": 4000,
+    "no_refresh": true,
+    "seed": 20260827,
+    "slot_rollouts": 500,
+    "slot_strategies": true
+  },
+  "combined_event": null,
+  "counts": {
+    "eligible_series": 4,
+    "eligible_teams": 8,
+    "skaters_injured": 0,
+    "skaters_projected": 231
+  },
+  "eligible_team_abbrevs": [
+    "ANA",
+    "BUF",
+    "CAR",
+    "COL",
+    "MIN",
+    "MTL",
+    "PHI",
+    "VGK"
+  ],
+  "feature_version": "skater-v1",
+  "generated_at": "2026-09-02T08:24:48.908029+00:00",
+  "git_dirty": false,
+  "git_sha": "e8656219b87297262c39461456fc527f70e350b7",
+  "ir_stash": {
+    "candidates": 0,
+    "enabled": false,
+    "stash_verdicts": 0
+  },
+  "model_versions": {
+    "game_win": "game-win-v1",
+    "projection": "skater-projection-v1",
+    "series_sim": "series-sim-v1",
+    "shutout": "shutout-v1",
+    "skater_production": "skater-production-v1"
+  },
+  "package_version": "0.1.0",
+  "platform": {
+    "machine": "AMD64",
+    "numpy": "2.5.2",
+    "os": "Windows",
+    "os_release": "11",
+    "python": "3.12.12"
+  },
+  "playoff_round": 2,
+  "scarcity": {
+    "assets": 239,
+    "ir": false,
+    "managers": 4,
+    "replacement_level": {
+      "D": 2.278,
+      "F": 3.699,
+      "G": 5.944197116232469
+    },
+    "roster_demand": {
+      "defense_per_manager": 3,
+      "forwards_per_manager": 5,
+      "goalies_per_manager": 1
+    }
+  },
+  "season": 2026,
+  "seeds": {
+    "base": 20260827,
+    "horizon": 7,
+    "n_sims": 4000
+  },
+  "slot_strategies": {
+    "best_slot": 1,
+    "fitted_opponents": false,
+    "ir": false,
+    "managers": 4,
+    "opponent_label": "league-average fitted coefficients (per-seat, affinity zeroed)",
+    "rollouts": 500,
+    "rounds": 9,
+    "seed": 20260827,
+    "slots": [
+      {
+        "first_pick": "Nathan MacKinnon",
+        "pick_numbers": [
+          1,
+          8,
+          9,
+          16,
+          17,
+          24,
+          25,
+          32,
+          33
+        ],
+        "projected_total": 44.118398,
+        "slot": 1
+      },
+      {
+        "first_pick": "Quinn Hughes",
+        "pick_numbers": [
+          2,
+          7,
+          10,
+          15,
+          18,
+          23,
+          26,
+          31,
+          34
+        ],
+        "projected_total": 43.820398,
+        "slot": 2
+      },
+      {
+        "first_pick": "Cale Makar",
+        "pick_numbers": [
+          3,
+          6,
+          11,
+          14,
+          19,
+          22,
+          27,
+          30,
+          35
+        ],
+        "projected_total": 43.658648,
+        "slot": 3
+      },
+      {
+        "first_pick": "Rasmus Dahlin",
+        "pick_numbers": [
+          4,
+          5,
+          12,
+          13,
+          20,
+          21,
+          28,
+          29,
+          36
+        ],
+        "projected_total": 42.49835,
+        "slot": 4
+      }
+    ]
+  },
+  "snapshot_id": "live-44src-12769611b",
+  "warnings": []
+}

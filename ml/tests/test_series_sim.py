@@ -1,0 +1,377 @@
+"""Tests for draft_oracle.models.series_sim (US-013).
+
+Most fixtures are in-memory synthetic games/series. Focused shootout and replay
+consistency regressions read the committed NHL archive; no network is used (SPEC
+section 7). The pure simulator is checked against known-probability edge cases
+(p=0.5 symmetric, p=1.0/0.0 sweeps), the 2-2-1-1-1 home-ice ordering,
+exact-vs-Monte-Carlo agreement, and goalie-slot valuation through the rules engine.
+The evaluation path is exercised end-to-end on a small multi-season synthetic league.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from draft_oracle.models import (
+    HOME_ICE_PATTERN,
+    SeriesSimConfig,
+    build_game_dataset,
+    evaluate_series_sim,
+    expected_goalie_points,
+    game_win_probs,
+    series_length_labels,
+    simulate_series,
+    simulate_series_monte_carlo,
+)
+from draft_oracle.models.series_sim import (
+    SeriesMonteCarloRequest,
+    _pivot_all_games,
+    reconstruct_series_matchups,
+)
+from draft_oracle.rules import goalie_series_points
+from tests.series_sim_fixtures import (
+    _ARCHIVE_TEAM_GAMES,
+    _ARCHIVE_TEAM_GAMES_2020_21,
+    TEAMS,
+    _game_rows,
+    _GameRowsInput,
+    _overlap_game,
+    _OverlapGameInput,
+    _synthetic_league,
+)
+
+
+def _real_team_games(season_label: str | None = None) -> pd.DataFrame:
+    if season_label == "2020-21":
+        return _ARCHIVE_TEAM_GAMES_2020_21.copy(deep=True)
+    return _ARCHIVE_TEAM_GAMES.copy(deep=True)
+
+# ── Home-ice pattern + per-game probability schedule ───────────────────────
+
+
+def test_home_ice_pattern_is_2_2_1_1_1() -> None:
+    # Higher seed (A) hosts games 1, 2, 5, 7; lower seed (B) hosts 3, 4, 6.
+    assert HOME_ICE_PATTERN == ("A", "A", "B", "B", "A", "B", "A")
+    assert len(HOME_ICE_PATTERN) == 7
+
+
+def test_game_win_probs_follow_venue() -> None:
+    probs = game_win_probs(0.7, 0.4)
+    assert probs == (0.7, 0.7, 0.4, 0.4, 0.7, 0.4, 0.7)
+
+
+def test_series_length_labels() -> None:
+    assert series_length_labels() == (4, 5, 6, 7)
+
+
+# ── Known-probability edge cases ───────────────────────────────────────────
+
+
+def test_coin_flip_series_is_symmetric() -> None:
+    outcome = simulate_series(0.5, 0.5)
+    assert outcome.p_a_win_series == pytest.approx(0.5)
+    assert outcome.p_b_win_series == pytest.approx(0.5)
+    assert outcome.e_wins_a == pytest.approx(outcome.e_wins_b)
+    assert sum(outcome.length_probs.values()) == pytest.approx(1.0)
+
+
+def test_certain_home_and_away_wins_produce_a_sweep() -> None:
+    outcome = simulate_series(1.0, 1.0)
+    assert outcome.p_a_win_series == pytest.approx(1.0)
+    assert outcome.p_b_win_series == pytest.approx(0.0)
+    assert outcome.length_probs[4] == pytest.approx(1.0)
+    assert outcome.length_probs[5] == pytest.approx(0.0)
+    assert outcome.e_games == pytest.approx(4.0)
+    assert outcome.e_wins_a == pytest.approx(4.0)
+    assert outcome.e_wins_b == pytest.approx(0.0)
+
+
+def test_certain_losses_hand_the_series_to_b() -> None:
+    outcome = simulate_series(0.0, 0.0)
+    assert outcome.p_a_win_series == pytest.approx(0.0)
+    assert outcome.p_b_win_series == pytest.approx(1.0)
+    assert outcome.e_wins_b == pytest.approx(4.0)
+    assert outcome.e_games == pytest.approx(4.0)
+
+
+def test_length_probs_always_sum_to_one() -> None:
+    outcome = simulate_series(0.62, 0.48)
+    assert set(outcome.length_probs) == {4, 5, 6, 7}
+    assert sum(outcome.length_probs.values()) == pytest.approx(1.0)
+    # E[games] must lie inside the achievable [4, 7] range.
+    assert 4.0 <= outcome.e_games <= 7.0
+
+
+def test_stronger_team_more_likely_to_win_series() -> None:
+    weak = simulate_series(0.55, 0.45)
+    strong = simulate_series(0.80, 0.70)
+    assert strong.p_a_win_series > weak.p_a_win_series > 0.5
+
+
+def test_probabilities_are_clamped() -> None:
+    outcome = simulate_series(1.5, -0.2)
+    assert outcome.p_a_win_series == pytest.approx(1.0)
+    assert 0.0 <= outcome.p_b_win_series <= 1.0
+
+
+# ── Goalie-slot valuation through the rules engine ─────────────────────────
+
+
+def test_expected_goalie_points_matches_rules_on_a_sweep() -> None:
+    # A sweeps in 4. With every win a shutout the goalie slot scores 4*4 = 16
+    # (goalie_series_points(4, 4)); with no shutouts 4*2 = 8.
+    all_shutouts = simulate_series(1.0, 1.0, shutout_prob_a=1.0)
+    no_shutouts = simulate_series(1.0, 1.0, shutout_prob_a=0.0)
+    assert all_shutouts.e_goalie_points_a == pytest.approx(goalie_series_points(4, 4))
+    assert no_shutouts.e_goalie_points_a == pytest.approx(goalie_series_points(4, 0))
+
+
+def test_expected_goalie_points_is_linear_mean_of_rules() -> None:
+    # E[pts] for 4 wins with per-win shutout prob 0.5 equals the binomial mean of
+    # goalie_series_points(4, S), S ~ Binomial(4, 0.5).
+    expected = sum(_binom(4, s, 0.5) * goalie_series_points(4, s) for s in range(5))
+    assert expected_goalie_points(4.0, 0.5) == pytest.approx(expected)
+
+
+def _binom(n: int, k: int, p: float) -> float:
+    from math import comb
+
+    return comb(n, k) * (p**k) * ((1.0 - p) ** (n - k))
+
+
+def test_goalie_points_zero_for_the_series_loser_with_no_wins() -> None:
+    outcome = simulate_series(1.0, 1.0, shutout_prob_a=0.3, shutout_prob_b=0.9)
+    assert outcome.e_goalie_points_b == pytest.approx(0.0)
+
+
+# ── Exact vs. Monte Carlo (determinism under a fixed seed) ─────────────────
+
+
+def test_monte_carlo_matches_exact_enumeration() -> None:
+    exact = simulate_series(0.63, 0.47, shutout_prob_a=0.2, shutout_prob_b=0.1)
+    mc = simulate_series_monte_carlo(
+        SeriesMonteCarloRequest(
+            p_a_home=0.63,
+            p_a_away=0.47,
+            shutout_prob_a=0.2,
+            shutout_prob_b=0.1,
+            n_sims=40000,
+            seed=7,
+        )
+    )
+    assert mc.p_a_win_series == pytest.approx(exact.p_a_win_series, abs=0.02)
+    assert mc.e_games == pytest.approx(exact.e_games, abs=0.05)
+    assert mc.e_wins_a == pytest.approx(exact.e_wins_a, abs=0.05)
+
+
+def test_monte_carlo_is_deterministic_under_seed() -> None:
+    request = SeriesMonteCarloRequest(0.6, 0.5, n_sims=5000, seed=123)
+    a = simulate_series_monte_carlo(request)
+    b = simulate_series_monte_carlo(request)
+    assert a == b
+
+
+# ── Synthetic multi-season league for the evaluation path ──────────────────
+
+# ── Reconstruction (leakage-free pre-series states) ────────────────────────
+
+
+def test_pivot_all_games_matches_all_real_archive_decisions() -> None:
+    team_games = _real_team_games()
+    archive_winners = team_games.groupby("game_id")["win"].sum()
+
+    assert int(archive_winners.eq(1).sum()) == 14_508
+    assert len(_pivot_all_games(team_games)) == 14_508
+
+
+def test_pivot_all_games_retains_real_shootout_winner() -> None:
+    team_games = _real_team_games("2020-21")
+    game = _pivot_all_games(team_games).loc[lambda frame: frame["game_id"] == 2020020007]
+
+    assert len(game) == 1
+    assert game.iloc[0]["home_goals"] == game.iloc[0]["away_goals"] == 2
+    assert game.iloc[0]["home_abbrev"] == "NJD"
+    assert game.iloc[0]["away_abbrev"] == "BOS"
+    assert game.iloc[0]["home_win"] == 0
+
+
+def test_pivot_all_games_warns_and_excludes_game_without_winner() -> None:
+    team_games = pd.DataFrame(
+        _game_rows(
+            _GameRowsInput(20202021, 2, 1, "2021-01-01", "AAA", "BBB", 2, 2)
+        )
+    )
+
+    with pytest.warns(RuntimeWarning, match="without exactly one archive winner"):
+        games = _pivot_all_games(team_games)
+
+    assert games.empty
+
+
+def test_reconstruct_elo_matches_game_win_training_path_at_real_series_cutoff() -> None:
+    team_games = _real_team_games("2020-21")
+    series = pd.DataFrame(
+        [
+            {
+                "season_id": 20202021,
+                "top_seed_abbrev": "WSH",
+                "bottom_seed_abbrev": "BOS",
+                "playoff_round": 1,
+            }
+        ]
+    )
+    game_id = 2020030121
+    game_rows = team_games.loc[team_games["game_id"] == game_id].set_index("home_road")
+    home_id = int(str(game_rows.loc["H", "team_id"]))
+    away_id = int(str(game_rows.loc["R", "team_id"]))
+    training_row = build_game_dataset(team_games, min_pregame_games=0).loc[
+        lambda frame: frame["game_id"] == float(game_id)
+    ].iloc[0]
+    matchup = reconstruct_series_matchups(team_games, series=series)[
+        (2021, min(home_id, away_id), max(home_id, away_id))
+    ]
+
+    assert matchup.win_snapshots[home_id]["elo"] == pytest.approx(
+        training_row["home_elo"], abs=1e-12
+    )
+    assert matchup.win_snapshots[away_id]["elo"] == pytest.approx(
+        training_row["away_elo"], abs=1e-12
+    )
+
+
+def test_reconstruct_captures_pre_series_snapshots_and_shutouts() -> None:
+    team_games, _ = _synthetic_league([2019], seed=3)
+    matchups = reconstruct_series_matchups(team_games)
+    assert len(matchups) == 1
+    (record,) = matchups.values()
+    top_id = TEAMS.index("AAA") + 1
+    bottom_id = TEAMS.index("DDD") + 1
+    assert top_id in record.win_snapshots
+    assert bottom_id in record.shutout_snapshots
+    # The AAA/DDD series had exactly one shutout (game 1) over five games.
+    assert record.observed_shutouts == 1
+    assert record.playoff_games == 5
+    # Pre-series snapshots read a full regular season -> non-cold-start.
+    assert record.win_snapshots[top_id]["points_per_game"] > 0.0
+
+
+def test_reconstruct_freezes_at_round_cutoff_not_matchup_first_game() -> None:
+    # Overlapping rounds (CODE_REVIEW m-3): round 2's declared cutoff is the earliest
+    # round-2 game (G/H on 05-01). Team E is still finishing round 1 on 05-01..05-03
+    # -- those games are on/after the round-2 cutoff. E's round-2 (E/F) snapshot must
+    # freeze at the cutoff (before E has played), never at E/F's later first game.
+    e_id, f_id, g_id, h_id, x_id = 11, 12, 13, 14, 15
+    rows: list[dict[str, object]] = []
+    # E's round-1 series (digit 1) overlaps the round-2 window; E wins all three.
+    for i, date in enumerate(("2022-05-01", "2022-05-02", "2022-05-03")):
+        rows += _overlap_game(
+            _OverlapGameInput(
+                game_id=f"202103011{i + 1}",
+                game_date=date,
+                home="E",
+                home_id=e_id,
+                away="X",
+                away_id=x_id,
+                hg=3,
+                ag=0,
+            )
+        )
+    # Round-2 series P (G/H, digit 2) sets the round-2 cutoff at 05-01.
+    rows += _overlap_game(
+        _OverlapGameInput(
+            game_id="2021030211",
+            game_date="2022-05-01",
+            home="G",
+            home_id=g_id,
+            away="H",
+            away_id=h_id,
+            hg=3,
+            ag=1,
+        )
+    )
+    # Round-2 series Q (E/F, digit 2) starts late, on 05-06.
+    rows += _overlap_game(
+        _OverlapGameInput(
+            game_id="2021030221",
+            game_date="2022-05-06",
+            home="E",
+            home_id=e_id,
+            away="F",
+            away_id=f_id,
+            hg=2,
+            ag=1,
+        )
+    )
+    team_games = pd.DataFrame(rows)
+    series = pd.DataFrame(
+        [
+            {"season_id": 20212022, "top_seed_abbrev": "E",
+             "bottom_seed_abbrev": "X", "playoff_round": 1},
+            {"season_id": 20212022, "top_seed_abbrev": "G",
+             "bottom_seed_abbrev": "H", "playoff_round": 2},
+            {"season_id": 20212022, "top_seed_abbrev": "E",
+             "bottom_seed_abbrev": "F", "playoff_round": 2},
+        ]
+    )
+    q_key = (2022, min(e_id, f_id), max(e_id, f_id))
+
+    # Legacy per-series freeze (no series context): E/F snapshot is frozen at E/F's
+    # first game (05-06) and so absorbs E's post-cutoff round-1 wins -> elo != initial.
+    legacy = reconstruct_series_matchups(team_games)
+    assert legacy[q_key].win_snapshots[e_id]["elo"] != pytest.approx(1500.0)
+
+    # Round-cutoff freeze: E has played nothing before the 05-01 cutoff, so its E/F
+    # snapshot is the cold initial rating -- the overlapping round-1 games are excluded.
+    fixed = reconstruct_series_matchups(team_games, series=series)
+    assert fixed[q_key].win_snapshots[e_id]["elo"] == pytest.approx(1500.0)
+
+
+# ── End-to-end evaluation ──────────────────────────────────────────────────
+
+
+def test_evaluate_series_sim_scores_held_out_series() -> None:
+    end_years = [2016, 2017, 2018, 2019, 2020, 2021]
+    team_games, series = _synthetic_league(end_years, seed=5)
+    result = evaluate_series_sim(
+        team_games, series, config=SeriesSimConfig(seed=5, n_test_seasons=2)
+    )
+    assert result.test_years == (2020, 2021)
+    assert result.n_series_scored == 2
+    assert result.n_series_skipped == 0
+    assert np.isfinite(result.brier_series)
+    # Length distribution predicted rates sum to 1.
+    total_predicted = sum(b.predicted_rate for b in result.length_bins)
+    assert total_predicted == pytest.approx(1.0)
+    # Observed lengths sum to 1 too (both held-out series went five games).
+    observed = {b.length: b.observed_rate for b in result.length_bins}
+    assert observed[5] == pytest.approx(1.0)
+
+
+def test_evaluate_series_sim_shutouts_by_round() -> None:
+    end_years = [2016, 2017, 2018, 2019, 2020, 2021]
+    team_games, series = _synthetic_league(end_years, seed=9)
+    result = evaluate_series_sim(
+        team_games, series, config=SeriesSimConfig(seed=9, n_test_seasons=2)
+    )
+    # Each held-out series had one observed shutout -> two in round 1.
+    assert result.observed_shutouts_by_round.get(1) == 2
+    assert result.predicted_shutouts_by_round.get(1, 0.0) >= 0.0
+
+
+def test_evaluate_series_sim_manifest_and_report() -> None:
+    end_years = [2016, 2017, 2018, 2019, 2020, 2021]
+    team_games, series = _synthetic_league(end_years, seed=1)
+    result = evaluate_series_sim(
+        team_games, series, config=SeriesSimConfig(seed=1, n_test_seasons=2)
+    )
+    manifest = result.manifest()
+    assert manifest["model_version"] == "series-sim-v1"
+    assert manifest["seed"] == 1
+    assert manifest["test_years"] == [2020, 2021]
+    assert "series_model" in manifest["brier"]
+    report = result.report_lines()
+    assert any("series simulator" in line.lower() for line in report)
+    assert any("With 2 playoff series held out" in line for line in report)
+    assert not any("~40" in line for line in report)

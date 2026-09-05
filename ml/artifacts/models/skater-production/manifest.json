@@ -1,0 +1,64 @@
+{
+  "model_version": "skater-production-v1",
+  "seed": 20260827,
+  "chosen_model_type": "lightgbm",
+  "shrink_k": 10.0,
+  "min_confident_games": 10,
+  "split": {
+    "train_years": [
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023
+    ],
+    "val_years": [
+      2024
+    ],
+    "test_years": [
+      2025,
+      2026
+    ]
+  },
+  "counts": {
+    "train": 4837,
+    "val": 611,
+    "test": 1203,
+    "cold_cases_test": 8
+  },
+  "validation_mae": {
+    "poisson": 0.23105759174868082,
+    "lightgbm": 0.2204217364522459
+  },
+  "test_mae": {
+    "model": 0.245518306645612,
+    "model_raw": 0.24265883215314107,
+    "baseline_reg_ppg": 0.2659703959861031,
+    "baseline_mean": 0.31658713694634355
+  },
+  "test_spearman": {
+    "model": 0.5786950846625322,
+    "baseline_reg_ppg": 0.5675472806454415
+  },
+  "per_season": [
+    {
+      "season_end_year": 2025,
+      "n": 595,
+      "mae": 0.23904678354430872,
+      "spearman": 0.60962304755027
+    },
+    {
+      "season_end_year": 2026,
+      "n": 608,
+      "mae": 0.251851458364815,
+      "spearman": 0.5494719731377212
+    }
+  ],
+  "beats_reg_baseline": true,
+  "beats_mean_baseline": true,
+  "git_sha": "e8656219b87297262c39461456fc527f70e350b7",
+  "git_dirty": false
+}

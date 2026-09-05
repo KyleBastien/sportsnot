@@ -1,0 +1,27 @@
+# Manual entity-match overrides (US-007 / PRD US-015).
+#
+# Anything the automated fuzzy matcher cannot resolve (or resolves wrongly)
+# is fixed here — never by lowering the match-rate bar or dropping picks.
+# Overrides take precedence over exact/fuzzy matching.
+#
+# `players`: effective draft name (`corrected_name` when present, otherwise the
+#   raw sheet/app-export name) -> NHL player_id (an integer from
+#   `players.parquet`). A mapping may declare `expected_matches`; match-drafts
+#   then fails if the F/D/IR-slot corpus count for that effective name changes.
+# `teams`: raw team/goalie name -> NHL team_id (an integer from
+#   `teams.parquet`). A mapping may also declare `expected_matches`;
+#   match-drafts then fails if the G-slot corpus count consumed by that override
+#   changes.
+#
+# Keys are normalized (accent-stripped, lowercased, punctuation removed) on
+# load, so "Montréal Canadiens" and "montreal canadiens" collide to one entry.
+#
+# The bare 2024 R3+4 "McDavid" row carries Draisaitl's exact 24/7/31 point split;
+# Connor McDavid is already owned by another manager in that event. Preserve the
+# raw sheet and correct the entity here.
+
+players:
+  McDavid:
+    player_id: 8477934
+    expected_matches: 1
+teams: {}

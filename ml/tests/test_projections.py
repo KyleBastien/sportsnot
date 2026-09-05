@@ -1,0 +1,635 @@
+"""Tests for draft_oracle.models.projections (US-016).
+
+All fixtures are in-memory synthetic games/series -- no network, no committed
+archive dependency (SPEC section 7). The suite covers the pure Monte-Carlo
+primitives (length normalization, expected series length, seeded round sampling,
+quantile ordering, availability haircut) and an end-to-end evaluation that composes
+the production, per-game win, and shutout sub-models and reports honest held-out
+metrics against the two fixed baselines.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+import pandas as pd
+import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
+from draft_oracle.models import (
+    BASELINE_REG_GAMES,
+    PROJECTION_VERSION,
+    ProjectionConfig,
+    SkaterProductionConfig,
+    evaluate_skater_projections,
+    expected_series_length,
+    normalize_length_probs,
+    project_skater_round,
+    simulate_round_points,
+)
+from draft_oracle.models.projections import (
+    CombinedRoundRequest,
+    ProjectionEvaluationRequest,
+    ProjectionResult,
+    ProjectionRuntime,
+    SkaterRoundRequest,
+    project_skater_combined,
+)
+from draft_oracle.models.series_sim import HOME_ICE_PATTERN
+
+# ── Pure primitives ────────────────────────────────────────────────────────
+
+
+def test_normalize_length_probs_renormalizes_to_one() -> None:
+    probs = normalize_length_probs({4: 1.0, 5: 1.0, 6: 1.0, 7: 1.0})
+    assert set(probs) == {4, 5, 6, 7}
+    assert sum(probs.values()) == pytest.approx(1.0)
+    assert all(v == pytest.approx(0.25) for v in probs.values())
+
+
+def test_normalize_length_probs_fills_missing_and_clips_negatives() -> None:
+    probs = normalize_length_probs({5: 3.0, 6: 1.0, 7: -5.0})
+    assert probs[4] == 0.0
+    assert probs[7] == 0.0
+    assert sum(probs.values()) == pytest.approx(1.0)
+    assert probs[5] == pytest.approx(0.75)
+
+
+def test_normalize_length_probs_degenerate_falls_back_to_six() -> None:
+    probs = normalize_length_probs({4: 0.0, 5: 0.0, 6: 0.0, 7: 0.0})
+    assert probs[6] == pytest.approx(1.0)
+    assert sum(probs.values()) == pytest.approx(1.0)
+
+
+def test_expected_series_length_of_point_mass() -> None:
+    assert expected_series_length({7: 1.0}) == pytest.approx(7.0)
+    assert expected_series_length({4: 1.0, 6: 1.0}) == pytest.approx(5.0)
+
+
+# ── Monte-Carlo round sampling ─────────────────────────────────────────────
+
+
+def test_simulate_round_points_zero_availability_is_all_zero() -> None:
+    rng = np.random.default_rng(0)
+    avail = np.zeros(7, dtype=float)
+    samples = simulate_round_points(rng, 1.0, {6: 1.0}, avail, n_sims=200)
+    assert np.all(samples == 0.0)
+
+
+def test_simulate_round_points_mean_matches_rate_times_games() -> None:
+    rng = np.random.default_rng(7)
+    avail = np.ones(7, dtype=float)
+    # Fixed 6-game series, fully available -> E[points] = 0.8 * 6.
+    samples = simulate_round_points(rng, 0.8, {6: 1.0}, avail, n_sims=40000)
+    assert float(np.mean(samples)) == pytest.approx(0.8 * 6, rel=0.05)
+
+
+def test_project_skater_round_is_reproducible_under_seed() -> None:
+    length_probs = {4: 0.1, 5: 0.3, 6: 0.35, 7: 0.25}
+    runtime = ProjectionRuntime(seed=123, n_sims=500)
+    a = project_skater_round(SkaterRoundRequest(0.7, length_probs), runtime)
+    b = project_skater_round(SkaterRoundRequest(0.7, length_probs), runtime)
+    assert a == b
+
+
+def test_project_skater_round_quantiles_are_ordered() -> None:
+    proj = project_skater_round(
+        SkaterRoundRequest(0.6, {5: 0.5, 6: 0.5}),
+        ProjectionRuntime(seed=42, n_sims=3000),
+    )
+    assert proj.p10 <= proj.p50 <= proj.p90
+    assert proj.expected_points == pytest.approx(proj.pts_per_game * proj.expected_games, rel=0.1)
+
+
+# ── Combined R3+R4 round sampling ──────────────────────────────────────────
+
+
+def test_project_skater_combined_reduces_to_single_round_when_no_advance() -> None:
+    length_probs = {4: 0.1, 5: 0.3, 6: 0.35, 7: 0.25}
+    runtime = ProjectionRuntime(seed=99, n_sims=6000)
+    single = project_skater_round(SkaterRoundRequest(0.7, length_probs), runtime)
+    combined = project_skater_combined(
+        CombinedRoundRequest(0.7, length_probs, 0.0, {6: 1.0}),
+        runtime,
+    )
+    # p_advance == 0 never plays the second series, so the totals match the single
+    # round (same seed drives the first-series draws identically).
+    assert combined.expected_points == pytest.approx(single.expected_points, rel=0.05)
+    assert combined.expected_games == pytest.approx(single.expected_games, rel=1e-9)
+
+
+def test_project_skater_combined_adds_conditional_next_round() -> None:
+    first = {5: 0.5, 6: 0.5}
+    second = {5: 0.5, 6: 0.5}
+    p_advance = 0.6
+    runtime = ProjectionRuntime(seed=7, n_sims=8000)
+    r3 = project_skater_round(SkaterRoundRequest(0.8, first), runtime)
+    r4 = project_skater_round(SkaterRoundRequest(0.8, second), runtime)
+    combined = project_skater_combined(
+        CombinedRoundRequest(0.8, first, p_advance, second),
+        runtime,
+    )
+    # Expected points and games are additive: R3 + p_advance * R4.
+    assert combined.expected_points == pytest.approx(
+        r3.expected_points + p_advance * r4.expected_points, rel=0.05
+    )
+    assert combined.expected_games == pytest.approx(
+        r3.expected_games + p_advance * r4.expected_games, rel=1e-9
+    )
+    # Spanning a possible second series widens the ceiling.
+    assert combined.p90 >= r3.p90
+
+
+def test_project_skater_combined_is_reproducible_under_seed() -> None:
+    runtime = ProjectionRuntime(seed=5, n_sims=1000)
+    request = CombinedRoundRequest(0.6, {6: 1.0}, 0.5, {6: 1.0})
+    a = project_skater_combined(request, runtime)
+    b = project_skater_combined(request, runtime)
+    assert a == b
+
+
+def test_project_skater_round_availability_curve_wins_over_multiplier() -> None:
+    length_probs = {6: 1.0}
+    # A curve that blanks the first three games halves a 6-game slate roughly.
+    curve = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]
+    proj = project_skater_round(
+        SkaterRoundRequest(1.0, length_probs, availability_curve=curve, availability=1.0),
+        ProjectionRuntime(seed=1, n_sims=8000),
+    )
+    # 6-game series, available only for games 4,5,6 -> 3 expected games.
+    assert proj.expected_games == pytest.approx(3.0)
+    assert proj.availability_multiplier == pytest.approx(0.5)
+
+
+def test_project_skater_round_scalar_availability_haircut() -> None:
+    proj = project_skater_round(
+        SkaterRoundRequest(1.0, {6: 1.0}, availability=0.5),
+        ProjectionRuntime(seed=2, n_sims=8000),
+    )
+    assert proj.expected_games == pytest.approx(3.0)
+    assert proj.availability_multiplier == pytest.approx(0.5)
+
+
+@settings(max_examples=25, deadline=None)
+@given(
+    ppg=st.floats(min_value=0.0, max_value=2.0),
+    seed=st.integers(min_value=0, max_value=10_000),
+)
+def test_quantiles_never_decrease_property(ppg: float, seed: int) -> None:
+    proj = project_skater_round(
+        SkaterRoundRequest(ppg, {4: 0.25, 5: 0.25, 6: 0.25, 7: 0.25}),
+        ProjectionRuntime(seed=seed, n_sims=400),
+    )
+    assert proj.p10 <= proj.p50 <= proj.p90
+    assert proj.expected_points >= 0.0
+
+
+# ── End-to-end evaluation fixture ──────────────────────────────────────────
+
+TEAMS = ["AAA", "BBB", "CCC", "DDD"]
+STRENGTH = {"AAA": 3.0, "BBB": 1.0, "CCC": -1.0, "DDD": -3.0}
+# Latent per-game scoring talent; skaters inherit it plus a per-position offset.
+TEAM_RATE = {"AAA": 0.9, "BBB": 0.6, "CCC": 0.4, "DDD": 0.2}
+_PLAYOFF_SERIES_RESULTS = [
+    ("AAA", 3, 0),
+    ("AAA", 4, 2),
+    ("DDD", 3, 1),
+    ("DDD", 2, 1),
+    ("AAA", 3, 2),
+    ("AAA", 2, 1),
+]
+_REGULAR_SEASON_MATCHUPS = [
+    (home, away) for index, home in enumerate(TEAMS) for away in TEAMS[index + 1 :]
+]
+
+
+@dataclass(frozen=True)
+class _AppendSkaterRowsRequest:
+    rows: list[dict[str, object]]
+    players: dict[int, tuple[str, float, str]]
+    rng: np.random.Generator
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    team: str
+    opp: str
+
+
+@dataclass(frozen=True)
+class _RegularSeasonRequest:
+    sk_rows: list[dict[str, object]]
+    tg_rows: list[dict[str, object]]
+    players: dict[int, tuple[str, float, str]]
+    rng: np.random.Generator
+    end_year: int
+    season_id: int
+    n_reg: int
+    gid_start: int
+
+
+def _players() -> tuple[pd.DataFrame, dict[int, tuple[str, float, str]]]:
+    players: dict[int, tuple[str, float, str]] = {}
+    rows: list[dict[str, object]] = []
+    pid = 100
+    for team in TEAMS:
+        for offset, pos in ((0.25, "F"), (-0.1, "D")):
+            players[pid] = (team, TEAM_RATE[team] + offset, pos)
+            rows.append(
+                {
+                    "player_id": pid,
+                    "player_name": f"{team}-{pid}",
+                    "last_name": f"L{pid}",
+                    "birth_date": "1996-01-01",
+                    "position_code": "C" if pos == "F" else "D",
+                    "position": pos,
+                    "shoots_catches": "L",
+                    "current_team_abbrev": team,
+                }
+            )
+            pid += 1
+    return pd.DataFrame(rows), players
+
+
+def _append_skater_rows(request: _AppendSkaterRowsRequest) -> None:
+    for player_id, (player_team, rate, pos) in request.players.items():
+        if player_team != request.team:
+            continue
+        goals, assists = _draw_ga(request.rng, rate)
+        request.rows.append(
+            _skater_row(
+                _SkaterRowInput(
+                    player_id,
+                    pos,
+                    request.game_id,
+                    request.game_date,
+                    request.season_id,
+                    request.game_type_id,
+                    request.team,
+                    request.opp,
+                    goals,
+                    assists,
+                )
+            )
+        )
+
+
+@dataclass(frozen=True)
+class _SkaterRowInput:
+    player_id: int
+    pos: str
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    team: str
+    opp: str
+    goals: int
+    assists: int
+
+
+def _skater_row(spec: _SkaterRowInput) -> dict[str, object]:
+    return {
+        "season_id": spec.season_id,
+        "game_type_id": spec.game_type_id,
+        "game_id": spec.game_id,
+        "game_date": spec.game_date,
+        "player_id": spec.player_id,
+        "player_name": f"{spec.team}-{spec.player_id}",
+        "position_code": "C" if spec.pos == "F" else "D",
+        "position": spec.pos,
+        "shoots_catches": "L",
+        "team_abbrev": spec.team,
+        "opponent_team_abbrev": spec.opp,
+        "home_road": "H",
+        "goals": spec.goals,
+        "assists": spec.assists,
+        "points": spec.goals + spec.assists,
+        "shots": spec.goals * 3 + 2,
+        "toi_seconds": 1000,
+        "pp_goals": 0,
+        "pp_points": 0,
+        "sh_goals": 0,
+        "sh_points": 0,
+        "ev_goals": spec.goals,
+        "ev_points": spec.goals + spec.assists,
+        "plus_minus": 0,
+        "penalty_minutes": 0,
+        "game_winning_goals": 0,
+        "ot_goals": 0,
+        "shooting_pct": 0.1,
+        "faceoff_win_pct": 0.5,
+    }
+
+
+@dataclass(frozen=True)
+class _TeamRowsInput:
+    game_id: int
+    game_date: str
+    season_id: int
+    game_type_id: int
+    home: str
+    away: str
+    home_goals: int
+    away_goals: int
+
+
+def _team_rows(game: _TeamRowsInput) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for team, opp, gf, ga, is_home in (
+        (game.home, game.away, game.home_goals, game.away_goals, True),
+        (game.away, game.home, game.away_goals, game.home_goals, False),
+    ):
+        won = gf > ga
+        rows.append(
+            {
+                "season_id": game.season_id,
+                "game_type_id": game.game_type_id,
+                "game_id": game.game_id,
+                "game_date": game.game_date,
+                "team_id": TEAMS.index(team) + 1,
+                "team_abbrev": team,
+                "opponent_team_abbrev": opp,
+                "home_road": "H" if is_home else "R",
+                "goals_for": gf,
+                "goals_against": ga,
+                "shots_against": 30,
+                "points": 2 if won else 0,
+                "win": won,
+                "shutout_win": won and ga == 0,
+            }
+        )
+    return rows
+
+
+def _draw_ga(rng: np.random.Generator, rate: float) -> tuple[int, int]:
+    goals = int(rng.poisson(max(rate * 0.5, 0.01)))
+    assists = int(rng.poisson(max(rate * 0.5, 0.01)))
+    return goals, assists
+
+
+def _emit_regular_season(request: _RegularSeasonRequest) -> int:
+    games = _regular_season_games(request)
+    for game in games:
+        home_win = STRENGTH[game.home] + 0.3 >= STRENGTH[game.away]
+        hg, ag = (3, 1) if home_win else (1, 3)
+        request.tg_rows.extend(
+            _team_rows(
+                _TeamRowsInput(
+                    game.game_id,
+                    game.game_date,
+                    request.season_id,
+                    2,
+                    game.home,
+                    game.away,
+                    hg,
+                    ag,
+                )
+            )
+        )
+        for team, opp in ((game.home, game.away), (game.away, game.home)):
+            _append_skater_rows(
+                _AppendSkaterRowsRequest(
+                    rows=request.sk_rows,
+                    players=request.players,
+                    rng=request.rng,
+                    game_id=game.game_id,
+                    game_date=game.game_date,
+                    season_id=request.season_id,
+                    game_type_id=2,
+                    team=team,
+                    opp=opp,
+                )
+            )
+    return games[-1].game_id if games else request.gid_start
+
+
+@dataclass(frozen=True)
+class _PlayoffSeriesRequest:
+    sk_rows: list[dict[str, object]]
+    tg_rows: list[dict[str, object]]
+    players: dict[int, tuple[str, float, str]]
+    rng: np.random.Generator
+    end_year: int
+    season_id: int
+    gid_start: int
+
+
+@dataclass(frozen=True)
+class _RegularSeasonGame:
+    game_id: int
+    game_date: str
+    home: str
+    away: str
+
+
+def _regular_season_games(request: _RegularSeasonRequest) -> list[_RegularSeasonGame]:
+    gid = request.gid_start
+    day = 1
+    month = 11
+    games: list[_RegularSeasonGame] = []
+    total_games = len(_REGULAR_SEASON_MATCHUPS) * (request.n_reg // (len(TEAMS) - 1))
+    for game_index in range(total_games):
+        home, away = _REGULAR_SEASON_MATCHUPS[game_index % len(_REGULAR_SEASON_MATCHUPS)]
+        gid += 1
+        games.append(
+            _RegularSeasonGame(
+                game_id=gid,
+                game_date=f"{request.end_year - 1}-{month:02d}-{day:02d}",
+                home=home,
+                away=away,
+            )
+        )
+        day += 1
+        if day > 27:
+            day, month = 1, (12 if month == 11 else 11)
+    return games
+
+
+def _emit_playoff_series(request: _PlayoffSeriesRequest) -> int:
+    gid = request.gid_start
+    top, bottom = "AAA", "DDD"
+    for game_number, (winner, winner_goals, loser_goals) in enumerate(_PLAYOFF_SERIES_RESULTS):
+        gid += 1
+        home = top if HOME_ICE_PATTERN[game_number] == "A" else bottom
+        away = bottom if home == top else top
+        home_goals, away_goals = (
+            (winner_goals, loser_goals)
+            if winner == home
+            else (loser_goals, winner_goals)
+        )
+        date = f"{request.end_year}-04-{20 + game_number:02d}"
+        request.tg_rows.extend(
+            _team_rows(
+                _TeamRowsInput(
+                    gid,
+                    date,
+                    request.season_id,
+                    3,
+                    home,
+                    away,
+                    home_goals,
+                    away_goals,
+                )
+            )
+        )
+        for team, opp in (("AAA", "DDD"), ("DDD", "AAA")):
+            _append_skater_rows(
+                _AppendSkaterRowsRequest(
+                    rows=request.sk_rows,
+                    players=request.players,
+                    rng=request.rng,
+                    game_id=gid,
+                    game_date=date,
+                    season_id=request.season_id,
+                    game_type_id=3,
+                    team=team,
+                    opp=opp,
+                )
+            )
+    return gid
+
+
+def _synthetic_archive(
+    end_years: list[int], *, seed: int = 0, n_reg: int = 36
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Round-robin regular seasons + a first-round AAA-over-DDD best-of-7 each year."""
+    rng = np.random.default_rng(seed)
+    players_df, players = _players()
+    sk_rows: list[dict[str, object]] = []
+    tg_rows: list[dict[str, object]] = []
+    series_rows: list[dict[str, object]] = []
+    gid = 6_000_000
+
+    for end_year in end_years:
+        season_id = (end_year - 1) * 10000 + end_year
+        gid = _emit_regular_season(
+            _RegularSeasonRequest(
+                sk_rows=sk_rows,
+                tg_rows=tg_rows,
+                players=players,
+                rng=rng,
+                end_year=end_year,
+                season_id=season_id,
+                n_reg=n_reg,
+                gid_start=gid,
+            )
+        )
+        gid = _emit_playoff_series(
+            _PlayoffSeriesRequest(
+                sk_rows=sk_rows,
+                tg_rows=tg_rows,
+                players=players,
+                rng=rng,
+                end_year=end_year,
+                season_id=season_id,
+                gid_start=gid,
+            )
+        )
+        series_rows.append(
+            {
+                "year": end_year,
+                "season_id": season_id,
+                "series_letter": "A",
+                "series_abbrev": "AAADDD",
+                "playoff_round": 1,
+                "top_seed_team_id": TEAMS.index("AAA") + 1,
+                "top_seed_abbrev": "AAA",
+                "top_seed_wins": 4,
+                "bottom_seed_team_id": TEAMS.index("DDD") + 1,
+                "bottom_seed_abbrev": "DDD",
+                "bottom_seed_wins": 2,
+                "winning_team_id": TEAMS.index("AAA") + 1,
+                "losing_team_id": TEAMS.index("DDD") + 1,
+            }
+        )
+
+    return (
+        pd.DataFrame(sk_rows),
+        pd.DataFrame(tg_rows),
+        players_df,
+        pd.DataFrame(series_rows),
+    )
+
+
+_PRODUCTION_CONFIG = SkaterProductionConfig(
+    seed=20260827,
+    n_val_seasons=1,
+    n_test_seasons=1,
+    min_confident_games=5,
+)
+
+
+_PROJECTION_CONFIG = ProjectionConfig(
+    seed=20260827,
+    n_test_seasons=2,
+    n_sims=300,
+    production_config=_PRODUCTION_CONFIG,
+)
+
+
+def test_evaluate_skater_projections_runs_end_to_end() -> None:
+    end_years = [2018, 2019, 2020, 2021, 2022, 2023]
+    _assert_projection_shape(_evaluate_projection_result(end_years, seed=1))
+
+
+def _assert_projection_shape(result: ProjectionResult) -> None:
+    assert result.test_years == (2022, 2023)
+    assert result.n_projected > 0
+    assert len(result.per_season) == 2
+    assert not np.isnan(result.test_mae_model)
+    # Uncertainty band is ordered on the held-out means.
+    assert result.mean_p10 <= result.mean_p90
+
+
+def _evaluate_projection_result(end_years: list[int], *, seed: int) -> ProjectionResult:
+    sk, tg, players, series = _synthetic_archive(end_years, seed=seed)
+    return evaluate_skater_projections(
+        ProjectionEvaluationRequest(sk, players, tg, series, _PROJECTION_CONFIG)
+    )
+
+
+def test_evaluate_skater_projections_report_and_manifest_are_consistent() -> None:
+    end_years = [2018, 2019, 2020, 2021, 2022, 2023]
+    sk, tg, players, series = _synthetic_archive(end_years, seed=2)
+    result = evaluate_skater_projections(
+        ProjectionEvaluationRequest(sk, players, tg, series, _PROJECTION_CONFIG)
+    )
+
+    report = "\n".join(result.report_lines())
+    assert PROJECTION_VERSION in report
+    assert "p10/p50/p90" in report
+    assert f"reg-ppg x {BASELINE_REG_GAMES:g}" in report
+    assert "previous round" in report
+
+    manifest = result.manifest()
+    assert manifest["model_version"] == PROJECTION_VERSION
+    assert manifest["test_years"] == [2022, 2023]
+    assert manifest["baseline_reg_games"] == BASELINE_REG_GAMES
+    assert set(manifest["test_mae"]) == {
+        "model",
+        "baseline_reg_ppg_x_games",
+        "baseline_prev_round",
+    }
+    assert manifest["beats_both_baselines"] == result.beats_both_baselines
+
+
+def test_evaluate_skater_projections_is_reproducible() -> None:
+    end_years = [2018, 2019, 2020, 2021, 2022, 2023]
+    sk, tg, players, series = _synthetic_archive(end_years, seed=3)
+    cfg = _PROJECTION_CONFIG
+    request = ProjectionEvaluationRequest(sk, players, tg, series, cfg)
+    a = evaluate_skater_projections(request)
+    b = evaluate_skater_projections(request)
+    assert a.test_mae_model == pytest.approx(b.test_mae_model)
+    assert a.mean_expected_points == pytest.approx(b.mean_expected_points)
+
+
+def test_evaluate_skater_projections_requires_enough_seasons() -> None:
+    sk, tg, players, series = _synthetic_archive([2022, 2023], seed=4)
+    with pytest.raises(ValueError, match="not enough seasons"):
+        evaluate_skater_projections(
+            ProjectionEvaluationRequest(sk, players, tg, series, _PROJECTION_CONFIG)
+        )

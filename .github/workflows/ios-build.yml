@@ -52,14 +52,30 @@ jobs:
 
       - name: Install iOS platform
         run: |
-          xcodebuild -runFirstLaunch
+          retry_xcode() {
+            local attempt=1
+            local max_attempts=3
+            while true; do
+              if "$@"; then
+                return 0
+              fi
+              if [ "$attempt" -ge "$max_attempts" ]; then
+                return 1
+              fi
+              echo "Retry $attempt/$max_attempts failed; sleeping before retry"
+              attempt=$((attempt + 1))
+              sleep 15
+            done
+          }
+
+          retry_xcode xcodebuild -runFirstLaunch
           XCODE_VERSION=$(xcodebuild -version | awk '/Xcode/{print $2}')
           EXPECTED_SDK="iphoneos${XCODE_VERSION}"
           if xcodebuild -showsdks | grep -q "$EXPECTED_SDK"; then
             echo "$EXPECTED_SDK already installed"
           else
             echo "$EXPECTED_SDK missing, downloading iOS platform"
-            sudo xcodebuild -downloadPlatform iOS
+            retry_xcode sudo xcodebuild -downloadPlatform iOS
           fi
           xcodebuild -showsdks
 

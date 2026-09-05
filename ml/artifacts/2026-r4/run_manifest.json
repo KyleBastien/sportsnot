@@ -1,0 +1,75 @@
+{
+  "artifact_version": "live-projection-v1",
+  "as_of_cutoff": "2026-06-02",
+  "cli_flags": {
+    "combine_final_rounds": true,
+    "horizon": 7,
+    "ir": false,
+    "managers": 4,
+    "n_sims": 4000,
+    "no_refresh": true,
+    "seed": 20260827,
+    "slot_rollouts": 500,
+    "slot_strategies": false
+  },
+  "combined_event": null,
+  "counts": {
+    "eligible_series": 1,
+    "eligible_teams": 2,
+    "skaters_injured": 0,
+    "skaters_projected": 57
+  },
+  "eligible_team_abbrevs": [
+    "CAR",
+    "VGK"
+  ],
+  "feature_version": "skater-v1",
+  "generated_at": "2026-09-02T08:25:29.942277+00:00",
+  "git_dirty": false,
+  "git_sha": "e8656219b87297262c39461456fc527f70e350b7",
+  "ir_stash": {
+    "candidates": 0,
+    "enabled": false,
+    "stash_verdicts": 0
+  },
+  "model_versions": {
+    "game_win": "game-win-v1",
+    "projection": "skater-projection-v1",
+    "series_sim": "series-sim-v1",
+    "shutout": "shutout-v1",
+    "skater_production": "skater-production-v1"
+  },
+  "package_version": "0.1.0",
+  "platform": {
+    "machine": "AMD64",
+    "numpy": "2.5.2",
+    "os": "Windows",
+    "os_release": "11",
+    "python": "3.12.12"
+  },
+  "playoff_round": 4,
+  "scarcity": {
+    "assets": 59,
+    "ir": false,
+    "managers": 4,
+    "replacement_level": {
+      "D": 1.39875,
+      "F": 2.248,
+      "G": 0.0
+    },
+    "roster_demand": {
+      "defense_per_manager": 3,
+      "forwards_per_manager": 5,
+      "goalies_per_manager": 1
+    }
+  },
+  "season": 2026,
+  "seeds": {
+    "base": 20260827,
+    "horizon": 7,
+    "n_sims": 4000
+  },
+  "slot_strategies": null,
+  "snapshot_id": "live-44src-12769611b",
+  "warnings": []
+}

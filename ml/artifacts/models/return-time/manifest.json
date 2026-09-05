@@ -1,0 +1,83 @@
+{
+  "model_version": "return-time-v1",
+  "seed": 20260827,
+  "horizon": 7,
+  "status_mean_games": {
+    "day_to_day": 1.0,
+    "out": 3.0,
+    "ir": 8.0
+  },
+  "spell_filters": {
+    "min_spell": 2,
+    "min_appearances": 20,
+    "min_median_toi": 600.0,
+    "min_team_games": 40
+  },
+  "split": {
+    "train_years": [
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024
+    ],
+    "test_years": [
+      2025,
+      2026
+    ]
+  },
+  "counts": {
+    "spells_total": 10470,
+    "spells_train": 8611,
+    "spells_test": 1859
+  },
+  "spell_distribution": {
+    "mean": 6.19484240687679,
+    "median": 4.0,
+    "p90": 14.0
+  },
+  "calibration_mae": 0.022961307472174584,
+  "calibration_bins": [
+    {
+      "missed": 1,
+      "predicted_survival": 1.0,
+      "observed_survival": 1.0
+    },
+    {
+      "missed": 2,
+      "predicted_survival": 0.695621878991987,
+      "observed_survival": 0.722431414739107
+    },
+    {
+      "missed": 3,
+      "predicted_survival": 0.5203809081407502,
+      "observed_survival": 0.5508337816030123
+    },
+    {
+      "missed": 4,
+      "predicted_survival": 0.40483103007780746,
+      "observed_survival": 0.4373318988703604
+    },
+    {
+      "missed": 5,
+      "predicted_survival": 0.3358494948321914,
+      "observed_survival": 0.36040882194728346
+    },
+    {
+      "missed": 6,
+      "predicted_survival": 0.27673905469747995,
+      "observed_survival": 0.3055406132329209
+    },
+    {
+      "missed": 7,
+      "predicted_survival": 0.23737080478457787,
+      "observed_survival": 0.2549757934373319
+    }
+  ],
+  "git_sha": "e8656219b87297262c39461456fc527f70e350b7",
+  "git_dirty": false
+}

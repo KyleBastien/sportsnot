@@ -1,0 +1,61 @@
+# draft_oracle .gitignore — keeps raw pulls, feature caches, and artifacts out of git.
+# See ml/SPEC.md §4 (directory contract) for what is committed vs. generated.
+
+# Raw ingested data is regenerated from the network; committed sources are the
+# exceptions re-included below.
+data/raw/*
+!data/raw/league-drafts/
+!data/raw/odds-archive/
+!data/raw/nhl-archive/
+
+# Generated feature matrices
+data/features/
+
+# Normalized Parquet tables + dated snapshots (regenerated from the archive)
+data/normalized/
+
+# Model artifacts, except committed backtest reports and manifests
+artifacts/*
+# One clean regeneration pass pins every committed evidence manifest to one SHA.
+!artifacts/EVIDENCE_PASS.json
+# Owner-approved 2026 projection evidence and structural regression fixtures.
+!artifacts/2026-r1/
+!artifacts/2026-r1/**
+!artifacts/2026-r2/
+!artifacts/2026-r2/**
+!artifacts/2026-r3/
+!artifacts/2026-r3/**
+!artifacts/2026-r4/
+!artifacts/2026-r4/**
+!artifacts/backtests/
+artifacts/backtests/*
+!artifacts/backtests/*/
+!artifacts/backtests/*/report.md
+!artifacts/backtests/*/manifest.json
+# Per-round intermediates are regenerable — keep them out of git.
+artifacts/backtests/*/rounds/
+!artifacts/models/
+artifacts/models/*
+!artifacts/models/*/
+!artifacts/models/*/report.md
+!artifacts/models/*/manifest.json
+
+# Draft-night autosave logs are local state, including inside committed fixtures.
+draft-session.json
+artifacts/2026-r*/draft-session.json
+
+# Secrets / env
+.env
+.env.*
+
+# Virtualenvs
+.venv/
+venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/

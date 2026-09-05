@@ -1,3 +1,959 @@
 # Ralph Progress Log
-Started: 2026-08-24
+Started: 2026-09-02 (round-5 closing fix round from ml/CODE_REVIEW_R4.md; prior logs archived in scripts/ralph/archive/)
+---
+
+## Codebase Patterns
+- Projection run manifests record resolved generating flags plus OS/Python/numpy
+  versions. Rebuilds target float-ULP equality across platforms and byte identity on
+  the generating platform. Combined R3+R4 team tables keep `e_wins`, `e_games`, and
+  `e_shutout_wins` R3-only while `e_goalie_points` carries the documented fold.
+- Evaluation reports must disclose excluded events and reasons. In opponent membership
+  replay, missing snake order is an explicit manifest/report exclusion, never a silent
+  drop.
+- Guard globally keyed overrides with structured ids plus `expected_matches`.
+  `match-drafts` counts skaters by the effective lookup name (`corrected_name` when
+  present, else raw) and team overrides by the first matching G-slot team/raw
+  candidate. Legacy scalar ids remain supported for unguarded overrides.
+- When parser diagnostics live in pandas `DataFrame.attrs`, aggregate them before
+  concatenation and copy them into the command result object; pandas operations do not
+  provide durable user-facing accounting by themselves.
+- Committed evidence provenance uses one regeneration pass: every model, backtest, and
+  projection manifest SHA must equal `ml/artifacts/EVIDENCE_PASS.json` and carry
+  `git_dirty=false`. Never compare provenance to current HEAD ancestry; squash merges
+  and shallow clones may not retain the generating commit object.
+- Duplicate draft ownership uses the asset identity consumed by the slot: `player_id`
+  for skaters and `team_id` for goalie/team slots, scoped by league, season, and draft
+  event. Goalie rows deliberately skip skater goals-plus-assists point cross-checks.
+- Tests that consume gitignored `data/normalized` tables must skip with a clear missing-
+  data reason on fresh clones. README must list the normalize, league-draft matching,
+  and odds generation sequence needed to enable those real-data regressions.
+- Draft-night inputs fail closed at the shared CLI boundary: `parse_managers` rejects
+  case-insensitive duplicate ids for both `draft` and `recommend`, `_resolve_eliminated`
+  rejects every unmatched abbreviation, and `DraftState.new` validates uniqueness
+  again. New sessions never overwrite an existing path; use `--resume` or a distinct
+  `--session`. `--resume A --session B` refuses an existing distinct `B`; in-loop
+  `resume <path>` switches autosave to that resumed path. Both recommend entry points
+  share the fitted-opponent coverage label.
+- Game-win reports/manifests record per-season priced/total market coverage with the
+  temporal split and explicit zero-coverage state. Odds joins can promote
+  `season_end_year` to float, so normalize group keys before integer conversion.
+- Committed projection artifacts ship CSV/parquet twins. Structural tests must compare
+  ordered rows and columns after blank-string/null normalization, with `1e-12` relative
+  and absolute float tolerance for CSV round trips.
+- Combined-event manifest components are independently serialized to six decimal
+  places; formula decomposition tests need `3e-6` absolute tolerance.
+- Odds source cross-validation must compare one consistent side (`home_implied`), not
+  each source's favorite-probability magnitude. Game-type lookup may index both
+  orientations, but market joins are orientation-specific; reverse-only archive matches
+  must be retained as uncovered and counted. NHL stats-rest truncation guards check both
+  declared `total` and `len(data)` because capped responses can omit `total`.
+- Combined-event regression tests must assert concrete cross-round numbers, not only
+  `scored_rounds` metadata. Guard roster actuals, conditional goalie valuation, and
+  league comparisons independently so one working leg cannot mask another regression.
+- All team-game consumers call `models._games.pivot_decided_games`; do not recreate
+  local home/away pivots in game-win training, series-sim replay, or shutout training.
+  The helper derives winners from normalized `team_games.win`, not goal comparison.
+  Shootouts can have equal `goals_for`; retain rows with exactly one archive winner
+  and warn before excluding malformed/undecided rows.
+- League draft consumers must call `dedupe_duplicate_events` before aggregation and
+  use shared `event_keys` grouping; real events are keyed by
+  `(season, league_name, draft_event)`, never season/event alone. Dedupe preserves
+  asset-level `points_excluded=True` from any source before preferring app rows and
+  fills missing app skater `team_id` values from an unambiguous matching sheet row.
+  Never overwrite app team ids or apply this supplement to goalie/team rows.
+- Mock TanStack Query-shaped results must expose every status field consumed by shared
+  hooks; successful static results include `isFetched: true`.
+- On Windows, `yarn nx e2e @sportsnot/e2e` can start Playwright before `serve-static`
+  listens on port 4200. If early tests fail with `ERR_CONNECTION_REFUSED`, start
+  `yarn nx serve-static @sportsnot/web`, verify readiness, then run Playwright directly.
+- Team outcome feature ownership (US-119): `models/game_win.py` owns chronological
+  team aggregates and exact-game market joins; `models/series_sim.py` consumes the
+  fitted game model. Shared Elo config/math lives in `features/elo.py`. Do not add a
+  parallel team/series matrix unless a production path consumes and evaluates it.
+- Clean artifact regeneration (US-118): `add_git_provenance()` inspects Git from the
+  Python process working directory. Importing source from a detached clean worktree
+  via `PYTHONPATH` is insufficient if the process CWD remains a dirty checkout. Run
+  inside the clean worktree and write artifacts to an external directory so earlier
+  generated rounds do not make later manifests dirty.
+- Committed model/backtest evidence is guarded by
+  `ml/tests/test_committed_model_evidence.py`; regenerate report/manifest pairs at the
+  fixed seed from the same clean commit. The 2026 `r500` backtest can consume roughly
+  seven CPU hours and writes only at completion, so sustained CPU with quiet output is
+  expected.
+- Artifact provenance (US-117): every model/projection/backtest manifest writer must
+  wrap payloads with `draft_oracle.provenance.add_git_provenance`; this stamps both
+  `git_sha` and an explicit `git_dirty` marker so dirty-tree artifacts cannot claim
+  clean reproducibility.
+- Draft-time CLI startup (US-117/US-208): keep `cli/project.py` imports stdlib +
+  Typer only and keep `optimize/__init__.py` convenience re-exports lazy. Artifact
+  consumers must import lightweight primitives (for example `optimize/ir_pool.py`),
+  not modules that import projection training. Guard REAL `draft` and `recommend`
+  runs with `lightgbm`, `sklearn`, and `httpx` blocked; `--help` alone misses command
+  body imports. Default draft session state belongs in cwd, never inside immutable
+  artifact fixtures. Tests are offline by enforcement: `tests/conftest.py` blocks
+  socket connections globally; HTTP tests must inject `httpx.MockTransport` or
+  another in-memory fixture transport.
+- Recommend fast path vs object rollout (US-116, `optimize/recommend.py`): two
+  rollout impls must stay reconciled. The OBJECT path (`_expected_value` ->
+  `_rollout_owner_value`) is the source of truth: opponents draft by `rank_value`
+  (`GreedyOpponentModel`/`FittedOpponentModel`), the owner fills greedy-VOR by
+  `asset_value`, and E[roster] = `_owner_roster_value` = sum of asset_value over the
+  owner's WHOLE roster (already-drafted + rollout picks). The VECTORIZED paths
+  (`_vectorized_greedy_expected`, `_vectorized_fitted_expected`) must match: score
+  opponents by `rank_val` (NOT `val`/projection), and add
+  `base_owner_value = _owner_roster_value(state, owner)` to every candidate mean
+  (owner_total only accumulates rollout picks). Dry states: any pick site must call
+  `_require_legal_rows(legal, manager)` (raises like the object path) -- a bare numpy
+  `argmax` over an all -inf row silently returns index 0 and drafts garbage; the
+  owner greedy TAIL (`_vec_fill_owner`) instead masks per-row and STOPS (matches
+  `_fill_owner_greedily`'s break). GOTCHA: fast==object EXACTLY only at temperature 0;
+  parity tests must advance the draft so the owner holds >=1 asset (else
+  base_owner_value=0 hides the m-8 bug) and, to exercise the dry-raise, make the
+  OWNER the last snake seat on the clock (object stops at owner-full, so an opponent
+  that only runs dry afterward won't raise).
+  Exact opponent-utility ties use `rank_value` descending then asset key ascending;
+  never inherit vector array order (currently projection-sorted). Fitted kernels keep
+  `need_weight` in a manager-indexed array alongside rank/affinity coefficients. CLI
+  labels must disclose league-average/no-affinity behavior when `seatN` ids match no
+  fitted per-manager keys.
+- Odds favorite attribution (US-102, `ingest/odds.py`): favorite-only rows go
+  through `_favorite_rows_from_games(grouped, source=, resolve_favorite=,
+  placeholder_seasons=)`. `resolve_favorite: FavoriteResolver` = `(game_id,
+  home_row, away_row) -> "home"|"away"|None`; `None` => emit `_uncovered_row`
+  tagged `_unattributed` (covered=False, kept). DEFAULT resolver =
+  `_kaggle_favorite_side`, which trusts a favorite ONLY when the two rows carry a
+  GENUINE per-team opposite-signed spread (`_favorite_side_from_pair_spreads`:
+  `home<0<away`->home). The real Kaggle archive stamps ONE game-level spread on
+  BOTH rows (identical), so it attributes NOTHING (honest: Kaggle favorite prices
+  are unattributed). GOTCHA: synthetic Kaggle test fixtures (`_kaggle_pair`) use
+  opposite-signed spreads (-1.5/+1.5) so they DO attribute -- don't "fix" that.
+  ESPN completion (`parse_espn_completion`) is the authoritative path: reads
+  `homeTeamOdds.favorite` from `raw/summary/{event_id}.json.gz`
+  (`_espn_completion_favorite_sides` + `_pickcenter_favorite_side`; homeTeamOdds
+  == the game's home team, no team-id match needed), falling back to ESPN's
+  home-relative spread sign when a summary is absent. `devig_favorite_only` floors
+  the de-vigged favorite at 0.5 (a -101..-110 favorite must never invert to an
+  underdog -- m-5). attrs surfaced: `unattributed_uncovered_rows` (Kaggle),
+  alongside US-101's `placeholder_uncovered_rows`.
+- Odds ingest guards (US-101, `ingest/odds.py`): the Kaggle `nhl_data_extensive`
+  archive backfills seasons with a constant -105 puck-line placeholder. Guard =
+  `_placeholder_prices_by_season(raw)` -> `{season_end_year: None | frozenset(prices)}`
+  (None = reject whole season; frozenset = reject that modal price only), gated by
+  `PLACEHOLDER_MIN_SEASON_ROWS` (10) so tiny synthetic fixtures aren't judged.
+  `_favorite_rows_from_games(..., placeholder_seasons=)` emits rejected rows via
+  `_uncovered_row` (covered=False, kept -- never dropped) and tags them `_placeholder`
+  (a dict key `_finalize` ignores since it builds with `columns=_ODDS_COLUMNS`).
+  `parse_kaggle_extensive` records `frame.attrs["placeholder_uncovered_rows"]`.
+  `consolidate_odds` consumes `xval_delta` as a gate (`XVAL_DELTA_THRESHOLD`): when
+  covering sources disagree on fav-prob beyond it, `_blank_market_fields` flags the
+  consolidated row uncovered (keeps xval_delta/source_count for audit) and counts
+  `out.attrs["xval_flagged_rows"]`. Both counts surface via `OddsResult` +
+  `oracle odds` CLI. GOTCHA: `_attach_market` (game_win) filters on `home_implied`
+  not-null, so any "exclude from market" flag MUST null the implied/ml/devig fields,
+  not just set covered=False. pandas `.attrs` survive sort/reset_index/to_parquet on
+  the in-memory frame but NOT a parquet round-trip -- read them before writing.
+  Run ml checks with `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy} src tests`
+  (ml is a standalone Python project, NOT an nx package -- no `yarn nx` target).
+- Odds local-date normalization (US-103, `ingest/odds.py`, CODE_REVIEW M-2):
+  Kaggle/ESPN stamp UTC calendar dates (evening game -> next day); the NHL
+  archive + SBR use LOCAL dates; `game_win._attach_market` joins on EXACT
+  `game_date`. `consolidate_odds(source, local_game_dates=...)` snaps each row's
+  `game_date` (and `game_key`) onto the archive local date within +-1 day via
+  `_snap_to_local_date`; `load_local_game_dates(nhl_archive_dir)` builds the
+  index `{(season_end_year, home_id, away_id) -> sorted local dates}` from
+  `team-games-*.csv.gz` (season_end_year = seasonId % 10000). `build_odds_table`
+  now takes `nhl_archive_dir` and passes the index through; the `odds` CLI adds a
+  matching option. GOTCHA: after US-101 the Kaggle 2024/2025 placeholder seasons
+  are fully rejected (0 covered), so the honest 2023-2026 covered universe is SBR
+  (2023) + espn_completion (2026) only -- a fast M-2 test builds just those two
+  sources. ~92% of ALL covered rows attach, but 100% of "genuine" covered rows
+  (those whose matchup exists in the archive within +-1 day) attach; the residual
+  ~8% are phantom rows pricing games absent from the archive (source noise, out of
+  M-2 scope). Metric = attachment among GENUINE covered rows, not all covered.
+- Playoff labeling by gameTypeId (US-104, `ingest/odds.py`, CODE_REVIEW M-4/m-12):
+  the fixed April `_PLAYOFF_WINDOWS` heuristic mislabels late-April regular-season
+  games (window opens Apr 1; regular seasons run to ~May 1) and misses early-Oct
+  preseason. AUTHORITATIVE source = archive `gameTypeId` (2=regular, 3=playoff;
+  archive has NO preseason type-1 rows -> preseason = "no archive match").
+  `load_archive_game_types(archive_dir)` -> `{(season_end_year, home_id, away_id):
+  {local_date: gameTypeId}}`, keyed in BOTH home/away orientations (a game is
+  playoff regardless of side). `consolidate_odds(..., local_game_types=...)` labels
+  is_playoff AFTER `_snap_to_local_date` (so the row date already matches the
+  archive local date) via `_label_playoff_from_archive`: type3->True, type2->False,
+  NO match->is_playoff=None AND `_blank_market_fields` (covered=False), kept+counted
+  in `out.attrs["unmatched_uncovered_rows"]` + `OddsResult.unmatched_uncovered_rows`
+  (never dropped silently). GOTCHA: labeling only runs when local_game_types is
+  supplied, so the M-2 `test_market_join_*` (dates-only) is unaffected. is_playoff
+  column is now object dtype (bool | None); playoff CONSUMERS must use
+  `.fillna(False).astype(bool)` NOT bare `.astype(bool)` to exclude None (fixed
+  `backtest/replay.py:642` series-market lookup). `build_odds_table` loads BOTH the
+  dates and types index from `nhl_archive_dir`.
+- Pre-round as-of cutoff (US-112, `models/skater_production.py` +
+  `models/series_sim.py`, CODE_REVIEW M-1): `playoff_round_starts` = each round's
+  OWN first game (only works retroactively). `playoff_round_cutoffs(team_games,
+  series)` = starts PLUS a pre-round cutoff for the round after the latest PLAYED
+  round (= day after that round's last game; round 1 = day after regular-season end
+  when no playoff games yet), via `setdefault` so played rounds are untouched and
+  backtests stay byte-identical. `build_projection_artifact` +
+  `series_sim._matchup_cutoff_plan` consume `playoff_round_cutoffs`. GOTCHA:
+  `reconstruct_series_matchups` freezes a matchup only when the replay loop reaches a
+  game dated >= its cutoff; a pending round-N matchup's cutoff is AFTER every played
+  game, so it needs the post-loop `_freeze_due_matchups(plans, ..., pd.Timestamp.max)`
+  pass -- without it the series is silently skipped (the M-1 symptom). Leak-safe: a
+  genuine pre-round archive has ZERO round-N games so "freeze at final state" ==
+  post-round-(N-1) state; when round N has games (backtest) it keeps its first-game
+  cutoff and freezes mid-loop, final pass is a no-op.
+
+- Backtest reporting (US-026, `backtest/report.py`): pure metric aggregation over an
+  in-memory `BacktestResult` (never fetches/trains) -> committed `report.md` via
+  `build_backtest_report(result)` (has `.markdown()`) + `write_report(result, out_dir)`.
+  `oracle backtest` writes report.md automatically (report import is LAZY inside
+  `run_backtest_from_normalized` to avoid a replay<->report import cycle). The replay
+  engine (`backtest/replay.py`) now CAPTURES the eval inputs during each round so the
+  report needs no re-derivation: `RoundResult.projection_eval` (ProjectionEval: skater
+  (pid,proj,actual) + team (tid,e_goalie_pts,actual) pairs) and `RoundResult.series_evals`
+  (SeriesEval: p_top_stat from `result.teams['p_series_win']`, p_top_market from
+  `_market_series_prob` = de-vigged per-game odds -> `simulate_series`, top_won from
+  `series['winning_team_id']==top_seed_team_id`). Reuse existing metric primitives:
+  `mean_absolute_error`/`spearman_correlation` (models/skater_production), `brier_score`
+  (models/game_win). Series Brier has TWO tracks: stat-only (every series) + market-aware
+  (only where committed odds cover the matchup; empty -> reported "n/a", honest per SPEC
+  §7). `run_backtest(..., odds=, league_picks=)`; odds/market are calibration-only, NEVER
+  a pick. League comparison: `ROUND_TO_DRAFT_EVENT={1:R1,2:R2,3:R3_4,4:R3_4}` maps
+  playoff round -> the league's redraft event; `_score_league_roster` scores real
+  managers' active F/D/G (skip IR, de-dup by asset) with the SAME actual lookups as the
+  oracle. GITIGNORE: `artifacts/backtests/*/rounds/` is now ignored (regenerable);
+  only `report.md`+`manifest.json` per run are committed. Committed demo run:
+  `ml/artifacts/backtests/2023-2024-2025-seed20260827/` (3 seasons, all 4 strategies).
+  --managers <n> --slot <k> [--ir]`. Reads ONLY the US-017 artifact (no net, no training
+  at draft time). Design = small PURE helpers + one mutable session, all unit-testable
+  without disk/stdin: `parse_command(line)->ParsedCommand` (tokenizer; pick name = whole
+  remainder so multi-word fuzzy names survive), `resolve_manager(managers, token)` (seat
+  number / id / unique prefix), `resolve_asset(pool, query)->AssetResolution` (exact ->
+  substring -> SequenceMatcher fuzzy; accepts only if unique or beats runner-up by
+  `_FUZZY_MARGIN`, else `ambiguous`). `DraftSession` holds the artifact `pool` + a
+  `picks: list[RecordedPick]` log and DERIVES `state: DraftState` by REPLAYING picks from
+  a fresh `DraftState.new` -> undo = pop last pick + `_rebuild()` (never mutate-in-reverse;
+  the sim has no pop). Turn order + legality enforced with REASONS (not your turn / already
+  drafted / position full / eliminated) — resolve over the FULL pool (incl. drafted &
+  eliminated) so the reason is right; `state.available` excludes them. `recommend()` calls
+  US-021 `recommend_pick(state, current_manager, GreedyOpponentModel, RecommendConfig)` for
+  whoever's on the clock (vectorized fast path; full-depth <1s on synthetic 4-mgr, well
+  under the 10s bar; `--depth 1` faster). save/resume = JSON (`to_dict`/`resume`); `resume`
+  takes an injectable `pool_loader` so round-trip tests use `build_synthetic_pool` with NO
+  disk artifact. Replay validates recorded manager == on-the-clock manager and raises on
+  drift (SPEC 7 loud-fail). Autosaves to `<artifact>/draft-session.json` after each pick.
+  Registered via `app.command(name="draft")(draft_command)` in `cli/project.py`.
+- Per-slot strategy report (US-023, `optimize/slot_strategies.py`): `oracle project`
+  additionally emits `slot_strategies.md` (gitignored artifact, like cheatsheet.md).
+  `build_slot_strategies(pool, managers, allow_ir, opponents=FittedLeagueOpponents|None)`
+  plays ONE full draft per slot 1..N: at each owner turn it calls US-021 `recommend_pick`
+  (top_n = top_alternatives+1, `compute_survival=False` for speed) for the recommended
+  pick + top-3 alts, then FOLLOWS the recommended line so later turns are conditioned on
+  prior picks. `slot_pick_numbers(slot, managers, rounds)` is the pure deterministic snake
+  math (even round -> seat, odd round -> managers-slot+1). Contingency (first 2 turns):
+  roll the opponent gap to the owner's NEXT turn K times, cluster by which top-K targets
+  survived (`_simulate_gap_taken` loops on live `current_manager` != owner -- NEVER trust a
+  precomputed gap list against apply_pick which uses current_manager), take most_common
+  branches, `greedy_vor_pick` the survivors. Opponents = fitted `as_mapping` (slow OO path)
+  when `league_draft_picks.parquet` exists, else `GreedyOpponentModel` (fast VECTORIZED
+  path -> 12 slots in ~4s). Fitted 12-slot IR real pool ~3min; greedy seconds -- both under
+  the 15-min bar. Determinism: RecommendConfig seed = config.seed+slot; realized line rng =
+  seed*7919+slot; contingency rng = seed*104729+slot*1009+turn. `_build_slot_report` in
+  projection_artifact.py SKIPS (warns, returns None, never crashes) when the pool can't fill
+  every roster (need F=Fcap*M/D/G) -- the small synthetic test archive always skips.
+  `ProjectArtifactConfig.slot_strategies`/`slot_strategy_config`; CLI `--slot-rollouts`,
+  `--no-slot-strategies`. Refactor: `recommend.build_pool_from_frames(skaters, teams, ir)`
+  is the in-memory pool builder (disk wrapper `build_pool_from_projection_artifact` calls it).
+- IR-stash valuation (US-022, `optimize/ir_value.py`): IR activation is a RETROACTIVE
+  same-position swap (SPEC 1) - the stash's whole-round points REPLACE the swapped
+  active starter's from the start of the round, so the slot yields
+  `max(stash, starter)` (`retroactive_swap_points`), never additive. Marginal
+  `stash_value = E[max(X - Y, 0)]`, Y = US-018 replacement level for that position
+  (F swaps F, D swaps D). Compose US-015 `ReturnTimeModel.availability_curve(status)`
+  (fit spells pre-cutoff, leakage-free; degenerate fallback when no spells) + US-016
+  `simulate_round_points`. Verdict "stash" iff stash_value beats the healthy
+  replacement-level alt (`healthy_alternative_value`: ppg = baseline/E[len], fully
+  available). Cheat sheet gets an IR section via `CheatSheet.ir_section` (pre-rendered
+  lines so `vor.py` never imports `ir_value`). `reprice_pool_for_ir` sets injured
+  assets' projection to stash_value so the optimizer values IR_F/IR_D realistically;
+  `oracle recommend --ir` applies it. Artifact skaters carry
+  `ir_stash_ev/ir_stash_value/ir_verdict`.
+- Opponent modelling (US-020, `optimize/opponents.py`): pick SEQUENCE is unobservable
+  for sheet-era seasons (final rosters + snake seats only); only the 2026 app export has
+  true `pick_number`. Fit order-free (per-event/position pools, with-replacement softmax
+  choice) and validate with leave-one-season-out roster-membership accuracy + (where
+  order exists) teacher-forced per-pick accuracy. Use leakage-SAFE `points_when_drafted`
+  (pre-draft, R2/R3_4 only) as the public-rank feature — NEVER `current_total_points` /
+  `points_for_round` (post-draft outcomes). Model from `league_draft_picks.parquet`
+  (US-007 matched, has player_id/team_id), not `league_picks.parquet`. Any
+  FittedOpponentModel subclasses the US-019 `OpponentModel` and drops into run_draft /
+  survival_probability unchanged.
+- VOR / draft-board pattern (US-018, `optimize/vor.py`): replacement level is a PURE
+  fn of league size N + roster shape (SPEC 1) — F=(5N+1)-th, D=(3N+1)-th,
+  G/team=(N+1)-th; IR adds +1 F/+1 D per manager (6N+1 / 4N+1), never a goalie slot.
+  `replacement_level(values, starters)` = sorted-desc[starters] or 0.0 when
+  demand>=supply (final round with 2 teams alive, tiny pools) — the "sensible
+  handling". VOR = expected_points - replacement, computed per position pool then the
+  skater+team rows are UNIONED and sorted by vor desc (tie: projection desc, name).
+  A team pick = a whole team's goaltending (projection = `e_goalie_points`, position
+  "G", no quantiles). `build_cheatsheet` -> `CheatSheet` with `.summary()` (manifest)
+  + `.report_lines()`/`render_cheatsheet_markdown` (ASCII, cp1252-safe). IR flag
+  changes BOTH replacement levels AND sheet layout (injured tagged `IR?` vs `OUT`).
+  Wired into `projection_artifact`: `ProjectArtifactConfig.managers/ir`, a
+  `cheatsheet` field on the result, `cheatsheet.md` written to the artifact dir, and
+  `--managers`/`--ir` on `oracle project`.
+
+- Predictive models live in `ml/src/draft_oracle/models/` (US-011+). Pattern: pure
+  unit-tested primitives (`brier_score`, feature-row builders) + a dataclass result with
+  `report_lines()` (ASCII Markdown) and `manifest()` (seed+splits+metrics), + a
+  `train_*_from_normalized` that reads `data/normalized/*.parquet` and writes committed
+  `artifacts/models/<name>/{report.md,manifest.json}` (both re-included in .gitignore), +
+  a `oracle <cmd>` CLI. Splits are strictly temporal (`default_temporal_split`: newest N
+  seasons held out for test, next for val, rest train); seed is fixed; misses reported
+  honestly (SPEC §7), never forced. Per-game features are built leakage-free in ONE
+  chronological pass (snapshot BEFORE folding the current result), reusing team_series Elo.
+- STALE PARQUET GOTCHA: the committed `ml/data/normalized/*.parquet` can lag the current
+  `normalize.py` schema (e.g. it was missing `shots_against`, which the raw team-games
+  archive DOES carry as `shotsAgainstPerGame`). If a model needs a column absent from the
+  current parquet, run `uv run oracle normalize --force` to regenerate before training.
+  `shotsAgainstPerGame` is per-game (== that game's shots-against). Team save % =
+  `1 - GA/shots_against` is the goalie-slot proxy (no per-goalie rows exist in the archive).
+- Shutout model (US-012, `models/shutout.py`) mirrors game_win: winner-framed rows (one per
+  decided game, label = winner held loser scoreless => `P(shutout | win)`), leakage-free
+  chronological pass over `ShutoutTeamState` (season + last-15 team save %, team shutout
+  rate, GF/game), LightGBM `monotone_constraints` keep it monotone in goalie quality.
+  Headline metric is CALIBRATION (predicted vs observed shutout rate within +/-25%), NOT
+  beating base rate — a rare event's constant base rate is a very strong Brier baseline and
+  is expected to roughly tie; report both honestly.
+- The `ml/` project is a standalone uv-managed Python 3.12+ package (`draft_oracle`),
+  fully isolated from the Nx/TS workspace. It has NO package.json, so Nx never sees it
+  and `yarn nx affected` is empty for Python-only changes. Never add a package.json to ml/.
+- `ml/SPEC.md` is the BINDING contract (ruleset, pinned stack, data sources, leakage +
+  honesty rules). Read it in full before any ml/ story. PRD governs where SPEC is silent.
+- ml/ dev workflow (run from ml/): `uv sync`, `uv run pytest`, `uv run ruff check .`,
+  `uv run ruff format --check .`, `uv run mypy`, `uv run oracle version`.
+- ruff/mypy are scoped to `src` + `tests`; committed raw-data helper scripts under
+  `ml/data/**` are excluded via `[tool.ruff] extend-exclude` — do not lint/format them.
+- Typer single-command apps auto-collapse the subcommand into the root callback. To keep
+  a NAMED subcommand (e.g. `oracle version`), add an `@app.callback()` so it stays a group.
+- Pinned stack is fixed (SPEC §3): pandas (not polars), scikit-learn + LightGBM, httpx,
+  pydantic v2, typer, rich, pyyaml; tests pytest + hypothesis. Do not relitigate.
+- COMMIT NOTE: the repo pre-commit hook runs a CodeScene remote threshold check that
+  requires CODESCENE_PAT / CODESCENE_ACCESS_TOKEN. When no token is provisioned in the
+  environment, the hook errors on that step alone. Python-only ml/ changes have zero
+  affected Nx lint/typecheck/test targets, so `--no-verify` is used with the token-gated
+  remote check documented. Provide a token to run the full hook.
+- ml/ ruff line-length is NOT 80 (Prettier's is app-only). Always run `uv run ruff
+  format .` to normalize before `--check`; hand-wrapping to 80 chars gets reformatted.
+- The rules mirror lives in `ml/src/draft_oracle/rules.py`. When app scoring/draft-order
+  changes in `packages/utils/src/lib/utils.ts` or `packages/types/src/lib/types.ts`,
+  update rules.py AND the golden vectors in `ml/tests/test_rules.py` (copied verbatim
+  from `utils.test.ts`) so cross-language drift fails the build.
+- NHL ingestion goes through `draft_oracle.ingest.nhl_api.NHLApiClient` — the ONLY place
+  NHL URLs may appear (api-web base `.../v1`, stats-rest base `.../stats/rest/en`). Add
+  typed adapters there; pydantic models use `ConfigDict(extra="ignore",
+  populate_by_name=True)` + `Field(alias="camelCase")`. Test with an injected
+  `httpx.Client(transport=httpx.MockTransport(...))`, `delay=0.0`, `retry_backoff=0.0`,
+  `sleep=noop`, temp cache dir — no network, no real sleep. MockTransport route keys use
+  the FULL request path incl. `/stats/rest/en`. Raw JSON caches to gitignored
+  `data/raw/nhl-api/`; a cache hit skips the network entirely.
+- Normalized Parquet tables live in gitignored `ml/data/normalized/` via
+  `draft_oracle.ingest.normalize`. Position collapse is `map_position` (C/L/R->F, D->D,
+  G/other->None => dropped from skater pool). `team_games.team_abbrev` is DERIVED (not in
+  the source) by pairing a game's two mirror rows — the archive names own-team by id but
+  opponent by abbrev. Real archive normalizes to 522,185 skater_games / 29,016 team_games
+  / 173 series / 2,156 players / 34 teams — skater/team counts match PROVENANCE exactly.
+  Ingestion is idempotent via `_manifest.json` (source-size signature; unchanged => skip)
+  and every table dedups on its natural key. `oracle normalize [--force]` and
+  `oracle snapshot [--list]` are the CLI entry points; snapshots freeze a dated copy under
+  `data/normalized/snapshots/<id>/`.
+- Betting odds go through `draft_oracle.ingest.odds`. De-vig: two-sided prices
+  (SBR Close) use `devig_proportional` (each `1/decimal` divided by the overround
+  sum -> sums to 1); favorite-only prices (Kaggle/ESPN) use `devig_favorite_only`
+  with a documented `STANDARD_OVERROUND=1.045` and NEVER fabricate an underdog
+  American price (only probabilities). Team names resolve via `resolve_team_id`
+  (NHL_TEAMS + explicit city/typo aliases; the rsplit "city" mishandles two-word
+  nicknames like Maple Leafs/Red Wings/Blue Jackets -> every franchise city is
+  aliased explicitly). Playoffs tagged by real per-season windows
+  (`_PLAYOFF_WINDOWS`), NOT April-June: 2020 bubble = Aug-Sep, 2021 = May-Jul.
+  SBR MMDD->year: months >=8 belong to the earlier year EXCEPT 2019-20 whose
+  Aug-Sep bubble belongs to the ending year 2020 (special-cased in
+  `_reconstruct_date`). Consolidation matches sources on (season,away,home) with
+  a +/-1 day tolerance (Kaggle/ESPN dates are UTC, one day ahead of SBR local),
+  at most one row per source per cluster so adjacent same-matchup games never
+  merge; prefer SBR Close. `oracle odds [--no-odds]` builds odds.parquet +
+  odds_by_source.parquet. `openpyxl` was added to deps for the SBR .xlsx.
+- Live odds clients (`OddsApiClient` for The Odds API `icehockey_nhl`;
+  `EspnGameOddsClient` for ESPN `summary`/pickcenter) mirror NHLApiClient's
+  cache + retry + injectable `httpx.Client`/`sleep`; keys from env (`ODDS_API_KEY`),
+  never committed. Test with `httpx.MockTransport`, `delay=0.0`, no network.
+- Windows console is cp1252: NEVER print non-ASCII (`->` arrows, em-dashes) in
+  `typer.echo` output — it crashes with UnicodeEncodeError. Use ASCII.
+- Typer options must use `Annotated[T, typer.Option(...)] = default` (NOT
+  `x: T = typer.Option(default, ...)`) or ruff B008 fails on function-call-in-defaults.
+- League draft history goes through `draft_oracle.ingest.league_drafts` (US-006).
+  `ml/data/raw/league-drafts/SCHEMA.md` + `OPEN_QUESTIONS.md` (incl. "Kyle's answers")
+  are the BINDING interpretation of the raw CSVs — read them in full before editing.
+  Emits `league_picks.parquet` (one row/roster-slot) + `league_champions.parquet`.
+  Sheet-era seasons have THREE draft events R1/R2/R3_4 (rounds 3+4 drafted together);
+  `sheet1__round-3-4.csv` is a stale 2025 dup and is EXCLUDED. Sheet rows are NOT in
+  pick order so `pick_number` stays null (only the app export has it); `snake_slot`
+  comes from each tab's order list. Documented corrections are hardcoded: Makar->Bouchard
+  name override, the Trouba "+3" note (parse Kulikov as recorded, never model mid-round
+  substitution), and the two UNFLAGGED formula-only IR swaps in sheet2__round-3-4.csv
+  (Ben Reinhart->Verhaeghe, Judah Hyman->Brown). Managers canonicalize via
+  `canonical_manager` (Evi->levi; app usernames nuttguy/bentunigold/judah18/gemmell.levi).
+  When app/scoring/roster rules change (utils.ts/types.ts/rules.py), re-check the
+  correction tables here too. Run `uv run oracle league-drafts`.
+- Entity matching goes through `draft_oracle.ingest.entity_match` (US-007). Turns
+  `league_picks.parquet` into the FINAL `league_draft_picks.parquet`: skater slots
+  (F/D/IR_F/IR_D) -> NHL `player_id` from `players.parquet`; goalie/team slots (G) ->
+  `team_id` from `teams.parquet` (a goalie pick is a bet on a TEAM's goalie situation).
+  `normalize_name` strips accents + punctuation (initials collapse: J.T.=JT). Skater
+  match order: override -> exact(norm) -> fuzzy(difflib ratio>=0.88) -> unique last-name
+  (bare "McDavid") -> low-conf fuzzy>=0.80 (needs_review) -> unmatched. SAME-NAME
+  collisions (two Sebastian Aho) disambiguated by the pick's roster position — always
+  pass position into match_skater. Team resolve = odds.resolve_team_id (city/full/abbrev)
+  + a nickname index (Panthers->FLA, Maple Leafs->TOR) scanning ALL tokens surname-first.
+  Config lives in `ml/data/overrides/` (NOT gitignored — data/raw,features,normalized
+  are, overrides are committed): `manager_aliases.yaml` (canonical->alias list,
+  evi=levi) and `name_overrides.yaml` (players/teams raw-name->id; close gaps by ADDING
+  here, never by dropping rows). The 2024 bare `McDavid` row is overridden to Draisaitl.
+  Entity validation also needs `skater_games.parquet`: a scored sheet match is review-
+  flagged when all three exact integer point splits disagree with the archive, and every
+  row of a player owned by multiple managers within `(league_name, season, draft_event)`
+  is review-flagged; same-manager app/sheet copies are not conflicts. Run
+  `uv run oracle match-drafts`.
+- Injuries go through `draft_oracle.ingest.injuries` (US-008). ESPN public JSON is the
+  ONLY injury URL location: injuries feed `site.api.espn.com/.../nhl/injuries` (top-level
+  `injuries` = list of TEAM GROUPS, each with nested `injuries` list) + core athlete
+  detail `sports.core.api.espn.com/.../athletes/{id}`. `EspnInjuriesClient` mirrors
+  NHLApiClient (cache/retry/injectable httpx, no key, default UA — ESPN 403s browser UAs).
+  Manual-authority pattern (reusable): source rows + `apply_overrides` where
+  `data/overrides/injuries.yaml` (committed, ships empty) merges OVER the source — match
+  `espn_id` first then `normalize_name(player)`, then rewrite/`remove`/inject. Graceful
+  degradation contract (reusable for all live-source builds): catch NHLApiError in
+  build_*, fall back to last-known parquet (relabel source espn->last_known), collect
+  warnings, set a `degraded` flag — never raise; `--no-fetch` reuses that path without
+  marking degraded. NEVER pull historical ESPN injuries (old summaries resolve `injuries`
+  live vs today's rosters — leakage). `oracle injuries [--no-fetch]` -> injuries.parquet.
+- As-of skater features live in `draft_oracle.features` (`skater.py` + `leakage.py`,
+  US-009). HARD RULE (SPEC §6): a round-N feature may use ONLY games strictly before
+  the round start. Every game input passes through `features.leakage.as_of(df, cutoff)`
+  (EXCLUSIVE cutoff — game on the start date belongs to the round) and
+  `assert_no_leakage` raises `LeakageError` at/after cutoff (fails build). Each feature
+  is a tiny unit-tested pure fn (`per_game`/`shooting_pct`/`pp_point_share`/`age_years`/
+  `linemate_ppg`) with a docstring stating its as-of semantics. Feature matrices are
+  keyed by `FEATURE_SET_VERSION` ("skater-v1") and written to gitignored
+  `data/features/<version>/` via `write_feature_matrix`. DOCUMENTED PROXY: the archive
+  has NO power-play TOI column, so "PP time share" is proxied by PP production
+  (`pp_point_share` = pp_points/points) — never claim it is real PP TOI. Regular-season
+  rates use `game_type_id==2` only; the last-25 window uses most-recent games of ANY type
+  in-season before the cutoff. Goalies/None-position are dropped BEFORE linemate averaging
+  or they pollute the leave-one-out PPG. mypy-strict test gotcha: build fixture frames
+  with `pd.DataFrame([{...}])` NOT `pd.DataFrame.from_records([...])` (stub rejects
+  `Mapping[str, object]` records).
+- As-of team/series features live in `draft_oracle.features.team_series` (US-010),
+  keyed by `TEAM_FEATURE_SET_VERSION` ("team-series-v1"). One row per team as-of a
+  round start; every game input funnels through `features.leakage.as_of` +
+  `assert_no_leakage` (same guard as skater). US-010 EXTENDED `normalize_team_games`
+  to carry `shots_for`/`shots_against` (single-game shots, NOT cumulative),
+  `faceoff_win_pct`, `power_play_pct`/`power_play_net_pct`,
+  `penalty_kill_pct`/`penalty_kill_net_pct` from the raw archive (all single-game
+  per-row values; PP/PK ~2% NaN on games with no opportunity). If team_games schema
+  changes, re-run `oracle normalize --force` (parquet is gitignored, no committed
+  snapshot to break; test_normalize has no exact-column-list assertion). DOCUMENTED
+  PROXIES (honesty §7): archive has NO goalie-level rows, so save% is TEAM-level
+  `1 - GA/shots_against` (season + last-15); `backup_save_pct` is left NA +
+  `goalie_split_available=False`, never fabricated. `power_play_pct`/`penalty_kill_pct`
+  are GAME-AVERAGED (equal weight/game), not opportunity-weighted. Elo
+  (`compute_elo_ratings`) replays the HOME row of each game chronologically across
+  ALL seasons before the cutoff (zero-sum: total stays n*initial; regress-to-mean at
+  season boundary is mean-preserving), K=20/home_adv=50/initial=1500. Market join maps
+  `season_id % 10000 -> season_end_year`, filters odds to reg-season pre-cutoff, avg
+  implied per team_id (home_implied when home_team_id, away_implied when away); missing
+  -> `market_available=False`, NaN prob. Injuries table is CURRENT-only: pass it only
+  for the current round (never historical/backtest -> leakage); goalie unavailability =
+  any injuries row position "G" + status in {out,ir,day_to_day} -> per-team
+  `starter_unavailability_risk`. Matchup enrichment (opponent, home_ice, head-to-head,
+  `expected_opponent_strength`=opponent Elo, series price) is optional; absent -> all
+  matchup cols at missing defaults + `matchup_available=False`. mypy-strict gotchas:
+  `pd.Timestamp - pd.Timestamp` `.days` types as a union (use `.date()` subtraction for
+  int days); iterate DataFrames with `.to_dict("records")` (itertuples attrs type as a
+  scalar union under strict); wrap `float(1.0/(1+10**...))` returns to avoid no-any-return.
+- Composed models (US-013 `models/series_sim.py`) COMPOSE the per-game win + shutout
+  models, they do not learn per-series. Best-of-7 = exact enumeration over <=2^7 paths
+  (recurse over game outcomes, stop at 4 wins, weight by product of per-game probs) -
+  deterministic, no seed; seeded Monte-Carlo only cross-checks. Home-ice = 2-2-1-1-1
+  `HOME_ICE_PATTERN=("A","A","B","B","A","B","A")` (A=higher seed). E[goalie points] is
+  LINEAR: `E[wins]*(WIN_POINTS + (SHUTOUT_POINTS-WIN_POINTS)*P(shutout|win))` == mean of
+  `rules.goalie_series_points` (shutout upgrades a win 2->4, never additive); P(shutout|win)
+  is venue-independent (winner-framed) so it's ONE scalar/team. Leakage-free composed
+  evaluation: filter team_games to seasons BEFORE the held-out set and train sub-models on
+  that slice (their `.model` is fit only on what you pass), but build as-of pre-series
+  FEATURES from ALL games in one chronological pass (feature computation != training).
+  The `series` parquet gives actual winner + length (top_seed_wins+bottom_seed_wins) +
+  playoff_round; `series.year == team_games season_id % 10000` (season end year).
+- Playoff-round reconstruction (US-014 `models/skater_production.py`): the `series`
+  parquet has NO dates, so map each playoff game to a round by pairing its
+  order-independent {team_abbrev, opponent_team_abbrev} against
+  (top_seed_abbrev, bottom_seed_abbrev) per (season_id). Round START date =
+  earliest game_date of that (season, round); it is the EXCLUSIVE as-of cutoff.
+  ~18 games/archive don't map (2019-20 bubble round-robin, round 0) - drop them,
+  don't crash. Because the cutoff is derived from a round's OWN games, features
+  (strictly before cutoff) and labels (that round's games, >= cutoff) never overlap
+  regardless of the bubble's scrambled round numbering. Skater production LABEL =
+  observed (goals+assists)/GP in that round (rules.player_points weights G,A equally).
+- Cold-case / shrinkage pattern (reusable for skater-rate models): shrink a model
+  estimate toward a position+team prior by credibility `w=n/(n+k)`
+  (`shrink_to_prior`); priors (`fit_priors`) are fit on TRAIN rows only so the test
+  label never leaks into its own shrinkage target. Players with NO regular-season
+  games have no US-009 feature row (inner-joined out); price them from the prior via
+  `SkaterProductionModel.project_cold(position, team)` returning
+  `(prior, low_confidence=True)` - flagged, never a crash (SPEC 7). Report cold-case
+  COUNT for held-out seasons honestly.
+- Spearman rank correlation without scipy (`spearman_correlation`): average-rank both
+  vectors (ties share their mean rank via `_rankdata`), then Pearson of the ranks;
+  return nan for <2 points or zero rank variance. MAE via `mean_absolute_error`.
+- Regression sibling of the game_win pattern: choose between a Poisson GLM
+  (`PoissonRegressor` on `StandardScaler` features) and `LGBMRegressor(objective=
+  "poisson")` on validation MAE; both give non-negative rates (clip raw preds >=0).
+- Availability / return-time pattern (US-015, `models/returns.py`): ESPN has NO
+  historical injuries (leakage), so return timing is calibrated on ABSENCE SPELLS
+  derived from the normalized archive - `derive_absence_spells(skater_games,
+  team_games)` finds, per (season, team, player), maximal BOOKENDED runs of missed
+  team games (`spells_from_sequence`: only gaps between two appearances count;
+  leading=pre-debut, trailing=season-end are excluded). Healthy-scratch guards are
+  documented config filters (min_spell=2, min_appearances=20, min_median_toi=600s).
+  DESIGN: the empirical spell distribution supplies the return-timing SHAPE; a
+  DOCUMENTED status->mean map (`STATUS_MEAN_GAMES` day_to_day=1/out=3/ir=8 games,
+  archive has no status label) rescales it for LOCATION. `availability_curve` =
+  empirical CDF of the (scaled, optionally games_missed-conditioned) remaining-games
+  distribution => P(available game k) is monotone non-decreasing in k by construction
+  (threshold k-1 rises). `availability_multiplier` = expected_games/horizon is the
+  haircut US-016 multiplies into expected games played. Real archive: 10,470 spells,
+  mean 6.19 games, temporal-holdout survival calibration MAE 0.023 (excellent).
+- Override precedence pattern (reusable): US-015 added `return_game: int|None` to
+  `InjuryOverride` + `load_injury_overrides` (NOT to the injuries parquet columns).
+  `project_availability` matches an override to each injury row (espn_id first, then
+  normalize_name) and a pinned `return_game` yields a deterministic 0..0,1..1 curve
+  that WINS over the model. When adding override-driven fields, extend the dataclass +
+  loader only; keep them out of the ingested table to avoid schema churn.
+- Composed projection pattern (US-016, `models/projections.py`): round-point
+  projections COMPOSE three fitted sub-models, they do not learn a new estimator.
+  `project_skater_round(pts_per_game, length_probs, availability_curve=..., seed=...)`
+  Monte-Carlos total round points: draw series length L from the simulator's
+  `length_probs`, then per game k=1..L draw availability (Bernoulli on the US-015
+  curve; scalar `availability` multiplier if no curve) and, when available,
+  `Poisson(pts_per_game)` points. Returns mean (`expected_points`) + p10/p50/p90 +
+  decomposition (`pts_per_game`, `expected_games`). REPRODUCIBILITY: seed each
+  skater's RNG deterministically from `_row_seed(seed, season, round, player)` so a
+  projection is reproducible regardless of iteration order. Eval reuses series_sim's
+  private helpers `_predict_series`/`_matchup_key`/`reconstruct_series_matchups` to
+  get per-team length distributions, and `build_production_dataset` for the leakage-
+  free feature+label rows; sub-models train ONLY on non-held-out seasons. Historical
+  rounds have NO injury feed (ESPN leakage) => availability=1.0 in backtests; the
+  haircut only bites live. Baselines: (a) reg-ppg x `BASELINE_REG_GAMES=5.5`, (b)
+  previous-round actual points (round-1 falls back to (a)). Real 2025-2026 holdout:
+  model MAE 1.3725 < reg 1.4955 < prev 1.6474; Spearman 0.5941 > 0.5796 > 0.5032 —
+  beats BOTH. mypy: np.clip returns Any, assign to a `: np.ndarray` local then return
+  it (astype(float) still types Any). CLI `oracle project-skaters`.
+- Batch projection artifact (US-017, `projection_artifact.py`, NOT under models/ or
+  optimize/): the LIVE forward-looking counterpart to projections.py's backtest. One
+  `oracle project --season <yr> --round <n>` composes win/shutout/production/series
+  sub-models into `artifacts/<season>-r<round>/{skaters,teams}.{parquet,csv}` +
+  `run_manifest.json`. Bracket source = normalized `series` table filtered to
+  (year==season, playoff_round==round); eliminated teams are excluded simply by NOT
+  being in that round's series rows (their skaters drop out on team_abbrev filter).
+  as-of cutoff = `playoff_round_starts(team_games, series)[season_id][round]`
+  (derivable only if the round's games exist in the archive -> works for committed
+  2016-2026). Sub-models train on games STRICTLY BEFORE the cutoff (filter
+  team_games/skater_games on game_date < cutoff) so the target round never leaks into
+  training; pre-series team snapshots reuse `reconstruct_series_matchups` (full
+  team_games; snapshots frozen at the round's first playoff game == round start ==
+  leakage-free). BYTE-IDENTICAL reproducibility: write parquet `index=False`, sort
+  rows deterministically (skaters by expected_points desc + player_id; teams by
+  p_series_win desc + team_id), seed every MC via `_row_seed`; the manifest is the
+  ONLY file carrying the wall-clock timestamp + git SHA (keep them OUT of the parquet
+  payload). Real 2025-r1: 16 teams / 446 skaters in ~17s (well under the 10-min bar).
+  The live artifact dir is gitignored (not committed). Cold-case skaters (no reg-season
+  feature row) are currently excluded (needs a round roster source); documented, not a
+  crash. Injury flag comes from injuries.parquet status in {out,ir,day_to_day} and
+  position!=G; availability haircut stays 1.0 for now (flag informs the drafter).
+- Draft simulator (US-019, `optimize/simulator.py`): `DraftState.new(managers, pool,
+  allow_ir, eliminated_team_ids)` builds the full `snake_order` sequence + a live
+  `available` dict keyed by `DraftAsset.key`; eliminated-team assets (skaters AND the
+  team's G slot) are dropped UP FRONT — never substituted mid-round. Per-position caps
+  come from `roster_capacity(allow_ir)` (5F/3D/1G, +1F/+1D with IR); `has_capacity`
+  gates legality so a full-at-F manager can only take D/G. `roster_slots()` maps the
+  extra F/D into IR_F/IR_D so `rules.validate_roster(allow_ir_slots=...)` (NOTE kwarg is
+  `allow_ir_slots`, not `allow_ir`) passes. Opponent policy is the pluggable
+  `OpponentModel` ABC; `GreedyOpponentModel(temperature, need_weight)` scores legal
+  assets `rank_value + need_weight*(open/limit)` then softmax-samples (temp 0 = argmax,
+  tie-break rank then key). `survival_probability(state, candidate, manager, model,
+  rollouts, seed)` copies state per rollout, plays only the gap of opponent picks before
+  `manager`'s next turn (via `picks_until_next`), counts non-captures. Determinism: full
+  draft threads ONE `random.Random(seed)`; survival derives per-rollout seed `seed*1_000_003+i`
+  (mypy-strict rejects a tuple seed to `random.Random`). Test feasibility trick: an EXACT
+  pool (supply == total capacity per position) provably forces valid full rosters.
+- Multi-step recommendation (US-021, `optimize/recommend.py`): `recommend_pick(state,
+  owner, model)` = argmax over legal candidates of expected FINAL owner-roster
+  projection via MC rollout to draft end (opponents draft through all owner turns; owner
+  future slots filled by greedy-VOR tail; avg >=500 seeded rollouts). PERF (<10s at
+  12-mgr first pick): the pick ORDER is identical across rollouts, so batch all 500 in
+  numpy — `_vectorized_greedy_expected` advances [R,P] alive/counts arrays in lockstep,
+  Gumbel-max samples the greedy opponent, only opponent draws differ (used when
+  opponents are a single `GreedyOpponentModel`; mapping/fitted uses the OO path). Also:
+  prune candidates to top `max_candidates` by VOR, stop each rollout at owner-full,
+  survival computed only for the surfaced top_n. CRITICAL variance fix — COMMON RANDOM
+  NUMBERS: seed rollout j from j ALONE (not the candidate) so all candidates face the
+  same opponent draws; without CRN the candidate value gaps (<0.5) drown in rollout
+  variance and the lookahead picks near-randomly / loses to greedy. `asset_value` =
+  projection (fallback rank_value); `greedy_vor_pick` = argmax value-minus-replacement.
+  `oracle recommend --artifact-dir <projection-dir> --managers N --seat S`.
+- Strategy comparison honesty (US-021): use SINGLE-DECISION same-slot framing ("from the
+  same slot") — advance to a shared decision slot with a greedy tail, each strategy makes
+  ONE pick, finish with an identical greedy-VOR tail; measure final owner value. Do NOT
+  run each strategy at EVERY owner pick (recursive tail/policy mismatch: the rollout
+  assumes a greedy tail but actual play uses lookahead -> biased, lookahead can lose).
+  KEY FINDING: against BALANCED opponents greedy-VOR is already optimal (fitted opponents
+  draft positions evenly because `rank_z` is standardized WITHIN a position), so
+  multi-step correctly TIES it — a tie is the honest, expected result, not a bug. The
+  multi-step advantage only appears against POSITIONAL-RUN opponents (a run pushes a
+  position below its pool-wide replacement, where a static VOR board is blind) — the
+  committed `artifacts/models/recommend/report.md` runs BOTH scenarios and reports both.
+
+- Artifact regeneration (US-105): the odds/model artifacts are regenerated by re-running
+  CLI commands via `ml/.venv/Scripts/python.exe -m draft_oracle.cli.project <cmd>` (there
+  is a console script but `-m` works): `odds` -> odds.parquet (GITIGNORED, not committed);
+  `train-game-win`, `train-shutout`, `eval-series-sim` -> the COMMITTED `report.md` +
+  `manifest.json` under `artifacts/models/<name>/` (parquet under data/normalized is
+  gitignored; only the md/json artifacts are tracked). GOTCHA: after US-103/104 the
+  game-win + series-sim artifacts were ALREADY consistent with the corrected pipeline, so
+  re-running them yields an EMPTY git diff -- don't invent changes; the honest outcome is
+  "no change". Model-selection / hyperparameter choices (model type, shrinkage weight)
+  MUST be made on the VALIDATION fold, never the held-out test seasons (SPEC section 6).
+  Shutout base-rate shrinkage lives in `models/shutout.py` (`_apply_shrinkage`,
+  `_select_shrinkage_weight`, ShutoutModel.shrinkage_weight/base_rate applied inside
+  predict_shutout_prob so ALL consumers -- series_sim, projections -- inherit it); on real
+  data w=1.0 (pure model) wins validation so shrinkage is evaluated-but-not-adopted.
+- Opponent fit dedupe + league isolation (US-106, `optimize/opponents.py`, M-3): the
+  committed `league_draft_picks.parquet` records the SAME real 2026 Gemmell draft twice
+  (`source='sheet'` + `source='app'`, 32/32 identical R1 ids) and also carries the
+  separate `Press Play-offs` league. `dedupe_duplicate_events(picks)` keeps one row per
+  `(season, league_name, draft_event)` preferring `app` over `sheet`
+  (`_SOURCE_PRIORITY`); a NO-OP when `source`/`league_name` columns are absent (synthetic
+  fixtures). `_prepare_picks` runs it FIRST, so counts/choices/validation all see deduped
+  data. Event pooling is league-aware via `_event_keys(frame)` ->
+  `[season, (league_name if present), draft_event]`, used by `_build_choices`,
+  `_membership_for_season`, `_per_pick_accuracy` -- two leagues in the same season/round
+  never merge into one cross-league choice set. GOTCHA: `manager_pick_counts` comes from
+  `prepared.groupby("manager").size()`, so it reflects the DEDUPED modelable inventory
+  (ben/judah/levi=87, kyle=87 Gemmell + 33 Press=120, press managers=33). Refit the
+  artifact with `train_opponent_model_from_normalized()` (writes
+  `artifacts/models/opponent/{manifest.json,report.md}`) after any pick-table change.
+- Retroactive IR swap in scoring (US-107, `backtest/replay.py`, SPEC section 1):
+  league picks carry parser-emitted bool columns `points_excluded` (Dropped/Not
+  playing) and `ir_activated` (Activated). ANY scorer over league picks must honor
+  BOTH: `points_excluded` row scores 0, an `ir_activated` IR_F/IR_D row scores as an
+  active skater via `skater_actual` (NOT `team_actual` -- that's the goalie/team
+  slot), a non-activated IR slot scores 0. `_score_league_roster` is the reference.
+  GOTCHA: 2025 is the only IR season (5 activations); regenerating the committed
+  2023-2024-2025 backtest report at HEAD is US-110's job (M-6), separate from the
+  scorer fix itself.
+- Backtest test fixtures (US-108, `tests/test_backtest.py`): the ORIGINAL
+  `_synthetic_archive`/`_tables` is an 8-team, ROUND-1-ONLY archive (8 teams reach
+  only a conference final, so it CANNOT exercise round 4 or the combined R3_4 event).
+  For multi-round/combined-event coverage use the separate `_four_round_archive`/
+  `_four_round_tables` (16 teams `TEAMS16`, `TEAM16_ID`, full bracket via
+  `ROUND_PAIRS`; lower-seed wins EVERY series so survivors are deterministic:
+  R1->T01..T08, R2->T01..T04, R3->T01,T02, R4->T01). Only the target season 2022
+  plays all 4 rounds; earlier seasons play round 1 (enough history to train the
+  3 sub-models -- production split needs >=3 seasons before the replayed round). Round
+  results/eligibility are read from the `series` table (`playoff_round` col) matched to
+  games by team-pair (`_series_round_map`+`_assign_rounds`), so a round is "present"
+  iff BOTH its series rows AND its games exist. Combined R3_4 requires EXACTLY 2
+  conference-final series (final four) with pre-round `win_snapshots` -> needs 16 teams.
+  `_team_rows(..., team_ids=)` takes an optional abbrev->id map (defaults to
+  `TEAMS.index+1`) so non-8-team fixtures get valid `team_id`s. GOTCHA: round dates
+  must be strictly increasing across rounds (R1<R2<R3<R4) or the leakage guard /
+  cutoff derivation breaks; `playoff_round_starts` gives each round's exclusive cutoff.
+  ml is standalone Python: run `ml/.venv/Scripts/python.exe -m {pytest|ruff check|mypy}
+  src tests` (NO yarn nx target).
+- Playoff round from game_id (US-110, CODE_REVIEW m-6): the authoritative,
+  collision-free round for a playoff game is `_playoff_round_digit(game_id)` in
+  `models/skater_production.py` = char index 7 of the 10-digit id (`SSSS03RMGG`):
+  `1`-`4` for the best-of-7 rounds, `0` for the 2019-20 bubble qualifying round AND
+  seeding round-robin. `_assign_rounds` (used by `skater_round_production`,
+  `playoff_round_starts`, `round_game_ids`, `team_actual_goalie_points`,
+  `skater_actual_points`) returns `None` for digit-`0` games, so a round-robin game
+  whose team pair ALSO meets in a real later series is never mislabeled as that
+  series' round (previously corrupted the 2020 round-2 cutoff to Aug 1). Qualifying
+  games still feed Elo/regular-season state -- only round LABELING/matchup counting
+  excludes them.
+- Pre-series snapshot freeze at ROUND cutoff (US-110, CODE_REVIEW m-3):
+  `series_sim.reconstruct_series_matchups(team_games, *, series=None)`. Pass
+  `series=` (both production callers now do) to freeze each matchup's pre-series
+  win/shutout snapshot at its ROUND's `as_of_cutoff` (earliest round game via
+  `playoff_round_starts`) instead of the matchup's own first game -- `_matchup_cutoff_plan`
+  precomputes (cutoff, team ids) per real series and `_freeze_due_matchups` freezes
+  BEFORE applying the first game dated >= cutoff, so an overlapping slower series
+  can't absorb another series' post-cutoff games (only `elo` moves in that window;
+  reg counters are playoff-untouched). `series=None` keeps the legacy per-series
+  freeze for synthetic tests. GOTCHA: no import cycle -- series_sim may import
+  skater_production (skater_production imports only features.skater + game_win).
+- Backtest leakage guard + injuries (US-110, `backtest/replay.py`): the self-date
+  slice check in `assert_round_inputs_leakfree` is tautological; pass
+  `authoritative_dates=team_games` (the skater call does) so each sliced row's TRUE
+  game date (game_id->team_games date) is checked vs cutoff -- catches a
+  skater/team-table desync (m-2). `run_backtest` NO LONGER takes an `injuries` param:
+  every historical round runs with `injuries=None` and `run_backtest_from_normalized`
+  never loads the live `injuries.parquet` (m-4; no historical injury data exists per
+  SPEC §5, and today's snapshot would leak roster status into `ir=True` picks).
+- Opponent model draft-time load (US-113, `optimize/opponents.py`): the committed
+  artifact (`artifacts/models/opponent/manifest.json`) is the ONLY draft-time input --
+  `FittedLeagueOpponents.load(dir)` / `load_committed_opponents(dir)` read it with
+  `json` alone (no `league_draft_picks.parquet`, no fit, no network). The manifest now
+  persists per-manager `affinity` (team_id->fraction) under `model.affinity` so the
+  reloaded model is faithful, not affinity-blind; `manifest()` rounds to 6dp so reload
+  != full-precision fit (compare via `from_manifest(result.fitted.manifest())`). CLI
+  wiring (`cli/draft.py`): `parse_managers(str)` accepts EITHER a count (`4`->seatN) OR
+  comma names (`ben,judah,levi,kyle`); `resolve_opponents_kind(kind, dir)` auto-picks
+  fitted when `manifest.json` exists (explicit `fitted` w/o artifact fails loudly). Both
+  `oracle draft` and `oracle recommend` share these. GOTCHA: `--managers` was already an
+  int flag -- it's now `str` on draft/recommend ONLY (project keeps int).
+- Recommend fast path (US-113, `optimize/recommend.py`): `_expected_values` vectorizes
+  greedy (single `GreedyOpponentModel`) AND now deterministic per-manager fitted
+  (`_fitted_zero_temp_models` gate: Mapping of temperature-0 `FittedOpponentModel`
+  covering every `state.order` seat). `_vectorized_fitted_expected` mirrors the greedy
+  kernel but scores opponents by `beta_rank*rank_z + beta_affinity*affinity +
+  need_weight*need` with `rank_z` standardized (population std, ddof=0) within the LEGAL
+  set per base position each pick -- reproduces the object rollout to <1e-9, so wiring
+  fitted in never changes a pick, and holds the <10s budget at rollouts>=500 (object
+  path is ~0.1s/rollout = 50s+). A temperature>0 fitted model falls back to the object
+  path (US-116 owns full reconciliation). Owner tail is always greedy-VOR.
+- ESPN->NHL injury id mapping (US-114, `ingest/injuries.py`, CODE_REVIEW M-11):
+  the ESPN injuries feed keys on athlete ids in the ~4-5M range; NHL player ids
+  live in [8.4M, 8.5M] (DISJOINT), so before this fix `injured` flags + IR-stash
+  valuation were permanent no-ops against the live feed. `injuries_response_to_rows`
+  now preserves the ESPN id in a new `espn_id` provenance column and, when a
+  `players` dimension is supplied, resolves each skater's `player_id` to the NHL id
+  via `resolve_player_ids` -> `resolve_espn_player_id` (name+team match through the
+  SHARED `entity_match.build_player_index` / `PlayerIndex.by_norm` / `.by_last`;
+  same-name collisions like the two Sebastian Ahos disambiguate by team abbrev then
+  position). Goalies fold to `method='goalie'` (team-level consumers key on
+  team_abbrev, NOT a per-player id join); anything ambiguous is `method='unresolved'`
+  -> kept (never dropped), keyed on the ESPN id, and surfaced via
+  `frame.attrs['unresolved_espn_ids']` + `InjuriesResult.unresolved_player_ids`
+  (SPEC honesty: never guessed). `build_injuries_table` auto-loads
+  `out_dir/players.parquet` (warns if absent). Manual overrides (`injuries.yaml`)
+  now prefer a `player_id` (NHL) key; legacy `espn_id` matches the `espn_id` column.
+  GOTCHA: mypy rejects `df.itertuples()` field access as an untyped union -- iterate
+  `df.to_dict('records')` (values are Any) instead. Downstream join is
+  `projection_artifact._injured_player_ids` (player_id + position!=G) feeding the
+  `injured` skater column and `_apply_ir_stash` (config.ir gate); test the full chain
+  by resolving a disjoint ESPN id onto a harness skater id then asserting
+  `manifest['ir_stash']['candidates'] >= 1`.
+- Snapshot pinning (US-115, `ingest/normalize.py` + `projection_artifact.py`,
+  CODE_REVIEW M-10): a pinned run must be self-contained. `create_snapshot` freezes
+  the 5 core `TABLE_NAMES` PLUS every present `OPTIONAL_TABLE_NAMES`
+  (`league_draft_picks`, `odds`, `injuries`) and writes a snapshot `_manifest.json`
+  with `optional_tables: {name: 'frozen'|'absent'}` and `complete: true`. BOTH
+  `build_projection_artifact_from_normalized` and `run_backtest_from_normalized` read
+  EVERY input from `source_dir` (= snapshot dir when pinned, else live
+  `normalized_dir`) -- never from live `normalized_dir` under a pin. GOTCHA: the old
+  bug was `injuries=_load_injuries(normalized_dir)` / `odds=_load_odds(normalized_dir)`
+  reading LIVE even when pinned -- always thread `source_dir`. Loud guard =
+  `_require_complete_snapshot(source_dir)` (in projection_artifact, imported by
+  replay): raises `FileNotFoundError` (no `_manifest.json`) / `RuntimeError` (no
+  `complete` marker = legacy core-only snapshot) / `FileNotFoundError` (declared-frozen
+  table missing). GOTCHA: `create_snapshot` needs ALL 5 core tables present
+  (`_tables_present` checks `teams` too), so a from-normalized test fixture that only
+  writes the 4 projection tables must also drop a `teams.parquet` before snapshotting.
+
+---
+
+## 2026-09-02T07:10:44Z - US-401
+- Replaced current-HEAD ancestry checks with one committed evidence-pass pin at
+  `ml/artifacts/EVIDENCE_PASS.json`. Every model, backtest, and 2026 projection
+  manifest must match that SHA and carry `git_dirty=false`.
+- Added a stale-manifest regression that supplies a different well-formed SHA and
+  proves the guard rejects it. Removed Git subprocess use, so shallow clones never
+  depend on missing commit objects.
+- Verified simulated squash evidence suite: 29 passed. Verified depth-1 clone full
+  suite: 732 passed, 5 expected missing-normalized-data skips, 0 failures. Mutating
+  game-win provenance in that clone failed named test
+  `test_committed_evidence_matches_pinned_pass` (1 failed, 13 passed).
+- Quality gates passed: ruff, mypy, 737 ML tests, Nx lint/typecheck, all monorepo unit
+  tests, web build, and 96 Playwright tests. Initial Nx E2E attempt hit documented
+  Windows server startup race (12 connection-refused failures, 84 passes); controlled
+  rerun after HTTP 200 readiness passed 96/96.
+- Normal commit hook reached CodeScene and failed only because neither `CODESCENE_PAT`
+  nor `CODESCENE_ACCESS_TOKEN` was available. All other required checks passed
+  independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `AGENTS.md`, `ml/.gitignore`, `ml/SPEC.md`,
+  `ml/artifacts/EVIDENCE_PASS.json`,
+  `ml/tests/test_committed_model_evidence.py`, `scripts/ralph/prd.json`, and
+  `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - Evidence provenance must compare manifests to one committed pass pin, never to
+    checkout ancestry; squash merges and depth-1 clones may omit generating objects.
+  - Regeneration story must rewrite `EVIDENCE_PASS.json` together with every committed
+    evidence manifest so stale partial regeneration remains detectable.
+  - On Windows, wait for `http://localhost:4200` to return HTTP 200 before launching
+    Playwright directly; Nx dependency ordering can race static-server readiness.
+---
+
+## 2026-09-02T07:21:08Z - US-402
+- Closed both remaining draft-session clobber paths. `--resume A --session B`
+  now rejects an existing distinct `B` before loading or saving; same-path resume
+  remains valid.
+- In-loop `resume <path>` now switches autosave target to resumed path and announces
+  switch, preserving original launch log byte-for-byte.
+- Added regression tests for two-pick target preservation, explicit same-path resume,
+  and two-league in-loop resume/quit behavior. Updated draft-assistant docs and help.
+- Quality gates passed: ruff, mypy, 740 ML tests, Nx affected lint/typecheck, all
+  monorepo unit tests, web build, and 96 Playwright tests.
+- Normal commit hook reached CodeScene and failed only because neither `CODESCENE_PAT`
+  nor `CODESCENE_ACCESS_TOKEN` was available. All other required checks passed
+  independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `AGENTS.md`, `ml/README.md`,
+  `ml/src/draft_oracle/cli/draft.py`, `ml/tests/test_draft.py`,
+  `scripts/ralph/prd.json`, and `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - Autosave path is mutable session state: loading another session must update both
+    `DraftSession` and destination path before any autosave.
+  - Compare existing resume targets by file identity when possible, with normalized
+    path fallback, so alternate spellings of same file remain valid.
+---
+
+## 2026-09-02T07:31:04Z - US-403
+- Made override count guards consume the same keys as matching: skater guards now use
+  `corrected_name` when present, and team guards follow first-match team/raw candidate
+  precedence for G slots.
+- Preserved team `expected_matches` in `NameOverrides` and fail closed on matching or
+  missing G-slot corpus counts. Documented both qualifier contracts in override YAML.
+- Added regressions for the R4 corrected-name bypass, team-count load, matching team
+  count, and mismatch rejection. Real 2024 corpus regression still resolves levi's
+  bare `McDavid` row to Draisaitl `8477934`.
+- Quality gates passed: ruff, mypy, 744 ML tests, Nx affected lint/typecheck, all
+  monorepo unit tests, web build, and 96 Playwright tests.
+- Normal commit hook reached CodeScene and failed only because neither `CODESCENE_PAT`
+  nor `CODESCENE_ACCESS_TOKEN` was available. All other required checks passed
+  independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `AGENTS.md`, `ml/data/overrides/name_overrides.yaml`,
+  `ml/src/draft_oracle/ingest/entity_match.py`, `ml/tests/test_entity_match.py`,
+  `scripts/ralph/prd.json`, and `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - Validation must share lookup precedence with matcher; counting a broader set of
+    candidate names can falsely certify an override matcher never consumes.
+  - Team override guards apply only to G slots; skater team resolution remains
+    best-effort metadata and must not inflate guarded team counts.
+---
+
+## 2026-09-02T07:48:24Z - US-404
+- Consolidated game-win, series-sim, and shutout home/away pairing into
+  `models._games.pivot_decided_games`; thin caller adapters preserve each existing
+  column contract.
+- Added shared-helper construction guards plus real-parquet evaluation pins for 2026:
+  membership events 6, picks 240, fitted 0.2875, greedy 0.2917; per-pick picks 240
+  and fitted top-1 0.1125.
+- Compared all three downstream frames against a detached pre-change worktree: each
+  remained exactly equal at 14,508 rows. No committed artifacts regenerated; US-406
+  owns the final one-pass evidence rebuild.
+- Re-applied both league-blind mutants in the temp worktree. Membership mutation
+  failed `test_real_membership_evaluation_keeps_league_events_isolated` (events 3 vs
+  6); per-pick mutation failed
+  `test_real_per_pick_evaluation_keeps_league_events_isolated` (picks 143 vs 240).
+- Quality gates passed: ruff, mypy, 749 ML tests, Nx affected lint/typecheck, 380
+  monorepo unit tests, web build, and 96 Playwright tests.
+- Normal commit hook reached CodeScene and failed only because neither `CODESCENE_PAT`
+  nor `CODESCENE_ACCESS_TOKEN` was available. All other required checks passed
+  independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `AGENTS.md`, `ml/src/draft_oracle/models/_games.py`,
+  `ml/src/draft_oracle/models/game_win.py`,
+  `ml/src/draft_oracle/models/series_sim.py`,
+  `ml/src/draft_oracle/models/shutout.py`, `ml/tests/test_decided_games.py`,
+  `ml/tests/test_opponents.py`, `scripts/ralph/prd.json`, and
+  `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - Keep archive pairing and decided-game filtering centralized; caller-specific
+    naming and column subsets belong in thin adapters.
+  - Pin evaluation counts as well as accuracies. League-blind grouping can discard
+    teacher-forced picks even when an aggregate accuracy still looks plausible.
+---
+
+## 2026-09-02T08:11:15Z - US-405
+- Fixed live ESPN favorite attribution: authoritative per-side flags now beat spread;
+  missing/None/blank attribution yields an uncovered row instead of default-away.
+- Made series-sim honesty text use `counts.series_scored`. Documented and tested the
+  goalie-column contract: single rounds recompute as `2*e_wins + 2*e_shutout_wins`;
+  combined R3+R4 folds only `e_goalie_points` while companion columns stay R3-only.
+- Added projection-manifest generating flags and OS/Python/numpy metadata. Updated
+  reproducibility language to float-ULP across platforms and byte identity on the
+  generating platform.
+- Added explicit opponent membership exclusions to report/manifest output; real data
+  confirms `2025 R1 (The Gemmell Cup): no snake order in sheet` as the sole exclusion.
+- Corrected SPEC and odds provenance: raw Kaggle/ESPN favorite prices from 2022-23
+  onward remain `covered=False`; raw price presence is not modeled coverage.
+- No committed reports/manifests/projection fixtures regenerated; US-406 owns the final
+  clean-HEAD one-pass evidence rebuild.
+- Quality gates passed: ruff, mypy, 758 ML tests, Nx affected lint/typecheck, 380
+  monorepo unit tests, web build, and 96 Playwright tests.
+- Normal commit hook reached CodeScene and failed only because neither `CODESCENE_PAT`
+  nor `CODESCENE_ACCESS_TOKEN` was available. All other required checks passed
+  independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `AGENTS.md`, `ml/README.md`, `ml/SPEC.md`,
+  `ml/data/raw/odds-archive/PROVENANCE.md`,
+  `ml/src/draft_oracle/cli/project.py`, `ml/src/draft_oracle/ingest/odds.py`,
+  `ml/src/draft_oracle/models/series_sim.py`,
+  `ml/src/draft_oracle/optimize/opponents.py`,
+  `ml/src/draft_oracle/projection_artifact.py`, five ML test files,
+  `scripts/ralph/prd.json`, and `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - Distinguish raw odds-file fill from pipeline `covered` state; unattributed prices
+    stay audit-only even when numerically populated.
+  - Report writers should derive narrative counts from the same result fields used by
+    manifests; duplicated prose constants drift.
+  - US-406 must regenerate every committed evidence artifact together so new manifest
+    fields and report disclosures share one clean source SHA.
+---
+
+## 2026-09-02T09:29:28-07:00 - US-406
+- Regenerated all four `2026-r1..r4` projection fixtures, all eight model
+  evidence pairs, and both committed backtests from clean detached SHA
+  `e8656219b87297262c39461456fc527f70e350b7` at pinned seed `20260827`.
+  Updated `ml/artifacts/EVIDENCE_PASS.json` to the same SHA. All 14 manifests
+  carry that SHA and `git_dirty=false`; projection manifests now record exact
+  CLI flags plus Windows 11 / Python 3.12.12 / numpy 2.5.2 platform metadata.
+- Honesty comparison against `05980f1` found zero substantive JSON metric or
+  config changes in every regenerated artifact. Report differences are limited
+  to timestamps and US-405 disclosures: opponent membership exclusion, exact
+  30-series sample size, and the R3 combined-goalie column contract. Projection
+  parquet files reproduced byte-identically. Windows-generated CSV/Markdown
+  files differ in CRLF bytes only where content is otherwise unchanged.
+- Historical `one_step` mean remained `58.44` on the generating platform, not
+  the observed Linux/Windows variant `58.31`; seeds and configs were not tuned.
+  The 2026 `r500` run completed in about 7h50m with 3 rounds and
+  `leakage_ok=true`.
+- Quality gates passed: Ruff, strict mypy (73 files), 758/758 ML tests, Nx
+  affected lint/typecheck, web production build, all nine Nx unit-test targets
+  (380 web tests), and 96/96 Playwright tests. A one-commit depth-1 clone in the
+  Windows temp directory passed 751 tests with 7 expected missing-normalized-
+  data skips and 0 failures.
+- Normal commit hook reached CodeScene and failed only because neither
+  `CODESCENE_PAT` nor `CODESCENE_ACCESS_TOKEN` was available. All other required
+  checks passed independently; commit retried with `--no-verify` per Ralph policy.
+- Files changed: `ml/artifacts/EVIDENCE_PASS.json`, projection run manifests
+  plus the R3 cheatsheet, all eight model manifests plus opponent/series reports,
+  both committed backtest report/manifest pairs, `scripts/ralph/prd.json`, and
+  `scripts/ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - One-pass clean-worktree regeneration can be verified before import by
+    recursively comparing JSON while excluding provenance, timestamp, and
+    intentional disclosure fields; require zero remaining differences.
+  - Long `r500` runs remain single-core and write evidence only at completion;
+    steady CPU plus a heartbeat monitor distinguishes expected silence from a
+    hung process.
 ---

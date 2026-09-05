@@ -1,0 +1,9 @@
+{
+  "playerId": 8478403,
+  "isActive": true,
+  "position": "C",
+  "firstName": { "default": "Tage" },
+  "lastName": { "default": "Thompson" },
+  "currentTeamAbbrev": "BUF",
+  "sweaterNumber": 72
+}
