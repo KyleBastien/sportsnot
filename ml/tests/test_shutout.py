@@ -274,8 +274,11 @@ def test_pivot_games_matches_all_real_archive_decisions() -> None:
     team_games = _real_team_games()
     archive_winners = team_games.groupby("game_id")["win"].sum()
 
-    assert int(archive_winners.eq(1).sum()) == 14_508
-    assert len(_pivot_games(team_games)) == 14_508
+    decided = int(archive_winners.eq(1).sum())
+    # 11 seasons (2015-16..2025-26) held exactly 14,508 decided games; the archive
+    # only ever grows, and every decided game must survive the pivot.
+    assert decided >= 14_508
+    assert len(_pivot_games(team_games)) == decided
 
 
 def test_pivot_games_retains_real_shootout_winner() -> None:
@@ -302,8 +305,10 @@ def test_build_dataset_counts_zero_zero_shootout_wins_as_shutouts() -> None:
         dataset["game_id"].astype(int).isin(zero_zero_ids), "is_shutout"
     ]
 
-    assert len(zero_zero_ids) == 16
-    assert len(zero_zero_shutouts) == 16
+    # 11 seasons (2015-16..2025-26) held exactly 16 zero-zero shootout games; the
+    # archive only ever grows, and every one of them must be scored as a shutout win.
+    assert len(zero_zero_ids) >= 16
+    assert len(zero_zero_shutouts) == len(zero_zero_ids)
     assert zero_zero_shutouts.eq(1.0).all()
     assert 2016020785 in dataset["game_id"].astype(int).to_numpy()
     example = games.loc[games["game_id"] == 2016020785].iloc[0]
