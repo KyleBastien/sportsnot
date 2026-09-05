@@ -1,0 +1,8 @@
+plain/
+*.json
+*.json.gz
+*.csv
+*.csv.gz
+*.tar
+*.tar.gz
+*.tmp
