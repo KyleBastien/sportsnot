@@ -69,36 +69,53 @@ def season_label(path):
     return name[len('team-games-') : -len('.csv.gz')]
 
 
-def derive_team_abbrevs(rows):
+def group_rows_by_game(rows):
     by_game = collections.defaultdict(list)
-    team_id_to_abbrev = {}
-    notes = []
     for row in rows:
         by_game[row['gameId']].append(row)
-    for game_id, game_rows in by_game.items():
-        if len(game_rows) != 2:
-            notes.append(
-                {
-                    'gameId': game_id,
-                    'issue': f'expected 2 team rows, found {len(game_rows)}',
-                }
-            )
-            continue
-        left, right = game_rows
-        for team_id, abbrev in (
-            (left['teamId'], right['opponentTeamAbbrev']),
-            (right['teamId'], left['opponentTeamAbbrev']),
-        ):
-            seen = team_id_to_abbrev.get(team_id)
-            if seen is not None and seen != abbrev:
-                notes.append(
-                    {
-                        'teamId': team_id,
-                        'issue': f'abbrev mismatch {seen} vs {abbrev}',
-                    }
-                )
-                continue
-            team_id_to_abbrev[team_id] = abbrev
+    return by_game
+
+
+def note_game_row_count(notes, game_id, game_rows):
+    notes.append(
+        {
+            'gameId': game_id,
+            'issue': f'expected 2 team rows, found {len(game_rows)}',
+        }
+    )
+
+
+def store_team_abbrev(team_id_to_abbrev, notes, team_id, abbrev):
+    seen = team_id_to_abbrev.get(team_id)
+    if seen is not None and seen != abbrev:
+        notes.append(
+            {
+                'teamId': team_id,
+                'issue': f'abbrev mismatch {seen} vs {abbrev}',
+            }
+        )
+        return
+    team_id_to_abbrev[team_id] = abbrev
+
+
+def add_game_team_abbrevs(team_id_to_abbrev, notes, game_id, game_rows):
+    if len(game_rows) != 2:
+        note_game_row_count(notes, game_id, game_rows)
+        return
+    left, right = game_rows
+    store_team_abbrev(
+        team_id_to_abbrev, notes, left['teamId'], right['opponentTeamAbbrev']
+    )
+    store_team_abbrev(
+        team_id_to_abbrev, notes, right['teamId'], left['opponentTeamAbbrev']
+    )
+
+
+def derive_team_abbrevs(rows):
+    team_id_to_abbrev = {}
+    notes = []
+    for game_id, game_rows in group_rows_by_game(rows).items():
+        add_game_team_abbrevs(team_id_to_abbrev, notes, game_id, game_rows)
     return sorted(set(team_id_to_abbrev.values())), notes
 
 
@@ -203,13 +220,34 @@ def validate(rows_by_game, expected_game_ids):
     return missing_game_ids, extra_game_ids, blank_start_times
 
 
-def process_season(team_path, outdir, counters):
+def season_context(team_path):
     label = season_label(team_path)
     rows = read_team_rows(team_path)
-    season_id = rows[0]['seasonId']
-    expected_game_ids = {row['gameId'] for row in rows}
-    teams, team_notes = derive_team_abbrevs(rows)
-    log(f'=== season {label} ({season_id}) teams={len(teams)} games={len(expected_game_ids)}')
+    return label, rows, rows[0]['seasonId'], {row['gameId'] for row in rows}
+
+
+def add_schedule_row(rows_by_game, mismatches, row):
+    existing = rows_by_game.get(row['gameId'])
+    if existing is None:
+        rows_by_game[row['gameId']] = row
+        return
+    if existing != row:
+        mismatches.append(
+            {
+                'gameId': row['gameId'],
+                'issue': 'duplicate schedule rows disagree',
+                'left': existing,
+                'right': row,
+            }
+        )
+
+
+def add_schedule_games(rows_by_game, mismatches, games):
+    for game in games:
+        add_schedule_row(rows_by_game, mismatches, game_row(game))
+
+
+def collect_schedule_rows(teams, season_id, counters):
     rows_by_game = {}
     mismatches = []
     aliases_used = {}
@@ -221,41 +259,50 @@ def process_season(team_path, outdir, counters):
         if alias_from is not None:
             aliases_used[team] = used_team
         log(f'  {team}->{used_team}: {len(games)} reg+po games')
-        for game in games:
-            row = game_row(game)
-            existing = rows_by_game.get(row['gameId'])
-            if existing is None:
-                rows_by_game[row['gameId']] = row
-                continue
-            if existing != row:
-                mismatches.append(
-                    {
-                        'gameId': row['gameId'],
-                        'issue': 'duplicate schedule rows disagree',
-                        'left': existing,
-                        'right': row,
-                    }
-                )
-    neutral_updates, neutral_city_misses = enrich_neutral_sites(rows_by_game, counters)
-    missing_game_ids, extra_game_ids, blank_start_times = validate(
-        rows_by_game, expected_game_ids
+        add_schedule_games(rows_by_game, mismatches, games)
+    return rows_by_game, mismatches, aliases_used
+
+
+def sorted_rows(rows_by_game):
+    return [rows_by_game[game_id] for game_id in sorted(rows_by_game, key=int)]
+
+
+def neutral_playoff_count(rows):
+    return sum(
+        1
+        for row in rows
+        if row['gameTypeId'] == '3' and row['neutralSite'] == 'true'
     )
-    out_rows = [rows_by_game[game_id] for game_id in sorted(rows_by_game, key=int)]
-    write_csv_gz(os.path.join(outdir, f'game-times-{label}.csv.gz'), out_rows)
-    neutral_playoff_rows = [
-        row for row in out_rows if row['gameTypeId'] == '3' and row['neutralSite'] == 'true'
-    ]
-    log(
-        f'  wrote {label}: rows {len(out_rows)} neutral-playoff {len(neutral_playoff_rows)} '
-        f'neutral-city-updates {neutral_updates}'
+
+
+def all_playoff_games_neutral(label, rows):
+    return label == '2019-20' and neutral_playoff_count(rows) == sum(
+        1 for row in rows if row['gameTypeId'] == '3'
     )
+
+
+def season_summary(
+    label,
+    season_id,
+    teams,
+    expected_game_ids,
+    out_rows,
+    aliases_used,
+    team_notes,
+    mismatches,
+    missing_game_ids,
+    extra_game_ids,
+    blank_start_times,
+    neutral_city_misses,
+):
+    neutral_playoff_rows = neutral_playoff_count(out_rows)
     return {
         'season': label,
         'seasonId': season_id,
         'teams': len(teams),
         'games': len(expected_game_ids),
         'rows': len(out_rows),
-        'neutral_playoff_rows': len(neutral_playoff_rows),
+        'neutral_playoff_rows': neutral_playoff_rows,
         'aliases_used': aliases_used,
         'team_notes': team_notes,
         'duplicate_mismatches': mismatches,
@@ -263,9 +310,42 @@ def process_season(team_path, outdir, counters):
         'extra_game_ids': extra_game_ids,
         'blank_start_times': blank_start_times,
         'neutral_city_misses': neutral_city_misses,
-        'all_2020_playoff_games_neutral': label == '2019-20'
-        and len(neutral_playoff_rows) == len([row for row in out_rows if row['gameTypeId'] == '3']),
+        'all_2020_playoff_games_neutral': all_playoff_games_neutral(label, out_rows),
     }
+
+
+def process_season(team_path, outdir, counters):
+    label, rows, season_id, expected_game_ids = season_context(team_path)
+    teams, team_notes = derive_team_abbrevs(rows)
+    log(f'=== season {label} ({season_id}) teams={len(teams)} games={len(expected_game_ids)}')
+    rows_by_game, mismatches, aliases_used = collect_schedule_rows(
+        teams, season_id, counters
+    )
+    neutral_updates, neutral_city_misses = enrich_neutral_sites(rows_by_game, counters)
+    missing_game_ids, extra_game_ids, blank_start_times = validate(
+        rows_by_game, expected_game_ids
+    )
+    out_rows = sorted_rows(rows_by_game)
+    write_csv_gz(os.path.join(outdir, f'game-times-{label}.csv.gz'), out_rows)
+    neutral_playoff_rows = neutral_playoff_count(out_rows)
+    log(
+        f'  wrote {label}: rows {len(out_rows)} neutral-playoff {neutral_playoff_rows} '
+        f'neutral-city-updates {neutral_updates}'
+    )
+    return season_summary(
+        label,
+        season_id,
+        teams,
+        expected_game_ids,
+        out_rows,
+        aliases_used,
+        team_notes,
+        mismatches,
+        missing_game_ids,
+        extra_game_ids,
+        blank_start_times,
+        neutral_city_misses,
+    )
 
 
 def main(outdir):
