@@ -7,6 +7,8 @@ data/raw/*
 !data/raw/league-drafts/
 !data/raw/odds-archive/
 !data/raw/nhl-archive/
+!data/raw/moneypuck/
+!data/raw/moneypuck/**
 
 # Generated feature matrices
 data/features/
