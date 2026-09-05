@@ -13,7 +13,14 @@ from typing import Annotated
 import typer
 
 from draft_oracle import __version__
-from draft_oracle.cli._project_artifact_commands import draft_cmd, project, recommend
+from draft_oracle.cli._project_artifact_commands import (
+    DraftCommandRequest,
+    ProjectCommandRequest,
+    RecommendCommandRequest,
+    run_draft,
+    run_project,
+    run_recommend,
+)
 from draft_oracle.cli._project_defaults import (
     DEFAULT_ARCHIVE_DIR,
     DEFAULT_ARTIFACTS_ROOT,
@@ -34,16 +41,19 @@ from draft_oracle.cli._project_defaults import (
     Strategy,
 )
 from draft_oracle.cli._project_training_commands import (
-    backtest,
-    compare_strategies_cmd,
+    BacktestCommandRequest,
+    CompareStrategiesRequest,
     eval_series_sim,
     project_skaters,
+    run_backtest,
+    run_compare_strategies,
     train_game_win,
     train_opponents,
     train_return_time,
     train_shutout,
     train_skater_production,
 )
+from draft_oracle.cli._request_commands import register_request_command
 
 _PROJECT_PUBLIC_DEFAULTS = (
     DEFAULT_ARCHIVE_DIR,
@@ -66,13 +76,13 @@ _PROJECT_PUBLIC_DEFAULTS = (
 )
 
 _PROJECT_COMMAND_EXPORTS = (
-    backtest,
-    compare_strategies_cmd,
-    draft_cmd,
     eval_series_sim,
-    project,
     project_skaters,
-    recommend,
+    run_backtest,
+    run_compare_strategies,
+    run_draft,
+    run_project,
+    run_recommend,
     train_game_win,
     train_opponents,
     train_return_time,
@@ -260,10 +270,6 @@ def injuries(
         typer.echo(line)
 
 
-
-
-
-
 app.command(name="train-game-win")(train_game_win)
 app.command(name="train-shutout")(train_shutout)
 app.command(name="train-skater-production")(train_skater_production)
@@ -271,31 +277,13 @@ app.command(name="train-return-time")(train_return_time)
 app.command(name="eval-series-sim")(eval_series_sim)
 app.command(name="project-skaters")(project_skaters)
 app.command(name="train-opponents")(train_opponents)
-app.command(
-    name="project",
-    add_help_option=False,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)(project)
-app.command(
-    name="recommend",
-    add_help_option=False,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)(recommend)
-app.command(
-    name="compare-strategies",
-    add_help_option=False,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)(compare_strategies_cmd)
-app.command(
-    name="backtest",
-    add_help_option=False,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)(backtest)
-app.command(
-    name="draft",
-    add_help_option=False,
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)(draft_cmd)
+register_request_command(app, "project", ProjectCommandRequest, run_project)
+register_request_command(app, "recommend", RecommendCommandRequest, run_recommend)
+register_request_command(
+    app, "compare-strategies", CompareStrategiesRequest, run_compare_strategies
+)
+register_request_command(app, "backtest", BacktestCommandRequest, run_backtest)
+register_request_command(app, "draft", DraftCommandRequest, run_draft)
 
 if __name__ == "__main__":  # pragma: no cover
     app()

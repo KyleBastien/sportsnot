@@ -1,10 +1,14 @@
-"""Model training, evaluation, and backtest CLI commands."""
+"""Model training/evaluation, strategy-comparison, and backtest CLI commands.
+
+``compare-strategies`` and ``backtest`` declare their options as request-dataclass
+fields (see ``_request_commands``); the ``train-*`` commands are small enough to keep
+plain Typer signatures.
+"""
 
 from __future__ import annotations
 
-import argparse
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated
 
@@ -23,6 +27,7 @@ from draft_oracle.cli._project_defaults import (
     STRATEGIES,
     Strategy,
 )
+from draft_oracle.cli._request_commands import option
 
 NormalizedDirOption = Annotated[
     Path,
@@ -37,28 +42,50 @@ ProjectionSeedOption = Annotated[int, typer.Option(help="Deterministic training/
 DeterministicSeedOption = Annotated[int, typer.Option(help="Deterministic seed.")]
 
 
-@dataclass(frozen=True)
-class _CompareStrategiesRequest:
-    normalized_dir: Path
-    managers: int
-    n_drafts: int
-    rollouts: int
-    max_candidates: int
-    seed: int
+_SIM_LEAGUE_SIZE = typer.Option(help="League size for the simulated drafts.")
+_SIM_N_DRAFTS = typer.Option(help="Seeded simulated drafts (>=200).")
+_SIM_ROLLOUTS = typer.Option(help="Rollouts per recommendation.")
+_MAX_CANDIDATES = typer.Option(help="Candidates rolled out.")
+_SEED = typer.Option(help="Deterministic seed.")
+_SEASONS = typer.Option(help="Playoff end years to replay, e.g. 2022.")
+_NORMALIZED_DIR = typer.Option(help="Directory holding normalized Parquet tables.")
+_BACKTEST_ROOT = typer.Option(help="Root directory for the written backtest run.")
+_SNAPSHOT = typer.Option(help="Pin a frozen snapshot id (defaults to the live tables).")
+_LEAGUE_SIZE = typer.Option(help="League size (2-12).")
+_IR = typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
+_N_DRAFTS = typer.Option(help="Seeded drafts per (round, slot).")
+_ROLLOUTS = typer.Option(help="Monte-Carlo rollouts per oracle pick.")
+_STRATEGY = typer.Option(
+    "--strategy", help="Oracle policies to seat (oracle/greedy_vor/one_step/random_legal)."
+)
 
 
 @dataclass(frozen=True)
-class _BacktestCommandRequest:
-    seasons: list[int]
-    normalized_dir: Path
-    backtest_root: Path
-    snapshot: str
-    managers: int
-    ir: bool
-    n_drafts: int
-    rollouts: int
-    strategies: list[str] | None
-    seed: int
+class CompareStrategiesRequest:
+    """Options of ``oracle compare-strategies`` — every field is one CLI option."""
+
+    normalized_dir: Path = field(default=DEFAULT_NORMALIZED_DIR, metadata=option(_NORMALIZED_DIR))
+    managers: int = field(default=4, metadata=option(_SIM_LEAGUE_SIZE))
+    n_drafts: int = field(default=200, metadata=option(_SIM_N_DRAFTS))
+    rollouts: int = field(default=40, metadata=option(_SIM_ROLLOUTS))
+    max_candidates: int = field(default=6, metadata=option(_MAX_CANDIDATES))
+    seed: int = field(default=20260827, metadata=option(_SEED))
+
+
+@dataclass(frozen=True)
+class BacktestCommandRequest:
+    """Options of ``oracle backtest`` — every field is one CLI option."""
+
+    seasons: list[int] = field(metadata=option(_SEASONS))
+    normalized_dir: Path = field(default=DEFAULT_NORMALIZED_DIR, metadata=option(_NORMALIZED_DIR))
+    backtest_root: Path = field(default=DEFAULT_BACKTEST_ROOT, metadata=option(_BACKTEST_ROOT))
+    snapshot: str = field(default="", metadata=option(_SNAPSHOT))
+    managers: int = field(default=4, metadata=option(_LEAGUE_SIZE))
+    ir: bool = field(default=False, metadata=option(_IR))
+    n_drafts: int = field(default=1, metadata=option(_N_DRAFTS))
+    rollouts: int = field(default=40, metadata=option(_ROLLOUTS))
+    strategies: list[str] | None = field(default=None, metadata=option(_STRATEGY))
+    seed: int = field(default=20260827, metadata=option(_SEED))
 
 
 def _yes_no(value: bool) -> str:
@@ -297,78 +324,8 @@ def train_opponents(
     )
 
 
-def compare_strategies_cmd(
-    ctx: typer.Context,
-) -> None:
+def run_compare_strategies(request: CompareStrategiesRequest) -> None:
     """Run the committed multi-step vs. greedy-VOR vs. one-step comparison (US-021)."""
-    _run_compare_strategies(_parse_compare_strategies_request(ctx.args))
-
-
-def _compare_strategies_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="compare-strategies",
-        add_help=False,
-        description=("Run committed multi-step vs. greedy-VOR vs. one-step comparison (US-021)."),
-    )
-    parser.add_argument(
-        "--normalized-dir",
-        type=Path,
-        default=DEFAULT_NORMALIZED_DIR,
-        help="Directory holding normalized Parquet tables.",
-    )
-    parser.add_argument(
-        "--managers",
-        type=int,
-        default=4,
-        help="League size for simulated drafts.",
-    )
-    parser.add_argument(
-        "--n-drafts",
-        type=int,
-        default=200,
-        help="Seeded simulated drafts (>=200).",
-    )
-    parser.add_argument(
-        "--rollouts",
-        type=int,
-        default=40,
-        help="Rollouts per recommendation.",
-    )
-    parser.add_argument(
-        "--max-candidates",
-        type=int,
-        default=6,
-        help="Candidates rolled out.",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=20260827,
-        help="Deterministic seed.",
-    )
-    return parser
-
-
-def _parse_compare_strategies_request(args: list[str]) -> _CompareStrategiesRequest:
-    parser = _compare_strategies_parser()
-    if any(arg in {"-h", "--help"} for arg in args):
-        typer.echo(parser.format_help().rstrip())
-        raise typer.Exit()
-    namespace, extras = parser.parse_known_args(args)
-    if extras:
-        raise typer.BadParameter(f"unknown compare-strategies args: {' '.join(extras)}")
-    return _CompareStrategiesRequest(
-        normalized_dir=namespace.normalized_dir,
-        managers=namespace.managers,
-        n_drafts=namespace.n_drafts,
-        rollouts=namespace.rollouts,
-        max_candidates=namespace.max_candidates,
-        seed=namespace.seed,
-    )
-
-
-def _run_compare_strategies(request: _CompareStrategiesRequest) -> None:
-    """Execute recommendation-strategy comparison from a structured request."""
     from draft_oracle.optimize.recommend import (
         DEFAULT_RECOMMEND_ARTIFACT_DIR,
         RecommendationEvaluationRequest,
@@ -390,9 +347,7 @@ def _run_compare_strategies(request: _CompareStrategiesRequest) -> None:
         typer.echo(line)
 
 
-def backtest(
-    ctx: typer.Context,
-) -> None:
+def run_backtest(request: BacktestCommandRequest) -> None:
     """Replay historical playoff rounds end-to-end and score against actuals (US-025).
 
     Rebuilds as-of projections for every round, seats the oracle in each snake slot
@@ -401,119 +356,6 @@ def backtest(
     if any round-N game leaks into the as-of inputs. Per-round intermediates and the
     run manifest are written under backtest_root/<run-id>/.
     """
-    _run_backtest_command(_parse_backtest_request(ctx.args))
-
-
-def _backtest_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="backtest",
-        add_help=False,
-        description="Replay historical playoff rounds end-to-end and score against actuals.",
-    )
-    _add_backtest_base_arguments(parser)
-    _add_backtest_runtime_arguments(parser)
-    return parser
-
-
-def _parse_backtest_request(args: list[str]) -> _BacktestCommandRequest:
-    parser = _backtest_parser()
-    if any(arg in {"-h", "--help"} for arg in args):
-        typer.echo(parser.format_help().rstrip())
-        raise typer.Exit()
-    namespace, extras = parser.parse_known_args(args)
-    if extras:
-        raise typer.BadParameter(f"unknown backtest args: {' '.join(extras)}")
-    return _BacktestCommandRequest(
-        seasons=namespace.seasons,
-        normalized_dir=namespace.normalized_dir,
-        backtest_root=namespace.backtest_root,
-        snapshot=namespace.snapshot,
-        managers=namespace.managers,
-        ir=namespace.ir,
-        n_drafts=namespace.n_drafts,
-        rollouts=namespace.rollouts,
-        strategies=namespace.strategies,
-        seed=namespace.seed,
-    )
-
-
-def _add_backtest_base_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--seasons",
-        dest="seasons",
-        type=int,
-        action="append",
-        required=True,
-        help="Playoff end years to replay, e.g. 2022.",
-    )
-    parser.add_argument(
-        "--normalized-dir",
-        type=Path,
-        default=DEFAULT_NORMALIZED_DIR,
-        help="Directory holding normalized Parquet tables.",
-    )
-    parser.add_argument(
-        "--backtest-root",
-        type=Path,
-        default=DEFAULT_BACKTEST_ROOT,
-        help="Root directory for written backtest run.",
-    )
-    parser.add_argument(
-        "--snapshot",
-        type=str,
-        default="",
-        help="Pin a frozen snapshot id (defaults to live tables).",
-    )
-    parser.add_argument(
-        "--managers",
-        type=int,
-        default=4,
-        help="League size (2-12).",
-    )
-
-
-def _add_backtest_runtime_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--ir",
-        dest="ir",
-        action="store_true",
-        help="League uses IR slots (+1 F, +1 D).",
-    )
-    parser.add_argument(
-        "--no-ir",
-        dest="ir",
-        action="store_false",
-        help="League does not use IR slots.",
-    )
-    parser.set_defaults(ir=False)
-    parser.add_argument(
-        "--n-drafts",
-        type=int,
-        default=1,
-        help="Seeded drafts per (round, slot).",
-    )
-    parser.add_argument(
-        "--rollouts",
-        type=int,
-        default=40,
-        help="Monte-Carlo rollouts per oracle pick.",
-    )
-    parser.add_argument(
-        "--strategy",
-        dest="strategies",
-        action="append",
-        help="Oracle policies to seat (oracle/greedy_vor/one_step/random_legal).",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=20260827,
-        help="Deterministic seed.",
-    )
-
-
-def _run_backtest_command(request: _BacktestCommandRequest) -> None:
-    """Execute backtest command from structured request."""
     from draft_oracle.backtest.replay import BacktestConfig, run_backtest_from_normalized
 
     resolved: tuple[Strategy, ...] = tuple(

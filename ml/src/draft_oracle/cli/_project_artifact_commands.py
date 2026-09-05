@@ -1,13 +1,17 @@
-"""Projection, recommendation, and draft-assistant CLI commands."""
+"""Projection, recommendation, and draft-assistant CLI commands.
+
+Each command's options are declared once, as the fields of a frozen request dataclass
+(``field(metadata=option(...))``); ``_request_commands.register_request_command`` turns
+the dataclass into the Typer command and calls the ``run_*`` function with the request.
+"""
 
 from __future__ import annotations
 
-import argparse
 import random as _random
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING
 
 import typer
 
@@ -17,6 +21,7 @@ from draft_oracle.cli._project_defaults import (
     DEFAULT_NORMALIZED_DIR,
     DEFAULT_OPPONENT_ARTIFACT_DIR,
 )
+from draft_oracle.cli._request_commands import option
 
 if TYPE_CHECKING:
     from draft_oracle.optimize.opponents import FittedLeagueOpponents
@@ -25,84 +30,44 @@ if TYPE_CHECKING:
     from draft_oracle.projection_artifact import ProjectArtifactConfig, ProjectArtifactResult
 
 
-_NormalizedDirOption = Annotated[
-    Path,
-    typer.Option(help="Directory holding normalized Parquet tables."),
-]
-_ArtifactDirOption = Annotated[
-    Path,
-    typer.Option(help="Projection artifact directory (has skaters/teams parquet)."),
-]
-_ArtifactsRootOption = Annotated[
-    Path,
-    typer.Option(help="Root directory for the written artifact."),
-]
-_SnapshotOption = Annotated[
-    str,
-    typer.Option(help="Pin a frozen snapshot id (defaults to the live tables)."),
-]
-_ManagersOption = Annotated[
-    int,
-    typer.Option(help="League size (2-12); sets VOR replacement levels."),
-]
-_ManagersInputOption = Annotated[
-    str,
-    typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle)."),
-]
-_SeatOption = Annotated[int, typer.Option(help="Owner's snake seat (1-based).")]
-_SlotOption = Annotated[int, typer.Option("--slot", help="Your snake seat (1-based).")]
-_IrOption = Annotated[
-    bool,
-    typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D)."),
-]
-_DraftIrOption = Annotated[
-    bool,
-    typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D per manager)."),
-]
-_TemperatureOption = Annotated[float, typer.Option(help="Greedy opponent softmax temperature.")]
-_SeedOption = Annotated[int, typer.Option(help="Deterministic seed.")]
-_ProjectionSeedOption = Annotated[int, typer.Option(help="Deterministic training/MC seed.")]
-_OpponentsOption = Annotated[
-    str,
-    typer.Option(help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."),
-]
-_OpponentArtifactOption = Annotated[
-    Path,
-    typer.Option(help="Committed opponent-model artifact directory (fitted path)."),
-]
-_RolloutsOption = Annotated[int, typer.Option(help="Monte-Carlo rollouts per candidate.")]
-_SlotRolloutsOption = Annotated[
-    int,
-    typer.Option(help="Monte-Carlo rollouts per turn in the slot report."),
-]
-_DepthOption = Annotated[
-    int,
-    typer.Option(help="Owner turns simulated vs. opponents (0 = full depth)."),
-]
-_ArchiveDirOption = Annotated[
-    Path,
-    typer.Option(help="Committed NHL archive directory (for the ingest refresh)."),
-]
-_NoRefreshOption = Annotated[
-    bool,
-    typer.Option("--no-refresh", help="Skip the idempotent ingest refresh (offline)."),
-]
-_SlotStrategiesOption = Annotated[
-    bool,
-    typer.Option(
-        "--slot-strategies/--no-slot-strategies",
-        help="Emit slot_strategies.md (per-slot draft plan, US-023).",
-    ),
-]
-_EliminatedOption = Annotated[str, typer.Option(help="Comma-separated eliminated team abbrevs.")]
-_SessionPathOption = Annotated[
-    Path | None,
-    typer.Option(help="Session-log path (defaults to ./draft-session.json)."),
-]
-_ResumePathOption = Annotated[
-    Path | None,
-    typer.Option("--resume", help="Resume a saved session JSON instead."),
-]
+DEFAULT_SEED = 20260827
+DEFAULT_TEMPERATURE = 0.3
+DEFAULT_ROLLOUTS = 500
+
+# One ``typer.Option`` per CLI option; shared between commands where the meaning is the same.
+_SEASON = typer.Option(help="Playoff season end year, e.g. 2026.")
+_ROUND = typer.Option("--round", help="Playoff round number (1-4).")
+_NORMALIZED_DIR = typer.Option(help="Directory holding normalized Parquet tables.")
+_ARTIFACT_DIR = typer.Option(help="Projection artifact directory (has skaters/teams parquet).")
+_DRAFT_ARTIFACT = typer.Option(help="Projection artifact directory (skaters/teams parquet).")
+_ARTIFACTS_ROOT = typer.Option(help="Root directory for the written artifact.")
+_SNAPSHOT = typer.Option(help="Pin a frozen snapshot id (defaults to the live tables).")
+_LEAGUE_SIZE = typer.Option(help="League size (2-12); sets VOR replacement levels.")
+_MANAGER_IDS = typer.Option(help="League size (2-12) or comma seat ids (e.g. ben,judah,levi,kyle).")
+_SEAT = typer.Option(help="Owner's snake seat (1-based).")
+_SLOT = typer.Option("--slot", help="Your snake seat (1-based).")
+_IR = typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D).")
+_PROJECT_IR = typer.Option("--ir/--no-ir", help="League uses IR slots (+1 F, +1 D per manager).")
+_TEMPERATURE = typer.Option(help="Greedy opponent softmax temperature.")
+_SEED = typer.Option(help="Deterministic seed.")
+_PROJECTION_SEED = typer.Option(help="Deterministic training/MC seed.")
+_OPPONENTS = typer.Option(
+    help="Opponent model: greedy, fitted, or auto (fitted when the artifact exists)."
+)
+_OPPONENT_ARTIFACT = typer.Option(help="Committed opponent-model artifact directory (fitted path).")
+_ROLLOUTS = typer.Option(help="Monte-Carlo rollouts per candidate.")
+_DRAFT_ROLLOUTS = typer.Option(help="Monte-Carlo rollouts per candidate for recommend.")
+_SLOT_ROLLOUTS = typer.Option(help="Monte-Carlo rollouts per turn in the slot report.")
+_DEPTH = typer.Option(help="Owner turns simulated vs. opponents (0 = full depth).")
+_ARCHIVE_DIR = typer.Option(help="Committed NHL archive directory (for the ingest refresh).")
+_NO_REFRESH = typer.Option("--no-refresh", help="Skip the idempotent ingest refresh (offline).")
+_SLOT_STRATEGIES = typer.Option(
+    "--slot-strategies/--no-slot-strategies",
+    help="Emit slot_strategies.md (per-slot draft plan, US-023).",
+)
+_ELIMINATED = typer.Option(help="Comma-separated eliminated team abbrevs.")
+_SESSION = typer.Option(help="Session-log path (defaults to ./draft-session.json).")
+_RESUME = typer.Option("--resume", help="Resume a saved session JSON instead.")
 
 
 @dataclass(frozen=True)
@@ -138,58 +103,59 @@ class _BuildRecommendSetupRequest:
 
 
 @dataclass(frozen=True)
-class _ProjectCommandRequest:
-    season: int
-    playoff_round: int
-    normalized_dir: Path
-    artifacts_root: Path
-    snapshot: str
-    managers: int
-    ir: bool
-    archive_dir: Path
-    no_refresh: bool
-    seed: int
-    slot_strategies: bool
-    slot_rollouts: int
+class ProjectCommandRequest:
+    """Options of ``oracle project`` — every field is one CLI option."""
+
+    season: int = field(metadata=option(_SEASON))
+    playoff_round: int = field(metadata=option(_ROUND))
+    normalized_dir: Path = field(default=DEFAULT_NORMALIZED_DIR, metadata=option(_NORMALIZED_DIR))
+    artifacts_root: Path = field(default=DEFAULT_ARTIFACTS_ROOT, metadata=option(_ARTIFACTS_ROOT))
+    snapshot: str = field(default="", metadata=option(_SNAPSHOT))
+    managers: int = field(default=4, metadata=option(_LEAGUE_SIZE))
+    ir: bool = field(default=False, metadata=option(_PROJECT_IR))
+    archive_dir: Path = field(default=DEFAULT_ARCHIVE_DIR, metadata=option(_ARCHIVE_DIR))
+    no_refresh: bool = field(default=False, metadata=option(_NO_REFRESH))
+    seed: int = field(default=DEFAULT_SEED, metadata=option(_PROJECTION_SEED))
+    slot_strategies: bool = field(default=True, metadata=option(_SLOT_STRATEGIES))
+    slot_rollouts: int = field(default=60, metadata=option(_SLOT_ROLLOUTS))
 
 
 @dataclass(frozen=True)
-class _RecommendCommandRequest:
-    artifact_dir: Path
-    managers: str
-    seat: int
-    ir: bool
-    rollouts: int
-    depth: int
-    temperature: float
-    seed: int
-    opponents: str
-    opponent_artifact: Path
+class RecommendCommandRequest:
+    """Options of ``oracle recommend`` — every field is one CLI option."""
+
+    artifact_dir: Path = field(metadata=option(_ARTIFACT_DIR))
+    managers: str = field(default="4", metadata=option(_MANAGER_IDS))
+    seat: int = field(default=1, metadata=option(_SEAT))
+    ir: bool = field(default=False, metadata=option(_IR))
+    rollouts: int = field(default=DEFAULT_ROLLOUTS, metadata=option(_ROLLOUTS))
+    depth: int = field(default=0, metadata=option(_DEPTH))
+    temperature: float = field(default=DEFAULT_TEMPERATURE, metadata=option(_TEMPERATURE))
+    seed: int = field(default=DEFAULT_SEED, metadata=option(_SEED))
+    opponents: str = field(default="auto", metadata=option(_OPPONENTS))
+    opponent_artifact: Path = field(
+        default=DEFAULT_OPPONENT_ARTIFACT_DIR, metadata=option(_OPPONENT_ARTIFACT)
+    )
 
 
 @dataclass(frozen=True)
-class _DraftCommandRequest:
-    artifact: Path | None
-    managers: str
-    slot: int
-    ir: bool
-    eliminated: str
-    session: Path | None
-    resume: Path | None
-    temperature: float
-    seed: int
-    rollouts: int
-    opponents: str
-    opponent_artifact: Path
+class DraftCommandRequest:
+    """Options of ``oracle draft`` — every field is one CLI option."""
 
-
-@dataclass(frozen=True)
-class _ToggleArgumentRequest:
-    parser: argparse.ArgumentParser
-    name: str
-    help_on: str
-    help_off: str
-    default: bool
+    artifact: Path | None = field(default=None, metadata=option(_DRAFT_ARTIFACT))
+    managers: str = field(default="4", metadata=option(_MANAGER_IDS))
+    slot: int = field(default=1, metadata=option(_SLOT))
+    ir: bool = field(default=False, metadata=option(_IR))
+    eliminated: str = field(default="", metadata=option(_ELIMINATED))
+    session: Path | None = field(default=None, metadata=option(_SESSION))
+    resume: Path | None = field(default=None, metadata=option(_RESUME))
+    temperature: float = field(default=DEFAULT_TEMPERATURE, metadata=option(_TEMPERATURE))
+    seed: int = field(default=DEFAULT_SEED, metadata=option(_SEED))
+    rollouts: int = field(default=DEFAULT_ROLLOUTS, metadata=option(_DRAFT_ROLLOUTS))
+    opponents: str = field(default="auto", metadata=option(_OPPONENTS))
+    opponent_artifact: Path = field(
+        default=DEFAULT_OPPONENT_ARTIFACT_DIR, metadata=option(_OPPONENT_ARTIFACT)
+    )
 
 
 def _maybe_refresh_normalized_archive(
@@ -258,9 +224,7 @@ def _echo_project_summary(result: ProjectArtifactResult, out_dir: Path) -> None:
         typer.echo(f"  warning: {warning}")
 
 
-def project(
-    ctx: typer.Context,
-) -> None:
+def run_project(request: ProjectCommandRequest) -> None:
     """Precompute a self-contained projection artifact for one upcoming round.
 
     Refreshes ingest (idempotent, offline), builds as-of features, runs inference, and
@@ -268,10 +232,6 @@ def project(
     run_manifest.json under artifacts_root/<season>-r<round>/. Eliminated teams are
     excluded automatically.
     """
-    _run_project(_parse_project_request(ctx.args))
-
-
-def _run_project(request: _ProjectCommandRequest) -> None:
     from draft_oracle.projection_artifact import build_projection_artifact_from_normalized
 
     _maybe_refresh_normalized_archive(
@@ -298,39 +258,6 @@ def _run_project(request: _ProjectCommandRequest) -> None:
         ),
     )
     _echo_project_summary(result, out_dir)
-
-
-def recommend(
-    ctx: typer.Context,
-) -> None:
-    """Recommend the best pick right now via multi-step Monte-Carlo rollout (US-021).
-
-    Builds a fresh draft from a projection artifact, puts the owner on the clock at
-    ``seat``, and prints the top-5 explained recommendations (VOR, survival, need,
-    delta vs. #2). Opponents default to the committed *fitted* league model when its
-    artifact is present; ``--opponents greedy`` forces the vectorized fallback, and
-    passing real names to ``--managers`` attaches each manager's fitted model to their
-    real seat.
-    """
-    request = _parse_recommend_request(ctx.args)
-    inputs = _recommend_inputs(
-        _RecommendInputsRequest(
-            artifact_dir=request.artifact_dir,
-            managers=request.managers,
-            seat=request.seat,
-            ir=request.ir,
-            temperature=request.temperature,
-            opponents=request.opponents,
-            opponent_artifact=request.opponent_artifact,
-        )
-    )
-    result = _recommendation_result(
-        inputs,
-        rollouts=request.rollouts,
-        depth=request.depth,
-        seed=request.seed,
-    )
-    _echo_recommendation(result, inputs.label)
 
 
 @dataclass(frozen=True)
@@ -448,13 +375,40 @@ def _model_for(
     return opponent_model
 
 
-def draft_cmd(
-    ctx: typer.Context,
-) -> None:
+def run_recommend(request: RecommendCommandRequest) -> None:
+    """Recommend the best pick right now via multi-step Monte-Carlo rollout (US-021).
+
+    Builds a fresh draft from a projection artifact, puts the owner on the clock at
+    ``seat``, and prints the top-5 explained recommendations (VOR, survival, need,
+    delta vs. #2). Opponents default to the committed *fitted* league model when its
+    artifact is present; ``--opponents greedy`` forces the vectorized fallback, and
+    passing real names to ``--managers`` attaches each manager's fitted model to their
+    real seat.
+    """
+    inputs = _recommend_inputs(
+        _RecommendInputsRequest(
+            artifact_dir=request.artifact_dir,
+            managers=request.managers,
+            seat=request.seat,
+            ir=request.ir,
+            temperature=request.temperature,
+            opponents=request.opponents,
+            opponent_artifact=request.opponent_artifact,
+        )
+    )
+    result = _recommendation_result(
+        inputs,
+        rollouts=request.rollouts,
+        depth=request.depth,
+        seed=request.seed,
+    )
+    _echo_recommendation(result, inputs.label)
+
+
+def run_draft(request: DraftCommandRequest) -> None:
     """Start the interactive, artifact-powered draft assistant (US-024)."""
     from draft_oracle.cli.draft import draft
 
-    request = _parse_draft_request(ctx.args)
     draft(
         artifact=request.artifact,
         managers=request.managers,
@@ -468,270 +422,4 @@ def draft_cmd(
         rollouts=request.rollouts,
         opponents=request.opponents,
         opponent_artifact=request.opponent_artifact,
-    )
-
-
-def _project_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="project",
-        add_help=False,
-        description="Precompute a self-contained projection artifact for one upcoming round.",
-    )
-    parser.add_argument("--season", type=int, required=True, help="Playoff season end year.")
-    parser.add_argument(
-        "--round", dest="playoff_round", type=int, required=True, help="Playoff round number (1-4)."
-    )
-    parser.add_argument(
-        "--normalized-dir",
-        type=Path,
-        default=DEFAULT_NORMALIZED_DIR,
-        help="Directory holding normalized Parquet tables.",
-    )
-    parser.add_argument(
-        "--artifacts-root",
-        type=Path,
-        default=DEFAULT_ARTIFACTS_ROOT,
-        help="Root directory for written artifact.",
-    )
-    parser.add_argument(
-        "--snapshot",
-        type=str,
-        default="",
-        help="Pin a frozen snapshot id (defaults to live tables).",
-    )
-    parser.add_argument(
-        "--managers", type=int, default=4, help="League size (2-12); sets VOR replacement levels."
-    )
-    _add_ir_toggle(
-        parser,
-        help_on="League uses IR slots (+1 F, +1 D per manager).",
-        help_off="League does not use IR slots.",
-    )
-    parser.add_argument(
-        "--archive-dir",
-        type=Path,
-        default=DEFAULT_ARCHIVE_DIR,
-        help="Committed NHL archive directory (for ingest refresh).",
-    )
-    parser.add_argument(
-        "--no-refresh", action="store_true", help="Skip idempotent ingest refresh (offline)."
-    )
-    _add_seed_argument(parser, help_text="Deterministic training/MC seed.")
-    _add_toggle_argument(
-        _ToggleArgumentRequest(
-            parser=parser,
-            name="slot_strategies",
-            help_on="Emit slot_strategies.md (per-slot draft plan, US-023).",
-            help_off="Skip slot_strategies.md output.",
-            default=True,
-        )
-    )
-    parser.add_argument(
-        "--slot-rollouts",
-        type=int,
-        default=60,
-        help="Monte-Carlo rollouts per turn in slot report.",
-    )
-    return parser
-
-
-def _recommend_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="recommend",
-        add_help=False,
-        description="Recommend best pick right now via multi-step Monte-Carlo rollout.",
-    )
-    parser.add_argument(
-        "--artifact-dir",
-        type=Path,
-        required=True,
-        help="Projection artifact directory (has skaters/teams parquet).",
-    )
-    _add_manager_ids_argument(parser)
-    parser.add_argument("--seat", type=int, default=1, help="Owner's snake seat (1-based).")
-    _add_ir_toggle(
-        parser,
-        help_on="League uses IR slots (+1 F, +1 D).",
-        help_off="League does not use IR slots.",
-    )
-    parser.add_argument(
-        "--rollouts", type=int, default=500, help="Monte-Carlo rollouts per candidate."
-    )
-    parser.add_argument(
-        "--depth", type=int, default=0, help="Owner turns simulated vs. opponents (0 = full depth)."
-    )
-    parser.add_argument(
-        "--temperature", type=float, default=0.3, help="Greedy opponent softmax temperature."
-    )
-    _add_seed_argument(parser, help_text="Deterministic seed.")
-    _add_opponent_arguments(parser)
-    return parser
-
-
-def _draft_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="draft",
-        add_help=False,
-        description="Start interactive, artifact-powered draft assistant.",
-    )
-    parser.add_argument(
-        "--artifact",
-        type=Path,
-        default=None,
-        help="Projection artifact directory (skaters/teams parquet).",
-    )
-    _add_manager_ids_argument(parser)
-    parser.add_argument("--slot", type=int, default=1, help="Your snake seat (1-based).")
-    _add_ir_toggle(
-        parser,
-        help_on="League uses IR slots (+1 F, +1 D).",
-        help_off="League does not use IR slots.",
-    )
-    parser.add_argument(
-        "--eliminated", type=str, default="", help="Comma-separated eliminated team abbrevs."
-    )
-    parser.add_argument(
-        "--session",
-        type=Path,
-        default=None,
-        help="Session-log path (defaults to ./draft-session.json).",
-    )
-    parser.add_argument(
-        "--resume", type=Path, default=None, help="Resume a saved session JSON instead."
-    )
-    parser.add_argument(
-        "--temperature", type=float, default=0.3, help="Greedy opponent softmax temperature."
-    )
-    _add_seed_argument(parser, help_text="Deterministic seed.")
-    parser.add_argument(
-        "--rollouts",
-        type=int,
-        default=500,
-        help="Monte-Carlo rollouts per candidate for recommend.",
-    )
-    _add_opponent_arguments(parser)
-    return parser
-
-
-def _parse_project_request(args: list[str]) -> _ProjectCommandRequest:
-    parser = _project_parser()
-    namespace = _parse_args(parser, args)
-    return _ProjectCommandRequest(
-        season=namespace.season,
-        playoff_round=namespace.playoff_round,
-        normalized_dir=namespace.normalized_dir,
-        artifacts_root=namespace.artifacts_root,
-        snapshot=namespace.snapshot,
-        managers=namespace.managers,
-        ir=namespace.ir,
-        archive_dir=namespace.archive_dir,
-        no_refresh=namespace.no_refresh,
-        seed=namespace.seed,
-        slot_strategies=namespace.slot_strategies,
-        slot_rollouts=namespace.slot_rollouts,
-    )
-
-
-def _parse_recommend_request(args: list[str]) -> _RecommendCommandRequest:
-    parser = _recommend_parser()
-    namespace = _parse_args(parser, args)
-    return _RecommendCommandRequest(
-        artifact_dir=namespace.artifact_dir,
-        managers=namespace.managers,
-        seat=namespace.seat,
-        ir=namespace.ir,
-        rollouts=namespace.rollouts,
-        depth=namespace.depth,
-        temperature=namespace.temperature,
-        seed=namespace.seed,
-        opponents=namespace.opponents,
-        opponent_artifact=namespace.opponent_artifact,
-    )
-
-
-def _parse_draft_request(args: list[str]) -> _DraftCommandRequest:
-    parser = _draft_parser()
-    namespace = _parse_args(parser, args)
-    return _DraftCommandRequest(
-        artifact=namespace.artifact,
-        managers=namespace.managers,
-        slot=namespace.slot,
-        ir=namespace.ir,
-        eliminated=namespace.eliminated,
-        session=namespace.session,
-        resume=namespace.resume,
-        temperature=namespace.temperature,
-        seed=namespace.seed,
-        rollouts=namespace.rollouts,
-        opponents=namespace.opponents,
-        opponent_artifact=namespace.opponent_artifact,
-    )
-
-
-def _parse_args(
-    parser: argparse.ArgumentParser,
-    args: list[str],
-) -> argparse.Namespace:
-    if any(arg in {"-h", "--help"} for arg in args):
-        typer.echo(parser.format_help().rstrip())
-        raise typer.Exit()
-    namespace, extras = parser.parse_known_args(args)
-    if extras:
-        raise typer.BadParameter(f"unknown {parser.prog} args: {' '.join(extras)}")
-    return namespace
-
-
-def _add_toggle_argument(request: _ToggleArgumentRequest) -> None:
-    flag = request.name.replace("_", "-")
-    request.parser.add_argument(
-        f"--{flag}",
-        dest=request.name,
-        action="store_true",
-        help=request.help_on,
-    )
-    request.parser.add_argument(
-        f"--no-{flag}",
-        dest=request.name,
-        action="store_false",
-        help=request.help_off,
-    )
-    request.parser.set_defaults(**{request.name: request.default})
-
-
-def _add_ir_toggle(
-    parser: argparse.ArgumentParser,
-    *,
-    help_on: str,
-    help_off: str,
-) -> None:
-    _add_toggle_argument(
-        _ToggleArgumentRequest(
-            parser=parser,
-            name="ir",
-            help_on=help_on,
-            help_off=help_off,
-            default=False,
-        )
-    )
-
-
-def _add_seed_argument(parser: argparse.ArgumentParser, *, help_text: str) -> None:
-    parser.add_argument("--seed", type=int, default=20260827, help=help_text)
-
-
-def _add_manager_ids_argument(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--managers", type=str, default="4", help="League size (2-12) or comma seat ids."
-    )
-
-
-def _add_opponent_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--opponents", type=str, default="auto", help="Opponent model: greedy, fitted, or auto."
-    )
-    parser.add_argument(
-        "--opponent-artifact",
-        type=Path,
-        default=DEFAULT_OPPONENT_ARTIFACT_DIR,
-        help="Committed opponent-model artifact directory (fitted path).",
     )
