@@ -79,8 +79,7 @@ class Client:
             handle.write(json.dumps(record, sort_keys=True) + "\n")
 
     def _report(self, request: ApiRequest, status: int, quota: dict[str, int | None]) -> None:
-        interval = self.settings.progress_every
-        if interval != 1 and self.network_calls != 1 and self.network_calls % interval:
+        if not self._should_report():
             return
         print(
             f"{request.label}: HTTP {status}; "
@@ -88,6 +87,13 @@ class Client:
             f"x-requests-used={quota['used']}; x-requests-last={quota['last']}",
             flush=True,
         )
+
+    def _should_report(self) -> bool:
+        if self.settings.progress_every == 1:
+            return True
+        if self.network_calls == 1:
+            return True
+        return self.network_calls % self.settings.progress_every == 0
 
     def _enforce_quota(self, quota: dict[str, int | None]) -> None:
         remaining = quota["remaining"]
