@@ -281,36 +281,25 @@ def all_playoff_games_neutral(label, rows):
     )
 
 
-def season_summary(
-    label,
-    season_id,
-    teams,
-    expected_game_ids,
-    out_rows,
-    aliases_used,
-    team_notes,
-    mismatches,
-    missing_game_ids,
-    extra_game_ids,
-    blank_start_times,
-    neutral_city_misses,
-):
+def season_summary(season, out_rows, validation):
     neutral_playoff_rows = neutral_playoff_count(out_rows)
     return {
-        'season': label,
-        'seasonId': season_id,
-        'teams': len(teams),
-        'games': len(expected_game_ids),
+        'season': season['label'],
+        'seasonId': season['season_id'],
+        'teams': season['team_count'],
+        'games': season['game_count'],
         'rows': len(out_rows),
         'neutral_playoff_rows': neutral_playoff_rows,
-        'aliases_used': aliases_used,
-        'team_notes': team_notes,
-        'duplicate_mismatches': mismatches,
-        'missing_game_ids': missing_game_ids,
-        'extra_game_ids': extra_game_ids,
-        'blank_start_times': blank_start_times,
-        'neutral_city_misses': neutral_city_misses,
-        'all_2020_playoff_games_neutral': all_playoff_games_neutral(label, out_rows),
+        'aliases_used': season['aliases_used'],
+        'team_notes': season['team_notes'],
+        'duplicate_mismatches': season['mismatches'],
+        'missing_game_ids': validation['missing_game_ids'],
+        'extra_game_ids': validation['extra_game_ids'],
+        'blank_start_times': validation['blank_start_times'],
+        'neutral_city_misses': validation['neutral_city_misses'],
+        'all_2020_playoff_games_neutral': all_playoff_games_neutral(
+            season['label'], out_rows
+        ),
     }
 
 
@@ -332,20 +321,22 @@ def process_season(team_path, outdir, counters):
         f'  wrote {label}: rows {len(out_rows)} neutral-playoff {neutral_playoff_rows} '
         f'neutral-city-updates {neutral_updates}'
     )
-    return season_summary(
-        label,
-        season_id,
-        teams,
-        expected_game_ids,
-        out_rows,
-        aliases_used,
-        team_notes,
-        mismatches,
-        missing_game_ids,
-        extra_game_ids,
-        blank_start_times,
-        neutral_city_misses,
-    )
+    season = {
+        'label': label,
+        'season_id': season_id,
+        'team_count': len(teams),
+        'game_count': len(expected_game_ids),
+        'aliases_used': aliases_used,
+        'team_notes': team_notes,
+        'mismatches': mismatches,
+    }
+    validation = {
+        'missing_game_ids': missing_game_ids,
+        'extra_game_ids': extra_game_ids,
+        'blank_start_times': blank_start_times,
+        'neutral_city_misses': neutral_city_misses,
+    }
+    return season_summary(season, out_rows, validation)
 
 
 def main(outdir):
