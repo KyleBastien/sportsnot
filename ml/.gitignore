@@ -11,6 +11,8 @@ data/raw/nhl-archive/_toi_*.json
 !data/raw/nhl-shifts/
 !data/raw/nhl-shifts/**
 data/raw/nhl-shifts/cache/
+data/raw/nhl-shifts/_*.json
+data/raw/nhl-shifts/*.tmp
 !data/raw/moneypuck/
 !data/raw/moneypuck/**
 
