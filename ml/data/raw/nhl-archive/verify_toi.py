@@ -26,6 +26,17 @@ def row_key(row):
     return row["gameId"], row["playerId"]
 
 
+def time_difference_row(values):
+    difference, game_id, player_id, left, right = values
+    return {
+        "difference_seconds": difference,
+        "gameId": game_id,
+        "playerId": player_id,
+        "summary_timeOnIcePerGame": left,
+        "timeonice_timeOnIce": right,
+    }
+
+
 def compare_time_on_ice(summary_rows, toi_rows):
     summary = {row_key(row): number(row, "timeOnIcePerGame") for row in summary_rows}
     compared = 0
@@ -49,16 +60,18 @@ def compare_time_on_ice(summary_rows, toi_rows):
         "within_1_second": within_one,
         "share_within_1_second": within_one / compared if compared else None,
         "missing_comparisons": len(missing),
-        "worst_20": [
-            {
-                "difference_seconds": difference,
-                "gameId": game_id,
-                "playerId": player_id,
-                "summary_timeOnIcePerGame": left,
-                "timeonice_timeOnIce": right,
-            }
-            for difference, game_id, player_id, left, right in worst[:20]
-        ],
+        "worst_20": [time_difference_row(values) for values in worst[:20]],
+    }
+
+
+def strength_difference_row(values):
+    difference, game_id, player_id, total, component_sum = values
+    return {
+        "difference_seconds": difference,
+        "gameId": game_id,
+        "playerId": player_id,
+        "timeOnIce": total,
+        "component_sum": component_sum,
     }
 
 
@@ -85,16 +98,7 @@ def strength_sum_check(toi_rows):
         "share_within_2_seconds": within_two / compared if compared else None,
         "missing_components": missing,
         "definition": "evTimeOnIce includes OT; total = ev + pp + sh",
-        "worst_20": [
-            {
-                "difference_seconds": difference,
-                "gameId": game_id,
-                "playerId": player_id,
-                "timeOnIce": total,
-                "component_sum": component_sum,
-            }
-            for difference, game_id, player_id, total, component_sum in worst[:20]
-        ],
+        "worst_20": [strength_difference_row(values) for values in worst[:20]],
     }
 
 
@@ -137,33 +141,48 @@ def verify_season(root, label):
     }
 
 
+def aggregate_rows(seasons):
+    keys = seasons[0]["rows"] if seasons else {}
+    return Counter({key: sum(season["rows"][key] for season in seasons) for key in keys})
+
+
+def aggregate_metric(seasons, section, metric):
+    return sum(season[section].get(metric, 0) for season in seasons)
+
+
+def tagged_starter_exceptions(seasons):
+    return [
+        {"season": season["season"], **row}
+        for season in seasons
+        for row in season["goalie_starters"]["exceptions"]
+    ]
+
+
+def share(numerator, denominator):
+    return numerator / denominator if denominator else None
+
+
 def aggregate(seasons):
-    totals = Counter()
-    starter_exceptions = []
-    for season in seasons:
-        rows = season["rows"]
-        for key, value in rows.items():
-            totals[key] += value
-        for key in ("time_on_ice", "strength_sum"):
-            for metric in ("compared", "within_1_second", "within_2_seconds"):
-                if metric in season[key]:
-                    totals[f"{key}_{metric}"] += season[key][metric]
-        starter_exceptions.extend(
-            {"season": season["season"], **row}
-            for row in season["goalie_starters"]["exceptions"]
-        )
-        totals["goalie_game_teams"] += season["goalie_starters"]["game_teams"]
-    toi_compared = totals["time_on_ice_compared"]
-    strength_compared = totals["strength_sum_compared"]
+    totals = aggregate_rows(seasons)
+    totals["time_on_ice_compared"] = aggregate_metric(seasons, "time_on_ice", "compared")
+    totals["time_on_ice_within_1_second"] = aggregate_metric(
+        seasons, "time_on_ice", "within_1_second"
+    )
+    totals["strength_sum_compared"] = aggregate_metric(seasons, "strength_sum", "compared")
+    totals["strength_sum_within_2_seconds"] = aggregate_metric(
+        seasons, "strength_sum", "within_2_seconds"
+    )
+    totals["goalie_game_teams"] = sum(season["goalie_starters"]["game_teams"] for season in seasons)
+    starter_exceptions = tagged_starter_exceptions(seasons)
     return {
         "rows": dict(totals),
-        "time_on_ice_share_within_1_second": (
-            totals["time_on_ice_within_1_second"] / toi_compared if toi_compared else None
+        "time_on_ice_share_within_1_second": share(
+            totals["time_on_ice_within_1_second"],
+            totals["time_on_ice_compared"],
         ),
-        "strength_sum_share_within_2_seconds": (
-            totals["strength_sum_within_2_seconds"] / strength_compared
-            if strength_compared
-            else None
+        "strength_sum_share_within_2_seconds": share(
+            totals["strength_sum_within_2_seconds"],
+            totals["strength_sum_compared"],
         ),
         "goalie_starter_exception_count": len(starter_exceptions),
         "goalie_starter_exceptions": starter_exceptions,
@@ -171,7 +190,10 @@ def aggregate(seasons):
 
 
 def main(root):
-    labels = [path.name[len("skater-toi-") : -len(".csv.gz")] for path in sorted(root.glob("skater-toi-*.csv.gz"))]
+    labels = [
+        path.name[len("skater-toi-") : -len(".csv.gz")]
+        for path in sorted(root.glob("skater-toi-*.csv.gz"))
+    ]
     seasons = [verify_season(root, label) for label in labels]
     result = {"aggregate": aggregate(seasons), "seasons": seasons}
     (root / "_toi_verify.json").write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
@@ -180,5 +202,7 @@ def main(root):
 
 
 if __name__ == "__main__":
-    directory = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent
+    directory = (
+        Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent
+    )
     sys.exit(main(directory))

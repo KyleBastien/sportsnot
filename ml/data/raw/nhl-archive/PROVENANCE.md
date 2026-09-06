@@ -358,6 +358,10 @@ Fetched **2026-09-05** from the public NHL stats REST API with the committed
 `fetch_toi.py`. Coverage is every regular-season and playoff game in the existing
 2007-08 through 2025-26 archive. No authentication was used.
 
+After the fetch, `fetch_toi.py` and `verify_toi.py` were refactored into smaller
+helpers to satisfy the CodeScene code-health gate. A full cache/output resume changed
+**0 of 57 gzip files**, and the verifier reproduced the same aggregate results below.
+
 ### 8.1 Exact endpoints and partitioning
 
 Skater time on ice:
