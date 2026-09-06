@@ -133,9 +133,8 @@ pre-series benchmark stays the game-1 line through the simulator.
 ### US-503: Extend the NHL archive back to 2007-08 (with era guardrails)
 **Description:** As the tool owner, I want more playoff series in training (today 11 seasons ≈
 165 series) because the series model's held-out sample is what makes its calibration noisy.
-The NHL stats REST API serves seasons back to 2007-08 with the same schema, and MoneyPuck and
-NaturalStatTrick data (US-504) begin in 2007-08 too, so the shot-quality features cover the
-whole span. Decision (Decisions §4): fetch to 2007-08, add an era indicator, define seeding by
+The NHL stats REST API serves seasons back to 2007-08 with the same schema, and MoneyPuck shot
+data (US-504) begins in 2007-08 too, so the shot-quality features cover the whole span. Decision (Decisions §4): fetch to 2007-08, add an era indicator, define seeding by
 regular-season points, and ablate.
 
 **Acceptance Criteria:**
@@ -149,7 +148,7 @@ regular-season points, and ablate.
 - [ ] All Unit tests pass (even if it's outside of your changes)
 - [ ] All Playwright tests pass (even if it's outside of your changes)
 
-### US-504: Goaltending and shot-quality data — MoneyPuck and NaturalStatTrick ingestion
+### US-504: Goaltending, shot-quality and deployment data — MoneyPuck and NHL shift/TOI ingestion
 **Description:** As the tool owner, I want goalie-level and shot-quality data because the
 team slot is priced from team win% and box-score save% today, and "who is in net and how
 good are they really" is the information the current features cannot see.
@@ -157,7 +156,7 @@ good are they really" is the information the current features cannot see.
 **Acceptance Criteria:**
 - [ ] MoneyPuck season summaries (skaters, goalies, teams, lines; regular and playoffs; 2008-09 onward) AND the raw per-season shot archives (`shots_<year>.zip`, 2007-08 onward, committed as the original downloaded bytes with sha256 recorded — plain git, no LFS; any file over 45 MB is split into gzipped parts with reassembly documented) live under `ml/data/raw/moneypuck/` with `PROVENANCE.md` (source URLs, fetch date, attribution note, checksums); a committed `aggregate_shots.py` derives per-game team xG for/against, per-game skater ixG, and per-game goalie shots-faced / xG-faced / GSAx / starter-flag tables from the shots files, and the pipeline normalizes those into `data/normalized/{skater_xg,goalie_xg,team_xg}.parquet` keyed on NHL ids via `entity_match`
 - [ ] A test recomputes the sha256 of each committed shots archive against PROVENANCE and re-derives one season's aggregates from it, proving the committed aggregates are reproducible from the committed raw bytes
-- [ ] NaturalStatTrick line/PP-unit deployment (TOI share by line and PP1/PP2) ingested for the seasons where the site serves it, with a polite rate limit and cached raw HTML/CSV; unmatched players reported loudly, never guessed
+- [ ] Deployment data comes from the NHL API, not NaturalStatTrick (Decisions §7): per-game skater TOI by strength (`skater/timeonice` and `skater/powerplay` REST reports, 2007-08 onward) committed under `ml/data/raw/nhl-archive/`, and per-game shift charts (`shiftcharts` REST endpoint; the HTML TOI reports for seasons it does not serve) committed under `ml/data/raw/nhl-shifts/` with a committed `derive_deployment.py` producing per-game forward-line / D-pair 5v5 TOI, PP-unit membership and TOI (PP1 = the five skaters with the most PP TOI that game), and per-skater 5v5 / PP / PK TOI; on-ice xG per skater comes from joining shifts to MoneyPuck shots by game clock; the pipeline normalizes these into `data/normalized/{skater_toi,lines,pp_units,skater_onice_xg}.parquet`; a test re-derives one season's tables from the committed shifts and checks byte identity; seasons the API does not serve are listed in PROVENANCE, never imputed
 - [ ] Starting-goalie identity per game derived from the NHL archive (the goalie who faced the first shot / played ≥ 30 min), giving each team a **starter GSAx / sv%** and **backup GSAx / sv%** time series with as-of discipline
 - [ ] Leakage tests extended: every new table has a `game_date`/`as_of_date` and `features/leakage.py` checks it against round cutoffs
 - [ ] All Typecheck passes (even if it's outside of your changes)
@@ -255,7 +254,7 @@ before US-501.
 ### US-510: Skater availability inside a round from absence spells and lineup data
 **Description:** As the tool owner, I want the probability a skater dresses for each game of
 the series (healthy scratch, in-series injury) modeled from the archive's absence spells and
-NaturalStatTrick lineups, not assumed to be 1.0.
+the per-game dressed lineups in the NHL shift charts (US-504), not assumed to be 1.0.
 
 **Acceptance Criteria:**
 - [ ] Per-skater per-game dress probability estimated as-of the round; held-out calibration reported; feeds the US-506 tensor
@@ -428,7 +427,7 @@ goals, so I know before next spring whether v2 is a real step up.
 - FR-6: Misses are reported with the honest number; baselines, splits, seeds and held-out sets are never changed to manufacture a pass (SPEC §7 unchanged).
 
 ### Data
-- FR-7: New external sources (The Odds API history, the extended NHL archive, MoneyPuck, NaturalStatTrick, NHL pre-game lineups) are fetched by committed scripts run from the owner's machine, committed as snapshots with `PROVENANCE.md`, and parsed by tested code; the pipeline never depends on live availability of these sites.
+- FR-7: New external sources (The Odds API history, the extended NHL archive incl. shift charts and TOI reports, MoneyPuck, NHL pre-game lineups) are fetched by committed scripts run from the owner's machine, committed as snapshots with `PROVENANCE.md`, and parsed by tested code; the pipeline never depends on live availability of these sites.
 - FR-8: Every new table carries an as-of date and is covered by the leakage tests.
 - FR-9: Paid API keys live in `ml/.env` (gitignored); fetch scripts fail loudly without them; fetch cost per run is estimated before fetching, capped by argument, and recorded in PROVENANCE.
 - FR-9a: Data whose license forbids redistribution (The Odds API) is committed only as AES-256-GCM ciphertext; the decryption key is never committed, the pipeline degrades to stat-only without it, and derived per-game market probabilities are likewise not committed in the clear.
@@ -472,7 +471,7 @@ goals, so I know before next spring whether v2 is a real step up.
 
 - **Small data is still small data.** Bayesian hierarchical models and multi-season priors exist precisely because ~165 series (≈255 after US-503) and ~350 skater-rounds per season overfit anything flexible; every flexible model must be beaten by (or beat) the regularized baseline on held-out years, and the report says which.
 - **Stack widening** (SPEC §3 amendment): add `catboost`, a probabilistic-programming library (`numpyro` or `pymc`), `mapie` (conformal), and optionally `torch` (CPU) as extras; keep the `uv` lockfile, seeds, `mypy --strict`, ruff; the draft-time CLI must still import none of them (US-208 guard extended).
-- **Sandbox limits.** The repo's cloud sandboxes cannot reach the NHL API, ESPN, MoneyPuck, NaturalStatTrick or The Odds API (confirmed again while writing this PRD); every fetch story specifies the owner-machine steps and commits snapshots, as the v1 data foundation did.
+- **Sandbox limits.** The repo's cloud sandboxes cannot reach the NHL API, ESPN, MoneyPuck or The Odds API (confirmed again while writing this PRD); every fetch story specifies the owner-machine steps and commits snapshots, as the v1 data foundation did.
 - **Odds cost model.** The Odds API bills historical snapshots at 10 × (markets × regions) credits each; a snapshot per playoff game start (≈ 630 games, 2020–2026) with `h2h,spreads,totals` over `us,eu` is ≈ 630 × 10 × 3 × 2 ≈ 38,000 credits — inside the 100K plan (~$59 for one month) with headroom for the probe and one re-pull. Data exists from June 6, 2020, which includes the 2020 bubble playoffs; additional (period/prop) markets only from May 2023 and are not needed.
 - **Encrypted archive mechanics.** One tiny module (`ingest/sealed.py`) wraps `cryptography.hazmat.primitives.ciphers.aead.AESGCM`: `seal(bytes, key) -> nonce || ciphertext` and `open(blob, key)`; per-season tarballs keep file counts small and diffs reviewable (a re-fetch changes one file). Chosen over `age` because every machine that builds artifacts (the owner's Windows box, the cloud sandbox, CI) must decrypt in-process without installing a binary; `cryptography` ships wheels for all of them. Add `cryptography` to `ml/pyproject.toml` in US-502.
 - **Correlation vs speed.** A 2,000-draw tensor over ~450 skaters × 7 games is ~6M cells per round; store as compact integers/float16 and precompute per-player cumulative points per draw so `recommend` reduces to sums over selected columns.
@@ -517,7 +516,7 @@ merge), 95% paired-bootstrap intervals; each row is met/not-met in `ml/EVALUATIO
    `p_win_season` (or `mean_minus_lambda_var`) becomes the default only if its
    paired-bootstrap interval on replayed season wins excludes zero; otherwise `mean` stays
    default and `recommend` shows the alternative's pick and P(win season) delta (US-514).
-4. **Archive depth.** Extend to 2007-08 (the floor of MoneyPuck/NaturalStatTrick data), add
+4. **Archive depth.** Extend to 2007-08 (the floor of MoneyPuck shot data), add
    an era indicator, define seeding by regular-season points, and ablate 2007–2013 under the
    harness; drop them if they hurt and say so (US-503).
 5. **Odds API data at rest.** The Odds API's terms prohibit redistributing its data as downloadable files and this repo is public, so the archive is committed only as AES-256-GCM ciphertext (Python `cryptography`; key `ODDS_ARCHIVE_KEY` held by the owner and injected as an environment secret where Ralph runs). The owner will confirm the arrangement with The Odds API by email; the stat-only path remains first-class so the tool works without the key.
@@ -525,3 +524,12 @@ merge), 95% paired-bootstrap intervals; each row is met/not-met in `ml/EVALUATIO
    backlog. Data acquisition stories (US-502..US-504) sit early because every model story
    downstream consumes them; US-506 (joint tensor) deliberately follows US-505 so the goalie
    model and the optimizer change are evaluated separately.
+7. **NaturalStatTrick dropped.** The first compliant request (project User-Agent, 5 s
+   spacing) received a Cloudflare challenge (HTTP 403; see
+   `ml/data/raw/naturalstattrick/FETCH_FAILURE_REPORT.md`). The site owner has chosen to
+   block non-browser clients, and we do not impersonate browsers, solve challenges or rotate
+   IPs to get around that. Decision: every deployment feature NST would have supplied (line
+   combinations, PP-unit membership, TOI by strength, on-ice xG) is derived instead from the
+   NHL API's own shift charts and TOI reports joined to MoneyPuck shots, the primary data NST
+   itself is built from (US-504). The failure report stays committed as the record; no NST
+   data is used anywhere.

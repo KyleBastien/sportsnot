@@ -13,3 +13,7 @@ IP to evade it, or use subscriber-only data.
 Future fetch tooling must be reviewed after access is explicitly approved. Tier 2 must
 run only after a complete Tier 1 snapshot is committed and only when Tier 1 has shown no
 HTTP 403 or 429. Natural Stat Trick must be credited when its data is used.
+
+**Decision (2026-09-06):** NaturalStatTrick is dropped as a source. See
+`tasks/prd-ml-model-improvements.md` Decisions §7; deployment data comes from the
+NHL API's shift charts and TOI reports instead (US-504, `ml/data/raw/nhl-shifts/`).
