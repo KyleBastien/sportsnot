@@ -145,13 +145,8 @@ def add_strength_unit(duration, team_players, situation, state):
         state.pp_units[(team, tuple(sorted(players)))] += duration
 
 
-def add_segment(duration, active, state):
+def add_head_to_head_segment(duration, active, state):
     teams = sorted(active)
-    if len(teams) != 2:
-        for team, players in active.items():
-            add_player_totals(duration, (team, players), "other", state.totals)
-        return
-
     for team in teams:
         opponent = teams[1] if team == teams[0] else teams[0]
         players = active[team]
@@ -159,6 +154,18 @@ def add_segment(duration, active, state):
         team_players = team, players
         add_player_totals(duration, team_players, situation, state.totals)
         add_strength_unit(duration, team_players, situation, state)
+
+
+def add_unmatched_segment(duration, active, state):
+    for team, players in active.items():
+        add_player_totals(duration, (team, players), "other", state.totals)
+
+
+def add_segment(duration, active, state):
+    if len(active) == 2:
+        add_head_to_head_segment(duration, active, state)
+        return
+    add_unmatched_segment(duration, active, state)
 
 
 def shift_events(intervals):
