@@ -36,13 +36,24 @@ class TextTableParser(html.parser.HTMLParser):
             self.cell.append(data)
 
     def handle_endtag(self, tag):
-        if tag in ("td", "th") and self.cell is not None and self.row is not None:
-            self.row.append(" ".join("".join(self.cell).split()))
-            self.cell = None
-        elif tag == "tr" and self.row is not None:
-            if any(self.row):
-                self.rows.append(self.row)
-            self.row = None
+        if tag in ("td", "th"):
+            self.finish_cell()
+            return
+        if tag == "tr":
+            self.finish_row()
+
+    def finish_cell(self):
+        if self.cell is None or self.row is None:
+            return
+        self.row.append(" ".join("".join(self.cell).split()))
+        self.cell = None
+
+    def finish_row(self):
+        if self.row is None:
+            return
+        if any(self.row):
+            self.rows.append(self.row)
+        self.row = None
 
 
 def log(message):
