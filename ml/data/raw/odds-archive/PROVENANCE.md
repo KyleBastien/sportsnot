@@ -700,3 +700,16 @@ table, not an archived snapshot.
 
 The three games with no `injuries` key at all (2022 R1, both 2017 games) do not change
 the verdict; they only show ESPN omits the block for some older events.
+
+---
+
+## 11. 2026-09 encrypted The Odds API history
+
+US-502 added purchased historical snapshots for 2019-20 through 2025-26. The Odds
+API's terms prohibit redistributing its data as downloadable files, so this public
+repository contains only per-season AES-256-GCM ciphertext. No raw response, index,
+flat line table, or per-game probability is committed in clear text.
+
+Full request parameters, probes, costs, gaps, encryption mechanics, and checksums are
+documented in
+[`the-odds-api-history/PROVENANCE.md`](the-odds-api-history/PROVENANCE.md).

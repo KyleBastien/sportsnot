@@ -182,8 +182,11 @@ def test_pivot_all_games_matches_all_real_archive_decisions() -> None:
     team_games = _real_team_games()
     archive_winners = team_games.groupby("game_id")["win"].sum()
 
-    assert int(archive_winners.eq(1).sum()) == 14_508
-    assert len(_pivot_all_games(team_games)) == 14_508
+    decided = int(archive_winners.eq(1).sum())
+    # 11 seasons (2015-16..2025-26) held exactly 14,508 decided games; the archive
+    # only ever grows, and every decided game must survive the pivot.
+    assert decided >= 14_508
+    assert len(_pivot_all_games(team_games)) == decided
 
 
 def test_pivot_all_games_retains_real_shootout_winner() -> None:

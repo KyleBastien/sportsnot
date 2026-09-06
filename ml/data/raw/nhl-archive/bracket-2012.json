@@ -1,0 +1,748 @@
+{
+ "bracketLogo": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-en.png",
+ "bracketLogoFr": "https://assets.nhle.com/logos/playoffs/png/scp-horizontal-banner-fr.png",
+ "series": [
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-a/senators-vs-rangers",
+   "seriesTitle": "Conference Quarterfinals",
+   "seriesAbbrev": "CQF",
+   "seriesLetter": "A",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 8,
+   "bottomSeedRankAbbrev": "C8",
+   "bottomSeedWins": 3,
+   "winningTeamId": 3,
+   "losingTeamId": 9,
+   "topSeedTeam": {
+    "id": 3,
+    "abbrev": "NYR",
+    "name": {
+     "default": "New York Rangers",
+     "fr": "Rangers de New York"
+    },
+    "commonName": {
+     "default": "Rangers"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYR_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 9,
+    "abbrev": "OTT",
+    "name": {
+     "default": "Ottawa Senators",
+     "fr": "S\u00e9nateurs d'Ottawa"
+    },
+    "commonName": {
+     "default": "Senators",
+     "fr": "S\u00e9nateurs"
+    },
+    "placeNameWithPreposition": {
+     "default": "Ottawa",
+     "fr": "d'Ottawa"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/OTT_20072008-20192020_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/OTT_20072008-20192020_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-b/capitals-vs-bruins",
+   "seriesTitle": "Conference Quarterfinals",
+   "seriesAbbrev": "CQF",
+   "seriesLetter": "B",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 3,
+   "bottomSeedRank": 7,
+   "bottomSeedRankAbbrev": "C7",
+   "bottomSeedWins": 4,
+   "winningTeamId": 15,
+   "losingTeamId": 6,
+   "topSeedTeam": {
+    "id": 6,
+    "abbrev": "BOS",
+    "name": {
+     "default": "Boston Bruins",
+     "fr": "Bruins de Boston"
+    },
+    "commonName": {
+     "default": "Bruins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Boston",
+     "fr": "de Boston"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/BOS_20082009-20222023_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 15,
+    "abbrev": "WSH",
+    "name": {
+     "default": "Washington Capitals",
+     "fr": "Capitals de Washington"
+    },
+    "commonName": {
+     "default": "Capitals"
+    },
+    "placeNameWithPreposition": {
+     "default": "Washington",
+     "fr": "de Washington"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WSH_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-c/devils-vs-panthers",
+   "seriesTitle": "Conference Quarterfinals",
+   "seriesAbbrev": "CQF",
+   "seriesLetter": "C",
+   "playoffRound": 1,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 3,
+   "bottomSeedRank": 6,
+   "bottomSeedRankAbbrev": "C6",
+   "bottomSeedWins": 4,
+   "winningTeamId": 1,
+   "losingTeamId": 13,
+   "topSeedTeam": {
+    "id": 13,
+    "abbrev": "FLA",
+    "name": {
+     "default": "Florida Panthers",
+     "fr": "Panthers de la Floride"
+    },
+    "commonName": {
+     "default": "Panthers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Florida",
+     "fr": "de la Floride"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/FLA_19992000-20152016_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/FLA_19992000-20152016_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 1,
+    "abbrev": "NJD",
+    "name": {
+     "default": "New Jersey Devils",
+     "fr": "Devils du New Jersey"
+    },
+    "commonName": {
+     "default": "Devils"
+    },
+    "placeNameWithPreposition": {
+     "default": "New Jersey",
+     "fr": "du New Jersey"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NJD_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NJD_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-d/flyers-vs-penguins",
+   "seriesTitle": "Conference Quarterfinals",
+   "seriesAbbrev": "CQF",
+   "seriesLetter": "D",
+   "playoffRound": 1,
+   "topSeedRank": 4,
+   "topSeedRankAbbrev": "C4",
+   "topSeedWins": 2,
+   "bottomSeedRank": 5,
+   "bottomSeedRankAbbrev": "C5",
+   "bottomSeedWins": 4,
+   "winningTeamId": 4,
+   "losingTeamId": 5,
+   "topSeedTeam": {
+    "id": 5,
+    "abbrev": "PIT",
+    "name": {
+     "default": "Pittsburgh Penguins",
+     "fr": "Penguins de Pittsburgh"
+    },
+    "commonName": {
+     "default": "Penguins"
+    },
+    "placeNameWithPreposition": {
+     "default": "Pittsburgh",
+     "fr": "de Pittsburgh"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PIT_20062007-20152016_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 4,
+    "abbrev": "PHI",
+    "name": {
+     "default": "Philadelphia Flyers",
+     "fr": "Flyers de Philadelphie"
+    },
+    "commonName": {
+     "default": "Flyers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Philadelphia",
+     "fr": "de Philadelphie"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PHI_19992000-20222023_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PHI_19992000-20222023_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-e/kings-vs-canucks",
+   "seriesTitle": "Conference Quarterfinals",
+   "seriesAbbrev": "CQF",
+   "seriesLetter": "E",
+   "playoffRound": 1,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 1,
+   "bottomSeedRank": 8,
+   "bottomSeedRankAbbrev": "C8",
+   "bottomSeedWins": 4,
+   "winningTeamId": 26,
+   "losingTeamId": 23,
+   "topSeedTeam": {
+    "id": 23,
+    "abbrev": "VAN",
+    "name": {
+     "default": "Vancouver Canucks",
+     "fr": "Canucks de Vancouver"
+    },
+    "commonName": {
+     "default": "Canucks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Vancouver",
+     "fr": "de Vancouver"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/VAN_20072008-20182019_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/VAN_20072008-20182019_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 26,
+    "abbrev": "LAK",
+    "name": {
+     "default": "Los Angeles Kings",
+     "fr": "Kings de Los Angeles"
+    },
+    "commonName": {
+     "default": "Kings"
+    },
+    "placeNameWithPreposition": {
+     "default": "Los Angeles",
+     "fr": "de Los Angeles"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/LAK_20112012-20182019_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/LAK_20112012-20182019_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-f/sharks-vs-blues",
+   "seriesTitle": "Conference Quarterfinals",
+   "seriesAbbrev": "CQF",
+   "seriesLetter": "F",
+   "playoffRound": 1,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 7,
+   "bottomSeedRankAbbrev": "C7",
+   "bottomSeedWins": 1,
+   "winningTeamId": 19,
+   "losingTeamId": 28,
+   "topSeedTeam": {
+    "id": 19,
+    "abbrev": "STL",
+    "name": {
+     "default": "St. Louis Blues",
+     "fr": "Blues de St. Louis"
+    },
+    "commonName": {
+     "default": "Blues"
+    },
+    "placeNameWithPreposition": {
+     "default": "St. Louis",
+     "fr": "de St. Louis"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 28,
+    "abbrev": "SJS",
+    "name": {
+     "default": "San Jose Sharks",
+     "fr": "Sharks de San Jose"
+    },
+    "commonName": {
+     "default": "Sharks"
+    },
+    "placeNameWithPreposition": {
+     "default": "San Jose",
+     "fr": "de San Jose"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/SJS_20082009-20232024_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-g/blackhawks-vs-coyotes",
+   "seriesTitle": "Conference Quarterfinals",
+   "seriesAbbrev": "CQF",
+   "seriesLetter": "G",
+   "playoffRound": 1,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 6,
+   "bottomSeedRankAbbrev": "C6",
+   "bottomSeedWins": 2,
+   "winningTeamId": 27,
+   "losingTeamId": 16,
+   "topSeedTeam": {
+    "id": 27,
+    "abbrev": "PHX",
+    "name": {
+     "default": "Phoenix Coyotes",
+     "fr": "Coyotes de Phoenix"
+    },
+    "commonName": {
+     "default": "Coyotes"
+    },
+    "placeNameWithPreposition": {
+     "default": "Phoenix",
+     "fr": "de Phoenix"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PHX_20032004-20132014_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PHX_20032004-20132014_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 16,
+    "abbrev": "CHI",
+    "name": {
+     "default": "Chicago Blackhawks",
+     "fr": "Blackhawks de Chicago"
+    },
+    "commonName": {
+     "default": "Blackhawks"
+    },
+    "placeNameWithPreposition": {
+     "default": "Chicago",
+     "fr": "de Chicago"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CHI_19981999-20242025_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-h/redwings-vs-predators",
+   "seriesTitle": "Conference Quarterfinals",
+   "seriesAbbrev": "CQF",
+   "seriesLetter": "H",
+   "playoffRound": 1,
+   "topSeedRank": 4,
+   "topSeedRankAbbrev": "C4",
+   "topSeedWins": 4,
+   "bottomSeedRank": 5,
+   "bottomSeedRankAbbrev": "C5",
+   "bottomSeedWins": 1,
+   "winningTeamId": 18,
+   "losingTeamId": 17,
+   "topSeedTeam": {
+    "id": 18,
+    "abbrev": "NSH",
+    "name": {
+     "default": "Nashville Predators",
+     "fr": "Predators de Nashville"
+    },
+    "commonName": {
+     "default": "Predators"
+    },
+    "placeNameWithPreposition": {
+     "default": "Nashville",
+     "fr": "de Nashville"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NSH_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 17,
+    "abbrev": "DET",
+    "name": {
+     "default": "Detroit Red Wings",
+     "fr": "Red Wings de Detroit"
+    },
+    "commonName": {
+     "default": "Red Wings"
+    },
+    "placeNameWithPreposition": {
+     "default": "Detroit",
+     "fr": "de Detroit"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/DET_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/DET_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-i/capitals-vs-rangers",
+   "seriesTitle": "Conference Semifinals",
+   "seriesAbbrev": "CSF",
+   "seriesLetter": "I",
+   "playoffRound": 2,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 7,
+   "bottomSeedRankAbbrev": "C7",
+   "bottomSeedWins": 3,
+   "winningTeamId": 3,
+   "losingTeamId": 15,
+   "topSeedTeam": {
+    "id": 3,
+    "abbrev": "NYR",
+    "name": {
+     "default": "New York Rangers",
+     "fr": "Rangers de New York"
+    },
+    "commonName": {
+     "default": "Rangers"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYR_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 15,
+    "abbrev": "WSH",
+    "name": {
+     "default": "Washington Capitals",
+     "fr": "Capitals de Washington"
+    },
+    "commonName": {
+     "default": "Capitals"
+    },
+    "placeNameWithPreposition": {
+     "default": "Washington",
+     "fr": "de Washington"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/WSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/WSH_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-j/devils-vs-flyers",
+   "seriesTitle": "Conference Semifinals",
+   "seriesAbbrev": "CSF",
+   "seriesLetter": "J",
+   "playoffRound": 2,
+   "topSeedRank": 5,
+   "topSeedRankAbbrev": "C5",
+   "topSeedWins": 1,
+   "bottomSeedRank": 6,
+   "bottomSeedRankAbbrev": "C6",
+   "bottomSeedWins": 4,
+   "winningTeamId": 1,
+   "losingTeamId": 4,
+   "topSeedTeam": {
+    "id": 4,
+    "abbrev": "PHI",
+    "name": {
+     "default": "Philadelphia Flyers",
+     "fr": "Flyers de Philadelphie"
+    },
+    "commonName": {
+     "default": "Flyers"
+    },
+    "placeNameWithPreposition": {
+     "default": "Philadelphia",
+     "fr": "de Philadelphie"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PHI_19992000-20222023_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PHI_19992000-20222023_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 1,
+    "abbrev": "NJD",
+    "name": {
+     "default": "New Jersey Devils",
+     "fr": "Devils du New Jersey"
+    },
+    "commonName": {
+     "default": "Devils"
+    },
+    "placeNameWithPreposition": {
+     "default": "New Jersey",
+     "fr": "du New Jersey"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NJD_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NJD_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-k/kings-vs-blues",
+   "seriesTitle": "Conference Semifinals",
+   "seriesAbbrev": "CSF",
+   "seriesLetter": "K",
+   "playoffRound": 2,
+   "topSeedRank": 2,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 0,
+   "bottomSeedRank": 8,
+   "bottomSeedRankAbbrev": "C8",
+   "bottomSeedWins": 4,
+   "winningTeamId": 26,
+   "losingTeamId": 19,
+   "topSeedTeam": {
+    "id": 19,
+    "abbrev": "STL",
+    "name": {
+     "default": "St. Louis Blues",
+     "fr": "Blues de St. Louis"
+    },
+    "commonName": {
+     "default": "Blues"
+    },
+    "placeNameWithPreposition": {
+     "default": "St. Louis",
+     "fr": "de St. Louis"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/STL_20082009-20242025_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 26,
+    "abbrev": "LAK",
+    "name": {
+     "default": "Los Angeles Kings",
+     "fr": "Kings de Los Angeles"
+    },
+    "commonName": {
+     "default": "Kings"
+    },
+    "placeNameWithPreposition": {
+     "default": "Los Angeles",
+     "fr": "de Los Angeles"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/LAK_20112012-20182019_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/LAK_20112012-20182019_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-l/predators-vs-coyotes",
+   "seriesTitle": "Conference Semifinals",
+   "seriesAbbrev": "CSF",
+   "seriesLetter": "L",
+   "playoffRound": 2,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 4,
+   "bottomSeedRank": 4,
+   "bottomSeedRankAbbrev": "C4",
+   "bottomSeedWins": 1,
+   "winningTeamId": 27,
+   "losingTeamId": 18,
+   "topSeedTeam": {
+    "id": 27,
+    "abbrev": "PHX",
+    "name": {
+     "default": "Phoenix Coyotes",
+     "fr": "Coyotes de Phoenix"
+    },
+    "commonName": {
+     "default": "Coyotes"
+    },
+    "placeNameWithPreposition": {
+     "default": "Phoenix",
+     "fr": "de Phoenix"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PHX_20032004-20132014_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PHX_20032004-20132014_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 18,
+    "abbrev": "NSH",
+    "name": {
+     "default": "Nashville Predators",
+     "fr": "Predators de Nashville"
+    },
+    "commonName": {
+     "default": "Predators"
+    },
+    "placeNameWithPreposition": {
+     "default": "Nashville",
+     "fr": "de Nashville"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NSH_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NSH_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-m/devils-vs-rangers",
+   "seriesTitle": "Eastern Conference Finals",
+   "seriesAbbrev": "ECF",
+   "seriesLetter": "M",
+   "conferenceAbbrev": "E",
+   "conferenceName": "Eastern",
+   "playoffRound": 3,
+   "topSeedRank": 1,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 2,
+   "bottomSeedRank": 6,
+   "bottomSeedRankAbbrev": "C6",
+   "bottomSeedWins": 4,
+   "winningTeamId": 1,
+   "losingTeamId": 3,
+   "topSeedTeam": {
+    "id": 3,
+    "abbrev": "NYR",
+    "name": {
+     "default": "New York Rangers",
+     "fr": "Rangers de New York"
+    },
+    "commonName": {
+     "default": "Rangers"
+    },
+    "placeNameWithPreposition": {
+     "default": "New York",
+     "fr": "de New York"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NYR_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NYR_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 1,
+    "abbrev": "NJD",
+    "name": {
+     "default": "New Jersey Devils",
+     "fr": "Devils du New Jersey"
+    },
+    "commonName": {
+     "default": "Devils"
+    },
+    "placeNameWithPreposition": {
+     "default": "New Jersey",
+     "fr": "du New Jersey"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NJD_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NJD_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-n/kings-vs-coyotes",
+   "seriesTitle": "Western Conference Finals",
+   "seriesAbbrev": "WCF",
+   "seriesLetter": "N",
+   "conferenceAbbrev": "W",
+   "conferenceName": "Western",
+   "playoffRound": 3,
+   "topSeedRank": 3,
+   "topSeedRankAbbrev": "D1",
+   "topSeedWins": 1,
+   "bottomSeedRank": 8,
+   "bottomSeedRankAbbrev": "C8",
+   "bottomSeedWins": 4,
+   "winningTeamId": 26,
+   "losingTeamId": 27,
+   "topSeedTeam": {
+    "id": 27,
+    "abbrev": "PHX",
+    "name": {
+     "default": "Phoenix Coyotes",
+     "fr": "Coyotes de Phoenix"
+    },
+    "commonName": {
+     "default": "Coyotes"
+    },
+    "placeNameWithPreposition": {
+     "default": "Phoenix",
+     "fr": "de Phoenix"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/PHX_20032004-20132014_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/PHX_20032004-20132014_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 26,
+    "abbrev": "LAK",
+    "name": {
+     "default": "Los Angeles Kings",
+     "fr": "Kings de Los Angeles"
+    },
+    "commonName": {
+     "default": "Kings"
+    },
+    "placeNameWithPreposition": {
+     "default": "Los Angeles",
+     "fr": "de Los Angeles"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/LAK_20112012-20182019_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/LAK_20112012-20182019_dark.svg"
+   }
+  },
+  {
+   "seriesUrl": "/schedule/playoff-series/2012/series-o/kings-vs-devils",
+   "seriesLogo": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesLogoFr": "https://assets.nhle.com/logos/playoffs/png/sc-banner.png",
+   "seriesTitle": "Stanley Cup Final",
+   "seriesAbbrev": "SCF",
+   "seriesLetter": "O",
+   "playoffRound": 4,
+   "topSeedRank": 6,
+   "topSeedRankAbbrev": "C6",
+   "topSeedWins": 2,
+   "bottomSeedRank": 8,
+   "bottomSeedRankAbbrev": "C8",
+   "bottomSeedWins": 4,
+   "winningTeamId": 26,
+   "losingTeamId": 1,
+   "topSeedTeam": {
+    "id": 1,
+    "abbrev": "NJD",
+    "name": {
+     "default": "New Jersey Devils",
+     "fr": "Devils du New Jersey"
+    },
+    "commonName": {
+     "default": "Devils"
+    },
+    "placeNameWithPreposition": {
+     "default": "New Jersey",
+     "fr": "du New Jersey"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/NJD_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/NJD_dark.svg"
+   },
+   "bottomSeedTeam": {
+    "id": 26,
+    "abbrev": "LAK",
+    "name": {
+     "default": "Los Angeles Kings",
+     "fr": "Kings de Los Angeles"
+    },
+    "commonName": {
+     "default": "Kings"
+    },
+    "placeNameWithPreposition": {
+     "default": "Los Angeles",
+     "fr": "de Los Angeles"
+    },
+    "logo": "https://assets.nhle.com/logos/nhl/svg/LAK_20112012-20182019_light.svg",
+    "darkLogo": "https://assets.nhle.com/logos/nhl/svg/LAK_20112012-20182019_dark.svg"
+   }
+  }
+ ]
+}

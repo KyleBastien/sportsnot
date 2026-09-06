@@ -1,17 +1,20 @@
 # Provenance — NHL API historical archive
 
-Snapshot fetched **2026-08-26** from the public NHL APIs (no auth). Seasons **2015-16
-through 2025-26**, regular season and playoffs (`gameTypeId` 2 and 3).
+Initial snapshot fetched **2026-08-26** from the public NHL APIs (no auth). It covered
+seasons **2015-16 through 2025-26**, regular season and playoffs (`gameTypeId` 2 and
+3). A **2026-09-04** extension (see §7) backfilled **2007-08 through 2014-15** and
+added `game-times-<season>.csv.gz` for **2007-08 through 2025-26**.
 
-Contents: 11 × 3 gzipped CSVs, 11 playoff brackets, the fetch script (`fetch_nhl.py`)
-and the verification script (`verify_nhl.py`). `fetch_nhl.py` was refactored after the
-run (functions extracted, behavior identical) to satisfy the repo's CodeScene gate;
-the byte-exact run version is in git history at the commit that added this archive. 47 files, 12 MB. No `.gitignore` rule
-matches this directory, so no exception was needed.
+Current committed contents: 19 seasons of `team-games`, `skater-games`, and
+`skater-bios`; 19 seasons of `game-times`; 19 playoff brackets; the fetch scripts
+(`fetch_nhl.py`, `fetch_game_times.py`) and the verification script
+(`verify_nhl.py`). `fetch_nhl.py` was refactored after the original run (functions
+extracted, behavior identical) to satisfy the repo's CodeScene gate; the byte-exact run
+version is in git history at the commit that added the first archive snapshot.
 
 **No gaps. No imputation.** Every request succeeded, `_gaps.json` came back empty, and
-every field written is a field the API returned. The only reconciliation discrepancy in
-the whole archive is six games, fully explained below.
+every field written is a field the API returned. The only reconciliation discrepancies
+in the whole archive are nine goalie-scored-goal games, documented in §4 and §7.3.
 
 ---
 
@@ -228,3 +231,255 @@ matches the app's own scoring and the ESPN odds archive independently
 check in §3 and §4 and writes `_verify.json`. The fetch writes `_manifest.json` (per
 season counts) and `_gaps.json` (empty in this run) alongside the data; those two are
 working files and are not committed.
+
+## 7. 2026-09 extension: 2007-08..2014-15 + game times
+
+Extension fetched **2026-09-04** into a scratch directory outside the repo, then copied
+into `ml/data/raw/nhl-archive/`. Existing `2015-16..2025-26` team/skater/bios files
+were left byte-identical in git; only the eight older seasons, eight older brackets,
+and the new `game-times-<season>.csv.gz` files were added.
+
+### 7.1 Requests and scripts
+
+#### `fetch_nhl.py`
+
+- `SEASONS` widened from `range(2015, 2026)` to `range(2007, 2026)`; no other behavior
+  change.
+- Run against scratch output only.
+- **279 HTTP requests total** across all 19 seasons.
+  - **116** served the eight newly committed seasons (`2007-08..2014-15`).
+  - **163** re-fetched the unchanged `2015-16..2025-26` baseline into scratch.
+- **0 retries, 0 failures, 0 gaps, 0 10,000-row cap hits, 0 half-month re-splits.**
+  The month partitioning described in §1 still kept every skater query under the cap.
+
+#### `fetch_game_times.py`
+
+New script: `ml/data/raw/nhl-archive/fetch_game_times.py`.
+
+- Primary source:
+
+  ```
+  GET https://api-web.nhle.com/v1/club-schedule-season/<TEAM>/<seasonId>
+  ```
+
+- One request per active team-season, where the active team abbreviations are derived
+  from paired `team-games` rows: each row's own abbreviation is the *other* row's
+  `opponentTeamAbbrev`, because `team-games` exposes the row team as `teamId` +
+  `teamFullName` but not as an abbreviation.
+- Keep only `gameTypeId` 2 and 3, dedupe on `gameId`, and write:
+  `gameId,seasonId,gameTypeId,gameDate,startTimeUTC,venue,venueCity,homeAbbrev,awayAbbrev,neutralSite`.
+- The schedule payload does **not** include `venueLocation`, so for neutral-site games
+  the script fills `venueCity` from:
+
+  ```
+  GET https://api-web.nhle.com/v1/gamecenter/<gameId>/landing
+  ```
+
+- **584** logical schedule requests + **216** neutral-site landing lookups =
+  **800 HTTP requests total**.
+- **0 retries, 0 failures.**
+
+### 7.2 Per-season counts
+
+`verify_nhl.py` on the scratch output wrote `_verify.json`. `fetch_game_times.py` wrote
+`_game_times_manifest.json`. Counts below are the committed archive after the extension:
+
+| Season | Reg games | PO games | Team rows | Skater rows | Bios | Game-times |
+|---|---:|---:|---:|---:|---:|---:|
+| 2007-08 | 1 230 | 85 | 2 630 | 47 326 | 854 | 1 315 |
+| 2008-09 | 1 230 | 87 | 2 634 | 47 390 | 888 | 1 317 |
+| 2009-10 | 1 230 | 89 | 2 638 | 47 475 | 880 | 1 319 |
+| 2010-11 | 1 230 | 89 | 2 638 | 47 466 | 892 | 1 319 |
+| 2011-12 | 1 230 | 86 | 2 632 | 47 371 | 897 | 1 316 |
+| 2012-13 | 720 | 86 | 1 612 | 29 014 | 843 | 806 |
+| 2013-14 | 1 230 | 93 | 2 646 | 47 624 | 888 | 1 323 |
+| 2014-15 | 1 230 | 89 | 2 638 | 47 478 | 883 | 1 319 |
+| 2015-16 | 1 230 | 91 | 2 642 | 47 553 | 900 | 1 321 |
+| 2016-17 | 1 230 | 87 | 2 634 | 47 406 | 891 | 1 317 |
+| 2017-18 | 1 271 | 84 | 2 710 | 48 780 | 890 | 1 355 |
+| 2018-19 | 1 271 | 87 | 2 716 | 48 887 | 910 | 1 358 |
+| 2019-20 | 1 082 | 130 | 2 424 | 43 630 | 890 | 1 212 |
+| 2020-21 | 868 | 84 | 1 904 | 34 250 | 917 | 952 |
+| 2021-22 | 1 312 | 89 | 2 802 | 50 412 | 1 006 | 1 401 |
+| 2022-23 | 1 312 | 88 | 2 800 | 50 376 | 953 | 1 400 |
+| 2023-24 | 1 312 | 88 | 2 800 | 50 389 | 925 | 1 400 |
+| 2024-25 | 1 312 | 86 | 2 796 | 50 320 | 924 | 1 398 |
+| 2025-26 | 1 312 | 82 | 2 788 | 50 182 | 940 | 1 394 |
+| **total** | **22 842** | **1 700** | **49 084** | **883 329** | **17 171** | **24 542** |
+
+### 7.3 Verification outcomes
+
+- `verify_nhl.py` reconciled **24,533 / 24,542** games exactly. The only nine misses are
+  goalie-scored goals excluded by `skater/summary`: the six already documented in §4,
+  plus three new ones from the older seasons.
+- Every game in every `team-games-<season>.csv.gz` file appears **exactly once** in the
+  matching `game-times-<season>.csv.gz` file.
+- Game-times validation found **0 missing gameIds, 0 extra gameIds, 0 blank
+  `startTimeUTC` values, 0 duplicate disagreements, and 0 neutral-site rows missing a
+  `venueCity` fill** across all 19 seasons.
+- All 19 brackets parsed successfully. No year needed derivation from team-games rows.
+
+New reconciliation exceptions added by the 2007-08..2014-15 backfill:
+
+| Season | gameId | Date | Score | Missing scorer |
+|---|---|---|---|---|
+| 2011-12 | 2011020522 | 2011-12-26 | New Jersey Devils 2 @ Carolina Hurricanes 4 | **Cam Ward** (empty-net) |
+| 2012-13 | 2012020446 | 2013-03-21 | New Jersey Devils 4 @ Carolina Hurricanes 1 | **Martin Brodeur** (empty-net) |
+| 2013-14 | 2013020120 | 2013-10-19 | Detroit Red Wings 2 @ Phoenix Coyotes 5 | **Mike Smith** (empty-net) |
+
+### 7.4 Bracket provenance
+
+Older brackets all came straight from the API endpoint; none were hand-derived:
+
+| Year | Source | Series | Final |
+|---|---|---:|---|
+| 2008 | `/v1/playoff-bracket/2008` | 15 | DET 4-2 PIT |
+| 2009 | `/v1/playoff-bracket/2009` | 15 | DET 3-4 PIT |
+| 2010 | `/v1/playoff-bracket/2010` | 15 | CHI 4-2 PHI |
+| 2011 | `/v1/playoff-bracket/2011` | 15 | VAN 3-4 BOS |
+| 2012 | `/v1/playoff-bracket/2012` | 15 | NJD 2-4 LAK |
+| 2013 | `/v1/playoff-bracket/2013` | 15 | CHI 4-2 BOS |
+| 2014 | `/v1/playoff-bracket/2014` | 15 | LAK 4-1 NYR |
+| 2015 | `/v1/playoff-bracket/2015` | 15 | TBL 2-4 CHI |
+
+### 7.5 New team abbreviations and anomalies
+
+- Team abbreviations present in the new seasons but not in the committed `2015+`
+  archive files: **ATL**, **PHX**.
+- **2012-13** is the lockout-shortened season: **720** regular-season games and **806**
+  total game-times rows. Verified, not a gap.
+- **2019-20** bubble check passed: the API reports `neutralSite=true` for **all 130
+  playoff games**. That season has **136** neutral-site games total because six
+  regular-season games were neutral-site as well.
+
+## 8. 2026-09 deployment extension: TOI, power play, and goalie games
+
+Fetched **2026-09-05** from the public NHL stats REST API with the committed
+`fetch_toi.py`. Coverage is every regular-season and playoff game in the existing
+2007-08 through 2025-26 archive. No authentication was used.
+
+After the fetch, `fetch_toi.py` and `verify_toi.py` were refactored into smaller
+helpers to satisfy the CodeScene code-health gate. A full cache/output resume changed
+**0 of 57 gzip files**, and the verifier reproduced the same aggregate results below.
+
+### 8.1 Exact endpoints and partitioning
+
+Skater time on ice:
+
+```text
+GET https://api.nhle.com/stats/rest/en/skater/timeonice
+    ?isGame=true
+    &limit=-1
+    &start=0
+    &cayenneExp=seasonId=<yyyyYYYY> and gameTypeId=<2|3>
+                and gameDate>="<YYYY-MM-01>" and gameDate<="<YYYY-MM-DD>"
+```
+
+Skater power play:
+
+```text
+GET https://api.nhle.com/stats/rest/en/skater/powerplay
+    ?isGame=true
+    &limit=-1
+    &start=0
+    &cayenneExp=seasonId=<yyyyYYYY> and gameTypeId=<2|3>
+                and gameDate>="<YYYY-MM-01>" and gameDate<="<YYYY-MM-DD>"
+```
+
+Goalie games:
+
+```text
+GET https://api.nhle.com/stats/rest/en/goalie/summary
+    ?isGame=true
+    &limit=-1
+    &start=0
+    &cayenneExp=seasonId=<yyyyYYYY> and gameTypeId=<2|3>
+```
+
+Skater reports use the same calendar-month partitioning as `fetch_nhl.py`. Months come
+from committed `game-times-<season>.csv.gz` rows for each game type. Both the declared
+`total` and returned `data` length are checked against the 10,000-row cap; a capped
+month automatically splits into days 1-15 and 16-end-of-month, and each half is checked
+again. Goalie reports fit below the cap at season/game-type granularity; the script
+falls back to the same month partitioning if either cap check fires.
+
+Run totals:
+
+- **406** requests: 368 skater month partitions + 38 goalie season/game-type reports
+- **0** retries, **0** failures, **0** gaps
+- **0** cap hits and **0** half-month splits
+- largest partition: **8,712 rows** (2025-26 regular season, March 2026)
+- politeness: curl-based GET, **1 request/second**, four attempts with exponential
+  backoff
+
+### 8.2 Output columns and source behavior
+
+`skater-toi-<season>.csv.gz` keeps identifiers, game date, team/opponent/home-road,
+position, handedness, `evTimeOnIce`, `ppTimeOnIce`, `shTimeOnIce`, `otTimeOnIce`,
+`shifts`, and `timeOnIce`.
+
+`skater-pp-<season>.csv.gz` keeps the same identifiers plus `ppGoals`, `ppAssists`,
+`ppPoints`, `ppShots`, `ppTimeOnIce`, and `ppIndividualSatFor`.
+
+`goalie-games-<season>.csv.gz` keeps identifiers, game date, team/opponent/home-road,
+`gamesStarted`, `timeOnIce`, `shotsAgainst`, `goalsAgainst`, `saves`, `savePct`,
+`shutouts`, and the one-game win/loss fields. The endpoint does not return a `decision`
+field. `fetch_toi.py` deterministically derives it as `W`, `L`, or `OTL` from the
+served `wins`, `losses`, and `otLosses`; goalies with no decision remain blank.
+
+The API's `evTimeOnIce` already includes `otTimeOnIce`. Therefore the exhaustive sum is
+`evTimeOnIce + ppTimeOnIce + shTimeOnIce = timeOnIce`; adding `otTimeOnIce` again would
+double-count overtime. `otTimeOnIce` is retained as the useful subset the API serves.
+
+All CSVs use LF line endings, stable `(gameId, teamAbbrev, playerId)` ordering, and gzip
+members with `mtime=0`. Total compressed size for the 57 files is **33,046,794 bytes**.
+
+### 8.3 Per-season counts
+
+| Season | Skater TOI | Skater PP | Goalie rows | TOI diff | PP diff |
+|---|---:|---:|---:|---:|---:|
+| 2007-08 | 47,326 | 47,326 | 2,847 | 0 | 0 |
+| 2008-09 | 47,390 | 47,390 | 2,834 | 0 | 0 |
+| 2009-10 | 47,475 | 47,475 | 2,851 | 0 | 0 |
+| 2010-11 | 47,466 | 47,466 | 2,854 | 0 | 0 |
+| 2011-12 | 47,371 | 47,371 | 2,829 | 0 | 0 |
+| 2012-13 | 29,014 | 29,014 | 1,747 | 0 | 0 |
+| 2013-14 | 47,624 | 47,624 | 2,850 | 0 | 0 |
+| 2014-15 | 47,478 | 47,478 | 2,835 | 0 | 0 |
+| 2015-16 | 47,553 | 47,553 | 2,843 | 0 | 0 |
+| 2016-17 | 47,406 | 47,406 | 2,842 | 0 | 0 |
+| 2017-18 | 48,780 | 48,780 | 2,945 | 0 | 0 |
+| 2018-19 | 48,887 | 48,887 | 2,901 | 0 | 0 |
+| 2019-20 | 43,630 | 43,630 | 2,583 | 0 | 0 |
+| 2020-21 | 34,250 | 34,250 | 2,026 | 0 | 0 |
+| 2021-22 | 50,412 | 50,412 | 3,014 | 0 | 0 |
+| 2022-23 | 50,376 | 50,376 | 2,983 | 0 | 0 |
+| 2023-24 | 50,389 | 50,389 | 2,979 | 0 | 0 |
+| 2024-25 | 50,320 | 50,320 | 2,953 | 0 | 0 |
+| 2025-26 | 50,182 | 50,182 | 2,942 | 0 | 0 |
+| **total** | **883,329** | **883,329** | **52,658** | **0** | **0** |
+
+`TOI diff` and `PP diff` compare each new skater report with the matching committed
+`skater-games` season row count.
+
+### 8.4 Validation
+
+`verify_toi.py` produced these full-archive checks:
+
+- skater TOI rows versus `skater-games`: **883,329 / 883,329**, difference **0**
+- skater PP rows versus `skater-games`: **883,329 / 883,329**, difference **0**
+- `timeOnIce` versus `skater-games.timeOnIcePerGame` within one second:
+  **883,329 / 883,329 (100.000%)**
+- `ev + pp + sh` versus `timeOnIce` within two seconds:
+  **883,329 / 883,329 (100.000%)**
+- goalie game-team groups: **49,084** (two for every one of 24,542 games)
+- groups whose `gamesStarted` sum is exactly one: **49,084 / 49,084 (100.000%)**
+- goalie starter exceptions: **0**
+
+No values were imputed. Reproduce with:
+
+```text
+cd ml
+.venv/Scripts/python.exe data/raw/nhl-archive/fetch_toi.py data/raw/nhl-archive
+.venv/Scripts/python.exe data/raw/nhl-archive/verify_toi.py data/raw/nhl-archive
+```

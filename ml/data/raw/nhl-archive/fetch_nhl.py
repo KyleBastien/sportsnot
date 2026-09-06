@@ -29,7 +29,7 @@ import time
 
 REST = "https://api.nhle.com/stats/rest/en"
 WEB = "https://api-web.nhle.com/v1"
-SEASONS = [(y, y + 1) for y in range(2015, 2026)]   # 20152016 .. 20252026
+SEASONS = [(y, y + 1) for y in range(2007, 2026)]   # 20072008 .. 20252026
 GAME_TYPES = [2, 3]
 DELAY = 1.0
 CAP = 10000
