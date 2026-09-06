@@ -186,10 +186,19 @@ def player_name(cells):
     return (match.group(2), match.group(1)) if match else None
 
 
+def period_number(value):
+    if value == "OT":
+        return 4
+    if not value.isdigit():
+        return None
+    period = int(value)
+    return period if 1 <= period <= 9 else None
+
+
 def is_shift_row(cells):
     if len(cells) != 6:
         return False
-    identity_is_valid = cells[0].isdigit() and cells[1] in {"1", "2", "3", "4", "5"}
+    identity_is_valid = cells[0].isdigit() and period_number(cells[1]) is not None
     clocks_are_valid = all(":" in value for value in cells[2:4])
     return identity_is_valid and clocks_are_valid
 
@@ -259,7 +268,9 @@ def html_shift_rows(cells, source, player):
     player_id, first_name, last_name = player
     start = seconds(cells[2].split("/", 1)[0].strip())
     end = seconds(cells[3].split("/", 1)[0].strip())
-    period = int(cells[1])
+    period = period_number(cells[1])
+    if period is None:
+        raise FetchError(f"invalid HTML shift period: {cells[1]!r}")
     return [
         {
             "gameId": game_id,

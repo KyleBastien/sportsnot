@@ -80,10 +80,21 @@ Matching applies Unicode decomposition plus case and punctuation folding, then
 tries exact full name, a unique exact surname, and a unique
 first-initial/fuzzy-surname match with score at least 0.75 and a 0.15 margin.
 This handles served historical forms such as `ROBERT BLAKE` versus `Rob Blake`.
-Six-cell rows for periods 1–5 are shift rows; seven-cell period summary rows are
-not. A uniquely identified opposing-team player embedded in the wrong side's
-report is rejected as a source anomaly and reported. Any other ambiguous or
-absent match stops the run; IDs are never guessed.
+Six-cell rows with `OT` or numeric periods 1–9 are shift rows; seven-cell period
+summary rows are not. `OT` maps to period 4, whose regular-season length is 300
+seconds. Numeric labels retain their value, including playoff periods 6 and 7.
+A uniquely identified opposing-team player embedded in the wrong side's report
+is rejected as a source anomaly and reported. Any other ambiguous or absent
+match stops the run; IDs are never guessed.
+
+The cached source proves both label forms. Regular-season game `2007020003` has
+raw period cells `1, 2, 3, OT`; playoff game `2007030246` has raw period cells
+`1, 2, 3, 4, 5, 6, 7`. Across the three original HTML seasons, `OT` appears in
+271/281/300 games; before this correction 271/277/299 of those games omitted
+period 4 because 4/1 reports used a numeric `4`. Periods 6+ appear in
+`2007030246` (through 7), `2007030415`, `2008030232`, and `2009030145`.
+Nineteen HTML fallback games in 2024-25 also use `OT`, so that season was
+re-emitted from cache too.
 
 Some HTML rows span a period boundary. Those rows are split at the period end;
 the served duration includes the intermission and is therefore not used. Normal
@@ -180,9 +191,9 @@ gzip bytes.
 
 | Season | Games | Served | REST | HTML | Missing | Shift rows | Goals | Bytes | SHA-256 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 2007-08 | 1,315 | 1,314 | 0 | 1,314 | 1 | 993,091 | 0 | 8,018,009 | `b35908fb19ca02ca817616d6f1edfc3fe974c7da404dd577d93c434fa5b32589` |
-| 2008-09 | 1,317 | 1,313 | 0 | 1,313 | 4 | 1,007,595 | 0 | 8,092,481 | `881b7dc28c4b9f906ba41db054931584fc073e8c39ad23e5e2890057b1f0581a` |
-| 2009-10 | 1,319 | 1,316 | 0 | 1,316 | 3 | 1,014,581 | 0 | 8,123,993 | `ed3102e01ce4d2b3181f74efe9d39e5b93f702799374008fad3fa5e7857d1208` |
+| 2007-08 | 1,315 | 1,314 | 0 | 1,314 | 1 | 1,006,100 | 0 | 8,120,028 | `ba66fdf054a37b4bac7433526bed172c4c4848e1162b80006b4beaa382459c2f` |
+| 2008-09 | 1,317 | 1,313 | 0 | 1,313 | 4 | 1,020,617 | 0 | 8,194,355 | `d5b80cd819f08581ac811a667cccda47879dcc88dbc2f1be194f75315a46b20d` |
+| 2009-10 | 1,319 | 1,316 | 0 | 1,316 | 3 | 1,028,869 | 0 | 8,234,808 | `e8128f517c8877bb945e0ae966225170777a5ea3aaeba243acf4c735914b69b4` |
 | 2010-11 | 1,319 | 1,319 | 1,319 | 0 | 0 | 1,043,268 | 7,544 | 8,121,240 | `ed7dd777f5afff755ddddc32ac1bebf59a68b62b8fc1cee65c8eaa0b8d38b2eb` |
 | 2011-12 | 1,316 | 1,316 | 1,316 | 0 | 0 | 1,037,744 | 7,370 | 8,095,325 | `355ff77788005bcc9386ad4c1e303f57107cd2a567c625da9d5dbbc08b9a78a7` |
 | 2012-13 | 806 | 806 | 806 | 0 | 0 | 641,452 | 4,480 | 4,993,220 | `0b1bfc536487e518ff44b1aa8e0c1d3ad62a3160a206d78ab72e891109006ed8` |
@@ -197,26 +208,26 @@ gzip bytes.
 | 2021-22 | 1,401 | 1,401 | 1,401 | 0 | 0 | 1,093,024 | 9,169 | 8,881,836 | `cffc2b551604e253a6c86b4232cbe06315f362adc3afef2af61d35c2a07f76a6` |
 | 2022-23 | 1,400 | 1,400 | 1,400 | 0 | 0 | 1,078,525 | 9,092 | 9,310,568 | `30b840c97179d2ba5bb2b76e6a95a44b1632911729972a3388f21db2adcd58b6` |
 | 2023-24 | 1,400 | 1,400 | 1,400 | 0 | 0 | 1,070,981 | 8,869 | 9,256,523 | `e44d3db27c8773509507cd8c9b274a4d3901dc664b2eea110702fbce2444e37f` |
-| 2024-25 | 1,398 | 1,398 | 1,341 | 57 | 0 | 1,069,781 | 8,281 | 9,276,782 | `427926f6bffe0b59ec733eb3c3d9277c587796e12c56fc51bb77f9b369b6c7fa` |
+| 2024-25 | 1,398 | 1,398 | 1,341 | 57 | 0 | 1,070,323 | 8,281 | 9,281,489 | `d2c110bf4c9a1ad633886189febf54e7f945b7e6e2111fbb9f099ba38c1fecc4` |
 | 2025-26 | 1,394 | 1,394 | 1,394 | 0 | 0 | 1,061,857 | 8,891 | 9,206,331 | `fda0a923dd614957971bf822719609a2661dbdc380a6eb68bbea436e232fa3ba` |
 
-All 19 shift files total **154,194,607 bytes (147.051 MiB)**. This is below
+All 19 shift files total **154,514,022 bytes (147.356 MiB)**. This is below
 the 200 MB rule, so every season is committed whole; no split or reassembly is
-needed. The 76 derived files add **23,043,406 bytes (21.976 MiB)**.
+needed. The 76 derived files add **23,047,959 bytes (21.980 MiB)**.
 
 ## 8. Derivation validation
 
-The derivation emitted **883,113 skater-game TOI rows**, **633,725 line/pair
-rows**, **381,148 PP-unit rows**, and **883,113 dressed rows**. It compared
+The derivation emitted **883,113 skater-game TOI rows**, **633,737 line/pair
+rows**, **381,211 PP-unit rows**, and **883,113 dressed rows**. It compared
 883,075 rows with Tier 1; 38 derived rows have no Tier 1 counterpart.
-`toiAll` is within five seconds for **860,950/883,075 (97.495%)** rows, and
-`toiPP` is within five seconds for **858,240/883,075 (97.188%)** rows.
+`toiAll` is within five seconds for **880,604/883,075 (99.720%)** rows, and
+`toiPP` is within five seconds for **859,718/883,075 (97.355%)** rows.
 
 | Season | Games | Skater TOI | Lines | PP units | TOI all <=5s | TOI PP <=5s | Missing Tier 1 |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| 2007-08 | 1,314/1,315 | 47,290 | 34,357 | 27,045 | 86.648% | 92.988% | 0 |
-| 2008-09 | 1,313/1,317 | 47,247 | 34,127 | 25,831 | 86.363% | 96.516% | 1 |
-| 2009-10 | 1,316/1,319 | 47,369 | 34,648 | 23,370 | 85.346% | 96.721% | 2 |
+| 2007-08 | 1,314/1,315 | 47,290 | 34,366 | 27,078 | 99.514% | 94.035% | 0 |
+| 2008-09 | 1,313/1,317 | 47,247 | 34,127 | 25,842 | 99.820% | 97.543% | 1 |
+| 2009-10 | 1,316/1,319 | 47,369 | 34,651 | 23,388 | 99.894% | 97.722% | 2 |
 | 2010-11 | 1,319/1,319 | 47,466 | 35,406 | 22,687 | 99.823% | 98.123% | 0 |
 | 2011-12 | 1,316/1,316 | 47,371 | 34,228 | 20,455 | 99.935% | 98.404% | 0 |
 | 2012-13 | 806/806 | 29,014 | 20,981 | 12,467 | 99.872% | 98.087% | 0 |
@@ -231,7 +242,7 @@ rows**, **381,148 PP-unit rows**, and **883,113 dressed rows**. It compared
 | 2021-22 | 1,401/1,401 | 50,448 | 35,945 | 19,694 | 99.225% | 95.903% | 0 |
 | 2022-23 | 1,400/1,400 | 50,376 | 37,296 | 25,874 | 99.913% | 98.795% | 0 |
 | 2023-24 | 1,400/1,400 | 50,389 | 36,622 | 25,953 | 99.782% | 98.789% | 0 |
-| 2024-25 | 1,398/1,398 | 50,321 | 36,841 | 23,697 | 99.259% | 99.094% | 1 |
+| 2024-25 | 1,398/1,398 | 50,321 | 36,841 | 23,698 | 99.897% | 99.141% | 1 |
 | 2025-26 | 1,394/1,394 | 50,215 | 37,347 | 24,181 | 99.837% | 99.002% | 33 |
 
 The largest discrepancies are served-source disagreements. In particular,
@@ -242,12 +253,13 @@ Worst 20 rows, seconds:
 | Season | gameId | playerId | Derived all | NHL all | Diff | Derived PP | NHL PP | PP diff |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | 2007-08 | 2007020938 | 8467096 | 2,223 | 1,112 | 1,111 | 605 | 303 | 302 |
+| 2007-08 | 2007020596 | 8470151 | 2,148 | 1,074 | 1,074 | 164 | 82 | 82 |
 | 2019-20 | 2019020287 | 8474230 | 1,308 | 249 | 1,059 | 2 | 2 | 0 |
 | 2007-08 | 2007020362 | 8470602 | 2,114 | 1,057 | 1,057 | 564 | 282 | 282 |
+| 2007-08 | 2007020216 | 8457063 | 2,110 | 1,055 | 1,055 | 605 | 303 | 302 |
 | 2010-11 | 2010020124 | 8471242 | 379 | 1,423 | 1,044 | 0 | 250 | 250 |
 | 2010-11 | 2010020124 | 8470137 | 604 | 1,647 | 1,043 | 75 | 338 | 263 |
 | 2007-08 | 2007020080 | 8467400 | 2,085 | 1,043 | 1,042 | 836 | 443 | 393 |
-| 2007-08 | 2007020596 | 8470151 | 2,102 | 1,074 | 1,028 | 164 | 82 | 82 |
 | 2019-20 | 2019020144 | 8474722 | 1,584 | 571 | 1,013 | 0 | 0 | 0 |
 | 2007-08 | 2007020556 | 8469770 | 2,018 | 1,009 | 1,009 | 239 | 120 | 119 |
 | 2007-08 | 2007020886 | 8467096 | 2,007 | 1,004 | 1,003 | 48 | 24 | 24 |
@@ -260,7 +272,13 @@ Worst 20 rows, seconds:
 | 2007-08 | 2007020393 | 8459462 | 1,949 | 975 | 974 | 352 | 176 | 176 |
 | 2007-08 | 2007020608 | 8470281 | 1,948 | 974 | 974 | 193 | 97 | 96 |
 | 2019-20 | 2019020163 | 8477512 | 1,718 | 745 | 973 | 9 | 9 | 0 |
-| 2011-12 | 2011020091 | 8469454 | 1,945 | 973 | 972 | 422 | 211 | 211 |
+
+Period-completeness validation compares each game's maximum committed period
+with the period implied by maximum team goalie TOI. It checked all 24,542 games.
+The eight unavailable games have no shifts. Of the remaining games, no complete
+source is short. One served-but-truncated source, `2007021178`, contains only
+periods 1–2 in both cached HTML reports although goalie TOI is 3,634 seconds;
+it is retained without imputation. Game `2007030246` now contains periods 1–7.
 
 ## 9. Dressed-skater validation
 
@@ -288,3 +306,16 @@ Across 49,084 team-games, dressed counts are: **0: 16, 15: 4, 16: 13,
 - **2025-26:** `2025020538/TBL=17`, `2025020929/EDM=17`
 
 The derivation replay changed **0 of 76** gzip files.
+
+## 10. Source-quality notes
+
+- Some 2019-20 REST shift charts contain corrupt over-long shifts for roughly
+  five skaters in affected games. In `2019020287`, Micheal Haley has 12 served
+  shifts totaling 1,373 seconds, versus 249 seconds in the REST time-on-ice
+  report. Derived interval union is 1,308 seconds. Therefore per-skater TOI must
+  come from Tier 1 REST reports; shift charts are suitable for composition only.
+- Twenty-two substantive HTML rows have internally consistent shift intervals
+  totaling twice the REST TOI within one second of whole-second boundary
+  rounding. Example: `2007020938` Dan Boyle has 2,223 HTML seconds versus 1,112
+  REST seconds. The REST total is the suspect value; HTML intervals remain
+  unmodified.
