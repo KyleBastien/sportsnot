@@ -1,0 +1,7 @@
+{
+  "cache_path": "raw-html/errors/raw-html__2023-24__2__skaters-all.attempt-1.status-403.html.gz",
+  "reason": "HTTP 403",
+  "status": 403,
+  "timestamp": "2026-09-06T01:34:51Z",
+  "url": "https://www.naturalstattrick.com/playerteams.php?fromseason=20232024&thruseason=20232024&stype=2&sit=all&stdoi=std&score=all&rate=n&team=ALL&pos=S&loc=B&toi=0&gpfilt=none&fd=&td=&tgp=410&lines=single"
+}
